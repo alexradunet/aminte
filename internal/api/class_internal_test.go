@@ -117,7 +117,7 @@ func TestAnAppActionKeepsAKnownClassAndLosesAnUnknownOne(t *testing.T) {
 	}
 }
 
-// TestAnAppIsRefusedAnActionWithTwoClasses: API.md says an action has at most one class, so Set refuses an app that
+// TestAnAppIsRefusedAnActionWithTwoClasses: API.md says an action has at most one class, so set refuses an app that
 // sends two, and it names the action. One known class is accepted.
 func TestAnAppIsRefusedAnActionWithTwoClasses(t *testing.T) {
 	act := func(class ...string) []siren.Action {

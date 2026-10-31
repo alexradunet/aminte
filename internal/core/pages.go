@@ -595,3 +595,32 @@ func (s *Store) AppendParagraph(ctx context.Context, source, title, day, categor
 	})
 	return m.id, m.sync, err
 }
+
+// EditBody replaces the body of the live plain page titled title by what edit makes of the body it has now, in one
+// write: the body is read and set under the write lock, so no other write comes between and no version token is
+// needed. edit runs inside the transaction: it must be quick and do no I/O. Its error ends the write, and the caller
+// gets it as it is. A missing page is a 404, and a page of another type or a deleted one a 409 (a write to a deleted
+// page does not revive it, as a save of a body does not). It returns the page's id and what the save did to the
+// wikilinks of the body.
+func (s *Store) EditBody(ctx context.Context, source, title string, edit func(body string) (string, error)) (int64, Sync, error) {
+	m, err := alone(s, ctx, source, func(t *Tx) (made, error) {
+		p, err := t.lookupWithBody(title)
+		switch {
+		case err != nil:
+			return made{}, err
+		case p == nil:
+			return made{}, NotFound("no page %q", title)
+		case p.Type != "page":
+			return made{}, Conflict("%q is a %s, not a plain page", title, p.Type)
+		case p.Deleted:
+			return made{}, Conflict("page %d %q is deleted: restore it first (Restore, revive)", p.ID, p.Title)
+		}
+		body, err := edit(p.Body)
+		if err != nil {
+			return made{}, err
+		}
+		r, err := t.SetBody(p.ID, body)
+		return made{p.ID, r}, err
+	})
+	return m.id, m.sync, err
+}

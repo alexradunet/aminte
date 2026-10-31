@@ -18,6 +18,10 @@ func TestReadsAJPEG(t *testing.T) {
 		if got := photo.Read(phototest.WithExif(phototest.JPEG(8, 8), south, little)); got.Taken != south.Taken {
 			t.Errorf("south and east (little-endian %v): %+v", little, got)
 		}
+		// A date alone: the picture has no orientation tag, so its orientation is 1 (upright), not 0 and not a guess.
+		if got := photo.Read(phototest.WithExif(phototest.JPEG(8, 8), photo.Meta{Taken: want.Taken}, little)); got.Taken != want.Taken || got.Orientation != 1 {
+			t.Errorf("a date alone (little-endian %v): %+v, want the date and orientation 1", little, got)
+		}
 	}
 }
 

@@ -212,8 +212,9 @@ extension, by the owner's word (2026-10-31, [plan 161](docs/plans/161-the-browse
   column is a defect ([plan 133](docs/plans/133-what-the-code-holds-twice.md)). One home per concept holds in the
   code as in the docs: a value computed and not read, a helper with one caller that only passes through, and an
   exported name used only inside its package are deleted or folded in the change that finds them.
-- **The catalog is the one list of an action's fields.** A handler reads its input through the action's row
-  (`fieldsOf(r, act)`) and reads no field the row does not list; `Required` of the row is the handler's rule. A field
+- **The catalog is the one list of an action's fields.** A handler gets the fields of its row from `admit` (`mount`
+  calls `admit`, and `admit` calls `fieldsOf`) and reads no field the row does not list; `Required` of the row is the
+  handler's rule. A field
   read outside the catalog is unreachable from the CLI and the MCP tools, which refuse what the catalog does not
   name, so it is a parity defect, not a convenience.
 - **Refused, never ignored.** What a surface does not take is refused with its reason: a flag or an argument a command does not

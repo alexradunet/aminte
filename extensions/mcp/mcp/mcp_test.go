@@ -238,7 +238,7 @@ func TestADateFieldTakesADayOrTheWordToday(t *testing.T) {
 	}
 	for tool, want := range map[string]string{ // the titles with brackets of their own
 		"open_day": "Day (default today; YYYY-MM-DD or today)",
-		"add_file": "Its day (default: a photo's EXIF date, else none; any other file: today; YYYY-MM-DD or today)",
+		"add_file": "Its day (default: a JPEG's EXIF date, else none; any other file: today; YYYY-MM-DD or today)",
 	} {
 		if got := props[tool]["day"]["description"]; got != want {
 			t.Errorf("%s's day: the description %q, want %q", tool, got, want)

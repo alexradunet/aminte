@@ -27,9 +27,9 @@ type server struct {
 	with *Apps // the connected apps (with.go); shared with the other handler of the same serve
 }
 
-// NewWith returns the whole API as one handler: lifelog serve mounts it on a socket, the CLI and the MCP server
-// call it in-process. It trusts no browser origin other than its own. A test gives a store with a fixed clock, so
-// today is a fixed day and a time is written in fixed words.
+// NewWith returns the whole API as one handler: lifelog serve mounts it on a socket; the CLI and the temporary server
+// of lifelog NAME call it in-process. It trusts no browser origin other than its own. A test gives a store with a
+// fixed clock, so today is a fixed day and a time is written in fixed words.
 //
 // apps is the registry of the connected apps: their actions are in the catalog, and /with/NAME leads to them. serve
 // and the handler share one registry, so both see the same apps. A nil apps is a server with no connected app: the CLI
@@ -116,7 +116,7 @@ func newServer(s *core.Store, apps *Apps) *server {
 		"retract": h.retract, "rename": h.rename, "register-metric": h.registerMetric, "integrity-check": h.integrity,
 		"search": h.search, "browse": h.browse, "find": h.find, "open-day": h.openDay,
 		"random-page": h.randomPage, "snapshot": h.snapshot,
-		"rebuild-search": h.rebuildSearch, "resync-links": h.resyncLinks, "say": h.say, "settings": h.saveSettings,
+		"rebuild-search": h.rebuildSearch, "resync-links": h.resyncLinks, "say": h.say, "reply": h.reply, "settings": h.saveSettings,
 	})
 	// The routes that are not actions: the resources and the files (a picture, a snapshot).
 	m.HandleFunc("GET /{$}", h.serve(h.root))
@@ -451,10 +451,22 @@ func requireOwner(source string) error {
 	if !writerRE.MatchString(source) {
 		return core.Invalid("source %q: 1-64 characters of a-z 0-9 _ : . -", source)
 	}
-	if strings.HasPrefix(source, siren.AgentPrefix) || strings.HasPrefix(source, siren.ImportPrefix) {
+	if agentWriter(source) {
 		return &core.Error{Status: http.StatusForbidden, Msg: "this action is the owner's: an agent or an import may not run it"}
 	}
 	return nil
+}
+
+// agentWriter says that a writer is an agent (agent:*) or an import (import:*): the writers that the owner's rules bind.
+func agentWriter(source string) bool {
+	return strings.HasPrefix(source, siren.AgentPrefix) || strings.HasPrefix(source, siren.ImportPrefix)
+}
+
+// ownerWriter says that a writer may speak as the owner: its name is a writer name, and it is not an agent or an
+// import. A name that is no writer name ("Agent:x") is not the owner's: the prefix tests of agentWriter would pass it,
+// and a write that only changes a body meets no CHECK of the name.
+func ownerWriter(source string) bool {
+	return writerRE.MatchString(source) && !agentWriter(source)
 }
 
 // actions is the catalog: every action with its templated href. The action that new names is filled in instead,

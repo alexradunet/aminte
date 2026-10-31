@@ -289,6 +289,7 @@ func parityRows() []parityRow {
 		parityRow{"register-metric", rowRegisterMetric},
 		parityRow{"settings", rowSettings},
 		parityRow{"say", rowSay},
+		parityRow{"reply", rowReply},
 		parityRow{"rebuild-search", rowRebuildSearch},
 		parityRow{"resync-links", rowResyncLinks},
 		parityRow{"promote", rowPromote},
@@ -1220,6 +1221,60 @@ func rowSay(x *parityRun) {
 	if turns, _ := props(x.t, got)["turns"].([]any); len(turns) != 2 {
 		x.t.Errorf("GET /days/today/conversation: %v, want two turns", turns)
 	}
+}
+
+// reply is no owner action: an agent runs it as the owner does. The owner's turn is set up with the store (an agent
+// cannot say). A day with no page is 404; the turn counts from 1 and a turn the page does not have is 404; a turn that
+// has a reply is 409 and the page stays as it was; the tool lines come in one field, one for each line. The one
+// difference between the writers is the save of the page: the owner edits it, an agent or an import is refused (403).
+func rowReply(x *parityRun) {
+	title := "Conversation " + parityToday
+	args := map[string]string{"day": "today", "turn": "1", "text": "Hi.", "tools": "- `search`: no hits\n- `get` → [/days/2031-05-20](/days/2031-05-20)"}
+	x.refused("reply", args, http.StatusNotFound, "not_found")
+	x.absent(title)
+	if _, _, err := x.store.AppendParagraph(x.t.Context(), "api", title, parityToday, "Conversations", "[["+parityToday+"]]", "**Owner** (09:00): Hello."); err != nil {
+		x.t.Fatal(err)
+	}
+	x.refused("reply", map[string]string{"day": "today", "turn": "0", "text": "Hi."}, http.StatusUnprocessableEntity, "invalid")
+	x.refused("reply", map[string]string{"day": "today", "turn": "1", "text": " \n "}, http.StatusUnprocessableEntity, "invalid")
+	x.refused("reply", map[string]string{"day": "today", "turn": "1", "text": "Hi.", "tools": "not a tool line"}, http.StatusUnprocessableEntity, "invalid")
+	x.refused("reply", map[string]string{"day": "today", "turn": "2", "text": "Hi."}, http.StatusNotFound, "not_found")
+	e := x.ok("reply", args)
+	p := props(x.t, e)
+	turns, _ := p["turns"].([]any)
+	if len(turns) != 2 {
+		x.t.Fatalf("reply: %v, want the owner's turn and the reply", turns)
+	}
+	reply, _ := turns[1].(map[string]any)
+	if reply["who"] != "lifelog" || reply["text"] != "Hi." || fmt.Sprint(reply["tools"]) != "[- `search`: no hits - `get` → [/days/2031-05-20](/days/2031-05-20)]" ||
+		fmt.Sprint(reply["refs"]) != "[/days/2031-05-20]" {
+		x.t.Errorf("the reply: %v, want the words, two tool lines and the ref of the second", reply)
+	}
+	before, _ := p["body"].(string)
+	x.refused("reply", args, http.StatusConflict, "conflict")
+	if got := x.pageByID(mustInt(x.t, p["id"]))["body"]; got != before {
+		x.t.Errorf("the page after the refused second reply: %q, want %q", got, before)
+	}
+	save := map[string]string{"id": fmt.Sprint(p["id"]), "body": before + "\n\nA note.", "version": fmt.Sprint(p["version"])}
+	if x.owner {
+		x.ok("save-body", save)
+		return
+	}
+	x.refused("save-body", save, http.StatusForbidden, "forbidden")
+}
+
+// mustInt reads the id of an entity that the client decoded with exact numbers.
+func mustInt(t *testing.T, v any) int64 {
+	t.Helper()
+	n, ok := v.(json.Number)
+	if !ok {
+		t.Fatalf("%v is not a number", v)
+	}
+	i, err := n.Int64()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return i
 }
 
 // create-page makes a page with a body and files it in a category in one write, and makes the category when it is new.

@@ -239,9 +239,9 @@ type FileRow struct {
 	MIME  string
 	// Picture says the file keeps a preview: a photo's own, or the frame a video was sent with.
 	Picture bool
-	// Day is the file's day (entities.day: the day given, a photo's EXIF day, else the day it was kept), else the day of
-	// the newest live day page that links to it (a photo kept with its capture day unknown, then shown in a day page);
-	// "" when it has neither.
+	// Day is the file's day (entities.day: the day given, else a JPEG's EXIF day; a photo with neither has none; any
+	// other file has the day it was kept), else the day of the newest live day page that links to it (a photo kept with
+	// its capture day unknown, then shown in a day page); "" when it has neither.
 	Day string
 	// Mentions is the number of live pages that link to this one, of any kind. A page counts once.
 	Mentions int

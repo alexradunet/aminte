@@ -119,6 +119,12 @@ func TestEveryDayFieldReadsTheWordToday(t *testing.T) {
 		"say day": {func(w string) (*siren.Entity, error) {
 			return do("say", map[string]string{"day": w, "text": "Good morning."})
 		}, "is not a local day"},
+		"reply day": {func(w string) (*siren.Entity, error) {
+			if _, err := do("say", map[string]string{"day": "today", "text": "Anything new?"}); err != nil {
+				return nil, err
+			}
+			return do("reply", map[string]string{"day": w, "turn": "1", "text": "Nothing."})
+		}, "is not a local day"},
 		"create-person birth_day": {func(w string) (*siren.Entity, error) {
 			return do("create-person", map[string]string{"title": title("Born"), "birth_day": w})
 		}, "CHECK constraint failed: people_birth_day"},

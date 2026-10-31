@@ -63,8 +63,8 @@ func (a *Apps) Expect(name string) {
 }
 
 // registerTimeout is the longest wait for one answer of a child in the handshake. A child that holds the connection
-// open must not stop the server.
-const registerTimeout = 5 * time.Second
+// open must not stop the server. It is a variable so that a test can shorten it.
+var registerTimeout = 5 * time.Second
 
 // Register is the one handshake of a child of `serve --with`, and of the child of a test (lifelogtest): it makes the
 // child at base (http://127.0.0.1:PORT) known as what its catalog says (extensions/README.md, "A catalog of its own"

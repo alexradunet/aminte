@@ -236,7 +236,10 @@ These are this application's own engineering decisions ([D14](docs/decisions/D14
   owner's turn and makes the page on the first turn of the day, in one write; it is for today only (another day is
   422, and that day's conversation offers no `say`); it is the owner's alone: an
   `agent:*` or `import:*` writer is refused (403), and it is never an MCP tool, so no agent speaks as the owner. The
-  WhatsApp extension relays the owner's words as the owner, with `via=whatsapp`; the paragraph then reads `**Owner** (HH:MM, via whatsapp): `. `GET /days/{day}/conversation` gives the turns, parsed from
+  agent's turn is written by `reply` (`POST /days/{day}/reply`), which is no owner action: the core puts the reply right
+  after the owner's turn that it answers, in one write, and an agent or an import cannot save the body of a conversation
+  page (403), so only `say` writes a turn of the owner. The core escapes a line of a `say` or a `reply` that reads as a
+  marker and closes a code fence that the text leaves open, so the page stays readable as turns. The WhatsApp extension relays the owner's words as the owner, with `via=whatsapp`; the paragraph then reads `**Owner** (HH:MM, via whatsapp): `. `GET /days/{day}/conversation` gives the turns, parsed from
   the body, with the page's properties, links and actions when the page exists (as a series carries a metric's page,
   [plan 144](docs/plans/144-one-view-for-a-metric.md)), and `say`. The page of a live conversation links to it (rel
   `conversation`). A live conversation page keeps its title: it offers no
@@ -335,6 +338,7 @@ not empty. `extensions/web/web/parity_test.go` holds that `lifelog-web` has a fo
 |---|---|---|---|---|
 | `capture` | `POST /days/{day}/capture` | `do capture`, `capture` | `capture` | a day: Add to the day |
 | `say` | `POST /days/{day}/say` | `do say` | none, the owner's | every page: the chat column; the rail: Chat |
+| `reply` | `POST /days/{day}/reply` | `do reply` | `reply` | the form of `/actions` alone: no page draws it, because the agent writes it |
 | `create-page` | `POST /pages` | `do create-page` | `create_page` | Browse, Pages: New page, a button in the head of the list (a category page: New page here) |
 | `save-body` | `POST /pages/{id}/body` | `do save-body` | `save_body` | a day or a page: Edit |
 | `create-person` | `POST /people` | `do create-person` | `create_person` | Browse, People: New person, a button in the head of the list |
@@ -394,7 +398,7 @@ which the CLI's `get` and the MCP tool `get` read.
 | `internal/core` | the cookbook's writes and reads; the save contract; metrics; renames; files | `core.Store` on `dbtest.New`, with a fixed `Clock` for a test of today |
 | `internal/preview` | the picture a file page keeps: decode, scale to 1280 px (the contract allows 1600), EXIF orientation, a JPEG at quality 80 of at most 1 MB with no metadata | `preview.Make` and `preview.Check` on pictures that the test makes |
 | `internal/photo` | what a photo's metadata says: the day and time taken and the orientation (a JPEG); `phototest` builds synthetic ones | `photo.Read` on the photos of `phototest`; `FuzzRead` |
-| `internal/api` | the action catalog, the routes, Siren JSON and the bytes of a picture, a file or a snapshot; the guard of the loopback authority and the bearer check; `apitest` makes a fresh handler and its clients for a test | `api.New` on a store, through `apitest.Fresh`, or `apitest.FreshOn` for a store with a fixed clock; a test inside package `api` cannot import `apitest` (an import cycle), so it makes its store with `dbtest.New`; the pure functions of the handler (`errorEntity`, `browseQueryOf`) with table tests |
+| `internal/api` | the action catalog, the routes, Siren JSON and the bytes of a picture, a file or a snapshot; the guard of the loopback authority and the bearer check; `apitest` makes a fresh handler and its clients for a test | `api.NewWith(store, nil)`, through `apitest.Fresh`, or `apitest.FreshOn` for a store with a fixed clock; a test inside package `api` cannot import `apitest` (an import cycle), so it makes its store with `dbtest.New`; the pure functions of the handler (`errorEntity`, `browseQueryOf`) with table tests |
 | `siren` | the Siren types, the `Lifelog-Source` header, the error codes, the JSON writer and the addresses of the resources; standard library only; public: the Go extensions import it | the tests of the package and of `internal/api`, which both use it |
 | `client` | the hypermedia client, transport only; public: the Go extensions import it; in-process or remote; `DoFiles` sends file parts from readers, and `Do` sends paths through it; of this module it imports only `siren`, so it builds no `core`, no `db` and no SQLite | `client.InProcess` and `client.Remote` on one handler: `TestTheTwoTransportsGiveEqualAnswers` |
 | `app` | the package a connected app serves its catalog with: `Catalog`, `Listen`, `Fail`, `StateDir`; public; standard library and `siren`; it serves and never dials | its tests |

@@ -87,7 +87,7 @@ func fakeCatalog() []siren.Action {
 		{Name: "revive", Method: "POST", Href: "/fake/pages/{id}/revive", Fields: []siren.Field{{Name: "id", Type: "number", In: "path", Required: true}}},
 		{Name: "add-file", Method: "POST", Href: "/fake/files", Fields: []siren.Field{
 			{Name: "original", Type: "file", Title: "The file", Required: true},
-			day("Its day (default: a photo's EXIF date, else none; any other file: today)", "")}},
+			day("Its day (default: a JPEG's EXIF date, else none; any other file: today)", "")}},
 		{Name: "create-person", Method: "POST", Href: "/fake/people", Fields: []siren.Field{
 			{Name: "title", Type: "text", Title: "Name", Required: true}, {Name: "birth_day", Type: "date", Title: "Born"}, {Name: "death_day", Type: "date", Title: "Died"}}},
 		{Name: "fake-forget", Danger: true, Method: "POST", Href: "/fake/pages/{id}/forget", Fields: []siren.Field{{Name: "id", Type: "number", In: "path", Required: true}}},

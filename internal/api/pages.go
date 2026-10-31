@@ -285,6 +285,9 @@ func (h *server) search(r *http.Request, a admitted) (*siren.Entity, error) {
 }
 
 func (h *server) createPage(r *http.Request, a admitted) (*siren.Entity, error) {
+	if err := refuseAgentWrite(a.src, a.v.Get("title")); err != nil {
+		return nil, err
+	}
 	id, sync, err := h.s.CreatePage(r.Context(), a.src, a.v.Get("title"), a.v.Get("body"), a.v.Get("category"))
 	if err != nil {
 		return nil, err
@@ -293,6 +296,15 @@ func (h *server) createPage(r *http.Request, a admitted) (*siren.Entity, error) 
 }
 
 func (h *server) saveBody(r *http.Request, a admitted) (*siren.Entity, error) {
+	if !ownerWriter(a.src) { // the owner edits a conversation page; an agent writes its turn with reply
+		p, err := h.s.PageByID(r.Context(), a.id)
+		if err != nil {
+			return nil, err
+		}
+		if err := refuseAgentWrite(a.src, p.Title); err != nil {
+			return nil, err
+		}
+	}
 	sync, err := h.s.SaveBody(r.Context(), a.src, a.id, a.v.Get("body"), a.v.Get("version"))
 	if err != nil {
 		return nil, err
@@ -387,7 +399,7 @@ func (h *server) rename(r *http.Request, a admitted) (*siren.Entity, error) {
 	if err != nil {
 		return nil, err
 	}
-	if conversationDay(p.Title) != "" || conversationDay(strings.TrimSpace(a.v.Get("title"))) != "" {
+	if isConversationTitle(p.Title) || isConversationTitle(strings.TrimSpace(a.v.Get("title"))) {
 		return nil, core.Conflict("a conversation page keeps its title: its day names it")
 	}
 	to, err := h.s.Rename(r.Context(), a.src, a.id, a.v.Get("title"))

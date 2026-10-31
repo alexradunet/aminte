@@ -86,14 +86,18 @@ func TestAnUnknownFieldIsRefused(t *testing.T) {
 			t.Errorf("HEAD %s: %d, want 422 as the GET", target, code)
 		}
 	}
-	// A multipart body to an action that takes no file is 415, also when the action lists no field at all.
-	for _, target := range []string{"/snapshots", "/search/rebuild", "/links/resync", "/pages/1/revive", "/measurements/1/retract"} {
+	// A multipart body to an action that takes no file is 415, also when the action lists no field at all, and also
+	// for a GET: it reads the query, so a body that it would drop is refused, as for a POST.
+	for _, tc := range []struct{ method, target string }{
+		{"POST", "/snapshots"}, {"POST", "/search/rebuild"}, {"POST", "/links/resync"}, {"POST", "/pages/1/revive"},
+		{"POST", "/measurements/1/retract"}, {"GET", "/integrity"}, {"GET", "/search?q=a"}, {"GET", "/browse"},
+	} {
 		var b bytes.Buffer
 		mw := multipart.NewWriter(&b)
 		mw.WriteField("nope", "1")
 		mw.Close()
-		if code, body := send(h, "POST", target, mw.FormDataContentType(), &b); code != 415 {
-			t.Errorf("a multipart body to %s: %d %s, want 415", target, code, body)
+		if code, body := send(h, tc.method, tc.target, mw.FormDataContentType(), &b); code != 415 {
+			t.Errorf("a multipart body to %s %s: %d %s, want 415", tc.method, tc.target, code, body)
 		}
 	}
 	// A multipart part named back, feedback or new is an unknown name too.

@@ -246,8 +246,8 @@ else its name) and `tasks` (`/tasks`) while a task service runs. Embedded: `toda
 for each path field of that action (`/actions?new=rename&id=12`), that one action has its `href` filled in, as a
 resource offers it; a client that cannot fill a path (a form of a browser) opens an action so.
 
-Two actions have a section of their own, as the resource where they are drawn: `say` ([conversation](#conversation))
-and the owner's `settings` ([settings](#settings)).
+Three actions have a section of their own, as the resource where they are drawn: `say` and `reply`
+([conversation](#conversation)) and the owner's `settings` ([settings](#settings)).
 
 ### days
 
@@ -362,7 +362,7 @@ offer no action.
 | `rows[].picture` | string | the address of its cover's picture, or of a file's own; absent when none |
 | `rows[].mime` | string | a file (not in `all`): the type of the original |
 | `rows[].file_kind` | string | a file: the first part of its type, `image`, `video`, `audio`, `application`, `text`, … |
-| `rows[].day` | string | a file (not in `all`): its day (the day given, a JPEG's EXIF day, else the day it was kept), else the day of the newest live day page that shows it; absent when it has neither |
+| `rows[].day` | string | a file (not in `all`): its day (the day given, else a JPEG's EXIF day; a photo with neither has none; any other file has the day it was kept), else the day of the newest live day page that shows it; absent when it has neither |
 | `rows[].unit` | string | a metric: its unit; absent for a count or a habit |
 | `rows[].deleted_at` | instant | the list of the deleted only: when it was deleted |
 | `limit` | integer | the page size used |
@@ -918,7 +918,8 @@ its `title` and the conversation of that day as its `href`. The answer of every 
 own day: they are the day bar of a chat client. Embedded: one `ref` for each address that the tool lines name (the
 `refs` of the turns), the newest turn first, each address once, at most 6 of one turn. Each is a reference, so
 `?embed=ref` [replaces](#embedding) it by the thing that the agent touched, in the 36 newest. Actions: `say` first, with `day` filled in,
-only when `day` is the server's local today (the conversation of another day offers none);
+only when `day` is the server's local today (the conversation of another day offers none; `reply` is in `GET /actions`
+alone, as the agent's action);
 when the page exists, the actions of [the page](#page-person-file) after it (`save-body` with the `version`, and
 the others). When the page exists, the answer carries the page as a series carries a metric's page: its properties
 (the rows below that follow `turns`), its links but `self`, `conversation` and `index`, and its embedded links. A page that is
@@ -928,23 +929,51 @@ deleted is no conversation: the answer has no turns, and `say` makes it live aga
 owner's turn, with the time of the server's clock in its zone. The page is made on the first turn of the day, in
 the same write; a deleted page of the conversation, or a deleted category `Conversations`, is revived by it. The
 answer is this entity, and `result` is the [save result](#result-of-capture-create-page-save-body).
+A line of the `text` outside a fenced code block that reads as a marker of a turn is written with its asterisks escaped
+(`\*\*Owner\*\* (09:31): ...`), so it is text and not a turn. A code fence that the `text` opens and does not close is
+closed by a line of three backticks at the end of the turn. A balanced block stays as it is.
 `say` is for today: a `day` that is not the server's local today is 422 `say is for today: the agent answers today's
 conversation`, and writes nothing. A `text` that is empty or only blanks is 422 and writes nothing. The optional field
 `via` names the relay, the program that carries the owner's words (`[a-z0-9_:.-]{1,64}`); another value is 422.
 `say` answers at once and calls no model. When the agent runs (`lifelog-agent`, started by `serve --with agent`), it reads
 the page, finds the turn of the owner that nobody has answered (the last turn is the owner's), and writes its reply on the
-page as `agent:lifelog`. A client reads the page to see the reply. Only `say` starts a turn of the agent: text that
-`save-body` adds is an edit.
+page as `agent:lifelog`, with `reply`. A client reads the page to see the reply. Only `say` starts a turn of the agent:
+an `agent:*` or `import:*` writer is refused (403 `forbidden`: `an agent or an import may not write a conversation
+page: the agent writes its turn with reply`) when it runs `save-body` on a conversation page, and when it runs `create-page`
+with the title of one. The owner edits the page as before, and text that the owner adds with `save-body` is an edit.
 
-**The format of the page.** An agent in any language reads and writes the conversation with `save-body`, or with `say`
-for the owner's turn. The page:
+`POST /days/{day}/reply` (the action `reply`; no owner action: the agent's writer `agent:lifelog` runs it, and so may
+any writer): the agent's turn, written in one transaction on the conversation page of `day` (a local day or the word
+`today`, any day that has a page).
+
+- `turn` (number, required): the owner turn that the reply answers, counted from 1 over the owner's turns of the page. An
+  agent that read N owner turns answers `turn` N. It is 422 when it is not a whole number of 1 or more.
+- `text` (text, required): the words of the reply. Empty or only blanks is 422. It is made safe as the `text` of `say` is.
+- `tools` (text): the tool lines of the turn, one for each line (LF or CRLF between them). A blank line is dropped. Each
+  line starts with ``- ` `` (a dash, a space and a backtick), or the answer is 422. They are written right before the
+  paragraph of the reply.
+
+The reply is the paragraph `**lifelog** (HH:MM): text`, with the time of the server's clock in its zone, written right
+after the owner turn that it answers: before the marker line of the next turn, or at the end of the page. A turn that the
+owner said while the agent worked stays after the reply and waits for its own. The page keeps LF line ends. A code fence
+that an edit left open before the reply is closed by a line of three backticks, so the reply is a turn. The answer is
+the conversation of the day, and `result` is the [save result](#result-of-capture-create-page-save-body).
+
+| status | `code` | when |
+|---|---|---|
+| 404 | `not_found` | the day has no conversation page, or the page has fewer than `turn` owner turns |
+| 409 | `conflict` | the owner turn `turn` has a reply already (the turn after it is a turn of the agent): nothing is written, so a resent reply never answers twice. Or the page is deleted: `reply` does not revive it |
+| 422 | `invalid` | a missing or bad `turn` or `text`, a `tools` line that is not a tool line, a `day` that is not a day, a field the action does not list |
+
+**The format of the page.** An agent in any language reads the conversation, and writes its turn with `reply` and the
+turn of the owner with `say`. The page:
 
 - is titled `Conversation YYYY-MM-DD` (the day), is filed in the category `Conversations`, and starts with the line
   `[[YYYY-MM-DD]]`;
 - is read by lines. Line ends are LF; CRLF is read as LF;
 - has a turn from each marker line. A marker line starts with `**Owner** (HH:MM): ` or `**lifelog** (HH:MM): ` and is
   outside a fenced code block (a line that starts with three backticks opens or closes a fence). `HH:MM` is the
-  server's local time; a marker written with the earlier separator, `(HH.MM)`, is read the same. The agent writes `**lifelog**`, and `say` writes `**Owner**`. The brackets may also name the
+  server's local time; a marker written with the earlier separator, `(HH.MM)`, is read the same. `reply` writes `**lifelog**`, and `say` writes `**Owner**`. The brackets may also name the
   writer that relayed the turn: `**Owner** (HH:MM, via whatsapp): `, where the name is `[a-z0-9_:.-]+`. `say` writes
   it when the request names `via`, and writes no such part without it;
 - runs a turn from its marker line to the line before the next marker line, or to the end of the page. The words of

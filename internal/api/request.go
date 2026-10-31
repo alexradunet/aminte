@@ -88,8 +88,7 @@ func form(r *http.Request) (url.Values, error) {
 		return v, nil
 	}
 	if ct == "multipart/form-data" {
-		// ParseForm does not read this body, so every field would be empty. Only the file forms (parseFileForm) take it.
-		return nil, &core.Error{Status: http.StatusUnsupportedMediaType, Msg: "this action does not take multipart/form-data: send application/x-www-form-urlencoded or JSON"}
+		return nil, multipartRefusal()
 	}
 	if err := r.ParseForm(); err != nil {
 		return nil, requestBodyError(err)
@@ -97,10 +96,20 @@ func form(r *http.Request) (url.Values, error) {
 	return r.Form, nil
 }
 
+// multipartRefusal is the 415 for a multipart body sent to an action that has no file field. Nothing reads the parts, so
+// every field would be empty and the sender would not know. Only the file forms (parseFileForm) take such a body.
+func multipartRefusal() error {
+	return &core.Error{Status: http.StatusUnsupportedMediaType, Msg: "this action does not take multipart/form-data: send application/x-www-form-urlencoded or JSON"}
+}
+
 // fieldsOf reads the fields of the catalog action act: the query of a GET, the form of a POST. It refuses a request
-// that breaks the shape the catalog gives the action (checked).
+// that breaks the shape the catalog gives the action (checked), and a multipart body (415) whatever the method: a GET
+// reads its query alone, so a body that it would ignore is refused too.
 func fieldsOf(r *http.Request, act spec) (url.Values, error) {
 	if act.Method == "GET" {
+		if isMultipart(r) {
+			return nil, multipartRefusal()
+		}
 		v := r.URL.Query()
 		return v, checked(v, act, r)
 	}
