@@ -256,8 +256,6 @@ stateDiagram-v2
   form, and the log has one line and not the token.
 - The cookie is not `Secure`. This program serves plain HTTP on the loopback, and the proxy ends TLS. If the owner wants
   the mark, the proxy can set it.
-- The older cookie `lifelog_token` is not a credential. A browser that has only it logs in again, and any request that
-  carries it gets it cleared.
 - A browser with no valid cookie gets `/login` for an HTML `GET`, and 401 `token_required` for any other request. **Web takes
   no bearer header.** A program uses the API of the core, and a bearer header opens nothing here, so it is no way round the
   lock. There is no CORS answer either: another origin or a program uses the API of the core.

@@ -19,9 +19,6 @@ import (
 // cookie made earlier with the same token is still valid, and the owner logs in only once.
 const sessionCookie = "lifelog_session"
 
-// legacyCookie held the token itself in the oldest login. It is no credential: any request that carries it clears it.
-const legacyCookie = "lifelog_token"
-
 // loginMaxAge is one year: an installed app on a phone loses a session cookie when the system ends the app. The owner
 // ends the login by a new token.
 const loginMaxAge = 365 * 24 * 60 * 60
@@ -99,11 +96,6 @@ func (ss *sessions) idOf(r *http.Request) (string, bool) {
 // the owner ends TLS.
 func setCookie(w http.ResponseWriter, value string, maxAge int) {
 	http.SetCookie(w, &http.Cookie{Name: sessionCookie, Value: value, Path: "/", HttpOnly: true, SameSite: http.SameSiteStrictMode, MaxAge: maxAge})
-}
-
-// clearLegacy clears the cookie lifelog_token of an older login.
-func clearLegacy(w http.ResponseWriter) {
-	http.SetCookie(w, &http.Cookie{Name: legacyCookie, Value: "", Path: "/", HttpOnly: true, SameSite: http.SameSiteStrictMode, MaxAge: -1})
 }
 
 // prune drops what is old. The caller holds the mutex.

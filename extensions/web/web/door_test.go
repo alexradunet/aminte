@@ -172,7 +172,6 @@ func TestTheDoorRequiresASession(t *testing.T) {
 	}{
 		{"no credential", nil, 401},
 		{"the token as a bearer", map[string]string{"Authorization": "Bearer " + testToken}, 401},
-		{"the token as the old cookie", map[string]string{"Cookie": "lifelog_token=" + testToken}, 401},
 		{"the token as a session cookie", map[string]string{"Cookie": "lifelog_session=" + testToken}, 401},
 		{"a session", map[string]string{"Cookie": l.cookie}, 200},
 	} {
@@ -286,28 +285,6 @@ func TestTheLoginSetsASessionCookie(t *testing.T) {
 	}
 }
 
-// TestTheLoginClearsTheOldCookie: a login clears the cookie of an older login, which held the token itself.
-func TestTheLoginClearsTheOldCookie(t *testing.T) {
-	l := emptyLife(t)
-	// The browser still has the cookie of an older login, which held the token itself.
-	rec := request(l.browser, "POST", "/login", "token="+url.QueryEscape(testToken), map[string]string{"Sec-Fetch-Site": "same-origin", "Cookie": "lifelog_token=" + testToken})
-	var session, legacy *http.Cookie
-	for _, c := range rec.Result().Cookies() {
-		switch c.Name {
-		case "lifelog_session":
-			session = c
-		case "lifelog_token":
-			legacy = c
-		}
-	}
-	if session == nil || strings.Contains(session.Value, testToken) {
-		t.Errorf("session cookie %+v", session)
-	}
-	if legacy == nil || legacy.MaxAge >= 0 {
-		t.Errorf("the login does not clear the old cookie: %+v", legacy)
-	}
-}
-
 // TestSessionCookieChecks: a cookie that is changed, cut, empty, the token itself or made with another token opens nothing,
 // and the cookie of a session that logged out is dead although its HMAC is right.
 func TestSessionCookieChecks(t *testing.T) {
@@ -325,7 +302,6 @@ func TestSessionCookieChecks(t *testing.T) {
 		"changed id":      "lifelog_session=" + flip(id) + "." + mac,
 		"no mac":          "lifelog_session=" + id,
 		"the token":       "lifelog_session=" + testToken,
-		"the old cookie":  "lifelog_token=" + testToken,
 		"nothing at all":  "",
 		"an empty cookie": "lifelog_session=",
 	} {
@@ -390,20 +366,6 @@ func TestTheLockPageKeepsThePathOnly(t *testing.T) {
 	rec := f.browse("/search?q=PurpleOctopus", nil)
 	if rec.Code != 303 || rec.Header().Get("Location") != "/locked?next="+url.QueryEscape("/search") {
 		t.Errorf("a locked search: %d %q", rec.Code, rec.Header().Get("Location"))
-	}
-}
-
-// TestTheOldCookieIsClearedOnAnyRequest: the old cookie held the token in clear. Any request that still carries it gets it
-// cleared.
-func TestTheOldCookieIsClearedOnAnyRequest(t *testing.T) {
-	f := newLockFixture(t, "")
-	rec := request(f.h, "GET", "/", "", map[string]string{"Accept": "text/html", "Cookie": "lifelog_token=" + testToken + "; " + f.cookie})
-	cleared := false
-	for _, c := range rec.Result().Cookies() {
-		cleared = cleared || (c.Name == "lifelog_token" && c.MaxAge < 0)
-	}
-	if !cleared {
-		t.Errorf("the old cookie is not cleared: %d %v", rec.Code, rec.Header().Values("Set-Cookie"))
 	}
 }
 

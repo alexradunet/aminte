@@ -60,10 +60,9 @@ func absoluteForm(r *http.Request) bool {
 //     (recovered).
 //  1. An absolute-form target is refused.
 //  2. The guard refuses a write from an origin that it does not trust, before anything else is done for the request.
-//  3. The old cookie lifelog_token, which held the token in clear, is cleared.
-//  4. The login, the logout and the install files need no session.
-//  5. Any other request needs a valid session cookie: a browser gets /login, any other client gets 401.
-//  6. A session goes on to serveSession, which holds the lock.
+//  3. The login, the logout and the install files need no session.
+//  4. Any other request needs a valid session cookie: a browser gets /login, any other client gets 401.
+//  5. A session goes on to serveSession, which holds the lock.
 func (b *Browser) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	started := &startWriter{ResponseWriter: w}
 	w = started
@@ -75,9 +74,6 @@ func (b *Browser) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if err := b.guard.Check(r); err != nil {
 		b.fail(w, r, http.StatusForbidden, siren.CodeCrossOrigin, "cross-origin browser write refused")
 		return
-	}
-	if _, err := r.Cookie(legacyCookie); err == nil {
-		clearLegacy(w) // it holds the token in clear: no browser keeps it
 	}
 	switch {
 	case r.URL.Path == "/login" && (r.Method == http.MethodGet || r.Method == http.MethodPost):
