@@ -140,7 +140,7 @@ Done: `cd extensions/web && go test ./...` passes; a test counts the reads of th
    each kind of field. The rows that only send one more action through the generic `do` are deleted.
 5. The counts in `tests/README.md` (the mutants, the diagrams) and their two rules in AGENTS.md are deleted.
 
-Done: all 284 mutants are still killed; the baseline is faster, with the time before and after in the report.
+Done: every mutant is still killed; the baseline is faster, with the time before and after in the report.
 
 ## Part E — the docs: one home for each rule
 
@@ -176,8 +176,9 @@ Done: all 284 mutants are still killed; the baseline is faster, with the time be
 
 ## Part H — the HEIF reader
 
-The HEIF reader of `internal/photo`, its kit and its tests are deleted (about 470 lines). A HEIC upload takes the day of
-the request. Preview cannot draw a HEIC today.
+The HEIF reader of `internal/photo`, its kit and its tests are deleted (about 470 lines). A HEIC upload takes the day
+that the request names (the field `day`), or has no day, as a JPEG with no EXIF date has
+([keep a file](../cookbook/keep-a-file.md): never the day it was kept). Preview cannot draw a HEIC today.
 
 ## Part I — the records
 

@@ -10,8 +10,8 @@ Earlier closed plans live in git history (`git log -- docs/plans`). The next pla
 |------|-------|----------|--------|------------|--------|
 | [162](162-the-simple-architecture.md) | The simple architecture: one home for each thing, and the agent on its own | P2 | XL | owner word 2026-10-31; plan 161; `cf5d373` | PLANNED |
 | [161](161-the-browser-as-an-extension.md) | The browser as an extension: a core with no HTML | P2 | XL | owner word 2026-10-31; plan 135; `4899fbe` | DONE |
-| [160](160-the-lock.md) | The lock: a journal left open closes itself | P2 | M | owner word 2026-10-30; `ff0f1c7`; A `6d43b9e`, B `6f665f3`, review `c926d91` | LIVE 2026-10-30 |
-| [159](159-the-class-of-an-action.md) | The class of an action: the browser places an action by what it does, not by where Siren lists it | P2 | L | owner word 2026-10-30; plan 157; `5046b38`; A `016adb5`, C `57016f9`, B1 `8c865ad`, B2 `1124bdf` | LIVE 2026-10-30 (`9d0e15f`; not seen in a browser) |
+| [160](160-the-lock.md) | The lock: a journal left open closes itself | P2 | M | owner word 2026-10-30; `ff0f1c7`; A `6d43b9e`, B `6f665f3`, review `c926d91` | DONE |
+| [159](159-the-class-of-an-action.md) | The class of an action: the browser places an action by what it does, not by where Siren lists it | P2 | L | owner word 2026-10-30; plan 157; `5046b38`; A `016adb5`, C `57016f9`, B1 `8c865ad`, B2 `1124bdf` | DONE (live 2026-10-30 at `9d0e15f`; not seen in a browser) |
 | [155](155-ticktick-the-first-connected-app.md) | TickTick: the first connected app, in this repo | P1 | M | owner word 2026-10-29; plan 154; `054138b`; live 2026-10-29 | DONE |
 | [156](156-browse-the-tasks-through-the-catalog.md) | Browse the tasks of TickTick inside lifelog, through the catalog | P2 | S | owner word 2026-10-29; plan 155; `b3d0a89`; built `9f1c584`; live 2026-10-30 | DONE |
 | [157](157-a-task-manager-feel-through-the-catalog.md) | A task manager's feel, through the catalog | P2 | M | owner word 2026-10-30; plan 156; `875fc5d`; built 2026-10-30; live 2026-10-30 | DONE |
