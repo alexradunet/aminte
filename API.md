@@ -1,6 +1,6 @@
 # The lifelog API, for client authors
 
-This page is what a client (a phone app, a browser app, a script) needs to speak to `lifelog serve`: the entity every
+This page is what a client (a phone app, a browser, a script) needs to speak to `lifelog serve`: the entity every
 answer is, every class of entity and the properties it carries, the errors, the pages, and how to reach a server. The
 database behind it is specified on its own in [docs/](docs/README.md); this page is only the application's wire shape.
 The test `TestAPIReferenceMatchesTheCode` in `internal/api` reads the property tables below and fails when the code
@@ -9,23 +9,19 @@ and this page disagree, so a property here is a property on the wire.
 ## Reaching a server
 
 - **Local:** `lifelog serve` listens on `http://127.0.0.1:7777` for this machine only ([README](README.md#decisions)).
-- **Other devices:** `lifelog serve --public --token-file PATH` listens on every interface; every request carries
-  `Authorization: Bearer <token>`, or a browser logs in once at `/login`. `--allow-origin` names the browser origins
-  allowed to call it; `--tls-cert`/`--tls-key` serve HTTPS. Without one of them the answer is 401 `token_required`.
+- **A token:** `lifelog serve --token-file PATH` (or `$LIFELOG_TOKEN`) turns on the check. Every request then carries
+  `Authorization: Bearer <token>`, else the answer is 401 `token_required`. With no token there is no check.
+- **Other devices:** the server listens on the loopback only. It answers no CORS preflight, and it trusts no browser
+  origin: a write that a browser sends from another origin is 403 `cross_origin`. Another device, or a browser, reaches
+  the API through a program on this machine, such as `lifelog-web` ([extensions/web](extensions/web/README.md)).
 - **Provenance:** `Lifelog-Source: <name>` names the writer on every row the request writes (`[a-z0-9_:.-]{1,64}`,
-  e.g. `app:phone`). Without it a browser form writes as `ui` and anything else as `api`. A writer named `agent:…`
+  e.g. `app:phone`). Without it a request writes as `api`. A writer named `agent:…`
   or `import:…` is refused the owner-only actions (`owner: true` in the catalog)
   and the owner-only reads `GET /settings` and `GET /snapshots/{name}` (403 `forbidden`).
-- **Representation:** `Accept: application/vnd.siren+json` (or anything but `text/html`) gets the JSON below;
-  `Accept: text/html` gets the same entity drawn as a page. A JSON client sends an action as
-  `application/x-www-form-urlencoded`, `application/json` (one object; a non-string value is sent as its JSON text) or,
-  for `add-file` and `set-cover`, `multipart/form-data`.
-- **Writes answer with the resource they changed** (200, with `Location`), and `result` says what the write did. A
-  browser form is answered 303 to that resource instead, or to the page its field `back` names when that is a path
-  on this server. The path may end in an id (`#row-4-2`) that names where the page opens.
-- **Preview:** `POST /render` with the field `body` (or `text`) answers a page that shows the body as its page shows
-  it once saved; it writes nothing, answers `text/html` only and is not a catalog action: it is the browser's Preview,
-  a second button of a form that writes a body, which opens it in a new tab.
+- **Representation:** every answer is Siren JSON (the entity below), or the bytes of a picture, a file or a snapshot. A
+  client sends an action as `application/x-www-form-urlencoded`, `application/json` (one object; a non-string value is
+  sent as its JSON text) or, for `add-file` and `set-cover`, `multipart/form-data`.
+- **Writes answer with the resource they changed** (200, with `Location`), and `result` says what the write did.
 
 ## The entity
 
@@ -36,7 +32,7 @@ Every answer is one [Siren](https://github.com/kevinswiber/siren) entity:
 | `class` | the kind of resource: one of the classes below, sometimes with a second word (`day-page`, `deleted`, `dry-run`) |
 | `title` | a human title |
 | `properties` | the resource's own data, per class below |
-| `entities` | embedded links: `{rel, href, title, class}` each, the things this resource lists or links to. An embedded link of a connected app may also carry `properties` and `actions` (an extension of Siren): a short form of an embedded representation that keeps its `href`. The browser draws it as a [row](extensions/README.md#how-the-browser-draws-a-page-of-an-app). `?embed=` replaces an embedded link by the full entity that its `href` answers ([embedding](#embedding)): then the sub-entity also carries `entities` and `links`. |
+| `entities` | embedded links: `{rel, href, title, class}` each, the things this resource lists or links to. An embedded link of a connected app may also carry `properties` and `actions` (an extension of Siren): a short form of an embedded representation that keeps its `href`. `?embed=` replaces an embedded link by the full entity that its `href` answers ([embedding](#embedding)): then the sub-entity also carries `entities` and `links`. |
 | `links` | `{rel, href, title}`: `self`, `index` (home), `prev`/`next` (a neighbour or the next page), and the rels named per class |
 | `actions` | what may be done here: `{name, class, title, description, hint, method, href, type, fields, owner, danger}`, each field `{name, type, title, value, required, options, in, rows, pages, accept, placeholder}` with its current value filled in; `class` is at most one word that says what the action does ([action classes](#action-classes)); `hint` is the short text of the action's form, one or two sentences in plain words (no status code, no code style); a client that draws a form shows it in place of `description`, and `GET /actions` has none; `owner: true` marks the owner's alone and `danger: true` marks one that hides or retracts what is there, so a client can warn before it sends; `in: "path"` marks a field of a templated href (`GET /actions` only) and `rows` is how many lines a `textarea` is drawn; `pages: true` says the value is a page's title, so a client can offer the names of the pages; `accept` is what a `file` field takes (`audio/*`); `placeholder` is the words that a client may show in an empty field, an example of a value (`Weight, Mood, Walk`) or a short prompt (`What happened? Who was there?`), and a client may ignore it |
 | `result` | after a write: what it did (the result shapes below) |
@@ -48,7 +44,7 @@ that follows `actions` needs no rules of its own. A `required` field that is mis
 or a `q` of blanks only, it answers with no hits ([search](#search)). A field of the type `date` takes a local day,
 `YYYY-MM-DD`, or the word `today`: the server's local day, the day that `GET /days/today` redirects to. Any other
 value that is not empty is refused (422 `invalid`). A field of the type `password` is a text that the catalog never
-fills in: `GET /actions` leaves its value empty, and only the owner's own resource (`GET /settings`) fills it. A browser
+fills in: `GET /actions` leaves its value empty, and only the owner's own resource (`GET /settings`) fills it. A client
 draws it as a password input.
 
 One read answers `303` to a thing picked at random ([plan 130](docs/plans/130-the-explore-pass.md)): `random-page`
@@ -59,7 +55,7 @@ another kind is 422.
 **Types** in the tables: `string`, `integer`, `number`, `boolean`, `day` (a local day, `YYYY-MM-DD`), `instant`
 (UTC, `2026-06-09T21:14:03.482Z`), `list`, `object`. A property marked *absent when empty* is left out of the JSON
 when it has no value. A `number` field is written in decimal digits; `mood`, `value` and `line` also take a sign, a point and an exponent (`-0.5`, `1e3`). `NaN`, `Inf`, a hexadecimal number and an underscore are refused.
-A request names only the fields of the action, and a browser's own `back`, `feedback` and `new`; any other name is 422 `invalid`. A read also takes `embed` ([embedding](#embedding)). A browser form may also carry the fields of a form it shares with another action (the pick bar of a list sends the form of `file-pages` to `tombstone-pages` too); another client is refused them. A value outside a field's `options`, as `GET /actions` lists them, is 422 `invalid`. A multipart part with an unknown name is refused before its bytes are read.
+A request names only the fields of the action; any other name is 422 `invalid`. A read also takes `embed` ([embedding](#embedding)) and `new`. `new=NAME` asks for the action NAME with its `href` filled in, and it allows the fields of that action as query values ([the actions](#actions)); a `POST` that names `new` is 422 `invalid`. A value outside a field's `options`, as `GET /actions` lists them, is 422 `invalid`. A multipart part with an unknown name is refused before its bytes are read.
 
 ## Embedding
 
@@ -81,9 +77,8 @@ flowchart TD
   G -->|"any other answer"| K["the sub-entity stays a reference"]
 ```
 
-- **Which reads.** Every `GET` that answers a Siren entity takes `embed`. An error answer does not embed. A request
-  for HTML with `embed` is 422 `invalid`, because a page reads its sub-entities itself. A `POST` that names `embed` is
-  422 `invalid` as for any name that the action does not list.
+- **Which reads.** Every `GET` that answers a Siren entity takes `embed`. An error answer does not embed. A `POST` that
+  names `embed` is 422 `invalid` as for any name that the action does not list.
 - **The depth is 1.** An embedded read does not embed. An `href` that has an `embed` parameter of its own stays a
   reference.
 - **The bound.** One answer makes 36 reads at most. The sub-entities are taken in order, and the ones after the 36th
@@ -111,7 +106,7 @@ class is any other action.
 | `toggle` | It flips one state of the resource it is on. It has no field, or one field with two options. |
 
 A client may ignore a class: an action with a class works as an action with none. The placement of an action is the
-choice of each client. The browser draws it by its class ([the browser and a page of an app](extensions/README.md#how-the-browser-draws-a-page-of-an-app)).
+choice of each client. `lifelog-web` draws it by its class ([the browser and a page of an app](extensions/web/README.md#how-the-browser-draws-a-page-of-an-app)).
 A class that is not in the list is dropped from the action of a connected app. The task service sends no class: the server holds the class of the [task](#tasks) actions.
 
 ## Errors
@@ -121,7 +116,7 @@ An error is an entity of class `error` with `properties`:
 | property | type | meaning |
 |---|---|---|
 | `status` | integer | the HTTP status |
-| `code` | string | what went wrong, to branch on: `stale_version` (a save with an old `version`), `exists` (a title in use; the link `existing` names the page. When `create-person` meets a live plain page, the link `promote` is the address of that page with the promote form open and the fields filled), `cross_origin` (a browser write from another origin), `token_required` (a public listener without a credential), `snapshot_refused` (the snapshot folder refused it), `restore_check_failed` (the snapshot is written but fails its restore check), `busy` (503 with `Retry-After`: another writer holds the file; nothing was written, so a retry is safe), `unavailable` (503 with `Retry-After`: an app connected by `serve --with` is not running), `upstream` (502: the app answered something that is not an entity), `locked` (401: a public listener holds that browser session shut by its lock; the PIN opens it at `/locked`; a request with the bearer token is never locked), or the status's general name: `bad_request`, `unauthorized`, `forbidden`, `not_found` (for a metric that does not exist, the link `register` is the address of the Metrics board with the form of `register-metric` open and the name filled), `conflict`, `too_large`, `unsupported_media` (415: a multipart body to an action that takes no file), `invalid` (422), `timeout`, `internal` |
+| `code` | string | what went wrong, to branch on: `stale_version` (a save with an old `version`), `exists` (a title in use; the link `existing` names the page. When `create-person` meets a live plain page, the link `promote` is the address of that page with the promote form open and the fields filled), `cross_origin` (a write that a browser sends from another origin; the server trusts no origin), `token_required` (a server with a token, and a request without the right one), `snapshot_refused` (the snapshot folder refused it), `restore_check_failed` (the snapshot is written but fails its restore check), `busy` (503 with `Retry-After`: another writer holds the file; nothing was written, so a retry is safe), `unavailable` (503 with `Retry-After`: an app connected by `serve --with` is not running), `upstream` (502: the app answered something that is not an entity), `locked` (401: `lifelog-web`, the door of a browser, sends it when its lock holds that session shut; the core never sends it), or the status's general name: `bad_request`, `unauthorized`, `forbidden`, `not_found` (for a metric that does not exist, the link `register` is the address of the Metrics board with the form of `register-metric` open and the name filled), `conflict`, `too_large`, `unsupported_media` (415: a multipart body to an action that takes no file), `invalid` (422), `timeout`, `internal` |
 | `message` | string | the text, for a person; a fault of the server (500 `internal`) says only `internal error`, and the server's log has the cause |
 
 ## Connected apps
@@ -147,13 +142,11 @@ flowchart LR
 - **The routes** are `/with/NAME` and `/with/NAME/...`, for every method. A request that matches an action of the app
   is checked as every action is: a field that the action does not name, a missing required field or a value outside
   `options` is 422 `invalid`, and an `owner` action is 403 `forbidden` for an `agent:*` or `import:*` writer. In both
-  cases the app is not called. A `GET` that matches no action goes to the app as it is, without `back`, `feedback` and
-  `new`. Any other method that matches no action is 404.
+  cases the app is not called. A `GET` that matches no action goes to the app as it is, without `new`. Any other method that matches no action is 404.
 - **The writer** of the app's request is the writer of yours (`Lifelog-Source`). The app gets no cookie and no token.
 - **The answer** is the entity of the app, with `/with/NAME` before each `href` and `NAME-` before each action name.
   The actions of an embedded link get the same prefixes.
-  A link or an action whose `href` has a scheme or a host is dropped. A `POST` from a browser is answered 303 to the
-  `self` link of the answer.
+  A link or an action whose `href` has a scheme or a host is dropped. A `POST` is answered 200 with the entity of the app, as for every write.
 
 | status | `code` | when |
 |---|---|---|
@@ -186,7 +179,7 @@ prefix. The file keeps no task ([D23](docs/decisions/D23-no-tasks.md)); the page
 
 A task with no due day is last, and tasks with the same day keep the order of the service. A row is an embedded link
 with the chips `due`, `list` (on a page that mixes lists) and `done`, and the round button `complete-task` (`reopen-task`
-on a done row). The pages follow the [rules of the generic view](extensions/README.md#how-the-browser-draws-a-page-of-an-app).
+on a done row). `lifelog-web` draws the pages by the [rules of the generic view](extensions/web/README.md#how-the-browser-draws-a-page-of-an-app).
 
 | action | route | fields | |
 |---|---|---|---|
@@ -221,8 +214,7 @@ first page. Orders: days newest first; search by rank, or newest first with `ord
 
 ### root
 
-`GET /`: the entry point of the API. A browser's `GET /` (it asks for HTML, and not Siren) is answered with the
-[day](#day) of today instead, the page of today. Links: `today`, `days`, `browse` (`/browse`), `people`
+`GET /`: the entry point of the API. Links: `today`, `days`, `browse` (`/browse`), `people`
 (`/browse?kind=person`), `media` (`/browse?kind=media`), `files`
 (`/browse?kind=document`), `metrics`, `ghosts` (`/browse?ghosts=1&kind=page`), `actions`, `calendar` (this month),
 `year` (this year), one `app` for each connected app that runs (`/with/NAME`; the title is the home title of the app,
@@ -249,7 +241,7 @@ else its name) and `tasks` (`/tasks`) while a task service runs. Embedded: `toda
 
 `GET /actions`: no properties; `actions` is the whole catalog with templated hrefs. With `new=<action>` and a value
 for each path field of that action (`/actions?new=rename&id=12`), that one action has its `href` filled in, as a
-resource offers it; a browser, which cannot fill a path from a form, opens an action so.
+resource offers it; a client that cannot fill a path (a form of a browser) opens an action so.
 
 Two actions have a section of their own, as the resource where they are drawn: `say` ([conversation](#conversation))
 and the owner's `settings` ([settings](#settings)).
@@ -386,7 +378,7 @@ and `Files`, each with `class` its kind (`all` for All) and the same words and o
 none, every kind. Any other `kind` is a 422 (`invalid`).
 A page is in one list only: the `hits` leave out the pages that `titles` lists, and the paging counts the pages that are left.
 With no `q`, or a `q` of blanks only (spaces, tabs, a no-break space or another Unicode space), the answer has the
-action `search` and no properties: a browser draws it as the page to search from.
+action `search` and no properties: a client draws it as the page to search from.
 
 | property | type | meaning |
 |---|---|---|
@@ -556,8 +548,8 @@ link to each month. Actions: `save-body` once the page of the year exists, else 
 
 ### page, person, file
 
-`GET /pages/{id}`; `GET /pages?title=` redirects to it. A browser's `GET` of the page of a live metric is a 303 to its [series](#series), with the query kept: the series carries the page, so a metric has one view. JSON, and the page of a deleted metric, are answered as here. The class is the page's type; a day page adds `day-page`, a
-tombstoned page adds `deleted`. Links: `day` (a day page's day view), `series` (a metric's readings), `conversation` (the [conversation](#conversation) of a
+`GET /pages/{id}`; `GET /pages?title=` redirects to it. The class is the page's type; a day page adds `day-page`, a
+tombstoned page adds `deleted`. Links: `day` (a day page's day view), `series` (a metric's readings: it carries the page, so a client that draws the view and not the page follows it), `conversation` (the [conversation](#conversation) of a
 conversation page's day: it carries the page, as a series carries a metric's page, so a client that draws the view and not the page follows it), `preview` (a
 file's picture), `cover` (the
 picture of the page's cover, when it has one), `choose-cover` (the [pictures it may take](#cover-choice): a live page that
@@ -570,8 +562,7 @@ be `part-of`, not a day page: `ids` is this page, and `category` offers the cate
 filed in it in one write), `set-cover` (a live page that is not a file), `tombstone-pages` with `ids` this page, or
 `revive` alone on a deleted page. The writes answer with this entity; `create-page` and `save-body` carry a `result` of the sync shape, `add-file` the kept
 shape. A page's cover is the first live file with a preview that its body embeds; a file page has none, its own
-picture stands for it. A browser draws the cover as a square at the head of the margin, with one link to the
-[picker](#cover-choice), and leaves that embed out of the body.
+picture stands for it. A client that draws the cover leaves that embed out of the body. The [picker](#cover-choice) lists the pictures it may take.
 `set-cover` (`POST /pages/{id}/cover`) puts `![[title]]` first in the body, unless that file is the page's
 cover already; a file the body embeds already trades places with the cover's embed, each with its label, so the body
 keeps each picture once. It takes a new photo as `original` (and
@@ -726,9 +717,7 @@ Actions: `record` (this metric), and the page's.
 ### metrics
 
 `GET /metrics`: the registry. Embedded: `item` links to each series. Actions: `record` with every live metric as an option,
-[`file-pages`](#filed) with the category titles as the options of `category`, and `register-metric` (owner; `daily` 1 asks for the metric on every day; a `daily` that differs from an existing metric's mark is 409). A
-browser draws each metric as a card: its latest reading and the line of its recent readings
-([plan 112](docs/plans/112-metrics-as-cards.md)). The answer of `register-metric` is the metric's [series](#series),
+[`file-pages`](#filed) with the category titles as the options of `category`, and `register-metric` (owner; `daily` 1 asks for the metric on every day; a `daily` that differs from an existing metric's mark is 409). The answer of `register-metric` is the metric's [series](#series),
 with a `result` sentence; `file-pages` files a metric in a category.
 
 | property | type | meaning |
@@ -802,8 +791,7 @@ The class of an answer that is not a resource: the `record` of a reading whose `
 ### snapshot
 
 `POST /snapshots` (the owner's action `snapshot`, refused to an `agent:*` writer): a dated copy of the database into
-the server's snapshot folder, then its restore check. The same values are in `result`; `self` is `/`, so a
-browser form is answered home with them as feedback. A refusal (no folder, a folder inside a git work tree, a name in
+the server's snapshot folder, then its restore check. The same values are in `result`; `self` is `/`. A refusal (no folder, a folder inside a git work tree, a name in
 use) is 422 `snapshot_refused`. A copy that fails its restore check is kept as `life-YYYY-MM-DD.failed.db` and answered 500 `restore_check_failed`.
 A timeout is 504 `timeout`, and any other failure is 500 `internal`. Links: `self`, `index`, `download` (the
 address of the file, below).
@@ -840,7 +828,7 @@ device. It is the file as written, never the live `life.db`. `name` is a name th
 `POST /search/rebuild` (the owner's action `rebuild-search`, refused to an `agent:*` or `import:*` writer): the repair of a
 full-text index that `integrity-check` found not ok. It rebuilds the index from the pages in one write, so a failure
 keeps the old index. It reads every page and holds the write lock while it runs. The same value is in `result`;
-`self` is `/`, so a browser form is answered home with it.
+`self` is `/`.
 
 | property | type | meaning |
 |---|---|---|
@@ -863,10 +851,9 @@ by the code of a body save, in one write. A page whose links are right is not wr
 ### tombstoned
 
 `POST /pages/tombstone` (`tombstone-pages`, the one delete of the catalog): the one field `ids` names
-the pages, one or several, separated by spaces or commas, or sent once per id as a browser form does; 500 at most. Every
+the pages, one or several, separated by spaces or commas, or sent once per id as a form of a browser does; 500 at most. Every
 id is tombstoned in one write, or none is: an id no row has is 404, and a row tombstoned already is left as it is. The
-answer embeds an `item` link to each; `result` is the [result of tombstone-pages](#result-of-tombstone-pages), which a browser form shows in words on the list it
-returns to (`back`), or home, with an Undo (`revive`) for one page or a link to the deleted list for several. `self` is `/`.
+answer embeds an `item` link to each; `result` is the [result of tombstone-pages](#result-of-tombstone-pages). `self` is `/`.
 
 | property | type | meaning |
 |---|---|---|
@@ -884,7 +871,7 @@ error. Exactly one of `category` and `from` is required: both, or neither, is 42
 page is 404 and a deleted page is 409.
 An id no page has is 404 and a deleted page or category is 409: either writes nothing. A day page or a person as the
 category is 422 (`links_endpoint_types`). The answer embeds an `item` link to each page and a `category` link;
-`result` says what was done in words, which a browser form shows on the list it returns to.
+`result` says what was done in words.
 
 | property | type | meaning |
 |---|---|---|
@@ -899,33 +886,6 @@ category is 422 (`links_endpoint_types`). The answer embeds an `item` link to ea
 | `added` | integer | the part-of links added (a page filed there already adds none) |
 | `moved` | integer | the other part-of links removed by `move` |
 | `removed` | integer | the part-of links removed by `from` |
-
-### login
-
-`GET /login` on a public listener: the one page served without a credential. `POST /login` with `token` sets the
-cookie `lifelog_session` (an id and its HMAC, valid for one year; the token is not in it) and redirects home;
-`POST /logout` ends the session and clears the cookie. The older cookie `lifelog_token` is no longer a credential.
-
-| property | type | meaning |
-|---|---|---|
-| `failed` | boolean | the last attempt was refused |
-| `logged_in` | boolean | this browser already carries the cookie |
-
-### locked
-
-The lock of a public listener, for a browser session only; a request with the bearer token never locks. Four routes
-beside `/login` and `/logout`, outside the catalog: `POST /lock` locks the session now (303 to `/locked`; 409 when the
-lock is off), `GET /locked` is the page with the PIN field (`next` is a path of this origin, else dropped), `POST /unlock`
-with `pin` and `next` opens the session (a wrong PIN goes back to `/locked?failed=1`; the fifth wrong PIN in a row ends
-the session and goes to `/login`), and `POST /awake` says that the owner is active (204). A locked session gets a 303 to
-`/locked?next=PATH` for an HTML `GET` (the path alone, never the query), and 401 `locked` for any other request. A
-try is counted before the PIN is compared, so requests sent at once get no more than five tries together. Every answer
-of a session carries `Cache-Control: no-store`, except `/assets/`.
-
-| property | type | meaning |
-|---|---|---|
-| `failed` | boolean | the last PIN was refused |
-| `next` | string | the page to go to after the unlock; `""` when none |
 
 ### settings
 
@@ -943,8 +903,6 @@ no settings file path refuses both routes (500, the message says so).
 | `model` | string | the model id; `""` when not set |
 | `model_key` | string | a bearer credential for the server; absent when not set |
 | `owner_number` | string | the digits of the owner's phone number with the country code, the one number the agent on the phone answers; absent when not set. A value that is not digits is 422 `owner_number: digits with the country code, such as 40712345678` |
-| `ground` | string | the floor under the pages of the browser: `boards`, `oak`, `firelight` or `embers`; `""` when not set, which is `boards`. Another value is 422 |
-| `lock_after` | string | the idle minutes after which a public listener locks a browser: `off`, `5`, `10`, `15`, `30` or `60`; `off` when not set. The field `lock_pin` (4 to 8 digits, else 422) is write-only: no read shows the PIN or its hash, and an empty `lock_pin` keeps the stored one. `lock_after` other than `off` with no stored PIN and no new one is 422 |
 
 ### conversation
 
@@ -961,8 +919,7 @@ only when `day` is the server's local today (the conversation of another day off
 when the page exists, the actions of [the page](#page-person-file) after it (`save-body` with the `version`, and
 the others). When the page exists, the answer carries the page as a series carries a metric's page: its properties
 (the rows below that follow `turns`), its links but `self`, `conversation` and `index`, and its embedded links. A page that is
-deleted is no conversation: the answer has no turns, and `say` makes it live again. A browser's `GET /pages/{id}` of a
-live conversation page is a 303 to this resource, with the query kept; the JSON of the page is the page's own.
+deleted is no conversation: the answer has no turns, and `say` makes it live again. The page of a live conversation links to this resource (rel `conversation`); the JSON of the page is the page's own.
 
 `POST /days/{day}/say` (the action `say`, the owner's: 403 `forbidden` to an `agent:*` or `import:*` writer): the field `text` is added to the page of the day as the
 owner's turn, with the time of the server's clock in its zone. The page is made on the first turn of the day, in
@@ -989,7 +946,7 @@ for the owner's turn. The page:
 - has the tool lines of a `lifelog` turn right before its marker: one block of lines that each start with ``- ` ``, for
   example ``- `search`: no hits``, with at most one blank line between the block and the marker. They are not part of
   the turn before. Tool lines before an `Owner` marker are part of the text before it. A tool line names the address
-  of what the agent touched as ``- `name` → [href](href)`` (or ``- `name` → href``); the browser draws it as a card.
+  of what the agent touched as ``- `name` → [href](href)`` (or ``- `name` → href``); a client may draw it as a card.
   A failed call is ``- `name` failed: code`` and names no address;
 - may hold text before the first marker, after the first line `[[YYYY-MM-DD]]`. It is one turn of `who` `text` when it
   is not blank, shown as it is. The first line is no turn.

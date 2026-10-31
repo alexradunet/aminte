@@ -1,5 +1,5 @@
 /* style.css — the look of the project's website: the tokens and faces of the Almanac bound in Hearthwood, the same
-   as the application (internal/api/view/html/base.css), so the site and the product look as one. The site is static: no
+   as the application (extensions/web/view/html/base.css), so the site and the product look as one. The site is static: no
    script, no build step, nothing fetched from another host. Dark is the identity; light is the daylight study of the
    same room, by prefers-color-scheme. */
 

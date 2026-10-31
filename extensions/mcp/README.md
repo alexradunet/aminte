@@ -39,7 +39,7 @@ beside `lifelog`.
 | `lifelog mcp [--agent NAME] [--db FILE]` | `lifelog` finds `lifelog-mcp` beside itself, serves the file on a temporary loopback server, and runs the extension against it ([extensions/README.md](../README.md)). |
 | `lifelog-mcp [--agent NAME] --url URL` | It talks to a running `lifelog serve` at `URL` (default `$LIFELOG_URL`). With neither, it refuses: a guessed address could be another file's server. |
 
-`--agent` defaults to `mcp`. `$LIFELOG_TOKEN` is sent as a bearer token when it is set (a `--public` server needs it).
+`--agent` defaults to `mcp`. `$LIFELOG_TOKEN` is sent as a bearer token when it is set (a server that has a token needs it).
 
 An MCP client starts it with a line such as:
 

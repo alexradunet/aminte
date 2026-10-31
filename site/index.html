@@ -109,10 +109,10 @@
     <p class="eyebrow">HOW YOU USE IT</p>
     <h2>One program, three ways in.</h2>
     <p class="intro">Lifelog is one Go binary, with its extensions beside it. The browser, the command line and an AI
-      agent all go through the same handler, so each one can do the same things, with the same rules.</p>
+      agent all use the same API, so each one can do the same things, with the same rules.</p>
 
-    <div class="flow" role="img" aria-label="The browser, the command line and an AI agent all use one handler. The handler writes through one core into life.db.">
-      <div class="node parchment">Browser<small>lifelog serve</small></div>
+    <div class="flow" role="img" aria-label="The browser, the command line and an AI agent all use one API. The API writes through one core into life.db.">
+      <div class="node parchment">Browser<small>lifelog serve --with web</small></div>
       <div class="node parchment">Command line<small>lifelog capture</small></div>
       <div class="node parchment">AI agent<small>lifelog mcp</small></div>
       <div class="stem"></div>
@@ -123,8 +123,9 @@
 
     <div class="grid">
       <article class="card parchment"><h3>The browser</h3>
-        <p>Today’s page, with your newest pages beside it. A Calendar of your days, with a month and a year.
-          Search, Browse and Metrics. Every form works with no script; one script keeps the chat column fresh. It works on a phone.</p></article>
+        <p>The browser is an extension, <code>lifelog-web</code>. Today’s page, with your newest pages beside it. A
+          Calendar of your days, with a month and a year. Search, Browse and Metrics. Every form works with no script.
+          It works on a phone.</p></article>
       <article class="card parchment"><h3>The command line</h3>
         <p>Capture a line, read a day, record a reading, keep a file or take a snapshot, from any terminal.</p>
         <span class="mono">lifelog capture "Ran 5k with [[Sam]] #running" --mood 4</span></article>
@@ -233,6 +234,7 @@
 git clone https://github.com/alexradunet/lifelogdb
 cd lifelogdb
 go build -o lifelog ./cmd/lifelog
+go build -C extensions/web -o ../../lifelog-web ./cmd/lifelog-web
 go build -C extensions/mcp -o ../../lifelog-mcp ./cmd/lifelog-mcp
 go build -C extensions/agentic -o ../../lifelog-agentic-init ./cmd/lifelog-agentic-init
 go build -C extensions/whatsapp -o ../../lifelog-whatsapp ./cmd/lifelog-whatsapp
@@ -244,8 +246,11 @@ lifelog init
 <span class="c"># write, then read</span>
 lifelog capture <span class="p">"Ran 5k with [[Sam]] #running"</span> --mood 4
 lifelog day --human</pre>
-<pre><span class="c"># open it in a browser: http://127.0.0.1:7777</span>
-lifelog serve
+<pre><span class="c"># a token file for the browser: 64 characters</span>
+mkdir -p ~/life &amp;&amp; (umask 077; head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n' &gt; ~/life/token)
+
+<span class="c"># open it in a browser: http://127.0.0.1:7780</span>
+lifelog serve --token-file ~/life/token --with web
 
 <span class="c"># keep a voice memo as its text</span>
 lifelog file memo.m4a --text memo.txt

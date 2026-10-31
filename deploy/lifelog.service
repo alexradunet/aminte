@@ -7,7 +7,14 @@ After=network.target
 Type=simple
 # Replace OWNER and the paths.
 User=OWNER
-ExecStart=/home/OWNER/.local/bin/lifelog --db /home/OWNER/lifelog/life.db serve --snapshots /home/OWNER/snapshots
+ExecStart=/home/OWNER/.local/bin/lifelog --db /home/OWNER/lifelog/life.db serve --token-file /home/OWNER/life/token --snapshots /home/OWNER/snapshots --with web
+# the core listens on 127.0.0.1:7777 only. The token file turns on its bearer check: one line of 32 characters or more
+# --with web runs the browser (extensions/web) beside the server: lifelog-web must be beside lifelog
+# the browser listens on LIFELOG_WEB_LISTEN. The local proxy points to it, and not to the core
+# LIFELOG_WEB_ORIGINS is the origin that the proxy shows to the browser
+Environment=LIFELOG_WEB_LISTEN=127.0.0.1:7780
+Environment=LIFELOG_WEB_ORIGINS=https://lifelog.example
+# with ProtectHome=read-only, the browser's state folder must be writable: ReadWritePaths=/home/OWNER/.config/lifelog-web
 # add --with whatsapp to run the WhatsApp agent beside the server (extensions/whatsapp)
 # with ProtectHome=read-only, the agent's state folder must be writable: ReadWritePaths=/home/OWNER/.config/lifelog-whatsapp
 # add --with ticktick to run TickTick, a connected app, beside the server (extensions/ticktick)

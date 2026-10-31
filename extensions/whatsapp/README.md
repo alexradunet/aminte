@@ -72,8 +72,8 @@ From the repository root: `go build -C extensions/whatsapp -o ../../lifelog-what
 
 ## Run
 
-The way to run it always is the server: `lifelog serve --with whatsapp` (for the service: `lifelog serve --public
---addr 127.0.0.1:7777 --token-file F --with whatsapp`). The server starts `lifelog-whatsapp` beside itself with its own
+The way to run it always is the server: `lifelog serve --with whatsapp` (for the service: `lifelog serve
+--token-file F --with whatsapp`). The server starts `lifelog-whatsapp` beside itself with its own
 address and token, and keeps it running. See "Run by serve" in [extensions/README.md](../README.md). The agent takes no
 argument then: the settings of lifelog hold everything.
 

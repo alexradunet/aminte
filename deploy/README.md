@@ -6,7 +6,7 @@ keep the settings that are only on the machine (the user, the paths), and then c
 
 | file | installed as | what it does |
 |---|---|---|
-| `lifelog.service` | `/etc/systemd/system/lifelog.service` | runs `lifelog serve` (`--with whatsapp` adds the agent on WhatsApp beside it); `KillSignal=SIGTERM` and `TimeoutStopSec=30` let the server drain its requests |
+| `lifelog.service` | `/etc/systemd/system/lifelog.service` | runs `lifelog serve` with `--with web` (the browser; `--with whatsapp` adds the agent on WhatsApp beside it); `KillSignal=SIGTERM` and `TimeoutStopSec=30` let the server drain its requests |
 | `lifelog-snapshot` | `/usr/local/bin/lifelog-snapshot` | runs `lifelog snapshot`, tests its exit status, prunes to the newest 14 good snapshots |
 | `lifelog-snapshot.service` | `/etc/systemd/system/lifelog-snapshot.service` | runs the script once; `TimeoutStartSec=30min`; `OnFailure=lifelog-snapshot-failed.service` |
 | `lifelog-snapshot.timer` | `/etc/systemd/system/lifelog-snapshot.timer` | starts the service every night |
@@ -46,11 +46,15 @@ journalctl -u lifelog-snapshot.service
 
 The service runs the installed program, not the one in the repo folder.
 
-1. `go build -o <install path> ./cmd/lifelog`, and the extensions beside it: `go build -C extensions/mcp -o <install
-   folder>/lifelog-mcp ./cmd/lifelog-mcp`, `go build -C extensions/agentic -o <install folder>/lifelog-agentic-init
+1. `go build -o <install path> ./cmd/lifelog`, and the extensions beside it: `go build -C extensions/web -o <install
+   folder>/lifelog-web ./cmd/lifelog-web`, `go build -C extensions/mcp -o <install folder>/lifelog-mcp
+   ./cmd/lifelog-mcp`, `go build -C extensions/agentic -o <install folder>/lifelog-agentic-init
    ./cmd/lifelog-agentic-init` and `go build -C extensions/whatsapp -o <install folder>/lifelog-whatsapp
-   ./cmd/lifelog-whatsapp` ([extensions](../extensions/README.md)). A unit with `--with whatsapp` needs
-   `lifelog-whatsapp` beside the program: `serve` refuses to start without it, before the file opens.
+   ./cmd/lifelog-whatsapp` ([extensions](../extensions/README.md)). A unit with `--with web` or `--with whatsapp` needs
+   the program (`lifelog-web`, `lifelog-whatsapp`) beside `lifelog`: `serve` refuses to start without it, before the file
+   opens. The local proxy points to `LIFELOG_WEB_LISTEN` (`127.0.0.1:7780`), and not to the core
+   ([install](../extensions/web/README.md#install)).
 2. `systemctl daemon-reload` after a change to a unit file.
 3. `systemctl restart lifelog.service`.
-4. Read the service's log line (`journalctl -u lifelog.service -n 20`): it names the version and the `user_version`.
+4. Read the service's log lines (`journalctl -u lifelog.service -n 20`): the first names the version and the
+   `user_version`, and the lines of `with web` say that the browser started.

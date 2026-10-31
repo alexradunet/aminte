@@ -20,7 +20,7 @@ page is tombstoned, and a reading is corrected or retracted by a new row.
 
 | mode | command | for |
 |---|---|---|
-| browser | `lifelog serve`, then http://127.0.0.1:7777 | the owner reads and edits |
+| browser | `lifelog serve --token-file F --with web`, then http://127.0.0.1:7780 (the owner logs in with the token) | the owner reads and edits |
 | MCP | `lifelog mcp --agent NAME` | you: every action that is not the owner's, as a tool |
 | CLI | `"{{.Exe}}" --db "{{.DB}}" --source agent:NAME day`, then `capture TEXT`, `page TITLE`, `search WORDS`, `do ACTION field=value`, `actions` in the same form | you (as `agent:NAME`) or the owner, in a shell |
 | setup | `lifelog init` (makes `life.db` here), `lifelog agentic-init` (writes this file) | the owner |

@@ -14,7 +14,7 @@ flowchart LR
   O["the owner: TickTick on the phone"] --> T["TickTick"]
   T -->|"POST /task/completed, else vanish-and-fetch, every 15 min"| C["lifelog-ticktick (serve --with ticktick)"]
   C -->|"capture, import_key id:completedTime, as import:ticktick"| L["lifelog: the day page"]
-  B["the browser, lifelog do, the agent"] -->|"Tasks, add-task, complete-task, ..."| L
+  B["lifelog-web, lifelog do, the agent"] -->|"Tasks, add-task, complete-task, ..."| L
   L -->|"the task protocol"| C
   C -->|"the Open API of TickTick"| T
 ```
@@ -139,7 +139,7 @@ TickTick's body or name.
 
 How you reach it:
 
-- In the browser: the rail entry Tasks. Today, Next 7 days, a page for each list, Done and one page for each task.
+- In lifelog-web: the rail entry Tasks. Today, Next 7 days, a page for each list, Done and one page for each task.
 - On the command line: `lifelog do add-task title=Milk list=Home --url URL`, and `complete-task`, `edit-task`,
   `reopen-task`, `delete-task` and `sync-tasks` the same way. The MCP tools have the same names with `_`.
 
@@ -188,7 +188,8 @@ staticcheck ./...
 - `cmd/lifelog-ticktick`: the usage, the refusals and the login against a fake token endpoint.
 - `e2e_test.go` builds the real `lifelog` and `lifelog-ticktick`, runs `lifelog serve --with ticktick` on a new
   `life.db` in a temporary folder (with `XDG_CONFIG_HOME` there too) and a fake TickTick, once with `/task/completed` and
-  once without it. It reads the pages Tasks and a list as HTML (no word TickTick), posts the round Complete form, and checks that
-  `/with/ticktick/` is 404. It also checks that a refused token ends the app with status 78. `go test -short` skips it.
+  once without it. It reads the entities Tasks and a list as Siren JSON (no word TickTick), posts the action `complete-task` as
+  the API takes it, and checks that `/with/ticktick/` is 404. It also checks that a refused token ends the app with
+  status 78. `go test -short` skips it. The pages of Tasks are held by the tests of `extensions/web`.
 
 No test calls TickTick, and none opens your `life.db`.
