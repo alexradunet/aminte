@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"slices"
 	"strings"
 	"syscall"
 	"testing"
@@ -65,6 +66,9 @@ func startLifelog(t *testing.T, bin string) string {
 	}
 	var stderr bytes.Buffer
 	cmd := exec.Command(bin, "serve", "--db", dbPath, "--addr", addr)
+	// No variable of lifelog reaches the server: a LIFELOG_TOKEN of the developer would turn on the bearer check, and the
+	// plain requests of this test send none.
+	cmd.Env = slices.DeleteFunc(os.Environ(), func(kv string) bool { return strings.HasPrefix(kv, "LIFELOG_") })
 	cmd.Stderr = &stderr
 	if err := cmd.Start(); err != nil {
 		t.Fatal(err)

@@ -1,8 +1,8 @@
 // Package siren is the hypermedia of the API: the Siren types that every answer is made of (an entity, its links, its
 // actions and their fields), the header that names the writer of a request, the JSON of an answer, and the addresses
-// of the resources that the API serves and that its view links. The API (internal/api), its view (internal/api/view),
-// the clients (internal/client, cmd/lifelog) and core (for the codes of an error) import it. It imports only the
-// standard library, so a client of the types gets none of the server with them.
+// of the resources that the API serves and that a UI links. The API (internal/api), the clients (client, cmd/lifelog),
+// the extensions, including the browser, and core (for the codes of an error) import it. It imports only the standard
+// library, so a client of the types gets none of the server with them.
 package siren
 
 import (
@@ -15,8 +15,8 @@ import (
 	"time"
 )
 
-// SourceHeader names the writer of a request's rows (lifelog_meta.source). Without it a browser form writes as
-// "ui" and any other client as "api".
+// SourceHeader names the writer of a request's rows (lifelog_meta.source). Without it a request writes as "api"; the
+// browser extension sends "ui".
 const SourceHeader = "Lifelog-Source"
 
 // The prefixes of the writers that are not the owner: an agent (the MCP server) writes as AgentPrefix+name, an import
@@ -54,7 +54,8 @@ const (
 	CodeUnavailable = "unavailable"
 	// CodeUpstream is the code of an app that answered something that is not an entity (502).
 	CodeUpstream = "upstream"
-	// CodeLocked is the code of a request from a browser session that the lock holds shut (401); the PIN opens it.
+	// CodeLocked is the code of a request from a browser session that the lock holds shut (401); the PIN opens it. The
+	// browser extension answers it. The core never does.
 	CodeLocked = "locked"
 )
 

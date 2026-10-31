@@ -54,7 +54,7 @@ func TestErrorAnswersCarryACode(t *testing.T) {
 			t.Errorf("%s: code=%q status=%d want %q/%d (%v)", tc.name, code, status, tc.code, tc.status, tc.err)
 		}
 	}
-	// The browser guard and the public listener name their refusals too.
+	// The guard of the API and the token check name their refusals too.
 	req := httptest.NewRequest("POST", "/pages", strings.NewReader("title=Cross"))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Origin", "https://evil.example")
@@ -64,17 +64,17 @@ func TestErrorAnswersCarryACode(t *testing.T) {
 	if rec.Code != 403 || !strings.Contains(rec.Body.String(), `"code": "cross_origin"`) {
 		t.Errorf("cross-origin refusal: %d %.200s", rec.Code, rec.Body.String())
 	}
-	pub, _ := publicHandler(t, api.PublicOptions{Token: testToken})
-	rec = request(pub, "GET", "/", "", nil)
+	guarded, _ := tokenHandler(t)
+	rec = request(guarded, "GET", "/", "", map[string]string{"Host": "127.0.0.1:7777"})
 	if rec.Code != 401 || !strings.Contains(rec.Body.String(), `"code": "token_required"`) {
 		t.Errorf("token refusal: %d %.200s", rec.Code, rec.Body.String())
 	}
 }
 
 // TestAnInternalErrorNamesNoCause: an error that core did not type is a fault of the server. Here the database is
-// closed under the store. The answer is 500 with no word of the cause, as JSON and as a page, and the page says
-// internal error; the entity of the answer is TestErrorEntity's. The server's log has the cause one time, with the
-// pattern of the route and not the path, because a path can name a metric.
+// closed under the store. The answer is 500 with no word of the cause; the entity of the answer is TestErrorEntity's.
+// The server's log has the cause one time, with the pattern of the route and not the path, because a path can name a
+// metric.
 func TestAnInternalErrorNamesNoCause(t *testing.T) {
 	d, err := db.Open(t.Context(), dbtest.File(t))
 	if err != nil {
@@ -85,30 +85,23 @@ func TestAnInternalErrorNamesNoCause(t *testing.T) {
 	}
 	h := api.New(&core.Store{DB: d})
 	const cause = "database is closed"
-	for _, accept := range []string{"application/vnd.siren+json", "text/html"} {
-		t.Run(accept, func(t *testing.T) {
-			var logged bytes.Buffer
-			prev := log.Writer()
-			log.SetOutput(&logged) // no test of this package runs in parallel
-			t.Cleanup(func() { log.SetOutput(prev) })
-			rec := request(h, "GET", "/metrics/weight", "", map[string]string{"Accept": accept})
-			body := rec.Body.String()
-			if rec.Code != 500 {
-				t.Fatalf("status %d, want 500: %.300s", rec.Code, body)
-			}
-			if strings.Contains(body, cause) || strings.Contains(body, "sql:") {
-				t.Errorf("the answer names the cause: %.600s", body)
-			}
-			if accept == "text/html" && !strings.Contains(body, "internal error") {
-				t.Errorf("the page does not say internal error: %.600s", body)
-			}
-			if n := strings.Count(logged.String(), cause); n != 1 {
-				t.Errorf("the log has the cause %d times, want 1: %q", n, logged.String())
-			}
-			if !strings.Contains(logged.String(), "GET /metrics/{name}") || strings.Contains(logged.String(), "weight") {
-				t.Errorf("the log does not name the route's pattern, or names the path: %q", logged.String())
-			}
-		})
+	var logged bytes.Buffer
+	prev := log.Writer()
+	log.SetOutput(&logged) // no test of this package runs in parallel
+	t.Cleanup(func() { log.SetOutput(prev) })
+	rec := request(h, "GET", "/metrics/weight", "", nil)
+	body := rec.Body.String()
+	if rec.Code != 500 {
+		t.Fatalf("status %d, want 500: %.300s", rec.Code, body)
+	}
+	if strings.Contains(body, cause) || strings.Contains(body, "sql:") || !strings.Contains(body, "internal error") {
+		t.Errorf("the answer names the cause, or not the internal error: %.600s", body)
+	}
+	if n := strings.Count(logged.String(), cause); n != 1 {
+		t.Errorf("the log has the cause %d times, want 1: %q", n, logged.String())
+	}
+	if !strings.Contains(logged.String(), "GET /metrics/{name}") || strings.Contains(logged.String(), "weight") {
+		t.Errorf("the log does not name the route's pattern, or names the path: %q", logged.String())
 	}
 }
 
@@ -151,5 +144,15 @@ func TestStaleVersionIsTheSameCodeOnEveryResource(t *testing.T) {
 	_, err = c.Do(t.Context(), apitest.Action(t, root, "add-file"), map[string]string{"title": "Scan.pdf", "sha256": strings.Repeat("a", 64), "mime": "application/pdf", "body": "OCR text"})
 	if code, status := codeOf(t, err); code != "conflict" || status != 409 {
 		t.Errorf("a file over a page with words: code %q status %d, want conflict 409 (%v)", code, status, err)
+	}
+}
+
+// TestAMissingPageIsA404WithItsMessage: the message of a missing page names the id, and the code is not_found.
+func TestAMissingPageIsA404WithItsMessage(t *testing.T) {
+	c, _, _ := apitest.Fresh(t, "cli")
+	_, err := c.Get(t.Context(), "/pages/999999")
+	var ce *client.Error
+	if !errors.As(err, &ce) || ce.Status != 404 || ce.Code() != "not_found" || ce.Entity.Properties.(map[string]any)["message"] != "no page 999999" {
+		t.Errorf("GET /pages/999999: %v, want 404 not_found with the message no page 999999", err)
 	}
 }

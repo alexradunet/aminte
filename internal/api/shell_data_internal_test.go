@@ -1,8 +1,8 @@
 package api
 
 // The data that a client needs to draw a frame, in the answers of the API: the Today strip on the day, the clock and
-// the apps on the root, the refs and the day bar on the conversation. A browser page reads them through ?embed
-// (shellFacts), and so does any other client.
+// the apps on the root, the refs and the day bar on the conversation. The browser extension reads them through ?embed,
+// and so does any other client.
 
 import (
 	"encoding/json"

@@ -2,11 +2,8 @@ package api_test
 
 import (
 	"fmt"
-	"html"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
-	"regexp"
 	"strings"
 	"testing"
 
@@ -30,7 +27,7 @@ func journalFixture(t *testing.T) (*client.Client, http.Handler) {
 }
 
 func TestTheDayCarriesItsMood(t *testing.T) {
-	c, h := journalFixture(t)
+	c, _ := journalFixture(t)
 
 	today := apitest.Must(t)(c.Get(t.Context(), "/days/"+fixedToday))
 	p := props(today)
@@ -53,21 +50,11 @@ func TestTheDayCarriesItsMood(t *testing.T) {
 	if hasAction(quiet, "save-body") {
 		t.Errorf("a quiet day offers save-body: %s", names(quiet))
 	}
-
-	// The browser.
-	body := browse(t, h, "/days/"+fixedToday)
-	for _, want := range []string{`<span class="mood" title="Mood">mood 4, 3</span>`, "<summary>Edit the day page</summary>"} {
-		if !strings.Contains(body, want) {
-			t.Errorf("the day view lacks %q", want)
-		}
-	}
-	if strings.Contains(body, `<th scope="col">scope</th>`) {
-		t.Error("the readings show a scope column")
-	}
 }
 
-// TestTheRootIsTodayAtAGlance: a browser's Home is the page of today (docs/plans/129-the-ux-pass.md, part 10): GET /
-// answers with the day of today. The JSON root, the entry point of the API, does not change.
+// TestTheRootIsTodayAtAGlance: GET / is the entry point of the API for every client: the newest day pages and every
+// action that starts something. A client that accepts HTML gets the same entity, not the page of today: the core draws
+// no page.
 func TestTheRootIsTodayAtAGlance(t *testing.T) {
 	c, h := journalFixture(t)
 	root := apitest.Must(t)(c.Get(t.Context(), "/"))
@@ -84,48 +71,21 @@ func TestTheRootIsTodayAtAGlance(t *testing.T) {
 		t.Errorf("the JSON root: today %v, actions %s", p["today"], names(root))
 	}
 
-	for _, accept := range []string{"text/html,application/xhtml+xml", "text/html"} {
+	for _, accept := range []string{"application/vnd.siren+json", "application/json", "text/html,application/json", "text/html,application/xhtml+xml", "text/html", ""} {
 		req := httptest.NewRequest("GET", "/", nil)
 		req.Header.Set("Accept", accept)
 		rec := httptest.NewRecorder()
 		h.ServeHTTP(rec, req)
-		if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `<span class="leaf-day">14</span>`) || !strings.Contains(rec.Body.String(), `<section class="capture"`) {
-			t.Errorf("GET / as %q: %d, want the page of today: %.300s", accept, rec.Code, rec.Body.String())
-		}
-	}
-	for _, accept := range []string{"application/vnd.siren+json", "application/json", "text/html,application/json", ""} {
-		req := httptest.NewRequest("GET", "/", nil)
-		req.Header.Set("Accept", accept)
-		rec := httptest.NewRecorder()
-		h.ServeHTTP(rec, req)
-		if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"class": [`) {
-			t.Errorf("GET / as %q: %d, want the JSON root: %.200s", accept, rec.Code, rec.Body.String())
+		if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"class": [`+"\n"+`    "root"`) || rec.Header().Get("Content-Type") != "application/vnd.siren+json" {
+			t.Errorf("GET / as %q: %d %q, want the JSON root: %.200s", accept, rec.Code, rec.Header().Get("Content-Type"), rec.Body.String())
 		}
 	}
 }
 
-// TestAFormThatReturnsHomeLandsOnToday: the write that answers "/" (a snapshot, a capture sent with back=/) is sent
-// home, which is the page of today, and its one-use receipt is read there, once.
-func TestAFormThatReturnsHomeLandsOnToday(t *testing.T) {
-	_, h, _ := apitest.FreshOn(t, "cli", fixedToday)
-	rec := submit(h, "/days/"+fixedToday+"/capture", url.Values{"text": {"Walked with [[Dana Example]]."}, "back": {"/"}}, "")
-	if rec.Code != http.StatusSeeOther || !strings.HasPrefix(rec.Header().Get("Location"), "/?feedback=") {
-		t.Fatalf("capture: %d %q", rec.Code, rec.Header().Get("Location"))
-	}
-	to := rec.Header().Get("Location")
-	if body := browse(t, h, to); !strings.Contains(body, `class="toast"`) || !strings.Contains(body, "Dana Example") || !strings.Contains(body, `<h1>Wednesday</h1>`) {
-		t.Errorf("the page of today does not carry the receipt of the capture:\n%.600s", body)
-	}
-	if strings.Contains(browse(t, h, to), `class="toast"`) {
-		t.Error("the receipt came back on a reload")
-	}
-
-}
-
-// TestTheDayOfTodayCarriesTheLastEntries: Home is the page of today, so "Last entries", the list the root had, is in
-// the margin of today and of no other day (docs/plans/129-the-ux-pass.md, part 10).
+// TestTheDayOfTodayCarriesTheLastEntries: the day of today carries "recent", the list the root has, and no other day
+// does (docs/plans/129-the-ux-pass.md, part 10).
 func TestTheDayOfTodayCarriesTheLastEntries(t *testing.T) {
-	c, h := journalFixture(t)
+	c, _ := journalFixture(t)
 	today := props(apitest.Must(t)(c.Get(t.Context(), "/days/"+fixedToday)))
 	var recent []string
 	list, _ := today["recent"].([]any)
@@ -139,24 +99,12 @@ func TestTheDayOfTodayCarriesTheLastEntries(t *testing.T) {
 	if _, ok := props(apitest.Must(t)(c.Get(t.Context(), "/days/"+dayOf(-1))))["recent"]; ok {
 		t.Error("a day that is not today carries recent")
 	}
-
-	body := browse(t, h, "/days/"+fixedToday)
-	for _, want := range []string{`aria-label="Last entries"`, "<h2>Last entries</h2>", `<a href="/days">Every day</a>`,
-		`<a class="entry" href="/days/` + dayOf(-2) + `">`, "Morning"} {
-		if !strings.Contains(body, want) {
-			t.Errorf("the page of today lacks %q", want)
-		}
-	}
-	if strings.Contains(browse(t, h, "/days/"+dayOf(-1)), "Last entries") {
-		t.Error("a day that is not today draws Last entries")
-	}
 }
 
 // TestTheMoodIsAChoiceOfFive: capture's mood offers the options 1 to 5 (docs/plans/092-the-app-shell.md), on the
-// day's action and in the catalog; the values the API takes do not change, and the browser draws the field as a row
-// of radio buttons that works with no script.
+// day's action and in the catalog; the values the API takes do not change.
 func TestTheMoodIsAChoiceOfFive(t *testing.T) {
-	c, h, _ := apitest.FreshOn(t, "cli", fixedToday)
+	c, _, _ := apitest.FreshOn(t, "cli", fixedToday)
 	day := apitest.Must(t)(c.Get(t.Context(), "/days/"+fixedToday))
 	for _, a := range []string{"the day's", "the catalog's"} {
 		capture := apitest.Action(t, day, "capture")
@@ -185,111 +133,28 @@ func TestTheMoodIsAChoiceOfFive(t *testing.T) {
 	if got := fmt.Sprint(props(apitest.Must(t)(c.Get(t.Context(), "/days/"+fixedToday)))["mood"]); got != "[4]" {
 		t.Errorf("the day's mood after the captures: %s", got)
 	}
-
-	body := browse(t, h, "/days/"+fixedToday)
-	form := captureForm(t, body, "/days/"+fixedToday+"/capture")
-	for _, want := range []string{`<fieldset class="segmented faces"><legend>Mood</legend>`,
-		`<label title="awful"><input type="radio" name="mood" value="1"><span>1 <small>awful</small></span></label>`,
-		`<label title="okay"><input type="radio" name="mood" value="3"><span>3 <small>okay</small></span></label>`,
-		`<label title="great"><input type="radio" name="mood" value="5"><span>5 <small>great</small></span></label>`, `<input type="hidden" name="back" value="/days/` + fixedToday + `">`} {
-		if !strings.Contains(form, want) {
-			t.Errorf("the day's Capture lacks %s:\n%s", want, form)
-		}
-	}
-	if strings.Contains(form, `<select name="mood"`) || strings.Contains(form, " required") {
-		t.Errorf("the mood is a list, or is required:\n%s", form)
-	}
 	past := apitest.Action(t, apitest.Must(t)(c.Get(t.Context(), "/days/"+dayOf(-1))), "capture")
 	apitest.Must(t)(c.Do(t.Context(), past, map[string]string{"mood": "2"}))
-	if one := browse(t, h, "/days/"+dayOf(-1)); !strings.Contains(one, `<span class="mood" title="Mood">mood 2 · bad</span>`) {
-		t.Errorf("a day with one mood does not say its word:\n%s", one)
-	}
-	rec := submit(h, "/days/"+fixedToday+"/capture", url.Values{"text": {"From the browser."}, "mood": {"3"}, "back": {"/days/" + fixedToday}}, "")
-	if rec.Code != http.StatusSeeOther || !strings.HasPrefix(rec.Header().Get("Location"), "/days/"+fixedToday) {
-		t.Fatalf("Capture from the browser: %d %q", rec.Code, rec.Header().Get("Location"))
-	}
-	if got := fmt.Sprint(props(apitest.Must(t)(c.Get(t.Context(), "/days/"+fixedToday)))["mood"]); got != "[4 3]" {
-		t.Errorf("the day's mood after the browser's capture: %s", got)
+	if got := fmt.Sprint(props(apitest.Must(t)(c.Get(t.Context(), "/days/"+dayOf(-1))))["mood"]); got != "[2]" {
+		t.Errorf("the mood of a day with one mood: %s", got)
 	}
 }
 
-// TestCaptureReturnsToThePageThatSentIt: the Capture of a day, today's too, returns to the day. Home is the page of
-// today, so no form returns to "/".
-func TestCaptureReturnsToThePageThatSentIt(t *testing.T) {
-	_, h, _ := apitest.FreshOn(t, "cli", fixedToday)
-	for _, day := range []string{fixedToday, dayOf(-3)} {
-		page := "/days/" + day
-		if form := captureForm(t, browse(t, h, page), page+"/capture"); !strings.Contains(form, `name="back" value="`+page+`"`) {
-			t.Errorf("Capture on %s does not return to it:\n%s", page, form)
+// TestADayLinksItsNeighboursAndItsMonth (docs/plans/095-the-leaf-and-its-margin.md): a day links the day before and
+// the day after, its month and its week, and says which day is today. 14 May 2031 is a Wednesday in ISO week 20.
+func TestADayLinksItsNeighboursAndItsMonth(t *testing.T) {
+	c, _, _ := apitest.FreshOn(t, "cli", fixedToday)
+	today := apitest.Must(t)(c.Get(t.Context(), "/days/"+fixedToday))
+	for rel, want := range map[string]string{"prev": "/days/2031-05-13", "next": "/days/2031-05-15", "month": "/months/2031-05", "week": "/weeks/2031-W20"} {
+		if got := apitest.Href(today, rel); got != want {
+			t.Errorf("the link %s of today is %q, want %q", rel, got, want)
 		}
+	}
+	past := apitest.Must(t)(c.Get(t.Context(), "/days/"+dayOf(-3)))
+	if props(today)["today"] != fixedToday || props(past)["today"] != fixedToday || props(past)["day"] != "2031-05-11" {
+		t.Errorf("today %v, past: today %v day %v", props(today)["today"], props(past)["today"], props(past)["day"])
 	}
 }
-
-// captureForm is the form of a page that posts to action.
-func captureForm(t *testing.T, body, action string) string {
-	t.Helper()
-	for _, m := range regexp.MustCompile(`(?s)<form method="POST" action="([^"]+)"[^>]*>.*?</form>`).FindAllStringSubmatch(body, -1) {
-		if html.UnescapeString(m[1]) == action {
-			return m[0]
-		}
-	}
-	t.Fatalf("no form posts to %s", action)
-	return ""
-}
-
-// TestTheDayIsALeafAndItsMargin (docs/plans/095-the-leaf-and-its-margin.md): the head of a day is a calendar leaf
-// that opens its month, beside the weekday, the week and "today"; the previous and next day keep their whole name for
-// a reader; the sheet (the journal, then Capture) comes before the margin in the source, so a narrow screen shows
-// the writing first; Record a reading is in the margin's Readings, its optional fields folded.
-// 14 May 2031 is a Wednesday in ISO week 20 (1 January 2031 is a Wednesday, so week 1 starts on 30 December 2030).
-func TestTheDayIsALeafAndItsMargin(t *testing.T) {
-	_, h, _ := apitest.FreshOn(t, "cli", fixedToday)
-	body := browse(t, h, "/days/"+fixedToday)
-	for _, want := range []string{
-		`<a class="leaf" href="/months/2031-05" aria-label="May 2031, the calendar of the month"><span class="leaf-month">May 2031</span><span class="leaf-day">14</span></a>`,
-		`<h1>Wednesday</h1>`,
-		`<p class="sub"><span class="tag open">today</span>`,
-		`href="/days/2031-05-13" rel="prev" aria-label="Previous day, Tue 13 May"><span aria-hidden="true">‹</span><span class="step-day">Tue 13 May</span></a>`,
-		`href="/days/2031-05-15" rel="next" aria-label="Next day, Thu 15 May"><span class="step-day">Thu 15 May</span><span aria-hidden="true">›</span></a>`,
-		`<p class="empty">Nothing written today yet. <a href="#capture">Add to today</a> below.</p>`,
-	} {
-		if !strings.Contains(body, want) {
-			t.Errorf("the day lacks %s", want)
-		}
-	}
-	order := []string{`<div class="sheet">`, `<section class="journal"`, `<section class="capture"`, `<div class="margin">`,
-		`<section class="group" aria-label="Readings">`}
-	at, prev := -1, "the start"
-	for _, mark := range order {
-		i := strings.Index(body, mark)
-		if i <= at {
-			t.Fatalf("%s is not after %s in the source (at %d, after %d)", mark, prev, i, at)
-		}
-		at, prev = i, mark
-	}
-	readings := body[strings.Index(body, `aria-label="Readings"`):]
-	readings = readings[:strings.Index(readings, "</section>")]
-	more := regexp.MustCompile(`(?s)<details class="more-fields"><summary>2 more fields</summary>(.*?)</details>`).FindStringSubmatch(readings)
-	if !strings.Contains(readings, `<summary class="button">Add a reading</summary>`) || more == nil ||
-		strings.Count(more[1], "<label>") != 2 || !strings.Contains(more[1], `name="taken_at"`) {
-		t.Errorf("Add a reading is not in the Readings, with 2 folded fields:\n%s", readings)
-	}
-	if !strings.Contains(readings, `<p class="empty">No readings on this day. <a href="#record">Add one</a> below.</p>`) {
-		t.Errorf("a day with no reading does not say so:\n%s", readings)
-	}
-
-	past := browse(t, h, "/days/"+dayOf(-3))
-	for _, want := range []string{`<span class="leaf-day">11</span>`, `<h1>Sunday</h1>`, `<a href="/days/today">Go to today</a>`,
-		`<p class="empty">Nothing written on this day. <a href="#capture">Add to it</a> below.</p>`, `<h2>Add to Sun 11 May</h2>`} {
-		if !strings.Contains(past, want) {
-			t.Errorf("a past day lacks %s", want)
-		}
-	}
-	if strings.Contains(past, `<span class="tag open">today</span>`) {
-		t.Error("a past day says today")
-	}
-}
-
 func TestLiveDayView(t *testing.T) {
 	c, _, _ := apitest.Fresh(t, "cli")
 	root := apitest.Must(t)(c.Get(t.Context(), "/"))
@@ -322,61 +187,30 @@ func TestLiveDayView(t *testing.T) {
 	}
 }
 
-// hiddenKey is the value of the hidden import_key of a form, "" when the form has none.
-func hiddenKey(form string) string {
-	m := regexp.MustCompile(`<input type="hidden" name="import_key" value="([^"]*)">`).FindStringSubmatch(form)
-	if m == nil {
-		return ""
-	}
-	return m[1]
-}
-
-// TestTheCaptureFormCarriesAFreshKeyEachTimeItIsDrawn (issue 0085, D28): the browser sends the key that the form was
-// drawn with, so a form sent twice (a double click, a reload that posts again) is one capture. The form of the next
-// draw has another key, so the next entry is a new capture.
-func TestTheCaptureFormCarriesAFreshKeyEachTimeItIsDrawn(t *testing.T) {
-	_, h, _ := apitest.FreshOn(t, "cli", fixedToday)
-	action := "/days/" + fixedToday + "/capture"
-	first := hiddenKey(captureForm(t, browse(t, h, "/days/"+fixedToday), action))
-	second := hiddenKey(captureForm(t, browse(t, h, "/days/"+fixedToday), action))
-	if len(first) < 16 || first == second {
-		t.Errorf("the keys of two draws are %q and %q: want two different keys of 16 characters or more", first, second)
-	}
-}
-
-// TestACaptureFormSentAgainIsAddedOnce: the same form sent twice answers 303 to the day both times, the second time
-// with "Already added" and no second paragraph. A JSON client gets the answer "Already added" with the day, as a
-// reading sent again gets "Already recorded".
-func TestACaptureFormSentAgainIsAddedOnce(t *testing.T) {
-	c, h, _ := apitest.FreshOn(t, "cli", fixedToday)
-	form := url.Values{"text": {"Walked the dog"}, "mood": {"4"}, "import_key": {"form-key-1"}}
+// TestACaptureSentAgainIsAddedOnce: the same capture sent twice, with the same import_key, adds one paragraph and one
+// mood. The second answer is "Already added" with the link to the day, as a reading sent again gets "Already recorded".
+func TestACaptureSentAgainIsAddedOnce(t *testing.T) {
+	c, _, _ := apitest.FreshOn(t, "cli", fixedToday)
 	toDay := "/days/" + fixedToday
-	first := submit(h, toDay+"/capture", form, "")
-	if first.Code != http.StatusSeeOther || withoutReceiptOrNot(first.Header().Get("Location")) != toDay {
-		t.Fatalf("first send: %d %q", first.Code, first.Header().Get("Location"))
-	}
-	if body := browse(t, h, first.Header().Get("Location")); strings.Contains(body, "Already added") {
-		t.Errorf("the first send says Already added:\n%.400s", body)
-	}
-	again := submit(h, toDay+"/capture", form, "")
-	if again.Code != http.StatusSeeOther || withoutReceiptOrNot(again.Header().Get("Location")) != toDay {
-		t.Fatalf("send again: %d %q, want 303 to the day", again.Code, again.Header().Get("Location"))
-	}
-	if body := browse(t, h, again.Header().Get("Location")); !strings.Contains(body, "Already added") {
-		t.Errorf("the second send does not say Already added:\n%.400s", body)
-	}
 	day := apitest.Must(t)(c.Get(t.Context(), toDay))
+	capture := apitest.Action(t, day, "capture")
+	if capture.Field("import_key") == nil {
+		t.Fatal("the capture action has no import_key field")
+	}
+	form := map[string]string{"text": "Walked the dog", "mood": "4", "import_key": "form-key-1"}
+	if first := apitest.Must(t)(c.Do(t.Context(), capture, form)); first.Title == "Already added" {
+		t.Errorf("the first send says Already added")
+	}
+	again := apitest.Must(t)(c.Do(t.Context(), capture, form))
+	if again.Title != "Already added" || apitest.Href(again, "day") != toDay {
+		t.Errorf("sent again: %q links the day %q, want Already added with %s", again.Title, apitest.Href(again, "day"), toDay)
+	}
+	day = apitest.Must(t)(c.Get(t.Context(), toDay))
 	if got := fmt.Sprint(props(day)["mood"]); got != "[4]" {
 		t.Errorf("the moods of the day after a send again: %s, want [4]", got)
 	}
 	if page := apitest.Must(t)(c.Get(t.Context(), apitest.Href(day, "page"))); props(page)["body"] != "(00:00) Walked the dog" {
 		t.Errorf("the page after a send again: %q", props(page)["body"])
-	}
-
-	// a JSON client sends the field import_key of the catalog
-	capture := apitest.Action(t, day, "capture")
-	if capture.Field("import_key") == nil {
-		t.Fatal("the capture action has no import_key field")
 	}
 	fields := map[string]string{"text": "By JSON", "import_key": "json-key-1"}
 	apitest.Must(t)(c.Do(t.Context(), capture, fields))
@@ -389,24 +223,11 @@ func TestACaptureFormSentAgainIsAddedOnce(t *testing.T) {
 	}
 }
 
-// withoutReceiptOrNot is a Location with its feedback receipt cut: the receipt of an answer with a result is part of
-// it, and a test of the destination does not read it.
-func withoutReceiptOrNot(location string) string {
-	u, err := url.Parse(location)
-	if err != nil {
-		return location
-	}
-	q := u.Query()
-	q.Del("feedback")
-	u.RawQuery = q.Encode()
-	return u.String()
-}
-
 // TestTheStreamPagesByDay: /days is the days with something, the newest first (docs/plans/130-the-explore-pass.md),
 // paged by limit and offset as every list: next is the older days, prev the newer days or the top. A day after today
 // is not in it.
 func TestTheStreamPagesByDay(t *testing.T) {
-	c, h, _ := apitest.FreshOn(t, "cli", fixedToday) // 2031-05-14
+	c, _, _ := apitest.FreshOn(t, "cli", fixedToday) // 2031-05-14
 	for day, text := range map[string]string{fixedToday: "Today.", dayOf(-1): "Yesterday.", dayOf(-2): "Two days ago.", "2030-05-14": "A year ago.", "2031-05-20": "Not yet."} {
 		apitest.Must(t)(c.Do(t.Context(), apitest.Action(t, apitest.Must(t)(c.Get(t.Context(), "/days/"+day)), "capture"), map[string]string{"text": text}))
 	}
@@ -440,14 +261,43 @@ func TestTheStreamPagesByDay(t *testing.T) {
 	if _, err := c.Get(t.Context(), "/days?limit=0"); apitest.Status(err) != 422 {
 		t.Errorf("/days?limit=0: %v, want a 422", err)
 	}
+}
 
-	body := browse(t, h, "/days")
-	for _, want := range []string{`<article class="day-card" aria-label="2031-05-14">`, `<p class="card-words">(00:00) Today.</p>`} {
-		if !strings.Contains(body, want) {
-			t.Errorf("the stream lacks %s", want)
+// TestOnThisDayListsTheSameDayOfEarlierYears: a day carries, as "earlier", its day pages of the years before, the nearest
+// year first, while a page exists, at most five. A day with no earlier year carries none, and a past day has its own.
+func TestOnThisDayListsTheSameDayOfEarlierYears(t *testing.T) {
+	c, _, _ := apitest.FreshOn(t, "cli", fixedToday)
+	earlier := func(day string) string {
+		t.Helper()
+		var out []string
+		list, _ := props(apitest.Must(t)(c.Get(t.Context(), "/days/"+day)))["earlier"].([]any)
+		for _, x := range list {
+			m := x.(map[string]any)
+			out = append(out, fmt.Sprintf("%v %v %v", m["day"], m["mood"], m["first_line"]))
 		}
+		return strings.Join(out, " | ")
 	}
-	if strings.Contains(body, "Not yet.") {
-		t.Error("the stream shows a day after today")
+	capture := func(day string, v map[string]string) {
+		t.Helper()
+		apitest.Must(t)(c.Do(t.Context(), apitest.Action(t, apitest.Must(t)(c.Get(t.Context(), "/days/"+day)), "capture"), v))
+	}
+	if got := earlier(fixedToday); got != "" {
+		t.Errorf("a day with no earlier year has %q", got)
+	}
+	capture("2030-05-14", map[string]string{"text": "A year ago.", "mood": "5"})
+	capture("2029-05-14", map[string]string{"text": "Two years ago."})
+	capture("2027-05-14", map[string]string{"text": "Four years ago, after a gap."})
+	if got, want := earlier(fixedToday), "2030-05-14 [5] (00:00) A year ago. | 2029-05-14 <nil> (00:00) Two years ago."; got != want {
+		t.Errorf("the earlier years of today:\n got %s\nwant %s", got, want)
+	}
+	if got, want := earlier("2030-05-14"), "2029-05-14 <nil> (00:00) Two years ago."; got != want {
+		t.Errorf("the earlier years of 2030-05-14:\n got %s\nwant %s", got, want)
+	}
+	for y := 2025; y <= 2026; y++ {
+		capture(fmt.Sprintf("%d-05-14", y), map[string]string{"text": "Synthetic words."})
+	}
+	capture("2028-05-14", map[string]string{"text": "Three years ago."})
+	if n := strings.Count(earlier(fixedToday), "|") + 1; n != 5 || strings.Contains(earlier(fixedToday), "2025-05-14") {
+		t.Errorf("the earlier years of today are %d, want the five nearest (2030 to 2026): %s", n, earlier(fixedToday))
 	}
 }

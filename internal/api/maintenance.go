@@ -15,7 +15,7 @@ import (
 
 // snapshot is the owner's action (docs/plans/082-snapshot-in-the-catalog.md): the file lands on this machine, in
 // the store's folder (named life-DATE.failed.db when its restore check fails); the answer is the path and the
-// restore check, with self at the root so a browser form is answered home with them as feedback. Core reports a refusal as 422 snapshot_refused; a timeout and a failure are
+// restore check, with self at the root. Core reports a refusal as 422 snapshot_refused; a timeout and a failure are
 // answered as on every route.
 func (h *server) snapshot(r *http.Request, _ spec, _ string) (*siren.Entity, error) {
 	path, res, err := h.s.TakeSnapshot(r.Context(), h.s.Local())
@@ -73,7 +73,7 @@ func (h *server) integrity(r *http.Request, _ spec, _ string) (*siren.Entity, er
 }
 
 // rebuildSearch is the owner's repair of the full-text index (docs/contract/integrity-checks.md). The answer is the
-// number of documents of the new index, with self at the root so that a browser form is answered home with it.
+// number of documents of the new index, with self at the root.
 func (h *server) rebuildSearch(r *http.Request, _ spec, _ string) (*siren.Entity, error) {
 	documents, err := h.s.RebuildSearch(r.Context())
 	if err != nil {

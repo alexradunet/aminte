@@ -289,20 +289,19 @@ func TestARefusedTaskWriteDoesNotCallTheService(t *testing.T) {
 	}
 }
 
-// When the task service ends, Tasks leaves the rail, the six actions leave GET /actions and every route is 503.
+// When the task service ends, the link tasks leaves the root, the six actions leave GET /actions and every route is 503.
 func TestWhenTheTaskServiceEndsTasksIsGone(t *testing.T) {
 	h, apps, _ := tasksOver(t)
-	html := map[string]string{"Accept": "text/html"}
-	hasRail := func() bool {
-		return strings.Contains(send(h, "GET", "/browse", "", html).Body.String(), `href="/tasks"`)
+	hasLink := func() bool {
+		return strings.Contains(send(h, "GET", "/", "", nil).Body.String(), `"href": "/tasks"`)
 	}
 	hasActions := func() bool { return strings.Contains(send(h, "GET", "/actions", "", nil).Body.String(), `"add-task"`) }
-	if !hasRail() || !hasActions() {
-		t.Fatalf("while the service runs: rail %v, actions %v, want both", hasRail(), hasActions())
+	if !hasLink() || !hasActions() {
+		t.Fatalf("while the service runs: link %v, actions %v, want both", hasLink(), hasActions())
 	}
 	apps.Remove("svc")
-	if hasRail() {
-		t.Error("the rail still links to /tasks")
+	if hasLink() {
+		t.Error("the root still links to /tasks")
 	}
 	body := send(h, "GET", "/actions", "", nil).Body.String()
 	for _, w := range taskWrites {

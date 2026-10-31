@@ -41,7 +41,7 @@ func TestAPIReferenceMatchesTheCode(t *testing.T) {
 			// and the page of the metric (plan 144): the properties of a page but its `metric` object
 			"id": int64(0), "entity_type": "", "title": "", "body": "", "created_at": "", "version": "", "is_day_page": false,
 			"links": []core.Edge{}, "backlinks": []core.Edge{}, "cover": core.Cover{}},
-		"settings": map[string]any{"model_url": "", "model": "", "model_key": "", "owner_number": "", "ground": "", "lock_after": ""},
+		"settings": map[string]any{"model_url": "", "model": "", "model_key": "", "owner_number": ""},
 		"conversation": map[string]any{"day": "", "turns": []Turn{},
 			// and the page of the conversation (plan 146): the properties of a page
 			"id": int64(0), "entity_type": "", "title": "", "body": "", "created_at": "", "version": "", "is_day_page": false,
@@ -54,8 +54,6 @@ func TestAPIReferenceMatchesTheCode(t *testing.T) {
 		"filed":      map[string]any{"category": core.Category{}, "created": false, "ids": []int64{}, "count": 0, "added": 0, "moved": 0, "removed": 0},
 		"integrity":  core.IntegrityResult{},
 		"result":     map[string]any{"title": "", "sha256": "", "mime": "", "picture": false},
-		"login":      map[string]any{"failed": false, "logged_in": false},
-		"locked":     map[string]any{"failed": false, "next": ""},
 		"result of capture, create-page, save-body": core.Sync{},
 		"result of add-file":                        core.Kept{},
 	}

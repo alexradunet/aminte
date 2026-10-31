@@ -2,18 +2,9 @@ package main
 
 import (
 	"context"
-	"crypto/ecdsa"
-	"crypto/elliptic"
-	"crypto/rand"
-	"crypto/tls"
-	"crypto/x509"
-	"crypto/x509/pkix"
-	"encoding/pem"
 	"errors"
 	"fmt"
 	"io"
-	"log"
-	"math/big"
 	"net"
 	"net/http"
 	"os"
@@ -23,8 +14,6 @@ import (
 	"testing"
 	"time"
 
-	"lifelog/internal/api"
-	"lifelog/internal/core"
 	"lifelog/internal/db/dbtest"
 )
 
@@ -86,54 +75,66 @@ func TestServeAuthorityMount(t *testing.T) {
 
 const testToken = "synthetic-token-0123456789abcdefghij"
 
-func TestPublicFlagsParse(t *testing.T) {
-	o, err := parse([]string{"serve", "--public", "--allow-origin", "https://a.example", "--allow-origin=http://localhost:3000", "--token-file", "t.txt", "--tls-cert", "c.pem", "--tls-key=k.pem"}, noVars)
+// TestServeFlagsParse: serve takes --addr, --snapshots, --token-file and --with. The flags of the network that the
+// core had (--public, --allow-origin, --tls-cert, --tls-key) are unknown now: a line that names one is refused with the
+// flag in the message, never ignored.
+func TestServeFlagsParse(t *testing.T) {
+	o, err := parse([]string{"serve", "--token-file", "t.txt", "--addr=127.0.0.1:0", "--with", "web"}, noVars)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !o.serve.public || o.serve.tokenFile != "t.txt" || o.serve.tlsCert != "c.pem" || o.serve.tlsKey != "k.pem" || o.serve.addrExplicit ||
-		!reflect.DeepEqual(o.serve.allowOrigins, []string{"https://a.example", "http://localhost:3000"}) {
+	if o.serve.tokenFile != "t.txt" || o.serve.addr != "127.0.0.1:0" || !reflect.DeepEqual(o.serve.with, []string{"web"}) {
 		t.Fatalf("%+v", o)
 	}
-	if _, err := parse([]string{"serve", "--allow-origin"}, noVars); err == nil {
-		t.Fatal("--allow-origin without a value accepted")
+	if _, err := parse([]string{"serve", "--token-file"}, noVars); err == nil {
+		t.Fatal("--token-file without a value accepted")
+	}
+	for _, argv := range [][]string{
+		{"serve", "--public"}, {"serve", "--allow-origin", "https://a.example"}, {"serve", "--allow-origin=https://a.example"},
+		{"serve", "--tls-cert", "c.pem"}, {"serve", "--tls-key=k.pem"},
+	} {
+		flag, _, _ := strings.Cut(argv[1], "=")
+		if _, err := parse(argv, noVars); err == nil || !strings.Contains(err.Error(), "unknown flag "+flag) {
+			t.Errorf("%v: %v, want the refusal unknown flag %s", argv, err, flag)
+		}
 	}
 	o, err = parse([]string{"serve", "--addr", "0.0.0.0:0"}, noVars)
-	if err != nil || !o.serve.addrExplicit || o.serve.public {
+	if err != nil || o.serve.addr != "0.0.0.0:0" {
 		t.Fatalf("%+v %v", o, err)
+	}
+	if _, err := prepareServe(env{}, o); err == nil || !strings.Contains(err.Error(), "serve address") {
+		t.Fatalf("the address 0.0.0.0:0: %v, want the refusal of a non-loopback address", err)
 	}
 }
 
-func TestPublicOptionsRefusals(t *testing.T) {
+// TestServeTokenOfTheFileOrTheEnvironment: tokenOf reads the token of the server before anything opens. The file wins
+// over $LIFELOG_TOKEN; one line break is cut; no token anywhere is no token (the check is off); a token that is short,
+// has two lines or sits in an empty file is refused with its reason.
+func TestServeTokenOfTheFileOrTheEnvironment(t *testing.T) {
 	absent := filepath.Join(t.TempDir(), "absent.db")
-	short := filepath.Join(t.TempDir(), "short.txt")
-	if err := os.WriteFile(short, []byte("too short\n"), 0o600); err != nil {
-		t.Fatal(err)
+	write := func(name, content string) string {
+		path := filepath.Join(t.TempDir(), name)
+		if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		return path
 	}
-	two := filepath.Join(t.TempDir(), "two.txt")
-	if err := os.WriteFile(two, []byte(testToken+"\n"+testToken+"\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	good := filepath.Join(t.TempDir(), "token.txt")
-	if err := os.WriteFile(good, []byte(testToken+"\r\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
+	short := write("short.txt", "too short\n")
+	two := write("two.txt", testToken+"\n"+testToken+"\n")
+	empty := write("empty.txt", "")
+	good := write("token.txt", testToken+"\r\n")
 	for _, tc := range []struct {
 		name string
 		o    opts
-		want string
+		want string // a part of the refusal
 	}{
-		{"token file without --public", opts{serve: serveFlags{tokenFile: good}}, "--token-file needs --public"},
-		{"origin without --public", opts{serve: serveFlags{allowOrigins: []string{"https://a.example"}}}, "--allow-origin needs --public"},
-		{"tls without --public", opts{serve: serveFlags{tlsCert: "c", tlsKey: "k"}}, "need --public"},
-		{"--public without a token", opts{serve: serveFlags{public: true}}, "needs a token"},
-		{"short token file", opts{serve: serveFlags{public: true, tokenFile: short}}, "at least 32"},
-		{"two-line token file", opts{serve: serveFlags{public: true, tokenFile: two}}, "one line"},
-		{"missing token file", opts{serve: serveFlags{public: true, tokenFile: filepath.Join(t.TempDir(), "none")}}, "token file"},
-		{"one tls flag", opts{serve: serveFlags{public: true, tokenFile: good, tlsCert: "c"}}, "go together"},
-		{"bad origin", opts{serve: serveFlags{public: true, tokenFile: good, allowOrigins: []string{"a.example"}}}, "origin"},
-		{"origin in upper case", opts{serve: serveFlags{public: true, tokenFile: good, allowOrigins: []string{"http://App.Example"}}}, "lower case"},
-		{"non-loopback address without --public", opts{serve: serveFlags{addr: "0.0.0.0:0"}}, "serve address"},
+		{"short token file", opts{serve: serveFlags{tokenFile: short}}, "at least 32"},
+		{"two-line token file", opts{serve: serveFlags{tokenFile: two}}, "one line"},
+		{"empty token file", opts{serve: serveFlags{tokenFile: empty}}, "at least 32"},
+		{"missing token file", opts{serve: serveFlags{tokenFile: filepath.Join(t.TempDir(), "none")}}, "token file"},
+		{"short token in the environment", opts{token: "short"}, "at least 32"},
+		{"non-loopback address with a token", opts{serve: serveFlags{addr: "0.0.0.0:0", tokenFile: good}}, "serve address"},
+		{"non-loopback address without a token", opts{serve: serveFlags{addr: "0.0.0.0:0"}}, "serve address"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			o := tc.o
@@ -151,47 +152,45 @@ func TestPublicOptionsRefusals(t *testing.T) {
 			}
 		})
 	}
-	// A good token file, with its line ending trimmed, and the env fallback.
-	pub, err := publicOptions(opts{serve: serveFlags{public: true, tokenFile: good, allowOrigins: []string{"https://a.example"}}})
-	if err != nil || pub.Token != testToken || pub.TLS || !reflect.DeepEqual(pub.Origins, []string{"https://a.example"}) {
-		t.Fatalf("%+v %v", pub, err)
-	}
-	withToken := func(name string) string { return map[string]string{"LIFELOG_TOKEN": testToken}[name] }
 	for _, tc := range []struct {
-		argv   []string
-		public bool
-	}{{[]string{"serve", "--public"}, true}, {[]string{"serve"}, false}} {
-		o, err := parse(tc.argv, withToken)
-		if err != nil {
-			t.Fatal(err)
+		name  string
+		o     opts
+		token string
+	}{
+		{"a token file, with its line ending cut", opts{serve: serveFlags{tokenFile: good}}, testToken},
+		{"the environment alone", opts{token: testToken}, testToken},
+		{"the file wins over the environment", opts{token: strings.Repeat("e", 40), serve: serveFlags{tokenFile: good}}, testToken},
+		{"no token anywhere", opts{}, ""},
+	} {
+		if got, err := tokenOf(tc.o); err != nil || got != tc.token {
+			t.Errorf("%s: token %q, %v; want %q", tc.name, got, err, tc.token)
 		}
-		pub, err := publicOptions(o)
-		switch {
-		case tc.public && (err != nil || pub.Token != testToken):
-			t.Fatalf("%v: %+v %v, want the token of the environment", tc.argv, pub, err)
-		case !tc.public && (err != nil || pub != nil):
-			t.Fatalf("without --public the token in the environment is ignored: %+v %v", pub, err)
-		}
+	}
+	// $LIFELOG_TOKEN reaches the options through parse, for the client (--url) and for serve alike.
+	withToken := func(name string) string { return map[string]string{"LIFELOG_TOKEN": testToken}[name] }
+	o, err := parse([]string{"serve"}, withToken)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, err := tokenOf(o); err != nil || got != testToken {
+		t.Errorf("serve with $LIFELOG_TOKEN: %q, %v, want the token of the environment", got, err)
 	}
 }
 
-// TestPublicServe runs serve --public in-process on a loopback address (a non-loopback bind is covered by
-// api.PublicAddress; loopback keeps this test clear of the Windows firewall prompt).
-func TestPublicServe(t *testing.T) {
+// TestServeWithAToken runs serve --token-file in-process on a loopback address. From the outside in: a wrong Host is
+// 403 whether the token is sent or not, a request on the right Host without the token is 401 with the challenge, the
+// token opens the API, and the guard against a write that a page of another origin sends stays on for a request with the
+// token. The startup line says that the token is required.
+func TestServeWithAToken(t *testing.T) {
 	live := dbtest.File(t)
 	tokenFile := filepath.Join(t.TempDir(), "token.txt")
 	if err := os.WriteFile(tokenFile, []byte(testToken+"\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	ctx := t.Context()
-	// Without a token the command refuses before it listens: main writes the error and exits 1.
 	e, _, _ := testEnv(t) // no LIFELOG_TOKEN in its environment
-	if err := runArgs(ctx, e, []string{"--db", live, "serve", "--public", "--addr", "127.0.0.1:0"}); err == nil || !strings.Contains(err.Error(), "needs a token") {
-		t.Fatalf("serve --public without a token: %v", err)
-	}
-	const app = "https://app.example"
-	startup := serveInProcess(t, e, "--db", live, "serve", "--public", "--addr", "127.0.0.1:0", "--token-file", tokenFile, "--allow-origin", app)
-	if !strings.Contains(startup, "public: token required") || !strings.Contains(startup, "in clear") {
+	startup := serveInProcess(t, e, "--db", live, "serve", "--addr", "127.0.0.1:0", "--token-file", tokenFile)
+	if !strings.Contains(startup, " on http://127.0.0.1:") || !strings.Contains(startup, " (token required) (version ") || strings.Contains(startup, "public") {
 		t.Fatalf("startup line does not say what it serves: %q", startup)
 	}
 	scheme, address := servedAt(t, startup)
@@ -201,134 +200,79 @@ func TestPublicServe(t *testing.T) {
 	base := scheme + "://" + address
 	// The client has its own transport. Its idle connections close before serve stops: the shutdown of serve waits
 	// 5 s for a connection that the client opened and sent no request on.
-	tr := &http.Transport{}
+	tr := &http.Transport{Proxy: nil}
 	defer tr.CloseIdleConnections()
 	hc := &http.Client{Transport: tr, Timeout: 10 * time.Second}
-	get := func(token string) int {
+	send := func(method, path, body string, header map[string]string) (int, http.Header) {
 		t.Helper()
-		req, _ := http.NewRequestWithContext(ctx, "GET", base+"/actions", nil)
-		if token != "" {
-			req.Header.Set("Authorization", "Bearer "+token)
+		req, _ := http.NewRequestWithContext(ctx, method, base+path, strings.NewReader(body))
+		if body != "" {
+			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		}
+		for k, v := range header {
+			if k == "Host" {
+				req.Host = v
+				continue
+			}
+			req.Header.Set(k, v)
 		}
 		res, err := hc.Do(req)
 		if err != nil {
 			t.Fatal(err)
 		}
 		res.Body.Close()
-		return res.StatusCode
+		return res.StatusCode, res.Header
 	}
-	if got := get(""); got != 401 {
-		t.Fatalf("without the token: %d", got)
+	bearer := map[string]string{"Authorization": "Bearer " + testToken}
+	if got, h := send("GET", "/actions", "", nil); got != 401 || h.Get("WWW-Authenticate") != `Bearer realm="lifelog"` {
+		t.Fatalf("without the token: %d, WWW-Authenticate %q", got, h.Get("WWW-Authenticate"))
 	}
-	if got := get(strings.Repeat("x", 36)); got != 401 {
+	if got, _ := send("GET", "/actions", "", map[string]string{"Authorization": "Bearer " + strings.Repeat("x", 36)}); got != 401 {
 		t.Fatalf("with a wrong token: %d", got)
 	}
-	if got := get(testToken); got != 200 {
+	if got, _ := send("GET", "/actions", "", map[string]string{"Cookie": "lifelog_session=" + testToken}); got != 401 {
+		t.Fatalf("with the token as a cookie: %d", got)
+	}
+	if got, _ := send("GET", "/actions", "", bearer); got != 200 {
 		t.Fatalf("with the token: %d", got)
 	}
-	// --allow-origin reaches the guard of the API's writes: a browser write from that origin is done, and one from
-	// another origin is refused.
-	post := func(origin string) int {
-		t.Helper()
-		req, _ := http.NewRequestWithContext(ctx, "POST", base+"/pages", strings.NewReader("title=From+"+strings.TrimPrefix(origin, "https://")))
-		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-		req.Header.Set("Authorization", "Bearer "+testToken)
-		req.Header.Set("Origin", origin)
-		req.Header.Set("Sec-Fetch-Site", "cross-site")
-		res, err := hc.Do(req)
-		if err != nil {
-			t.Fatal(err)
+	// A wrong Host is refused before the token is looked at.
+	for _, header := range []map[string]string{{"Host": "arbitrary.invalid:7777"}, {"Host": "arbitrary.invalid:7777", "Authorization": bearer["Authorization"]}} {
+		if got, _ := send("GET", "/actions", "", header); got != 403 {
+			t.Fatalf("a wrong Host, headers %v: %d, want 403", header, got)
 		}
-		res.Body.Close()
-		return res.StatusCode
 	}
-	if got := post(app); got != 200 {
-		t.Fatalf("a write from the allowed origin: %d", got)
+	// A write with the token is done; a write that a page of another origin sends through the browser is refused, also
+	// with the token: the guard has no trusted origin.
+	if got, _ := send("POST", "/pages", "title=From+a+program", bearer); got != 200 {
+		t.Fatalf("a write with the token: %d", got)
 	}
-	if got := post("https://evil.example"); got != 403 {
-		t.Fatalf("a write from another origin: %d", got)
+	cross := map[string]string{"Authorization": bearer["Authorization"], "Origin": "https://evil.example", "Sec-Fetch-Site": "cross-site"}
+	if got, _ := send("POST", "/pages", "title=From+elsewhere", cross); got != 403 {
+		t.Fatalf("a write from another origin: %d, want 403", got)
 	}
 }
 
-func TestTLSListener(t *testing.T) {
-	dir := t.TempDir()
-	certFile, keyFile := filepath.Join(dir, "cert.pem"), filepath.Join(dir, "key.pem")
-	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	if err != nil {
-		t.Fatal(err)
+// TestServeWithNoToken: with no token the server has no bearer check and says nothing of one on its startup line. A
+// program sends nothing and is served; the Host check stays.
+func TestServeWithNoToken(t *testing.T) {
+	live := dbtest.File(t)
+	e, _, _ := testEnv(t)
+	startup := serveInProcess(t, e, "--db", live, "serve", "--addr", "127.0.0.1:0")
+	if strings.Contains(startup, "token") || !strings.Contains(startup, " on http://127.0.0.1:") {
+		t.Fatalf("startup line: %q", startup)
 	}
-	template := &x509.Certificate{SerialNumber: big.NewInt(1), Subject: pkix.Name{CommonName: "lifelog test"},
-		NotBefore: time.Now().Add(-time.Hour), NotAfter: time.Now().Add(time.Hour), IPAddresses: []net.IP{net.ParseIP("127.0.0.1")}}
-	der, err := x509.CreateCertificate(rand.Reader, template, template, &key.PublicKey, key)
-	if err != nil {
-		t.Fatal(err)
-	}
-	keyDER, err := x509.MarshalECPrivateKey(key)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(certFile, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der}), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(keyFile, pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: keyDER}), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := tlsListener(nil, certFile, filepath.Join(dir, "missing.pem")); err == nil {
-		t.Fatal("a missing key was accepted")
-	}
-	raw, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatal(err)
-	}
-	listener, err := tlsListener(raw, certFile, keyFile)
-	if err != nil {
-		raw.Close()
-		t.Fatal(err)
-	}
-	// A synthetic database: the API that api.Public builds needs a store. Its cleanup closes it after the server's
-	// shutdown below: a cleanup runs after the ones registered later.
-	handler, err := api.Public(&core.Store{DB: dbtest.New(t)}, api.PublicOptions{Token: testToken, TLS: true})
-	if err != nil {
-		t.Fatal(err)
-	}
-	srv := &http.Server{Handler: handler, ErrorLog: log.New(io.Discard, "", 0)} // the plain request below logs a handshake error
-	ctx, cancel := context.WithCancel(context.Background())
-	done := make(chan error, 1)
-	go func() { done <- serveHTTP(ctx, srv, listener, 5*time.Second) }()
-	t.Cleanup(func() {
-		cancel()
-		select {
-		case err := <-done:
-			if err != nil {
-				t.Error(err)
-			}
-		case <-time.After(10 * time.Second):
-			t.Error("shutdown timed out")
-		}
-	})
-	pool := x509.NewCertPool()
-	pool.AppendCertsFromPEM(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der}))
-	tr := &http.Transport{TLSClientConfig: &tls.Config{RootCAs: pool, MinVersion: tls.VersionTLS12}}
+	_, address := servedAt(t, startup)
+	tr := &http.Transport{Proxy: nil}
 	defer tr.CloseIdleConnections()
 	hc := &http.Client{Transport: tr, Timeout: 10 * time.Second}
-	req, _ := http.NewRequest("GET", "https://"+listener.Addr().String()+"/", nil)
-	req.Header.Set("Authorization", "Bearer "+testToken)
-	res, err := hc.Do(req)
+	res, err := hc.Get("http://" + address + "/actions")
 	if err != nil {
 		t.Fatal(err)
 	}
 	res.Body.Close()
-	if res.StatusCode != http.StatusOK || res.TLS == nil {
-		t.Fatalf("status=%d tls=%v", res.StatusCode, res.TLS != nil)
-	}
-	// A plain request on the TLS port is answered by the server's own 400, never by the handler.
-	plain, err := hc.Get("http://" + listener.Addr().String() + "/")
-	if err != nil {
-		t.Fatal(err)
-	}
-	plain.Body.Close()
-	if plain.StatusCode != http.StatusBadRequest {
-		t.Fatalf("plain HTTP on the TLS listener: %d", plain.StatusCode)
+	if res.StatusCode != 200 || res.Header.Get("WWW-Authenticate") != "" {
+		t.Fatalf("without a token: %d, WWW-Authenticate %q, want 200 and no challenge", res.StatusCode, res.Header.Get("WWW-Authenticate"))
 	}
 }
 

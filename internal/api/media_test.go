@@ -14,7 +14,7 @@ import (
 // first, with a kind, a picture where one is kept and a day; a file of another kind keeps its page and is a document.
 // One kind alone is read by media=, and any other word is refused.
 func TestMediaListsPicturesVideosAndRecordings(t *testing.T) {
-	c, h, _ := apitest.FreshOn(t, "cli", fixedToday)
+	c, _, _ := apitest.FreshOn(t, "cli", fixedToday)
 	ctx := t.Context()
 	root := apitest.Must(t)(c.Get(ctx, "/"))
 	add := apitest.Action(t, root, "add-file")
@@ -86,21 +86,6 @@ func TestMediaListsPicturesVideosAndRecordings(t *testing.T) {
 		t.Errorf("the pictures: %v", rows)
 	}
 
-	// The browser: the counts in words, the kinds as links, a tile a file with its picture or the icon of its kind.
-	body := browse(t, h, "/browse?kind=media")
-	for _, want := range []string{"<span>3 pictures, 1 video, 2 recordings</span>",
-		`<nav class="kinds" aria-label="Media kind"><a href="/browse?kind=media" aria-current="page">All media</a><a href="/browse?kind=media&amp;media=image">Pictures</a><a href="/browse?kind=media&amp;media=video">Videos</a><a href="/browse?kind=media&amp;media=audio">Recordings</a></nav>`,
-		`<ul class="plain tiles">`, `<img src="` + apitest.Href(photo, "preview") + `" alt="" loading="lazy"><span class="first">Lake.jpg</span><span class="meta">picture · Sat 10 May</span>`,
-		`<span class="tile-blank" aria-hidden="true"><span class="icon icon-video" aria-hidden="true"></span>`, `<span class="first">Walk.mp4</span><span class="meta">video · Mon 12 May</span>`, `<span class="first">Dawn.jpg</span><span class="meta">picture · Wed 14 May</span>`,
-		`<span class="first">Memo 1.m4a</span><span class="meta">recording · Thu 1 May</span>`, `<span class="first">Blank.jpg</span><span class="meta">picture · no day yet</span>`,
-		`<label class="pick-box"><input type="checkbox" name="ids" value="`} {
-		if !strings.Contains(body, want) {
-			t.Errorf("the media page lacks %s", want)
-		}
-	}
-	if strings.Contains(body, "Scan.pdf") {
-		t.Error("the media page shows the PDF")
-	}
 	// The documents are every other file, as rows, with the same words.
 	apitest.Must(t)(c.Do(ctx, add, map[string]string{"title": "Notes.txt", "sha256": strings.Repeat("0f", 32), "mime": "text/plain", "day": "2031-05-03"}))
 	files := apitest.Must(t)(c.Get(ctx, "/browse?kind=document"))
@@ -115,30 +100,12 @@ func TestMediaListsPicturesVideosAndRecordings(t *testing.T) {
 		accept(apitest.Action(t, files, "add-file")) != "" || props(files)["media_counts"] != nil {
 		t.Errorf("the documents: %v\n%+v %+v", got, files.Links, props(files))
 	}
-	body = browse(t, h, "/browse?kind=document")
-	for _, want := range []string{`<a href="/browse?kind=document" aria-current="page">Documents <small>2</small></a>`,
-		`<input type="hidden" name="back" value="/browse?kind=document">`, `aria-label="Select Notes.txt">`,
-		`<span class="first">Notes.txt</span><span class="meta">text/plain · Sat 3 May</span>`, `<ul class="plain rows">`} {
-		if !strings.Contains(body, want) {
-			t.Errorf("the documents page lacks %s", want)
-		}
-	}
-	if strings.Contains(body, "Lake.jpg") || strings.Contains(body, "Memo 1.m4a") || strings.Contains(body, " pictures, ") {
-		t.Error("the documents page shows media")
-	}
-	if body := browse(t, h, "/browse?kind=media&media=video"); !strings.Contains(body, `<a href="/browse?kind=media&amp;media=video" aria-current="page">Videos</a>`) ||
-		strings.Contains(body, "Memo 1.m4a") || !strings.Contains(body, `value="/browse?kind=media&amp;media=video">`) {
-		t.Errorf("the videos page: %.800s", body)
-	}
-	if body := browse(t, h, "/browse?kind=media&media=video&offset=1"); !strings.Contains(body, `<p class="empty">Nothing of this kind yet. New, above, makes the first one.</p>`) {
-		t.Errorf("an empty kind: %.800s", body)
-	}
 }
 
 // TestTheMediaCountsFollowTheScope: inside a category the media list counts what is filed there, and Not filed what
 // is in no category.
 func TestTheMediaCountsFollowTheScope(t *testing.T) {
-	c, h, s := apitest.Fresh(t, "cli")
+	c, _, s := apitest.Fresh(t, "cli")
 	browseFixture(t, s) // Family: photo.jpg and scan.pdf; nowhere: memo.m4a
 	ctx := t.Context()
 	for path, want := range map[string]string{
@@ -152,34 +119,24 @@ func TestTheMediaCountsFollowTheScope(t *testing.T) {
 			t.Errorf("%s: %s, want %s", path, got, want)
 		}
 	}
-	if body := browse(t, h, "/browse?kind=media&in=Family"); !strings.Contains(body, "<span>1 picture, no videos, no recordings</span>") {
-		t.Error("the media list in Family does not say its counts")
-	}
 }
 
 // TestMediaIsEmptyUntilAFileOfItsKindsIsKept: a PDF alone leaves the media list empty, with its counts and its
 // empty words, and a photo alone the documents.
 func TestMediaIsEmptyUntilAFileOfItsKindsIsKept(t *testing.T) {
-	c, h, _ := apitest.Fresh(t, "cli")
+	c, _, _ := apitest.Fresh(t, "cli")
 	ctx := t.Context()
 	apitest.Must(t)(c.Do(ctx, apitest.Action(t, apitest.Must(t)(c.Get(ctx, "/")), "add-file"), map[string]string{"title": "Scan.pdf", "sha256": strings.Repeat("ef", 32), "mime": "application/pdf"}))
 	e := apitest.Must(t)(c.Get(ctx, "/browse?kind=media"))
 	if rows, _ := props(e)["rows"].([]any); len(rows) != 0 || len(e.Entities) != 0 {
 		t.Errorf("the rows: %v", props(e)["rows"])
 	}
-	if body := browse(t, h, "/browse?kind=media"); !strings.Contains(body, `<span>no pictures, no videos, no recordings</span>`) ||
-		!strings.Contains(body, `<p class="empty">Nothing of this kind yet. New, above, makes the first one.</p>`) {
-		t.Errorf("the empty page: %.800s", body)
-	}
 	// And the other way round: a photo alone leaves the documents empty.
-	c, h, _ = apitest.Fresh(t, "cli")
+	c, _, _ = apitest.Fresh(t, "cli")
 	path, _ := jpegFile(t, "lake.jpg", 40, 30)
 	apitest.Must(t)(c.Do(ctx, apitest.Action(t, apitest.Must(t)(c.Get(ctx, "/")), "add-file"), map[string]string{"title": "Lake.jpg", "original": path}))
 	if e := apitest.Must(t)(c.Get(ctx, "/browse?kind=document")); len(e.Entities) != 0 {
 		t.Errorf("the documents: %+v", e.Entities)
-	}
-	if body := browse(t, h, "/browse?kind=document"); !strings.Contains(body, `<p class="empty">Nothing of this kind yet. New, above, makes the first one.</p>`) {
-		t.Errorf("the empty documents page: %.800s", body)
 	}
 }
 

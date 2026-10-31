@@ -1,37 +1,49 @@
 package api_test
 
 import (
+	"errors"
 	"fmt"
-	"net/url"
+	"net/http"
 	"strings"
 	"testing"
 
+	"lifelog/client"
 	"lifelog/internal/api/apitest"
 )
 
-// TestAFormDrawsTheHintAndTheActionsPageTheDescription: a form says what the action does in the words of its hint.
-// /actions lists every action with the text of the API.
-func TestAFormDrawsTheHintAndTheActionsPageTheDescription(t *testing.T) {
-	_, h, _ := apitest.Fresh(t, "cli")
+// TestAnActionCarriesTheHintOfItsFormAndTheActionsListTheDescription: an action on a resource says what it does in the
+// words of its hint. /actions lists every action with the text of the API and no hint.
+func TestAnActionCarriesTheHintOfItsFormAndTheActionsListTheDescription(t *testing.T) {
+	c, _, _ := apitest.Fresh(t, "cli")
+	ctx := t.Context()
 	hint := "Make a person. The title is the short name that links use. The name is the full name."
-	if page := browse(t, h, "/browse?kind=person"); !strings.Contains(page, hint) {
-		t.Errorf("/browse?kind=person does not draw the hint of create-person")
+	if got := apitest.Action(t, apitest.Must(t)(c.Get(ctx, "/browse?kind=person")), "create-person").Hint; got != hint {
+		t.Errorf("/browse?kind=person offers the hint %q for create-person, want %q", got, hint)
 	}
-	page := browse(t, h, "/actions")
-	if strings.Contains(page, hint) || !strings.Contains(page, "Create a person: title is the permanent handle") {
-		t.Errorf("/actions does not draw the description of create-person")
+	listed := apitest.Action(t, apitest.Must(t)(c.Get(ctx, "/actions")), "create-person")
+	if listed.Hint != "" || !strings.Contains(listed.Description, "Create a person: title is the permanent handle") {
+		t.Errorf("/actions lists create-person with the hint %q and the description %q", listed.Hint, listed.Description)
 	}
 }
 
-// TestARefusedReadingOfAnUnknownMetricLinksToTheFormOfTheMetric: the answer says the metric does not exist, in the
-// words of the buttons, and links to the form that adds it with the name filled.
+// TestARefusedReadingOfAnUnknownMetricLinksToTheFormOfTheMetric: the answer says the metric does not exist and links
+// (rel register) to the address that opens the form that adds it, with the name filled.
 func TestARefusedReadingOfAnUnknownMetricLinksToTheFormOfTheMetric(t *testing.T) {
-	_, h, _ := apitest.Fresh(t, "cli")
-	rec := submit(h, "/measurements", url.Values{"metric": {"Ghost"}, "day": {"2026-10-12"}, "value": {"3"}}, "")
-	body := rec.Body.String()
-	if rec.Code != 404 || !strings.Contains(body, `href="/metrics?name=Ghost&amp;new=register-metric"`) || !strings.Contains(body, "New metric") {
-		t.Errorf("status %d, and the page has no link to the form of the metric:\n%.3000s", rec.Code, body)
+	c, _, _ := apitest.Fresh(t, "cli")
+	ctx := t.Context()
+	record := apitest.Action(t, apitest.Must(t)(c.Get(ctx, "/")), "record")
+	_, err := c.Do(ctx, record, map[string]string{"metric": "Ghost", "day": "2026-10-12", "value": "3"})
+	var ce *client.Error
+	if !errors.As(err, &ce) || ce.Status != http.StatusNotFound {
+		t.Fatalf("a reading of an unknown metric: %v, want 404", err)
 	}
+	register := ce.Entity.LinkByRel("register")
+	if register == nil || register.Href != "/metrics?name=Ghost&new=register-metric" || register.Title != "Add the metric Ghost" {
+		t.Fatalf("the link register is %+v, want /metrics?name=Ghost&new=register-metric", register)
+	}
+	// The address is served, and the page there offers the action. The browser fills the fields from the query.
+	filled := apitest.Must(t)(c.Get(ctx, register.Href))
+	apitest.Action(t, filled, "register-metric")
 }
 
 // TestFilingNamesFewPagesAndCountsMany: the sentence of file-pages names up to three pages, else counts them.

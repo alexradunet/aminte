@@ -9,7 +9,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"slices"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -43,7 +42,7 @@ func startWith(ctx context.Context, e env, listen net.Addr, apps *api.Apps) (ser
 	if len(paths) == 0 {
 		return ctx, func() {}
 	}
-	url := "http://" + loopbackOf(listen)
+	url := "http://" + listen.String() // the listener is on a loopback address (api.LoopbackAddress): a child reaches it there
 	childCtx, endChildren := context.WithCancel(ctx)
 	serveCtx, endServe := context.WithCancel(context.WithoutCancel(ctx))
 	var children sync.WaitGroup
@@ -68,29 +67,14 @@ func startWith(ctx context.Context, e env, listen net.Addr, apps *api.Apps) (ser
 	}
 }
 
-// loopbackOf is the address a child reaches the listener at: the listener's own host and port, or the IPv4 loopback
-// for a listener on every interface (0.0.0.0, [::]). A listener on [::1] or on one address of the machine is
-// reached there.
-func loopbackOf(a net.Addr) string {
-	t, ok := a.(*net.TCPAddr)
-	if !ok {
-		return a.String()
-	}
-	host := t.IP.String()
-	if t.IP.IsUnspecified() {
-		host = "127.0.0.1"
-	}
-	return net.JoinHostPort(host, strconv.Itoa(t.Port))
-}
-
-// withEnv is the environment of a child of serve: the one of any extension, and the token of a public listener. A
-// LIFELOG_TOKEN that the child could inherit is removed: the child gets the token of this listener or none.
+// withEnv is the environment of a child of serve: the one of any extension, and the token of this server. A
+// LIFELOG_TOKEN that the child could inherit is removed: the child gets the token of this server or none.
 func withEnv(e env, exe, file, url string) []string {
 	env := slices.DeleteFunc(extensionEnv(os.Environ(), exe, file, url), func(kv string) bool {
 		return strings.HasPrefix(kv, "LIFELOG_TOKEN=") || strings.HasPrefix(kv, "LIFELOG_LISTEN=") // runWithOnce sets the address
 	})
-	if pub := e.o.serve.pub; pub != nil {
-		env = append(env, "LIFELOG_TOKEN="+pub.Token)
+	if token := e.o.serve.token; token != "" {
+		env = append(env, "LIFELOG_TOKEN="+token)
 	}
 	return env
 }

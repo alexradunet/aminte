@@ -65,24 +65,6 @@ func (h *server) page(r *http.Request) (*siren.Entity, error) {
 	if err != nil {
 		return nil, err
 	}
-	// A live metric has one view in a browser, its series, which carries the page (plan 144). The query goes with it,
-	// so ?new=edit-metric opens the same form there. A tombstoned metric is not in the series: its page stays.
-	if wantsHTML(r) && slices.Contains(e.Class, "metric") && !slices.Contains(e.Class, "deleted") {
-		to := siren.MetricHref(e.Title)
-		if r.URL.RawQuery != "" {
-			to += "?" + r.URL.RawQuery
-		}
-		return nil, redirect{to}
-	}
-	// A live conversation page has one view in a browser, the conversation of its day, which carries the page. The
-	// query goes with it, as for a metric.
-	if day := conversationDay(e.Title); wantsHTML(r) && day != "" && !slices.Contains(e.Class, "deleted") {
-		to := conversationHref(day)
-		if r.URL.RawQuery != "" {
-			to += "?" + r.URL.RawQuery
-		}
-		return nil, redirect{to}
-	}
 	return e, nil
 }
 

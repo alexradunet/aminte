@@ -27,7 +27,7 @@ type Client struct {
 	hc     *http.Client
 	base   string
 	source string
-	token  string // sent as a bearer credential to a public listener (docs/plans/078-network-server.md)
+	token  string // sent as a bearer credential to a server that has a token (internal/api RequireToken)
 }
 
 // InProcess calls h directly; no socket is opened.
@@ -36,7 +36,7 @@ func InProcess(h http.Handler, source string) *Client {
 }
 
 // Remote calls a running server, e.g. http://127.0.0.1:7777, with token as the owner's bearer credential when the
-// server is --public ("" for none). Connecting and the TLS handshake are bounded by dialTimeout, and the wait for the
+// server has a token ("" for none). Connecting and the TLS handshake are bounded by dialTimeout, and the wait for the
 // answer's headers by headerTimeout. That timer starts after the request is sent, so an upload may take minutes. The
 // answer's body is bounded in size (maxResponse). It is not bounded in time: the caller's context ends a body that
 // stalls, and the command's context carries the interrupt.

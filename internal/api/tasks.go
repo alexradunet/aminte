@@ -375,7 +375,7 @@ func noTaskService() error {
 }
 
 // mountTasks gives m the routes of Tasks: the pages, and the six actions. The routes are always there; each answers
-// 503 while no task service runs. They go through serve, so a browser gets the shell, the toast and the redirect.
+// 503 while no task service runs. They go through serve, so an error is an error entity.
 func (h *server) mountTasks(m *http.ServeMux) {
 	m.HandleFunc("GET /tasks", h.serve(h.tasksToday))
 	m.HandleFunc("GET /tasks/week", h.serve(h.tasksWeek))
@@ -594,7 +594,7 @@ func listNames(lists []TaskList) []string {
 	return names
 }
 
-// synced is the answer of sync-tasks: how many Done entries the service wrote. Its self link is Today, where a browser
+// synced is the answer of sync-tasks: how many Done entries the service wrote. Its self link is Today, where a UI
 // returns.
 func (s taskService) synced(ctx context.Context, r *http.Request, href string) (*siren.Entity, error) {
 	e, err := s.post(ctx, r, href, nil)
@@ -611,7 +611,7 @@ func (s taskService) synced(ctx context.Context, r *http.Request, href string) (
 		Links: []siren.Link{{Rel: []string{"self"}, Href: "/tasks", Title: "Today"}}}, nil
 }
 
-// deleted is the answer of delete-task. The task has no page now, so the self link is Today and a browser returns
+// deleted is the answer of delete-task. The task has no page now, so the self link is Today and a UI returns
 // there; the properties are the task as it was.
 func (s taskService) deleted(ctx context.Context, r *http.Request, href string) (*siren.Entity, error) {
 	e, err := s.post(ctx, r, href, nil)

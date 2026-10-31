@@ -89,18 +89,13 @@ func (h *server) sameDayEarlier(ctx context.Context, day string) ([]recentDay, e
 	return h.withMoods(ctx, entries)
 }
 
-// The root is the entry point of the API: the newest day pages, and every action that starts something. A browser's
-// Home is the page of today instead (docs/plans/129-the-ux-pass.md, part 10), which carries the same lists.
-// It names the clock (zone, utc_offset), the day of today and its conversation as sub-entities that ?embed=today,
+// The root is the entry point of the API: the newest day pages, and every action that starts something. It names the clock (zone, utc_offset), the day of today and its conversation as sub-entities that ?embed=today,
 // conversation reads in the same answer, the connected apps that run (the links app) and the task service (the link
 // tasks): what a client needs to draw its frame once (API.md, root).
 func (h *server) root(r *http.Request) (*siren.Entity, error) {
 	ctx := r.Context()
 	now := h.s.Local() // one read of the clock, so today and the zone agree
 	today := now.Format(time.DateOnly)
-	if wantsHTML(r) { // a browser's Home is the page of today (docs/plans/129-the-ux-pass.md, part 10)
-		return h.dayEntity(ctx, today)
-	}
 	recent, err := h.recentDaysUpTo(ctx, today)
 	if err != nil {
 		return nil, err

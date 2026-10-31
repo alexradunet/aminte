@@ -33,3 +33,21 @@ func TestSettingsOnTheCommandLine(t *testing.T) {
 		t.Errorf("lifelog get /settings: %s", out)
 	}
 }
+
+// TestTheSettingsOfTheBrowserAreNotOnTheCommandLine: `lifelog do settings ground=embers` is refused with the field
+// named, and so are the lock settings. They are the settings of the browser extension (lifelog-web), which has its own
+// action. The refused line writes no file.
+func TestTheSettingsOfTheBrowserAreNotOnTheCommandLine(t *testing.T) {
+	live := dbtest.File(t)
+	e, _, _ := testEnv(t)
+	for _, field := range []string{"ground=embers", "lock_after=15", "lock_pin=1234"} {
+		name, _, _ := strings.Cut(field, "=")
+		err := runArgs(t.Context(), e, []string{"do", "settings", field, "--db", live})
+		if err == nil || !strings.Contains(err.Error(), "unknown field "+name) {
+			t.Errorf("%s: %v, want a refusal that names the field", field, err)
+		}
+	}
+	if _, err := os.Stat(strings.TrimSuffix(live, ".db") + ".settings.json"); !os.IsNotExist(err) {
+		t.Errorf("a refused line wrote the settings file: %v", err)
+	}
+}

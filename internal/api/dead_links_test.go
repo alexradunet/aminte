@@ -2,7 +2,6 @@ package api_test
 
 import (
 	"net/http"
-	"net/http/httptest"
 	"regexp"
 	"slices"
 	"strings"
@@ -11,23 +10,27 @@ import (
 	"lifelog/internal/api/apitest"
 )
 
-// TestHomeAndADayLinkOnlyToServedPaths: every link of Home (the page of today) and of a day page opens a page, and no link sends a query
-// that its page does not read (docs/plans/117-one-browse-view.md, step 0).
+// TestHomeAndADayLinkOnlyToServedPaths: every link and every sub-entity of Home, of the catalog and of a day leads to
+// a path that the server serves, and no link sends a query that its page does not read
+// (docs/plans/117-one-browse-view.md, step 0).
 func TestHomeAndADayLinkOnlyToServedPaths(t *testing.T) {
-	c, h, _ := apitest.FreshOn(t, "cli", fixedToday)
+	c, _, _ := apitest.FreshOn(t, "cli", fixedToday)
 	apitest.Must(t)(c.Do(t.Context(), apitest.Action(t, apitest.Must(t)(c.Get(t.Context(), "/days/2031-05-03")), "capture"), map[string]string{"text": "Synthetic entry"}))
-	for _, page := range []string{"/actions", "/days/2031-05-03", "/days/" + fixedToday} {
-		body := browse(t, h, page)
-		for _, m := range regexp.MustCompile(`href="(/[^"]*)"`).FindAllStringSubmatch(body, -1) {
-			href, _, _ := strings.Cut(strings.ReplaceAll(m[1], "&amp;", "&"), "#") // a browser sends no fragment
+	for _, page := range []string{"/", "/actions", "/days/2031-05-03", "/days/" + fixedToday} {
+		e := apitest.Must(t)(c.Get(t.Context(), page))
+		hrefs := []string{}
+		for _, l := range append(slices.Clone(e.Links), e.Entities...) {
+			hrefs = append(hrefs, l.Href)
+		}
+		for _, href := range hrefs {
+			href, _, _ = strings.Cut(href, "#") // a client sends no fragment
+			if !strings.HasPrefix(href, "/") {
+				continue
+			}
 			if strings.HasPrefix(href, "/metrics?show=") {
 				t.Errorf("%s links %s: /metrics reads no show", page, href)
 			}
-			req := httptest.NewRequest("GET", href, nil)
-			req.Header.Set("Accept", "text/html")
-			rec := httptest.NewRecorder()
-			h.ServeHTTP(rec, req)
-			if rec.Code == http.StatusNotFound {
+			if _, err := c.Get(t.Context(), href); apitest.Status(err) == http.StatusNotFound {
 				t.Errorf("%s links %s, which answers 404", page, href)
 			}
 		}

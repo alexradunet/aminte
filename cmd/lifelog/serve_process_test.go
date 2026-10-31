@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"syscall"
 	"testing"
@@ -41,6 +42,12 @@ func TestExecutableServeDrainsActiveRequest(t *testing.T) {
 	}
 }
 
+// withoutLifelogVars is env without any variable of lifelog (LIFELOG_DB, LIFELOG_TOKEN and the others). A token in the
+// environment of a developer turns on the bearer check of the serve, and the plain requests of this test send none.
+func withoutLifelogVars(env []string) []string {
+	return slices.DeleteFunc(slices.Clone(env), func(kv string) bool { return strings.HasPrefix(kv, "LIFELOG_") })
+}
+
 func drainsOn(ctx context.Context, t *testing.T, binary string, sig os.Signal) {
 	live := dbtest.File(t)
 	cmd := exec.CommandContext(ctx, binary, "--db", live, "serve", "--addr", "127.0.0.1:0")
@@ -51,7 +58,7 @@ func drainsOn(ctx context.Context, t *testing.T, binary string, sig os.Signal) {
 	if f := flag.Lookup("test.gocoverdir"); f != nil && f.Value.String() != "" {
 		coverDir = f.Value.String()
 	}
-	cmd.Env = append(os.Environ(), "GOCOVERDIR="+coverDir)
+	cmd.Env = append(withoutLifelogVars(os.Environ()), "GOCOVERDIR="+coverDir)
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
 		t.Fatal(err)

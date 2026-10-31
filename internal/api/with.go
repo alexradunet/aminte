@@ -32,8 +32,8 @@ var forwardTimeout = 30 * time.Second
 // the merged catalog.
 var appNameRE = regexp.MustCompile(`^[a-z0-9-]+$`)
 
-// Apps is the registry of the connected apps of one server. The local handler and the public one share one value, so
-// both see the same apps. It is safe for use by many goroutines. Make it with NewApps.
+// Apps is the registry of the connected apps of one server. The handler of the API and serve (which starts the children)
+// share one value, so both see the same apps. It is safe for use by many goroutines. Make it with NewApps.
 type Apps struct {
 	mu   sync.RWMutex
 	apps map[string]liveApp // by name; a name that is here is known
@@ -209,7 +209,7 @@ func (a *Apps) specs() []spec {
 }
 
 // specOfApp is the row of the merged catalog for an action of the app: the name and the path have the prefix of the
-// app. The short text of the browser (Hint) is not the app's, so it is empty. pathValues, fieldsOf and the forms read
+// app. The short text of a form (Hint) is not the app's, so it is empty. pathValues, fieldsOf and the forms read
 // the row as they read a row of the static catalog.
 func specOfApp(app string, act siren.Action) spec {
 	return spec{Name: app + "-" + act.Name, Title: act.Title, Description: act.Description, Method: act.Method,
@@ -217,7 +217,7 @@ func specOfApp(app string, act siren.Action) spec {
 }
 
 // knownClasses keeps the classes that this server lists (siren.ActionClasses) and drops the others, so an app cannot
-// make the browser draw something it does not know. It is nil when none is left.
+// make a UI draw something it does not know. It is nil when none is left.
 func knownClasses(classes []string) []string {
 	var out []string
 	for _, c := range classes {
@@ -229,7 +229,7 @@ func knownClasses(classes []string) []string {
 }
 
 // mountWith gives m the routes of the apps: /with/NAME and everything under it, for every method. They go through
-// serve, so a browser gets the shell, the toast and the redirect, and an error is an error entity.
+// serve, so an error is an error entity.
 func (h *server) mountWith(m *http.ServeMux) {
 	m.HandleFunc("/with/{app}", h.serve(h.withApp))
 	m.HandleFunc("/with/{app}/{rest...}", h.serve(h.withApp))
@@ -268,9 +268,7 @@ func (h *server) withApp(r *http.Request) (*siren.Entity, error) {
 		return inNamespace(name, e), nil
 	} else if r.Method == http.MethodGet {
 		q := r.URL.Query()
-		for _, f := range browserFields { // the fields of this server: the app never sees them
-			q.Del(f)
-		}
+		q.Del(newField)   // the form that a link asks for is this server's: the app never sees it
 		q.Del(embedField) // this server embeds in the answer (serve)
 		href := rest
 		if len(q) > 0 {

@@ -35,7 +35,7 @@ func walk(t *testing.T, c *client.Client, first string) (titles []string, sizes 
 }
 
 func TestListsPage(t *testing.T) {
-	c, h, _ := apitest.FreshOn(t, "cli", "2031-03-08") // the stream holds no day after today
+	c, _, _ := apitest.FreshOn(t, "cli", "2031-03-08") // the stream holds no day after today
 	root := apitest.Must(t)(c.Get(t.Context(), "/"))
 	catalog := apitest.Must(t)(c.Get(t.Context(), "/actions"))
 	for i := 1; i <= 7; i++ {
@@ -93,12 +93,12 @@ func TestListsPage(t *testing.T) {
 			t.Errorf("%s: code=%q, want invalid", bad, code)
 		}
 	}
-	// The browser sees the links.
-	body := browse(t, h, "/browse?kind=person&limit=3&offset=3")
-	if !strings.Contains(body, `href="/browse?kind=person&amp;limit=3&amp;offset=0" rel="prev"`) || !strings.Contains(body, `href="/browse?kind=person&amp;limit=3&amp;offset=6" rel="next"`) {
-		t.Errorf("people page 2: %.600s", body)
+	// The links of a page past the first.
+	people := apitest.Must(t)(c.Get(t.Context(), "/browse?kind=person&limit=3&offset=3"))
+	if apitest.Href(people, "prev") != "/browse?kind=person&limit=3&offset=0" || apitest.Href(people, "next") != "/browse?kind=person&limit=3&offset=6" {
+		t.Errorf("people page 2: prev %q next %q", apitest.Href(people, "prev"), apitest.Href(people, "next"))
 	}
-	if body := browse(t, h, "/search?q=needleword&limit=3"); !strings.Contains(body, `rel="next"`) || strings.Contains(body, `rel="prev"`) {
-		t.Errorf("search page 1 pager: %.600s", body)
+	if first := apitest.Must(t)(c.Get(t.Context(), "/search?q=needleword&limit=3")); apitest.Href(first, "next") == "" || apitest.Href(first, "prev") != "" {
+		t.Errorf("search page 1 pager: next %q prev %q", apitest.Href(first, "next"), apitest.Href(first, "prev"))
 	}
 }

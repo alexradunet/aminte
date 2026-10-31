@@ -13,16 +13,16 @@ import (
 )
 
 // TestTheCommandTableDecidesTheFlagsTheUsageAndTheInterrupt: a flag a command does not take is refused, never
-// ignored: --dry-run belongs to file, --public to serve. The usage names every command of the table. A setup command
+// ignored: --dry-run belongs to file, --token-file to serve. The usage names every command of the table. A setup command
 // of the machine (init) keeps the OS's interrupt, as does a line with no command; a name that is no command is an extension, which gets the interrupt through its context and passes it on; every other command takes the interrupt through its context, snapshot too, as it runs through the
 // client since plan 082.
 func TestTheCommandTableDecidesTheFlagsTheUsageAndTheInterrupt(t *testing.T) {
-	for _, argv := range [][]string{{"search", "x", "--dry-run"}, {"day", "--public"}, {"search", "x", "--day", "2026-01-01"}, {"capture", "hello", "--snapshots", "x"}} {
+	for _, argv := range [][]string{{"search", "x", "--dry-run"}, {"day", "--token-file", "t"}, {"search", "x", "--day", "2026-01-01"}, {"capture", "hello", "--snapshots", "x"}} {
 		if _, err := parse(argv, noVars); err == nil || !strings.Contains(err.Error(), "does not take") {
 			t.Errorf("%v: %v, want a refusal of the flag", argv, err)
 		}
 	}
-	for _, argv := range [][]string{{"file", "x", "--dry-run"}, {"serve", "--public"}, {"capture", "hello", "--day", "2026-01-01"}, {"snapshot", "--snapshots", "x"}} {
+	for _, argv := range [][]string{{"file", "x", "--dry-run"}, {"serve", "--token-file", "t"}, {"capture", "hello", "--day", "2026-01-01"}, {"snapshot", "--snapshots", "x"}} {
 		if _, err := parse(argv, noVars); err != nil {
 			t.Errorf("%v: %v, want the flag taken", argv, err)
 		}
@@ -231,5 +231,28 @@ func TestAShortcutRefusesAnArgumentItDoesNotRead(t *testing.T) {
 				t.Errorf("%v: left %d file(s) in the snapshot folder", tc.argv, len(left))
 			}
 		})
+	}
+}
+
+// TestTheUsageOfServeSaysWhatServeTakes: serve takes a loopback address, a snapshot folder, a token file and the
+// extensions to run. The usage says that a token turns on the bearer check, and names no flag of the network that the
+// core had (--public, --allow-origin, --tls-cert, --tls-key) and no HTML.
+func TestTheUsageOfServeSaysWhatServeTakes(t *testing.T) {
+	usage := usageText()
+	for _, want := range []string{
+		"  lifelog serve [--addr 127.0.0.1:7777] [--snapshots DIR] [--token-file PATH]\n",
+		"the API: Siren JSON, on a loopback address; a token (--token-file PATH or\n",
+		"$LIFELOG_TOKEN) turns on the bearer check\n",
+		"  lifelog serve ... --with NAME       also run the extension lifelog-NAME as a child, and start it again when it fails\n",
+		`--url URL      talk to a running "lifelog serve" instead of opening the file ($LIFELOG_TOKEN if it has a token)`,
+	} {
+		if !strings.Contains(usage, want) {
+			t.Errorf("the usage lacks %q", want)
+		}
+	}
+	for _, bad := range []string{"--public", "--allow-origin", "--tls-cert", "--tls-key", "HTML", "browser"} {
+		if strings.Contains(usage, bad) {
+			t.Errorf("the usage still says %q", bad)
+		}
 	}
 }

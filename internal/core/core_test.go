@@ -174,20 +174,20 @@ func TestRowReadsReportEveryFault(t *testing.T) {
 	}
 }
 
-// TestTheClockOfThisDeviceKeepsItsMonotonicReading: with no Clock, the instant of Now is time.Now with its monotonic
-// reading, with a Zone and with none. Thus a span between two instants (the life of a feedback receipt) does not change
-// when the wall clock is set. A time that keeps the monotonic reading is not equal to its Round(0). With a Clock, Now
-// is the instant of that clock, Local is the same instant in the Zone, and Today is the day of Local.
-func TestTheClockOfThisDeviceKeepsItsMonotonicReading(t *testing.T) {
+// TestTheStoreClockGivesLocalAndToday: with a Clock, Local is the instant of that clock in the Zone, and Today is the
+// day of Local. With no Clock the clock of this device answers, with a Zone and with none.
+func TestTheStoreClockGivesLocalAndToday(t *testing.T) {
 	zone := time.FixedZone("+14", 14*60*60)
 	for name, s := range map[string]*Store{"no zone": {}, "a zone": {Zone: zone}} {
-		if now := s.Now(); now == now.Round(0) {
-			t.Errorf("%s: Now gives %v, with no monotonic reading", name, now)
+		before := time.Now()
+		local := s.Local()
+		if after := time.Now(); local.Before(before) || local.After(after) {
+			t.Errorf("%s: Local gives %v, not an instant between %v and %v", name, local, before, after)
 		}
 	}
 	at := time.Date(2026, 3, 10, 11, 30, 0, 0, time.UTC) // 2026-03-11 01:30 in the zone
 	s := &Store{Clock: func() time.Time { return at }, Zone: zone}
-	if now, local := s.Now(), s.Local(); now != at || !local.Equal(at) || local.Location() != zone || s.Today() != "2026-03-11" {
-		t.Errorf("a fixed clock: Now %v, Local %v, Today %s; want %v, the same instant in +14, and 2026-03-11", now, local, s.Today(), at)
+	if local := s.Local(); !local.Equal(at) || local.Location() != zone || s.Today() != "2026-03-11" {
+		t.Errorf("a fixed clock: Local %v, Today %s; want %v in +14, and 2026-03-11", local, s.Today(), at)
 	}
 }

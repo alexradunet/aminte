@@ -3,6 +3,7 @@ package api_test
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 	"strings"
 	"testing"
@@ -12,6 +13,7 @@ import (
 	"lifelog/internal/api/apitest"
 	"lifelog/internal/core"
 	"lifelog/internal/db/dbtest"
+	"lifelog/siren"
 )
 
 // The owner-only actions are refused to an agent and to an import, with 403 and the code forbidden. The full-text
@@ -174,5 +176,20 @@ func TestResyncLinksIsTheOwnersRepair(t *testing.T) {
 	}
 	if len(drift()) != 0 {
 		t.Fatal("the owner's resync-links did not repair the links")
+	}
+}
+
+// TestAnAgentIsRefusedTheOwnersReads: the settings and the integrity check are the owner's reads. The writer of an
+// embedded read (agent:embed) and any other agent get 403, so a tool line of a conversation that names them never makes
+// the server run them (a UI keeps a plain link for such a card).
+func TestAnAgentIsRefusedTheOwnersReads(t *testing.T) {
+	_, h, _ := apitest.Fresh(t, "cli")
+	for _, source := range []string{"agent:embed", "agent:x", "import:x"} {
+		for _, path := range []string{"/settings", "/integrity"} {
+			rec := request(h, "GET", path, "", map[string]string{siren.SourceHeader: source})
+			if rec.Code != http.StatusForbidden {
+				t.Errorf("GET %s as %s: %d, want 403", path, source, rec.Code)
+			}
+		}
 	}
 }

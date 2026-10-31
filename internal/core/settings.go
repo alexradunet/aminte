@@ -1,18 +1,12 @@
 package core
 
 import (
-	"crypto/pbkdf2"
-	"crypto/rand"
-	"crypto/sha256"
-	"crypto/subtle"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 )
 
@@ -26,64 +20,6 @@ type Settings struct {
 	// OwnerNumber is the digits of the owner's phone number with the country code: the one number that the agent on
 	// the phone answers. The action settings refuses a value that is not digits.
 	OwnerNumber string `json:"owner_number,omitempty"`
-	// Ground is the floor of the browser: boards, oak, firelight or embers. Empty is boards. The catalog lists the
-	// four values, and the action settings refuses any other.
-	Ground string `json:"ground,omitempty"`
-	// LockAfter is the idle minutes after which the public listener locks a browser (docs/plans/160-the-lock.md): a
-	// number of minutes as text. Empty is off. The catalog lists the values, and the action settings refuses any other.
-	LockAfter string `json:"lock_after,omitempty"`
-	// LockPINHash is the stored form of the PIN that opens a locked browser (HashPIN). The file never holds the PIN.
-	LockPINHash string `json:"lock_pin_hash,omitempty"`
-}
-
-// LockMinutes is the idle time of the lock in minutes; 0 means that the lock is off. The lock is on only when a PIN
-// is stored: without one, nothing could open a locked browser.
-func (v Settings) LockMinutes() int {
-	n, err := strconv.Atoi(v.LockAfter)
-	if err != nil || n <= 0 || v.LockPINHash == "" {
-		return 0
-	}
-	return n
-}
-
-// pinIterations is the cost of one PBKDF2 try. A PIN has few values, so the cost protects little if the file is
-// read; the limit of tries at the public listener protects the PIN.
-const pinIterations = 200_000
-
-// HashPIN is the stored form of pin: "pbkdf2-sha256$ITERATIONS$SALT$KEY", with the salt and the key in base64. The
-// salt and the count are in the text, so a later version can change the count and still read an old hash.
-func HashPIN(pin string) (string, error) {
-	salt := make([]byte, 16)
-	if _, err := rand.Read(salt); err != nil {
-		return "", fmt.Errorf("hash the PIN: %w", err)
-	}
-	key, err := pbkdf2.Key(sha256.New, pin, salt, pinIterations, 32)
-	if err != nil {
-		return "", fmt.Errorf("hash the PIN: %w", err)
-	}
-	enc := base64.RawStdEncoding
-	return fmt.Sprintf("pbkdf2-sha256$%d$%s$%s", pinIterations, enc.EncodeToString(salt), enc.EncodeToString(key)), nil
-}
-
-// PINMatches reports whether pin is the PIN that stored (from HashPIN) was made from. A stored text that is not
-// of that form matches nothing.
-func PINMatches(stored, pin string) bool {
-	parts := strings.Split(stored, "$")
-	if len(parts) != 4 || parts[0] != "pbkdf2-sha256" {
-		return false
-	}
-	n, err := strconv.Atoi(parts[1])
-	if err != nil || n < 1 || n > 10_000_000 {
-		return false
-	}
-	enc := base64.RawStdEncoding
-	salt, err1 := enc.DecodeString(parts[2])
-	want, err2 := enc.DecodeString(parts[3])
-	if err1 != nil || err2 != nil || len(want) == 0 {
-		return false
-	}
-	got, err := pbkdf2.Key(sha256.New, pin, salt, n, len(want))
-	return err == nil && subtle.ConstantTimeCompare(got, want) == 1
 }
 
 // SettingsPathFor is the settings file of the database at dbPath: the path with .db cut and .settings.json added

@@ -4,6 +4,9 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
+	"errors"
+	"fmt"
 	"image/jpeg"
 	"log"
 	"mime/multipart"
@@ -33,6 +36,16 @@ func jpegFile(t *testing.T, name string, w, h int) (string, string) {
 }
 
 func props(e *siren.Entity) map[string]any { p, _ := e.Properties.(map[string]any); return p }
+
+// goneClient is a client that went away: each write of a body fails.
+type goneClient struct {
+	header http.Header
+	status int
+}
+
+func (g *goneClient) Header() http.Header       { return g.header }
+func (g *goneClient) WriteHeader(status int)    { g.status = status }
+func (g *goneClient) Write([]byte) (int, error) { return 0, errors.New("the client went away") }
 
 // TestAPictureThatCannotBeSentIsLogged: when the client of a picture went away, the write of its bytes fails. The
 // server's log has it one time, under the route of the picture; nothing else can be done.
@@ -148,35 +161,44 @@ func TestAddFileKeepsMalformedHEIFWithUnknownMetadata(t *testing.T) {
 	}
 }
 
-func TestFileViews(t *testing.T) {
-	c, h, _ := apitest.Fresh(t, "cli")
+// TestFileEntities: the lists and the pages of a file give a UI what it draws: the add-file action takes the file as
+// its first field, the media list has the picture of the file, the file page has its type and its preview, and the day
+// page that embeds the file has it as its cover, once.
+func TestFileEntities(t *testing.T) {
+	c, _, _ := apitest.Fresh(t, "cli")
 	root := apitest.Must(t)(c.Get(t.Context(), "/"))
 	path, _ := jpegFile(t, "lake.jpg", 40, 30)
 	f := apitest.Must(t)(c.Do(t.Context(), apitest.Action(t, root, "add-file"), map[string]string{"title": "Lake.jpg", "body": "dawn", "original": path}))
 	day := apitest.Must(t)(c.Do(t.Context(), apitest.Action(t, root, "capture"), map[string]string{"text": "Swam. ![[Lake.jpg|the lake]]"}))
-	for path, want := range map[string][]string{
-		"/browse?kind=document": {`enctype="multipart/form-data"`, `type="file" name="original"`, `type="hidden" name="sha256"`},
-		"/browse?kind=media":    {"Lake.jpg", `action="/files"`, `<img src="` + apitest.Href(f, "preview") + `" alt="" loading="lazy">`},
-		apitest.Href(f, "self"): {`<img class="preview" src="` + apitest.Href(f, "preview") + `"`, "image/jpeg", "Backlinks"},
-		// the first picture of a day page is its cover, drawn above it and not again in the body
-		apitest.Href(day, "page"): {`<figure class="cover"><img src="` + apitest.Href(f, "preview") + `" alt="Lake.jpg">`, "Swam."},
-	} {
-		body := browse(t, h, path)
-		for _, w := range want {
-			if !strings.Contains(body, w) {
-				t.Errorf("%s does not show %s", path, w)
-			}
-		}
+
+	// The file is the first field of add-file, and it says that the original stays where it is.
+	add := apitest.Action(t, apitest.Must(t)(c.Get(t.Context(), "/browse?kind=document")), "add-file")
+	if first := add.Fields[0]; first.Name != "original" || first.Type != "file" || !strings.Contains(first.Title, "the original stays where it is") {
+		t.Errorf("the first field of add-file is %+v, want the file", first)
 	}
-	if body := browse(t, h, apitest.Href(day, "page")); strings.Contains(body, `/previews?title=Lake.jpg`) {
-		t.Errorf("the day page draws its cover twice")
+	preview := apitest.Href(f, "preview")
+	rows, _ := props(apitest.Must(t)(c.Get(t.Context(), "/browse?kind=media")))["rows"].([]any)
+	if len(rows) != 1 || rows[0].(map[string]any)["title"] != "Lake.jpg" || rows[0].(map[string]any)["picture"] != preview {
+		t.Errorf("the media list is %v, want Lake.jpg with its preview %s", rows, preview)
+	}
+	page := apitest.Must(t)(c.Get(t.Context(), apitest.Href(f, "self")))
+	if props(page)["mime"] != "image/jpeg" && fmt.Sprint(props(page)["file"]) == "" {
+		t.Errorf("the file page does not say the type: %v", props(page))
+	}
+	if apitest.Href(page, "preview") != preview {
+		t.Errorf("the file page has the preview %q, want %q", apitest.Href(page, "preview"), preview)
+	}
+	// The first picture of a day page is its cover.
+	dayPage := apitest.Must(t)(c.Get(t.Context(), apitest.Href(day, "page")))
+	if got, title := apitest.Href(dayPage, "cover"), str(props(dayPage)["cover"].(map[string]any)["title"]); got != preview || title != "Lake.jpg" {
+		t.Errorf("the day page has the cover %q titled %q, want %q titled Lake.jpg", got, title, preview)
 	}
 }
 
 // TestAPhotosDay is a photo's own day, read from the original: the file keeps that day, and the page of that day
 // shows the photo. Its position is never read (D21).
 func TestAPhotosDay(t *testing.T) {
-	c, h, _ := apitest.Fresh(t, "cli")
+	c, _, _ := apitest.Fresh(t, "cli")
 	root := apitest.Must(t)(c.Get(t.Context(), "/"))
 	write := func(name string, b []byte) string {
 		p := filepath.Join(t.TempDir(), name)
@@ -193,8 +215,8 @@ func TestAPhotosDay(t *testing.T) {
 		t.Fatalf("a photo with a day: %+v", res)
 	}
 	day := apitest.Must(t)(c.Get(t.Context(), "/days/2019-06-03"))
-	if body := browse(t, h, apitest.Href(day, "page")); !strings.Contains(body, `<figure class="cover"><img src="`+apitest.Href(e, "preview")+`"`) {
-		t.Errorf("the day page does not show the photo as its cover")
+	if page := apitest.Must(t)(c.Get(t.Context(), apitest.Href(day, "page"))); apitest.Href(page, "cover") != apitest.Href(e, "preview") {
+		t.Errorf("the day page has the cover %q, want the preview of the photo %q", apitest.Href(page, "cover"), apitest.Href(e, "preview"))
 	}
 	// a HEIC: no picture, no embed, its day still read
 	heic := write("IMG_2.HEIC", phototest.HEIF(photo.Meta{Taken: "2019-06-04 10:00:00"}, phototest.Layout{Version: 1}))
@@ -261,8 +283,11 @@ func TestAddFileDryRunWritesNothing(t *testing.T) {
 	}
 }
 
-func TestBrowserMutationFeedbackPhoto(t *testing.T) {
-	_, h, _ := apitest.Fresh(t, "cli")
+// TestADatedPhotoAnswersItsOwnDay: a multipart upload of a photo with its date. A dry run answers the day it would
+// take and writes nothing. A write answers the page, with the day in the result and the address of the page in
+// Location, which holds neither the coordinates nor the file name.
+func TestADatedPhotoAnswersItsOwnDay(t *testing.T) {
+	c, h, _ := apitest.Fresh(t, "cli")
 	for _, dry := range []bool{true, false} {
 		var b bytes.Buffer
 		mw := multipart.NewWriter(&b)
@@ -278,29 +303,29 @@ func TestBrowserMutationFeedbackPhoto(t *testing.T) {
 		mw.Close()
 		req := httptest.NewRequest("POST", "/files", &b)
 		req.Header.Set("Content-Type", mw.FormDataContentType())
-		req.Header.Set("Accept", "text/html")
 		rec := httptest.NewRecorder()
 		h.ServeHTTP(rec, req)
 		body := rec.Body.String()
-		if dry {
-			if rec.Code != 200 || rec.Header().Get("Location") != "" || !strings.Contains(body, "nothing written") {
-				t.Fatalf("dry run: %d %s", rec.Code, body)
-			}
-		} else {
-			if rec.Code != 303 {
-				t.Fatalf("photo POST: %d %s", rec.Code, body)
-			}
-			location := rec.Header().Get("Location")
-			if strings.Contains(location, "41.1496") || strings.Contains(location, "synthetic") {
-				t.Fatal("private redirect")
-			}
-			body = browse(t, h, location)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("dry=%v: %d %s", dry, rec.Code, body)
 		}
-		for _, want := range []string{"Result", "Its own day is"} { // the toast says the result in words
-			if !strings.Contains(body, want) {
-				t.Errorf("photo feedback missing %q", want)
-			}
+		var e siren.Entity
+		if err := json.Unmarshal(rec.Body.Bytes(), &e); err != nil {
+			t.Fatal(err)
 		}
+		if res, _ := e.Result.(map[string]any); res["day"] != "2019-06-04" {
+			t.Errorf("dry=%v: the result is %+v, want the own day 2019-06-04", dry, e.Result)
+		}
+		location := rec.Header().Get("Location")
+		switch {
+		case dry && location != "":
+			t.Errorf("a dry run has the Location %q", location)
+		case !dry && (!strings.HasPrefix(location, "/pages/") || strings.Contains(location, "41.1496") || strings.Contains(location, "synthetic")):
+			t.Errorf("the Location of the write is %q, want the page and nothing private", location)
+		}
+	}
+	if list := apitest.Must(t)(c.Get(t.Context(), "/browse?kind=media")); len(list.Entities) != 1 {
+		t.Errorf("the list holds %d files, want the one that the write kept", len(list.Entities))
 	}
 }
 
@@ -316,8 +341,10 @@ func TestAutomaticEmbedAPIRefusal(t *testing.T) {
 	}
 }
 
-func TestBrowserMultipartRecoversAcceptedBody(t *testing.T) {
-	for _, kind := range []string{"title", "preview", "overflow", "conflict"} {
+// TestARefusedMultipartFileWritesNothing: a multipart form for add-file that the writer refuses, whatever the reason,
+// answers an error status, and keeps no file. The server does not give the text back: a UI keeps what the owner typed.
+func TestARefusedMultipartFileWritesNothing(t *testing.T) {
+	for kind, status := range map[string]int{"title": 422, "preview": 422, "overflow": 413, "conflict": 422} {
 		t.Run(kind, func(t *testing.T) {
 			c, h, _ := apitest.Fresh(t, "cli")
 			if kind == "conflict" {
@@ -343,11 +370,13 @@ func TestBrowserMultipartRecoversAcceptedBody(t *testing.T) {
 			mw.Close()
 			req := httptest.NewRequest("POST", "/files", &b)
 			req.Header.Set("Content-Type", mw.FormDataContentType())
-			req.Header.Set("Accept", "text/html")
 			rec := httptest.NewRecorder()
 			h.ServeHTTP(rec, req)
-			if rec.Code < 400 || !strings.Contains(rec.Body.String(), "transcript &lt;script&gt; &amp; draft</textarea>") {
-				t.Fatalf("%s: status %d recovered=%v", kind, rec.Code, strings.Contains(rec.Body.String(), "draft</textarea>"))
+			if rec.Code != status {
+				t.Fatalf("%s: status %d, want %d: %.300s", kind, rec.Code, status, rec.Body.String())
+			}
+			if strings.Contains(rec.Body.String(), "transcript") {
+				t.Errorf("%s: the refusal gives the text back: %.300s", kind, rec.Body.String())
 			}
 			if len(apitest.Must(t)(c.Get(t.Context(), "/browse?kind=media")).Entities) != 0 {
 				t.Fatal("wrote file")
@@ -356,62 +385,46 @@ func TestBrowserMultipartRecoversAcceptedBody(t *testing.T) {
 	}
 }
 
-func TestPhotoDaySyncJSONAndBrowserReceipt(t *testing.T) {
-	for _, browser := range []bool{false, true} {
-		t.Run(map[bool]string{false: "JSON", true: "browser"}[browser], func(t *testing.T) {
-			c, h, _ := apitest.Fresh(t, "cli")
-			apitest.Must(t)(c.Do(t.Context(), apitest.Action(t, apitest.Must(t)(c.Get(t.Context(), "/")), "create-page"), map[string]string{"title": "2026-10-04", "body": "[[Old synthetic target]]"}))
-			target := apitest.Must(t)(c.Get(t.Context(), "/pages?title=Old+synthetic+target"))
-			apitest.Must(t)(c.Do(t.Context(), apitest.Action(t, target, "tombstone-pages"), nil))
-			var b bytes.Buffer
-			mw := multipart.NewWriter(&b)
-			for key, value := range map[string]string{"title": "Next synthetic.jpg", "day": "2026-10-04", "body": "[[File synthetic target]]"} {
-				if err := mw.WriteField(key, value); err != nil {
-					t.Fatal(err)
-				}
-			}
-			part, err := mw.CreateFormFile("original", "synthetic.jpg")
-			if err != nil {
-				t.Fatal(err)
-			}
-			path, _ := jpegFile(t, "synthetic.jpg", 16, 16)
-			// The fixture is generated locally and contains no metadata.
-			data, err := os.ReadFile(path)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if _, err := part.Write(data); err != nil {
-				t.Fatal(err)
-			}
-			if err := mw.Close(); err != nil {
-				t.Fatal(err)
-			}
-			r := httptest.NewRequest("POST", "/files", &b)
-			r.Header.Set("Content-Type", mw.FormDataContentType())
-			if browser {
-				r.Header.Set("Accept", "text/html")
-			}
-			w := httptest.NewRecorder()
-			h.ServeHTTP(w, r)
-			body := w.Body.String()
-			if browser {
-				if w.Code != 303 {
-					t.Fatalf("POST: %d %s", w.Code, body)
-				}
-				body = browse(t, h, w.Header().Get("Location"))
-			} else if w.Code != 200 && w.Code != 201 {
-				t.Fatalf("POST: %d %s", w.Code, body)
-			}
-			wants := []string{"day_sync", "revived", "Old synthetic target", "File synthetic target"}
-			if browser { // the toast says the result in words
-				wants = []string{"In its day page: ", "Revived", "Old synthetic target", "File synthetic target"}
-			}
-			for _, want := range wants {
-				if !strings.Contains(body, want) {
-					t.Errorf("missing %s: %s", want, body)
-				}
-			}
-		})
+func TestPhotoDaySyncJSON(t *testing.T) {
+	c, h, _ := apitest.Fresh(t, "cli")
+	apitest.Must(t)(c.Do(t.Context(), apitest.Action(t, apitest.Must(t)(c.Get(t.Context(), "/")), "create-page"), map[string]string{"title": "2026-10-04", "body": "[[Old synthetic target]]"}))
+	target := apitest.Must(t)(c.Get(t.Context(), "/pages?title=Old+synthetic+target"))
+	apitest.Must(t)(c.Do(t.Context(), apitest.Action(t, target, "tombstone-pages"), nil))
+	var b bytes.Buffer
+	mw := multipart.NewWriter(&b)
+	for key, value := range map[string]string{"title": "Next synthetic.jpg", "day": "2026-10-04", "body": "[[File synthetic target]]"} {
+		if err := mw.WriteField(key, value); err != nil {
+			t.Fatal(err)
+		}
+	}
+	part, err := mw.CreateFormFile("original", "synthetic.jpg")
+	if err != nil {
+		t.Fatal(err)
+	}
+	path, _ := jpegFile(t, "synthetic.jpg", 16, 16)
+	// The fixture is generated locally and contains no metadata.
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := part.Write(data); err != nil {
+		t.Fatal(err)
+	}
+	if err := mw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	r := httptest.NewRequest("POST", "/files", &b)
+	r.Header.Set("Content-Type", mw.FormDataContentType())
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	body := w.Body.String()
+	if w.Code != 200 && w.Code != 201 {
+		t.Fatalf("POST: %d %s", w.Code, body)
+	}
+	for _, want := range []string{"day_sync", "revived", "Old synthetic target", "File synthetic target"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("missing %s: %s", want, body)
+		}
 	}
 }
 

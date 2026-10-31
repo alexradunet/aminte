@@ -122,22 +122,17 @@ func TestRequestBufferLimits(t *testing.T) {
 	// A request of 1 MiB more than the limit: the handler reads the limit and one byte more, and no other byte.
 	// http.MaxBytesReader asks for one byte past the limit, and it refuses the request when it gets that byte.
 	for _, ct := range []string{"application/json", "application/x-www-form-urlencoded"} {
-		for _, html := range []bool{false, true} {
-			body := &counted{r: io.MultiReader(strings.NewReader(`{"title":"Overflow","body":"`), generated(21<<20), strings.NewReader(`"}`))}
-			r := httptest.NewRequest("POST", "/pages", body)
-			r.ContentLength = 1
-			r.Header.Set("Content-Type", ct)
-			if html {
-				r.Header.Set("Accept", "text/html")
-			}
-			w := httptest.NewRecorder()
-			h.ServeHTTP(w, r)
-			if w.Code != 413 {
-				t.Fatalf("%s html=%v: %d %.200s", ct, html, w.Code, w.Body.String())
-			}
-			if body.n != 20<<20+1 {
-				t.Fatalf("%s html=%v: the handler read %d bytes, want %d (the limit and one byte)", ct, html, body.n, 20<<20+1)
-			}
+		body := &counted{r: io.MultiReader(strings.NewReader(`{"title":"Overflow","body":"`), generated(21<<20), strings.NewReader(`"}`))}
+		r := httptest.NewRequest("POST", "/pages", body)
+		r.ContentLength = 1
+		r.Header.Set("Content-Type", ct)
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		if w.Code != 413 {
+			t.Fatalf("%s: %d %.200s", ct, w.Code, w.Body.String())
+		}
+		if body.n != 20<<20+1 {
+			t.Fatalf("%s: the handler read %d bytes, want %d (the limit and one byte)", ct, body.n, 20<<20+1)
 		}
 	}
 	r := httptest.NewRequest("POST", "/pages", strings.NewReader(`{"title":"Suffix"} {}`))
@@ -303,7 +298,6 @@ func TestARefusedLargeRequestClosesTheConnection(t *testing.T) {
 	for _, c := range []struct{ path, ct, head, tail string }{
 		{"/pages", "application/json", `{"title":"Overflow","body":"`, `"}`},
 		{"/pages", "application/x-www-form-urlencoded", "title=Overflow&body=", ""},
-		{"/render", "application/x-www-form-urlencoded", "body=", ""},
 	} {
 		conn, err := net.Dial("tcp", srv.Listener.Addr().String())
 		if err != nil {

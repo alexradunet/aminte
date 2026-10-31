@@ -13,7 +13,6 @@ import (
 	"strconv"
 	"strings"
 
-	"lifelog/internal/api/view"
 	"lifelog/internal/core"
 	"lifelog/siren"
 )
@@ -54,7 +53,7 @@ func limitBody(next http.Handler) http.Handler {
 	})
 }
 
-// form reads an action's fields: urlencoded (what a browser and the CLI send) or a JSON object. The body has the limit
+// form reads an action's fields: urlencoded (what an HTML form and the CLI send) or a JSON object. The body has the limit
 // of limitBody.
 func form(r *http.Request) (url.Values, error) {
 	defer r.Body.Close()
@@ -112,10 +111,9 @@ func fieldsOf(r *http.Request, act spec) (url.Values, error) {
 	return v, checked(v, act, r)
 }
 
-// browserFields are the names that a request may carry beside the fields of its action: back is the page a browser
-// form returns to (backOf), feedback is the token of the toast after a redirect, and new names the form that a link
-// of a page asks for (view/forms.go).
-var browserFields = []string{"back", "feedback", "new"}
+// newField is the one name that a GET may carry beside the fields of its action: it names the action whose form a link
+// asks for (known). A POST that carries it is refused as an unknown field.
+const newField = "new"
 
 // checked refuses values that break the shape of the action act: a required field left empty (required), a name the
 // action does not list (known), and a value outside the options of a field (options). The shape of a request is the
@@ -146,24 +144,23 @@ func unknownField(name string, s spec) error {
 	return core.Invalid("unknown field %s: %s takes %s", name, s.Name, strings.Join(fieldNames(s), ", "))
 }
 
-// known refuses a name that is not a field of the action and not one of browserFields. A GET may carry embed, which
-// serve reads (embed.go). A GET that has new may carry the fields of the action that new names, as a link asks for its
-// form (view/forms.go). A new that names no action is refused. A browser form also carries the fields of the form that
-// view.SharedForms gives the action; another client does not.
+// known refuses a name that is not a field of the action. A GET may carry embed, which serve reads (embed.go), and
+// new, which names an action whose form a link of a UI asks for; the GET may then carry the fields of that action too.
+// A new that names no action is refused. Every other name, back and feedback too, is refused on every method.
 func known(v url.Values, act spec, r *http.Request) error {
 	allowed := fieldNames(act)
-	if shared, ok := view.SharedForms[act.Name]; ok && wantsHTML(r) {
-		allowed = append(allowed, fieldNames(specOf(shared))...)
-	}
-	if asked := v.Get("new"); r.Method == "GET" && asked != "" {
-		s, ok := lookup(asked)
-		if !ok {
-			return core.Invalid("unknown form %s: new names an action of GET /actions", asked)
+	if r.Method == "GET" {
+		allowed = append(allowed, newField, embedField)
+		if asked := v.Get(newField); asked != "" {
+			s, ok := lookup(asked)
+			if !ok {
+				return core.Invalid("unknown form %s: new names an action of GET /actions", asked)
+			}
+			allowed = append(allowed, fieldNames(s)...)
 		}
-		allowed = append(allowed, fieldNames(s)...)
 	}
 	for _, name := range slices.Sorted(maps.Keys(v)) {
-		if !slices.Contains(allowed, name) && !slices.Contains(browserFields, name) && !(name == embedField && r.Method == "GET") {
+		if !slices.Contains(allowed, name) {
 			return unknownField(name, act)
 		}
 	}

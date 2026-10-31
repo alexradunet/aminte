@@ -132,10 +132,6 @@ func TestAWriteToAnAppIsForwardedAndItsAnswerIsInTheNamespace(t *testing.T) {
 	if child.hits.Load() != 1 {
 		t.Errorf("the child had %d requests, want 1", child.hits.Load())
 	}
-	rec = call(h, "POST", "/with/testapp/items", "text=hi", map[string]string{"Accept": "text/html"})
-	if rec.Code != 303 || !strings.HasPrefix(rec.Header().Get("Location"), "/with/testapp/items/2") {
-		t.Errorf("browser POST = %d, Location %q, want 303 to the rewritten self", rec.Code, rec.Header().Get("Location"))
-	}
 }
 
 func TestLifelogRefusesWhatTheCatalogRefusesBeforeTheAppIsCalled(t *testing.T) {
@@ -158,7 +154,9 @@ func TestLifelogRefusesWhatTheCatalogRefusesBeforeTheAppIsCalled(t *testing.T) {
 	}
 }
 
-func TestAReadOfAnAppIsForwardedWithoutTheFieldsOfTheBrowser(t *testing.T) {
+// TestAReadOfAnAppIsForwardedWithoutTheFieldsOfThisServer: new (the form that a link asks for) and embed are this
+// server's names, and the app never sees them. Any other name is the app's.
+func TestAReadOfAnAppIsForwardedWithoutTheFieldsOfThisServer(t *testing.T) {
 	h, _, child := withServer(t)
 	for _, target := range []string{"/with/testapp/", "/with/testapp"} {
 		rec := call(h, "GET", target, "", nil)
@@ -166,7 +164,7 @@ func TestAReadOfAnAppIsForwardedWithoutTheFieldsOfTheBrowser(t *testing.T) {
 			t.Errorf("GET %s = %d %s", target, rec.Code, rec.Body)
 		}
 	}
-	rec := call(h, "GET", "/with/testapp/?feedback=abc&new=testapp-add-item&k=v", "", nil)
+	rec := call(h, "GET", "/with/testapp/?new=testapp-add-item&k=v", "", nil)
 	if rec.Code != 200 {
 		t.Fatalf("%d %s", rec.Code, rec.Body)
 	}
@@ -246,21 +244,5 @@ func TestAnAppThatAnswersNoEntityIsBadGateway(t *testing.T) {
 	rec := call(api.NewWith(s, apps), "GET", "/with/plain/", "", nil)
 	if rec.Code != 502 || !strings.Contains(rec.Body.String(), `"upstream"`) || strings.Contains(rec.Body.String(), "hello") {
 		t.Errorf("%d %s, want 502 upstream with no cause", rec.Code, rec.Body)
-	}
-}
-
-func TestAnAppPageIsDrawnWithTheRail(t *testing.T) {
-	h, _, _ := withServer(t)
-	rec := call(h, "GET", "/with/testapp/", "", map[string]string{"Accept": "text/html"})
-	body := rec.Body.String()
-	if rec.Code != 200 || !strings.Contains(body, "Test app") || !strings.Contains(body, `action="/with/testapp/items"`) {
-		t.Fatalf("%d: the page lacks the title or the form: %s", rec.Code, body)
-	}
-	if !strings.Contains(body, `href="/with/testapp" aria-current="page"`) {
-		t.Errorf("the rail has no current link to /with/testapp")
-	}
-	rec = call(h, "GET", "/browse", "", map[string]string{"Accept": "text/html"})
-	if b := rec.Body.String(); !strings.Contains(b, `href="/with/testapp"`) || strings.Contains(b, `href="/with/testapp" aria-current`) {
-		t.Errorf("another page: the link is missing or marked")
 	}
 }

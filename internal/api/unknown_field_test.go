@@ -25,8 +25,9 @@ func send(h http.Handler, method, target, ctype string, body io.Reader) (int, st
 	return rec.Code, rec.Body.String()
 }
 
-// TestAnUnknownFieldIsRefused: a request names only the fields of its action and the three names of a browser. Any
-// other name is 422, in a form, in JSON and in a query, and nothing is written.
+// TestAnUnknownFieldIsRefused: a request names only the fields of its action. A GET may also name new (the action whose
+// form a link asks for) and embed. Any other name is 422, in a form, in JSON, in a query and in a multipart body, and
+// nothing is written. back and feedback were the names of a browser: they are unknown now, and so is new on a POST.
 func TestAnUnknownFieldIsRefused(t *testing.T) {
 	_, h, s := apitest.Fresh(t, "cli")
 	const form = "application/x-www-form-urlencoded"
@@ -39,6 +40,12 @@ func TestAnUnknownFieldIsRefused(t *testing.T) {
 		{"a query of a GET", "GET", "/search?q=a&nope=1", "", ""},
 		{"a new that names no action", "GET", "/browse?new=typo", "", ""},
 		{"a field of the asked form and one more", "GET", "/browse?new=create-page&nope=1", "", ""},
+		{"back in a form", "POST", "/days/2026-09-01/capture", form, "text=x&back=%2F"},
+		{"feedback in a form", "POST", "/days/2026-09-01/capture", form, "text=x&feedback=t"},
+		{"back in a JSON body", "POST", "/days/2026-09-01/capture", "application/json", `{"text":"x","back":"/"}`},
+		{"back in a query", "GET", "/search?q=a&back=%2F", "", ""},
+		{"feedback in a query", "GET", "/search?q=a&feedback=t", "", ""},
+		{"new in a form", "POST", "/days/2026-09-01/capture", form, "text=x&new=create-page"},
 	} {
 		code, body := send(h, tc.method, tc.target, tc.ctype, strings.NewReader(tc.body))
 		if code != 422 || !strings.Contains(body, "invalid") {
@@ -53,13 +60,24 @@ func TestAnUnknownFieldIsRefused(t *testing.T) {
 		t.Errorf("entities %s, want %s: a refused request wrote", got, before)
 	}
 
-	for _, target := range []string{"/search?q=a", "/browse?new=create-page&title=x", "/search?q=a&back=%2F&feedback=t&new=create-page"} {
+	for _, target := range []string{"/search?q=a", "/browse?new=create-page&title=x", "/search?q=a&new=create-page&embed=item"} {
 		if code, body := send(h, "GET", target, "", nil); code != 200 {
 			t.Errorf("%s: %d %s, want 200", target, code, body)
 		}
 	}
-	if code, body := send(h, "POST", "/days/2026-09-01/capture", form, strings.NewReader("text=x&back=%2F&feedback=t")); code >= 400 {
-		t.Errorf("a browser's own names: %d %s", code, body)
+	// A multipart part named back, feedback or new is an unknown name too.
+	for _, name := range []string{"back", "feedback", "new"} {
+		var b bytes.Buffer
+		mw := multipart.NewWriter(&b)
+		mw.WriteField("title", "Scan.jpg")
+		mw.WriteField(name, "x")
+		mw.Close()
+		if code, body := send(h, "POST", "/files", mw.FormDataContentType(), &b); code != 422 || !strings.Contains(body, "unknown field "+name) {
+			t.Errorf("a multipart part %s: %d %s, want 422 that names it", name, code, body)
+		}
+	}
+	if got := pages(); got != before {
+		t.Errorf("entities %s, want %s: a refused request wrote", got, before)
 	}
 }
 

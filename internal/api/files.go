@@ -81,9 +81,6 @@ func parseFileForm(r *http.Request, act spec) (fileForm, error) {
 		return encodedFileForm(r, act)
 	}
 	m, err := readMultipart(r, act)
-	// A multipart form is read by hand, so net/http fills no r.PostForm. The text that was kept goes there, as ParseForm
-	// would put it: the page to return to and the text a refused form sent read it (backOf, submittedText).
-	r.PostForm = m.retained()
 	if err != nil {
 		return fileForm{}, err
 	}
@@ -126,18 +123,6 @@ type multipartForm struct {
 	picture   []byte     // the original, held, when the writer can read it as a picture and it is not too large
 	given     []byte     // the preview part, when one was sent
 	meta      photo.Meta // the metadata read from the head of the original
-}
-
-// retained is the part of the text that the browser needs back when a form is refused, or to return from it: the
-// body (the transcript) and the page to return to.
-func (m *multipartForm) retained() url.Values {
-	kept := url.Values{}
-	for _, key := range []string{"body", "back"} {
-		if m.text.Has(key) {
-			kept.Set(key, m.text.Get(key))
-		}
-	}
-	return kept
 }
 
 // readMultipart streams the parts of a multipart request and keeps only what the budgets allow: bounded text of known
@@ -203,8 +188,8 @@ func (m *multipartForm) take(part *multipart.Part, name string, act spec) error 
 	return nil
 }
 
-// takeText reads a text part. A name that is not a text field of the action act (or a name of a browser) is refused
-// before its bytes are read.
+// takeText reads a text part. A name that is not a text field of the action act is refused before its bytes are
+// read.
 func (m *multipartForm) takeText(part *multipart.Part, name string, act spec) error {
 	if !slices.Contains(textFields(act), name) {
 		return unknownField(name, act)
@@ -266,7 +251,7 @@ func previewOf(m *multipartForm) ([]byte, error) {
 }
 
 // textFields are the names of the text parts that a multipart request to the action act may carry: its fields that are
-// not files, and the names of a browser.
+// not files.
 func textFields(act spec) []string {
 	var names []string
 	for _, f := range act.Fields {
@@ -274,7 +259,7 @@ func textFields(act spec) []string {
 			names = append(names, f.Name)
 		}
 	}
-	return append(names, browserFields...)
+	return names
 }
 
 // readOriginal hashes the original as it streams, and keeps its first megabyte for its metadata (photo.Read: a

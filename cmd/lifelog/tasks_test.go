@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -90,21 +91,12 @@ func startNoTaskServer(t *testing.T) *withServer {
 	return w
 }
 
-// htmlOf is the status and the body of a page for a browser.
-func htmlOf(t *testing.T, w *withServer, path string) (int, string) {
+// linksTasks says whether the root of the server links the task service (the link tasks, to /tasks): what a UI reads to
+// draw Tasks in its rail.
+func linksTasks(t *testing.T, w *withServer) bool {
 	t.Helper()
-	req, err := http.NewRequestWithContext(t.Context(), "GET", w.base+path, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	req.Header.Set("Accept", "text/html")
-	res, err := http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer res.Body.Close()
-	b, _ := io.ReadAll(res.Body)
-	return res.StatusCode, string(b)
+	l := mustGet(t, w, "", "/").LinkByRel("tasks")
+	return l != nil && l.Href == "/tasks"
 }
 
 // rowTitles are the titles of the rows (embedded links) of an entity, in order.
@@ -177,22 +169,16 @@ func TestTheTaskServiceIsTasksAndNotAnApp(t *testing.T) {
 		t.Errorf("/with/taskservice: got %v, want 404", err)
 	}
 
-	status, page := htmlOf(t, w, "/tasks")
-	if status != 200 {
-		t.Fatalf("GET /tasks: status %d\n%s", status, page)
+	// The answer of /tasks names neither the service nor an app address, and the root links it.
+	b, err := json.Marshal(mustGet(t, w, "", "/tasks"))
+	if err != nil {
+		t.Fatal(err)
 	}
-	if !strings.Contains(page, `<a href="/tasks" aria-current="page">`) {
-		t.Errorf("the rail does not mark Tasks on /tasks")
+	if strings.Contains(string(b), "/with/") || strings.Contains(strings.ToLower(string(b)), "taskservice") {
+		t.Errorf("the entity of Tasks names the service or an app address: %s", b)
 	}
-	if strings.Contains(page, "/with/") || strings.Contains(strings.ToLower(page), "taskservice") {
-		t.Errorf("the page of Tasks names the service or an app address")
-	}
-	_, other := htmlOf(t, w, "/browse")
-	if !strings.Contains(other, `href="/tasks"`) {
-		t.Errorf("the rail of /browse has no Tasks")
-	}
-	if strings.Index(other, `href="/browse"`) > strings.Index(other, `href="/tasks"`) {
-		t.Errorf("Tasks is not after Browse in the rail")
+	if !linksTasks(t, w) {
+		t.Errorf("the root does not link /tasks while the service runs")
 	}
 }
 
@@ -297,22 +283,6 @@ func TestThePagesOfTasksGiveTheRowsInOrder(t *testing.T) {
 			if status, code := statusOf(err); status != 404 || code != "not_found" {
 				t.Errorf("GET %s: got %v, want 404 not_found", href, err)
 			}
-		}
-	})
-
-	t.Run("the browser draws the page", func(t *testing.T) {
-		status, page := htmlOf(t, w, "/tasks")
-		if status != 200 {
-			t.Fatalf("status %d", status)
-		}
-		for _, want := range []string{`class="quick-add"`, `action="/tasks"`, `<form method="POST" action="/tasks/items/t3/complete" class="round">`,
-			`aria-label="Complete"`, `<span class="chip">due: 2031-01-29</span>`, `<nav class="side" aria-label="Links">`, `href="/tasks/lists/home"`} {
-			if !strings.Contains(page, want) {
-				t.Errorf("the page does not hold %q", want)
-			}
-		}
-		if strings.Index(page, "Fix tap") > strings.Index(page, "Pay rent") {
-			t.Error("the page draws Pay rent before Fix tap")
 		}
 	})
 }
@@ -504,9 +474,8 @@ func TestWithNoTaskServiceTasksIsUnavailable(t *testing.T) {
 			t.Errorf("the catalog holds %s with no task service", name)
 		}
 	}
-	_, page := htmlOf(t, w, "/browse")
-	if strings.Contains(page, `href="/tasks"`) {
-		t.Error("the rail has Tasks with no task service")
+	if linksTasks(t, w) {
+		t.Error("the root links Tasks with no task service")
 	}
 }
 

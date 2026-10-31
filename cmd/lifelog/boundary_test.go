@@ -11,9 +11,10 @@ import (
 	"testing"
 )
 
-// The two tests of this file keep the rings of plan 135 (AGENTS.md, "The four rings"): the core is the file, the
-// writer and the catalog, and everything that names a third party or talks to one is an extension. Both read the Go
-// source of internal/, cmd/, siren/, client/, app/, text/ and lifelogtest/ that is not a test.
+// The three tests of this file keep the rings of plan 135 and plan 161 (AGENTS.md, "The four rings"): the core is the
+// file, the writer and the catalog, and everything that names a third party, talks to one or draws a page is an
+// extension. The first two read the Go source of internal/, cmd/, siren/, client/, app/, text/ and lifelogtest/ that is
+// not a test. The third reads every file of these folders, tests and test data too.
 
 // thirdParties are the products and companies the core never names. A thing that names one is an extension; the
 // change that moves it out adds its name here.
@@ -75,6 +76,56 @@ var remoteAllowed = map[string]bool{
 	"lifelogtest/lifelogtest.go":      true, // the app that a test started over its own handler (Server.Connect), as serve probes a child
 	"internal/api/with.go":            true, // a connected app that `serve --with` started, on the loopback address it gave (plan 154)
 	"cmd/lifelog/with.go":             true, // the same children, when serve probes them before it registers them (plan 154)
+}
+
+// presentationExtensions are the extensions of the files that draw a page: a page, a style sheet, a script, a
+// picture, a font and the manifest of an installed app. The browser is the extension lifelog-web (extensions/web);
+// the core answers Siren JSON and bytes, and it holds none of these files.
+var presentationExtensions = []string{".html", ".htm", ".css", ".js", ".mjs", ".svg", ".png", ".jpg", ".jpeg", ".gif", ".webp", ".ico",
+	".woff", ".woff2", ".ttf", ".otf", ".webmanifest"}
+
+// TestTheCoreHoldsNoPresentation holds the decision of plan 161: no file that draws a page lives under internal/ or
+// cmd/, and no Go file of the core imports html/template. It does not read extensions/, where the browser and the
+// review page of the photo extension draw pages.
+func TestTheCoreHoldsNoPresentation(t *testing.T) {
+	root := filepath.Join("..", "..")
+	fset := token.NewFileSet()
+	var goFiles int
+	for _, dir := range []string{"internal", "cmd", "siren", "client", "app", "text", "lifelogtest"} {
+		err := filepath.WalkDir(filepath.Join(root, dir), func(path string, d os.DirEntry, err error) error {
+			if err != nil || d.IsDir() {
+				return err
+			}
+			rel, err := filepath.Rel(root, path)
+			if err != nil {
+				return err
+			}
+			rel = filepath.ToSlash(rel)
+			if (strings.HasPrefix(rel, "internal/") || strings.HasPrefix(rel, "cmd/")) && slices.Contains(presentationExtensions, strings.ToLower(filepath.Ext(path))) {
+				t.Errorf("%s draws a page: the core holds no HTML, style sheet, script, picture or font (extensions/web holds them)", rel)
+			}
+			if filepath.Ext(path) != ".go" {
+				return nil
+			}
+			goFiles++
+			f, err := parser.ParseFile(fset, path, nil, parser.ImportsOnly)
+			if err != nil {
+				return err
+			}
+			for _, imp := range f.Imports {
+				if pkg, _ := strconv.Unquote(imp.Path.Value); pkg == "html/template" {
+					t.Errorf("%s imports html/template: the core draws no page", rel)
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	if goFiles < 100 {
+		t.Fatalf("read %d Go files; the walk missed the tree", goFiles)
+	}
 }
 
 // coreSources is the Go source of internal/, cmd/, siren/, client/, app/, text/ and lifelogtest/ that is not a test, by its path relative to the repo root.

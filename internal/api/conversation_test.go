@@ -3,7 +3,7 @@ package api_test
 import (
 	"fmt"
 	"net/http"
-	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -255,54 +255,37 @@ func TestTheConversationOfADay(t *testing.T) {
 	}
 }
 
-// TestAConversationPageHasOneViewInABrowser: a browser's GET of a live conversation page is a 303 to the conversation
-// of its day, with the query kept; the JSON of the page is the page's; a tombstoned page stays a page; the view is a
-// whole page for a day with no talk and for a day with a page.
-func TestAConversationPageHasOneViewInABrowser(t *testing.T) {
-	c, h, s := conversationStore(t)
-	browser := func(path string) *httptest.ResponseRecorder {
-		req := httptest.NewRequest("GET", path, nil)
-		req.Header.Set("Accept", "text/html")
-		rec := httptest.NewRecorder()
-		h.ServeHTTP(rec, req)
-		return rec
-	}
-	browse(t, h, "/days/today/conversation")
+// TestAConversationPageLinksTheViewThatCarriesIt: the JSON of the page of a conversation is the page's, and it links
+// (rel conversation) to the view of its day that carries it; the view does not link to itself; a page titled
+// Conversation notes has no such link, and a page that was deleted is a page. A UI that shows the view and not the page
+// (the browser extension) follows this link.
+func TestAConversationPageLinksTheViewThatCarriesIt(t *testing.T) {
+	c, _, s := conversationStore(t)
 	if _, err := say(t, c, convDay, "Hello"); err != nil {
 		t.Fatal(err)
 	}
-	browse(t, h, "/days/today/conversation")
 	id, _ := s.PageID(t.Context(), "Conversation "+convDay)
 	self := siren.PageHref(id)
-	for query, want := range map[string]string{"": "/days/" + convDay + "/conversation", "?new=rename": "/days/" + convDay + "/conversation?new=rename"} {
-		if rec := browser(self + query); rec.Code != http.StatusSeeOther || rec.Header().Get("Location") != want {
-			t.Errorf("GET %s%s in a browser: %d %q, want 303 to %s", self, query, rec.Code, rec.Header().Get("Location"), want)
-		}
-	}
 	if e := apitest.Must(t)(c.Get(t.Context(), self)); strings.Join(e.Class, " ") != "page" || apitest.Href(e, "self") != self {
 		t.Errorf("the JSON of the page: %v %q, want the page", e.Class, apitest.Href(e, "self"))
 	}
-	// The JSON of the page links to the view that carries it, and the view does not link to itself: a client that
-	// shows the view and not the page (the extension that draws the browser) follows this link.
 	if got, want := apitest.Href(apitest.Must(t)(c.Get(t.Context(), self)), "conversation"), "/days/"+convDay+"/conversation"; got != want {
 		t.Errorf("the link conversation of the page: %q, want %q", got, want)
 	}
 	if got := apitest.Href(apitest.Must(t)(c.Get(t.Context(), "/days/"+convDay+"/conversation")), "conversation"); got != "" {
 		t.Errorf("the conversation links to itself: %q", got)
 	}
-	// A page that is not a conversation, and one with a title that is not of a day, are not redirected.
+	// A page that is not a conversation, and one with a title that is not of a day, have no such link.
 	other := apitest.Must(t)(c.Do(t.Context(), apitest.Action(t, apitest.Must(t)(c.Get(t.Context(), "/")), "create-page"), map[string]string{"title": "Conversation notes"}))
 	if got := apitest.Href(apitest.Must(t)(c.Get(t.Context(), apitest.Href(other, "self"))), "conversation"); got != "" {
 		t.Errorf("a page titled Conversation notes links to a conversation: %q", got)
 	}
-	if rec := browser(apitest.Href(other, "self")); rec.Code != http.StatusOK {
-		t.Errorf("a page titled Conversation notes: %d, want 200", rec.Code)
-	}
+	// A page of a conversation that is deleted stays a page, and it is a plain GET: the core redirects nothing.
 	if err := s.Tombstone(t.Context(), "cli", id); err != nil {
 		t.Fatal(err)
 	}
-	if rec := browser(self); rec.Code != http.StatusOK {
-		t.Errorf("a tombstoned conversation page: %d, want 200", rec.Code)
+	if e := apitest.Must(t)(c.Get(t.Context(), self)); !slices.Contains(e.Class, "deleted") {
+		t.Errorf("a tombstoned conversation page is %v, want a deleted page", e.Class)
 	}
 }
 

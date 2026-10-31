@@ -2,9 +2,6 @@ package api_test
 
 import (
 	"fmt"
-	"net/http"
-	"net/http/httptest"
-	"regexp"
 	"strings"
 	"testing"
 
@@ -26,7 +23,7 @@ func objects(p map[string]any, key string) []map[string]any {
 // TestTheYearHoldsTwelveMonths: the day pages and the current readings of one year, month by month. A reading of the
 // year before is not counted.
 func TestTheYearHoldsTwelveMonths(t *testing.T) {
-	c, h, _ := apitest.FreshOn(t, "cli", weekToday)
+	c, _, _ := apitest.FreshOn(t, "cli", weekToday)
 	for _, day := range []string{"2026-10-05", "2026-10-07", "2026-10-11"} {
 		apitest.Must(t)(c.Do(t.Context(), apitest.Action(t, apitest.Must(t)(c.Get(t.Context(), "/days/"+day)), "capture"), map[string]string{"text": "A page."}))
 	}
@@ -66,23 +63,6 @@ func TestTheYearHoldsTwelveMonths(t *testing.T) {
 			t.Errorf("/years/%s: %v", bad, err)
 		}
 	}
-
-	body := browse(t, h, "/years/2026")
-	if n := strings.Count(body, `<div class="month-box">`); n != 12 { // the sidebar draws none
-		t.Errorf("%d month boxes on the year's page, want 12", n)
-	}
-	for _, want := range []string{`<a href="/months/2026-01">January</a>`, `<a href="/months/2026-12">December</a>`, `<span class="meta">3 written</span>`,
-		`<a href="/days/2026-10-12" aria-current="date"`, `<a href="/days/2026-10-05" class="written"`, "3 days written", "3 readings", `rel="prev"`, `rel="next"`} {
-		if !strings.Contains(body, want) {
-			t.Errorf("the year's page lacks %q", want)
-		}
-	}
-	if !strings.Contains(browse(t, h, "/years/2027"), "0 days written") {
-		t.Error("a year with no page does not say that no day is written")
-	}
-	if !strings.Contains(browse(t, h, "/months/2026-10"), `<a href="/years/2026">Year</a>`) {
-		t.Error("a month does not link to its year")
-	}
 }
 
 // TestHomeLinksThisMonthAndThisYear: Home links this month and this year by their own addresses.
@@ -99,19 +79,9 @@ func said(v any) string { return fmt.Sprint(v) }
 
 // TestTheEdgesOfTheCalendarLinkOnlyToPages: the days run from 0000-01-01 to 9999-12-31 (lifelog_meta.days), and a
 // year has a page from 0001 to 9999. The first and the last day, month and year answer, and each of their links leads
-// to a page that answers: a link to a period that has no page is absent, in the links of the entity and in its HTML.
-// Where the entity has no prev or next link, the HTML has no step with that rel, and no page has an empty href.
+// to a page that answers: a link to a period that has no page is absent.
 func TestTheEdgesOfTheCalendarLinkOnlyToPages(t *testing.T) {
-	c, h, _ := apitest.FreshOn(t, "cli", weekToday)
-	calendarHref := regexp.MustCompile(`href="(/(?:days|months|years)/[^"]+)"`)
-	checked := map[string]bool{} // the HTML links already fetched: the sidebar repeats the days of this month
-	answers := func(path, accept string) int {
-		req := httptest.NewRequest("GET", path, nil)
-		req.Header.Set("Accept", accept)
-		rec := httptest.NewRecorder()
-		h.ServeHTTP(rec, req)
-		return rec.Code
-	}
+	c, _, _ := apitest.FreshOn(t, "cli", weekToday)
 	for _, tc := range []struct{ page, rels string }{
 		{"/days/0000-01-01", "next,month"},
 		{"/days/0000-01-02", "prev,next,month"},
@@ -133,31 +103,12 @@ func TestTheEdgesOfTheCalendarLinkOnlyToPages(t *testing.T) {
 				continue
 			}
 			rels = append(rels, rel)
-			if code := answers(href, "application/vnd.siren+json"); code != http.StatusOK {
-				t.Errorf("%s: the %s link %s answers %d, want 200", tc.page, rel, href, code)
+			if _, err := c.Get(t.Context(), href); err != nil {
+				t.Errorf("%s: the %s link %s does not answer: %v", tc.page, rel, href, err)
 			}
 		}
 		if got := strings.Join(rels, ","); got != tc.rels {
 			t.Errorf("%s links %s, want %s", tc.page, got, tc.rels)
-		}
-		page := browse(t, h, tc.page)
-		for _, m := range calendarHref.FindAllStringSubmatch(page, -1) {
-			if checked[m[1]] {
-				continue
-			}
-			checked[m[1]] = true
-			// a browser keeps the fragment (#capture of the Today strip) to itself; httptest would send it in the path
-			if code := answers(strings.SplitN(m[1], "#", 2)[0], "text/html"); code != http.StatusOK && code != http.StatusSeeOther {
-				t.Errorf("%s: its HTML links %s, which answers %d", tc.page, m[1], code)
-			}
-		}
-		for _, rel := range []string{"prev", "next"} {
-			if apitest.Href(e, rel) == "" && strings.Contains(page, `rel="`+rel+`"`) {
-				t.Errorf("%s has no %s link, and its HTML draws a step with rel=%q", tc.page, rel, rel)
-			}
-		}
-		if strings.Contains(page, `href=""`) {
-			t.Errorf("%s: its HTML has an empty href", tc.page)
 		}
 	}
 }

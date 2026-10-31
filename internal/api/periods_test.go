@@ -10,50 +10,48 @@ import (
 	"lifelog/internal/api/apitest"
 )
 
-// The period pages in the browser (D30). Today is Wednesday 2031-05-14, in ISO week 2031-W20. A period page is a plain
-// page with a key as its title, made with create-page.
-
-// mainOf is the part of a page between its main tags: what a failure of a test needs to show.
-func mainOf(page string) string {
-	_, rest, _ := strings.Cut(page, `<main id="main">`)
-	rest, _, _ = strings.Cut(rest, "</main>")
-	return rest
-}
+// The period pages (D30). Today is Wednesday 2031-05-14, in ISO week 2031-W20. A period page is a plain page with a key
+// as its title, made with create-page. The view of a period (a week, a month, a year) carries its page when it has one.
 
 func TestAWeekListsItsSevenDaysAndItsPage(t *testing.T) {
 	c, h, _ := apitest.FreshOn(t, "cli", fixedToday)
 	root := apitest.Must(t)(c.Get(t.Context(), "/"))
 	apitest.Must(t)(c.Do(t.Context(), apitest.Action(t, root, "create-page"), map[string]string{"title": "2031-W20", "body": "Finish the report"}))
 
-	page := browse(t, h, "/weeks/2031-W20")
-	if strings.Contains(page, "no value") {
-		t.Errorf("the week draws a missing value:\n%s", mainOf(page))
+	week := apitest.Must(t)(c.Get(t.Context(), "/weeks/2031-W20"))
+	if week.Class[0] != "week" || week.Title != "Week 20 of 2031" {
+		t.Errorf("the week is %v titled %q, want a week titled Week 20 of 2031", week.Class, week.Title)
 	}
-	if !strings.Contains(page, "<h1>Week 20 of 2031</h1>") {
-		t.Errorf("the title of the week:\n%s", mainOf(page))
-	}
-	for d := 12; d <= 18; d++ {
-		if want := fmt.Sprintf(`href="/days/2031-05-%02d"`, d); !strings.Contains(page, want) {
-			t.Errorf("the week does not list %s", want)
+	var days []string
+	for _, l := range week.Entities {
+		if l.HasRel("day") {
+			days = append(days, l.Href)
 		}
 	}
-	if strings.Contains(page, `href="/days/2031-05-11"`) || strings.Contains(page, `href="/days/2031-05-19"`) {
-		t.Error("the week lists a day outside it")
+	var want []string
+	for d := 12; d <= 18; d++ { // Monday to Sunday: not the 11th, not the 19th
+		want = append(want, fmt.Sprintf("/days/2031-05-%02d", d))
 	}
-	for _, want := range []string{`aria-label="The page of the period"`, `<h2>The week page</h2>`, "Finish the report", `href="/weeks/2031-W19" rel="prev"`, `aria-current="page">Week</a>`} {
-		if !strings.Contains(page, want) {
-			t.Errorf("the week does not carry %s", want)
-		}
+	if strings.Join(days, " ") != strings.Join(want, " ") {
+		t.Errorf("the week lists %v, want %v", days, want)
 	}
-	if strings.Contains(page, "has no page yet") {
-		t.Error("a week with a page offers to make it")
+	if props(week)["body"] != "Finish the report" || apitest.Href(week, "page") == "" {
+		t.Errorf("the week carries the body %v and the page %q, want the page of the week", props(week)["body"], apitest.Href(week, "page"))
+	}
+	if page := week.LinkByRel("page"); page == nil || page.Title != "The week page" {
+		t.Errorf("the link page of the week is %+v, want the title The week page", page)
+	}
+	if apitest.Href(week, "prev") != "/weeks/2031-W19" {
+		t.Errorf("the link prev of the week is %q, want /weeks/2031-W19", apitest.Href(week, "prev"))
+	}
+	if hasAction(week, "create-page") {
+		t.Errorf("a week with a page offers to make it: %s", names(week))
 	}
 
 	req := httptest.NewRequest("GET", "/weeks/today", nil)
-	req.Header.Set("Accept", "text/html")
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
-	if rec.Code != http.StatusSeeOther && rec.Code != http.StatusFound || rec.Header().Get("Location") != "/weeks/2031-W20" {
+	if rec.Code != http.StatusSeeOther || rec.Header().Get("Location") != "/weeks/2031-W20" {
 		t.Errorf("/weeks/today: %d to %q", rec.Code, rec.Header().Get("Location"))
 	}
 	for _, bad := range []string{"/weeks/2031-W53", "/weeks/2031-W00", "/weeks/2031-W5", "/weeks/x"} {
@@ -63,71 +61,70 @@ func TestAWeekListsItsSevenDaysAndItsPage(t *testing.T) {
 	}
 }
 
+// TestAMonthAndAYearShowTheirPages: a month and a year with no page offer create-page; with pages they carry them, and
+// the year lists its four quarters with the page of each (0 for a quarter with no page, which create-page makes).
 func TestAMonthAndAYearShowTheirPages(t *testing.T) {
-	c, h, _ := apitest.FreshOn(t, "cli", fixedToday)
+	c, _, _ := apitest.FreshOn(t, "cli", fixedToday)
 	root := apitest.Must(t)(c.Get(t.Context(), "/"))
-	if page := browse(t, h, "/months/2031-05"); strings.Contains(page, "<h2>The month page</h2>") || !strings.Contains(page, "This month has no page yet") {
-		t.Errorf("a month with no page:\n%s", mainOf(page))
+	month := apitest.Must(t)(c.Get(t.Context(), "/months/2031-05"))
+	if apitest.Href(month, "page") != "" || !hasAction(month, "create-page") {
+		t.Errorf("a month with no page: link page %q, actions %s", apitest.Href(month, "page"), names(month))
 	}
 	apitest.Must(t)(c.Do(t.Context(), apitest.Action(t, root, "create-page"), map[string]string{"title": "2031-05", "body": "Plan the month"}))
 	apitest.Must(t)(c.Do(t.Context(), apitest.Action(t, root, "create-page"), map[string]string{"title": "2031", "body": "Run a marathon"}))
-	month := browse(t, h, "/months/2031-05")
-	for _, want := range []string{`aria-label="The page of the period"`, "Plan the month"} {
-		if !strings.Contains(month, want) {
-			t.Errorf("the month does not carry %s", want)
+	month = apitest.Must(t)(c.Get(t.Context(), "/months/2031-05"))
+	if props(month)["body"] != "Plan the month" || apitest.Href(month, "page") == "" || hasAction(month, "create-page") {
+		t.Errorf("a month with a page: body %v, link page %q, actions %s", props(month)["body"], apitest.Href(month, "page"), names(month))
+	}
+	quarters := func() map[string]string {
+		t.Helper()
+		out := map[string]string{}
+		list, _ := props(apitest.Must(t)(c.Get(t.Context(), "/years/2031")))["quarters"].([]any)
+		for _, q := range list {
+			m := q.(map[string]any)
+			out[fmt.Sprint(m["key"])] = fmt.Sprint(m["page_id"])
 		}
+		return out
 	}
-	if strings.Index(month, "Plan the month") > strings.Index(month, `<table class="calendar">`) {
-		t.Error("the page of the month is below its calendar")
+	year := apitest.Must(t)(c.Get(t.Context(), "/years/2031"))
+	if props(year)["body"] != "Run a marathon" || apitest.Href(year, "page") == "" {
+		t.Errorf("a year with a page: body %v, link page %q", props(year)["body"], apitest.Href(year, "page"))
 	}
-	year := browse(t, h, "/years/2031")
-	for _, want := range []string{"Run a marathon", `aria-label="Quarters"`, `href="/actions?new=create-page&amp;title=2031-Q4"`} {
-		if !strings.Contains(year, want) {
-			t.Errorf("the year does not carry %s", want)
-		}
-	}
-	// The link of a quarter with no page opens the form of create-page, with the quarter as the title.
-	opened := browse(t, h, "/actions?new=create-page&title=2031-Q4")
-	if !strings.Contains(opened, `<details class="action" open>`) || !strings.Contains(opened, `name="title" value="2031-Q4"`) {
-		t.Errorf("?new=create-page&title=2031-Q4 does not open the form for the quarter:\n%s", mainOf(opened))
+	before := quarters()
+	if len(before) != 4 || before["2031-Q4"] != "<nil>" {
+		t.Fatalf("the quarters before the page of Q4: %v, want four with no page for 2031-Q4", before)
 	}
 	apitest.Must(t)(c.Do(t.Context(), apitest.Action(t, root, "create-page"), map[string]string{"title": "2031-Q4", "body": "Ship it"}))
-	if after := browse(t, h, "/years/2031"); !strings.Contains(after, `<a href="/pages/`) || strings.Contains(after, `title=2031-Q4"`) {
-		t.Errorf("a quarter with a page still links its opener:\n%s", after)
+	if after := quarters(); after["2031-Q4"] == "<nil>" || after["2031-Q4"] == "" || after["2031-Q1"] != "<nil>" {
+		t.Errorf("the quarters after the page of Q4: %v, want the page of 2031-Q4", after)
 	}
 }
 
-func TestAPeriodPageNamesItsKindAndItsView(t *testing.T) {
-	c, h, _ := apitest.FreshOn(t, "cli", fixedToday)
+// TestAPeriodPageNamesItsKind: the entity of a page titled with a key of a period says which period (props period), and
+// carries its body.
+func TestAPeriodPageNamesItsKind(t *testing.T) {
+	c, _, _ := apitest.FreshOn(t, "cli", fixedToday)
 	root := apitest.Must(t)(c.Get(t.Context(), "/"))
-	for key, want := range map[string][]string{
-		"2031-W20": {`<span class="kind">week page</span>`, `<a href="/weeks/2031-W20">The week view</a>`},
-		"2031-05":  {`<span class="kind">month page</span>`, `<a href="/months/2031-05">The month view</a>`},
-		"2031":     {`<span class="kind">year page</span>`, `<a href="/years/2031">The year view</a>`},
-		"2031-Q4":  {`<span class="kind">quarter page</span>`, `<a href="/months/2031-10">October</a>`, `<a href="/months/2031-12">December</a>`},
-	} {
+	for key, want := range map[string]string{"2031-W20": "week", "2031-05": "month", "2031": "year", "2031-Q4": "quarter"} {
 		e := apitest.Must(t)(c.Do(t.Context(), apitest.Action(t, root, "create-page"), map[string]string{"title": key, "body": "Aim " + key}))
-		page := browse(t, h, fmt.Sprint("/pages/", props(e)["id"]))
-		want = append(want, `Aim `+key)
-		for _, w := range want {
-			if !strings.Contains(page, w) {
-				t.Errorf("the page %s does not carry %s", key, w)
-			}
+		if props(e)["period"] != want || props(e)["body"] != "Aim "+key {
+			t.Errorf("the page %s: period %v, body %v; want %s and Aim %s", key, props(e)["period"], props(e)["body"], want, key)
 		}
 	}
 }
 
 // TestCreatePageMakesAPeriodPageAndRefusesAPeriodThatDoesNotExist: a create-page of a week key makes the period page
-// that the week view then shows. The file refuses a week that the year does not have, by the name of its constraint.
+// that the week view then carries. The file refuses a week that the year does not have, by the name of its constraint.
 func TestCreatePageMakesAPeriodPageAndRefusesAPeriodThatDoesNotExist(t *testing.T) {
-	c, h, _ := apitest.FreshOn(t, "cli", fixedToday)
+	c, _, _ := apitest.FreshOn(t, "cli", fixedToday)
 	root := apitest.Must(t)(c.Get(t.Context(), "/"))
 	week := apitest.Must(t)(c.Do(t.Context(), apitest.Action(t, root, "create-page"), map[string]string{"title": "2031-W43"}))
 	if p := props(week); week.Title != "2031-W43" || p["period"] != "week" {
 		t.Errorf("the week page: %q %v", week.Title, p["period"])
 	}
-	if page := browse(t, h, "/weeks/2031-W43"); !strings.Contains(page, `<h2>The week page</h2>`) || strings.Contains(page, "has no page yet") {
-		t.Errorf("the week view does not show the page that create-page made:\n%s", mainOf(page))
+	view := apitest.Must(t)(c.Get(t.Context(), "/weeks/2031-W43"))
+	if apitest.Href(view, "page") == "" || hasAction(view, "create-page") {
+		t.Errorf("the week view does not carry the page that create-page made: link page %q, actions %s", apitest.Href(view, "page"), names(view))
 	}
 	_, err := c.Do(t.Context(), apitest.Action(t, root, "create-page"), map[string]string{"title": "2027-W53"})
 	if apitest.Status(err) != http.StatusUnprocessableEntity || !strings.Contains(err.Error(), "entities_period_exists") {
@@ -136,9 +133,9 @@ func TestCreatePageMakesAPeriodPageAndRefusesAPeriodThatDoesNotExist(t *testing.
 }
 
 // TestAPeriodViewWithoutAPageOffersCreatePage: a week, a month and a year with no page offer create-page with the key
-// as the title, and draw the form with the title fixed. With a page they offer save-body and not create-page.
+// as the title. With a page they offer save-body and not create-page.
 func TestAPeriodViewWithoutAPageOffersCreatePage(t *testing.T) {
-	c, h, _ := apitest.FreshOn(t, "cli", fixedToday)
+	c, _, _ := apitest.FreshOn(t, "cli", fixedToday)
 	root := apitest.Must(t)(c.Get(t.Context(), "/"))
 	for path, key := range map[string]string{"/weeks/2031-W20": "2031-W20", "/months/2031-05": "2031-05", "/years/2031": "2031"} {
 		e := apitest.Must(t)(c.Get(t.Context(), path))
@@ -154,12 +151,6 @@ func TestAPeriodViewWithoutAPageOffersCreatePage(t *testing.T) {
 		}
 		if title != key {
 			t.Errorf("%s: the title of create-page is %v, want %s", path, title, key)
-		}
-		page := browse(t, h, path)
-		for _, want := range []string{"has no page yet", `<input type="hidden" name="title" value="` + key + `">`} {
-			if !strings.Contains(page, want) {
-				t.Errorf("%s does not carry %s:\n%s", path, want, mainOf(page))
-			}
 		}
 		apitest.Must(t)(c.Do(t.Context(), apitest.Action(t, root, "create-page"), map[string]string{"title": key}))
 		if after := apitest.Must(t)(c.Get(t.Context(), path)); names(after) != "save-body" {

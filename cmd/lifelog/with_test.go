@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"context"
-	"net"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -86,7 +85,8 @@ func (w *withServer) start(t *testing.T, argv, extra []string) {
 	e.executable = func() (string, error) { return filepath.Join(w.dir, "lifelog"), nil }
 	e.stdout, e.stderr = new(lockedBuffer), w.stderr
 	e.clock = func() time.Time { return time.Date(2031, 2, 3, 12, 0, 0, 0, time.Local) }
-	// The ambient LIFELOG_TOKEN is the parent's: getenv gives the token of a public listener only through the flags.
+	// The ambient LIFELOG_TOKEN is the parent's, and serve does not read it (getenv is noVars): the server has a token
+	// only through --token-file, and a child never inherits the ambient one.
 	ctx, cancel := context.WithCancel(context.Background())
 	w.cancel = cancel
 	go func() { w.done <- runArgs(ctx, e, append(argv, extra...)) }()
@@ -195,14 +195,14 @@ func TestServeWithGivesTheChildTheListenerAndNothingElse(t *testing.T) {
 	}
 }
 
-// TestServeWithGivesTheChildTheTokenOfAPublicListener: the child reaches a --public listener with the token of the
-// listener, not the token of the parent's environment.
-func TestServeWithGivesTheChildTheTokenOfAPublicListener(t *testing.T) {
+// TestServeWithGivesTheChildTheTokenOfTheServer: the child reaches a server that has a token with the token of the
+// server, not the token of the parent's environment.
+func TestServeWithGivesTheChildTheTokenOfTheServer(t *testing.T) {
 	tokenFile := filepath.Join(t.TempDir(), "token")
 	if err := os.WriteFile(tokenFile, []byte(testToken+"\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	w := startWithServer(t, map[string]string{"fake": "wait"}, "--public", "--token-file", tokenFile)
+	w := startWithServer(t, map[string]string{"fake": "wait"}, "--token-file", tokenFile)
 	got := w.logOf(t, "fake", 1)[0]
 	want := "url=http://127.0.0.1:" + port(w.base) + " token=" + testToken + " stdin=0 args=0 status=200"
 	if got != want {
@@ -253,8 +253,8 @@ func TestServeWithRunsEveryNameGiven(t *testing.T) {
 	}
 }
 
-// TestServeWithRefusesBeforeAnythingOpens: an unknown name, and --with with --tls-cert, end the command with no
-// listener and a file that is not touched.
+// TestServeWithRefusesBeforeAnythingOpens: an unknown name, a name twice and a flag of the network that serve no longer
+// takes end the command with no listener and a file that is not touched.
 func TestServeWithRefusesBeforeAnythingOpens(t *testing.T) {
 	dir := t.TempDir()
 	absent := filepath.Join(dir, "absent.db")
@@ -270,7 +270,8 @@ func TestServeWithRefusesBeforeAnythingOpens(t *testing.T) {
 		{[]string{"serve", "--with", "nosuch"}, "lifelog-nosuch"},
 		{[]string{"serve", "--with", "fake", "--with", "nosuch"}, "lifelog-nosuch"},
 		{[]string{"serve", "--with", "fake", "--with", "fake"}, "given twice"}, // two children on one session: refused
-		{[]string{"serve", "--public", "--token-file", tokenFile, "--tls-cert", "c.pem", "--tls-key", "k.pem", "--with", "fake"}, "--with and --tls-cert"},
+		{[]string{"serve", "--public", "--token-file", tokenFile, "--with", "fake"}, "unknown flag --public"},
+		{[]string{"serve", "--tls-cert", "c.pem", "--with", "fake"}, "unknown flag --tls-cert"},
 	} {
 		e, _, stderr := testEnv(t)
 		e.executable = func() (string, error) { return filepath.Join(dir, "lifelog"), nil }
@@ -317,22 +318,5 @@ func TestServeWithEndsTheChildBeforeTheDrain(t *testing.T) {
 	page, err := store.PageByID(t.Context(), id)
 	if err != nil || !strings.Contains(page.Body, "written while the child ended") {
 		t.Fatalf("the capture of the child is not on the day page: %+v, %v", page, err)
-	}
-}
-
-// TestTheChildReachesTheListenerWhereItIs: the address in LIFELOG_URL is the listener's own host and port; a listener
-// on every interface is reached on the IPv4 loopback, one on [::1] or on one address of the machine where it is.
-func TestTheChildReachesTheListenerWhereItIs(t *testing.T) {
-	for addr, want := range map[string]string{
-		"127.0.0.1:7777": "127.0.0.1:7777", "0.0.0.0:7777": "127.0.0.1:7777", "[::]:7777": "127.0.0.1:7777",
-		"[::1]:7777": "[::1]:7777", "192.168.1.10:7777": "192.168.1.10:7777",
-	} {
-		a, err := net.ResolveTCPAddr("tcp", addr)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if got := loopbackOf(a); got != want {
-			t.Errorf("loopbackOf(%s) = %q, want %q", addr, got, want)
-		}
 	}
 }

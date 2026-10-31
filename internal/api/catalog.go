@@ -1,8 +1,8 @@
-// Package api serves life.db as hypermedia: Siren-style JSON for programs, plain HTML for a browser, one
-// representation behind both. A client needs no rules of its own: an action is offered only where it is legal,
-// with its fields (and their current values) filled in. The Siren types and the addresses of the resources are in
-// package siren, which the clients import too; package view draws an entity as a page, and reads no store. This
-// file holds the catalog of the actions.
+// Package api serves life.db as hypermedia: Siren-style JSON for every client, and bytes (a picture, a snapshot). It
+// draws no page: a UI is a client, and the browser is the extension lifelog-web. A client needs no rules of its own: an
+// action is offered only where it is legal, with its fields (and their current values) filled in. The Siren types and
+// the addresses of the resources are in package siren, which the clients import too. This file holds the catalog of the
+// actions.
 package api
 
 import (
@@ -18,7 +18,7 @@ const formType = "application/x-www-form-urlencoded"
 
 // spec is one action of the catalog: a templated href ("/pages/{id}/body") and its fields, path fields included.
 // An Owner action is the owner's alone: refused to an agent:* writer and never an MCP tool. A Danger action hides or
-// retracts what is already there: a browser draws its button as a danger and any other client may warn the same way;
+// retracts what is already there: a UI draws its button as a danger and any other client may warn the same way;
 // no surface decides this by an action's name.
 type spec struct {
 	Name, Title, Description, Hint, Method, Path string
@@ -44,12 +44,12 @@ func pageField(name, title string, required bool) siren.Field {
 	return siren.Field{Name: name, Type: "text", Title: title, Required: required, Pages: true}
 }
 
-// area is a multi-line field a browser draws rows lines tall.
+// area is a multi-line field that a UI draws rows lines tall.
 func area(name, title string, rows int) siren.Field {
 	return siren.Field{Name: name, Type: "textarea", Title: title, Rows: rows}
 }
 
-// flagField is a 0 or 1 choice: a browser draws a checkbox, and a program sends 1 for yes. Any other value is refused
+// flagField is a 0 or 1 choice: a UI draws a checkbox, and a program sends 1 for yes. Any other value is refused
 // (options).
 func flagField(name, title string) siren.Field {
 	return siren.Field{Name: name, Type: "number", Title: title, Options: []string{"0", "1"}}
@@ -189,14 +189,11 @@ var catalog = []spec{
 		Owner:  true,
 	},
 	{Name: "settings", Title: "Settings", Class: []string{"edit"},
-		Description: "The owner's settings of the application, kept in a file beside life.db (not in the database): model_url is the base URL of a server that speaks the chat-completions protocol and ends in /v1, model the model id, model_key a bearer credential for it, owner_number the digits of the owner's phone number with the country code (the one number that the agent on the phone answers; other text is 422), ground the floor under the pages of the browser (boards, oak, firelight or embers; empty is boards), lock_after the idle minutes after which a public listener locks a browser (off, 5, 10, 15, 30 or 60; empty is off), lock_pin the PIN that opens it (4 to 8 digits, else 422; the file keeps a salted hash only). A field left out stays as it is, and an empty field clears that setting, except lock_pin: an empty lock_pin keeps the stored PIN, because no read ever shows it. lock_after other than off with no stored PIN and no new one is 422. GET /actions fills no value; GET /settings, the owner's read, fills them all. The answer is the settings.",
+		Description: "The owner's settings of the application, kept in a file beside life.db (not in the database): model_url is the base URL of a server that speaks the chat-completions protocol and ends in /v1, model the model id, model_key a bearer credential for it, owner_number the digits of the owner's phone number with the country code (the one number that the agent on the phone answers; other text is 422). A field left out stays as it is, and an empty field clears that setting. GET /actions fills no value; GET /settings, the owner's read, fills them all. The answer is the settings.",
 		Hint:        "Set the model that the agent uses. The key is kept in a file beside life.db, not in the database.",
 		Method:      "POST", Path: "/settings",
 		Fields: []siren.Field{opt("model_url", "text", "Model server, the base URL ending in /v1"), opt("model", "text", "Model id"), opt("model_key", "password", "Model key, when the server needs one"),
-			opt("owner_number", "text", "Your phone number: digits with the country code; the agent on the phone answers this number alone"),
-			{Name: "ground", Type: "text", Title: "Ground", Options: grounds},
-			{Name: "lock_after", Type: "text", Title: "Lock after idle minutes", Options: lockAfters},
-			opt("lock_pin", "password", "Lock PIN, 4 to 8 digits; empty keeps the PIN now stored")},
+			opt("owner_number", "text", "Your phone number: digits with the country code; the agent on the phone answers this number alone")},
 		Owner: true,
 	},
 	{Name: "integrity-check", Title: "Integrity",

@@ -7,7 +7,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
-	"regexp"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -146,10 +146,9 @@ func TestBrowseListsEachKindWithItsRowAndOrder(t *testing.T) {
 	}
 }
 
-// TestBrowseRowsNameTheirPicture: a file kept with a preview and a person whose picture it is name the preview, and
-// the page draws it in the tile and in the face.
+// TestBrowseRowsNameTheirPicture: a file kept with a preview and a person whose picture it is name the preview.
 func TestBrowseRowsNameTheirPicture(t *testing.T) {
-	c, h, s := apitest.Fresh(t, "cli")
+	c, _, s := apitest.Fresh(t, "cli")
 	ids := browseFixture(t, s)
 	ctx := t.Context()
 	path, sum := jpegFile(t, "lake.jpg", 40, 30)
@@ -170,12 +169,6 @@ func TestBrowseRowsNameTheirPicture(t *testing.T) {
 	}
 	if got, want := browseRows(t, apitest.Must(t)(c.Get(ctx, "/browse?kind=person")), "picture"), "Ana:picture=- Bo:picture="+preview; got != want {
 		t.Errorf("people:\n got %s\nwant %s", got, want)
-	}
-	if body := browse(t, h, "/browse?kind=media"); !strings.Contains(body, `<img src="`+preview+`" alt="" loading="lazy"><span class="first">lake.jpg</span>`) {
-		t.Error("the media tile does not draw the picture")
-	}
-	if body := browse(t, h, "/browse?kind=person"); !strings.Contains(body, fmt.Sprintf(`<a class="entry named face" href="/pages/%d"><img class="face-picture" src="%s" alt="" loading="lazy">`, ids["Bo"], preview)) {
-		t.Error("the face does not draw the picture")
 	}
 }
 
@@ -506,112 +499,25 @@ func TestTheCatalogsBrowseGivesTheRowsToAnAgent(t *testing.T) {
 	}
 }
 
-func TestTheBrowsePageDrawsTheTreeTheChipsAndTheRows(t *testing.T) {
-	_, h, s := apitest.Fresh(t, "cli")
-	ids := browseFixture(t, s)
-	family := browse(t, h, "/browse?in=Family")
-	for _, want := range []string{
-		`<nav class="crumbs" aria-label="Where"><a href="/browse">Browse</a><span aria-current="page">Family</span></nav>`, `<h1>Family</h1>`, `<p class="sub"><a href="/pages/` + fmt.Sprint(ids["Family"]) + `">Open its page</a>`,
-		`<details class="browse-tree panel"><summary>Categories <span class="meta">Family</span></summary><nav aria-label="Categories">`,
-		`<a class="entry" href="/browse"><span class="first">Everything</span>`,
-		// The tree folds (docs/plans/118-fold-and-find.md, rule 1): Cousins is in the fold of Family, open, since the
-		// list is on Family.
-		`<li class="branch"><a class="entry" href="/browse?in=Family" aria-current="page"><span class="first">Family</span><span class="meta">5</span></a><a class="tree-new" href="/browse?in=Family&amp;kind=page&amp;new=create-page" aria-label="New page in Family">+</a><details open><summary><span class="sr">Categories in Family</span></summary><ul class="plain rows tree"><li><a class="entry" href="/browse?in=Cousins"><span class="first">Cousins</span><span class="meta">2</span></a><a class="tree-new" href="/browse?in=Cousins&amp;kind=page&amp;new=create-page" aria-label="New page in Cousins">+</a></li>`,
-		`<li class="tree-foot"><a href="/browse?kind=page&amp;new=file-pages">New category</a></li>`,
-		`<a class="entry" href="/browse?unfiled=1"><span class="first">Not filed</span>`,
-		`<nav class="kinds chips" aria-label="Kind"><a href="/browse?in=Family&amp;kind=all" aria-current="page">All <small>5</small></a><a href="/browse?in=Family&amp;kind=page">Pages <small>2</small></a>`,
-		// The category under Family is a row with its badge.
-		`<span class="first">Cousins</span><span class="meta"><span class="badge category">category</span></span>`,
-		`<span class="first">Ana</span><span class="meta"><span class="badge">person</span></span>`,
-	} {
-		if !strings.Contains(family, want) {
-			t.Errorf("/browse?in=Family lacks %s", want)
-		}
+// TestABlankFieldOfBrowseIsTheDefault: the form of browse sends the fields that the reader left empty as empty values,
+// and each means the default: the answer is the answer of the bare address, with the pages first. The list of ghost
+// pages looks at everything, so its link everything leads to the list of the kind.
+func TestABlankFieldOfBrowseIsTheDefault(t *testing.T) {
+	c, _, s := apitest.Fresh(t, "cli")
+	browseFixture(t, s)
+	ctx := t.Context()
+	bare := apitest.Must(t)(c.Get(ctx, "/browse"))
+	blank := apitest.Must(t)(c.Get(ctx, "/browse?kind=&in=&media=&limit=&offset="))
+	if !reflect.DeepEqual(props(blank), props(bare)) || !reflect.DeepEqual(blank.Entities, bare.Entities) {
+		t.Errorf("the blank form of browse answers\n%v\nand the bare address\n%v", props(blank), props(bare))
 	}
-	// All is the default view of a category, so it is where a thing is moved: the bar moves and removes, and never
-	// deletes (a person is deleted from its own page).
-	if !strings.Contains(family, `id="pick"`) || !strings.Contains(family, `<button class="primary">Move to</button>`) ||
-		!strings.Contains(family, `<button form="pick" name="from" value="Family" formnovalidate>Remove from Family</button>`) || strings.Contains(family, `>Delete<`) {
-		t.Error("All in a category does not draw the pick bar with Move to and Remove from Family, and no Delete")
+	counts, _ := props(blank)["counts"].(map[string]any)
+	if props(blank)["kind"] != "page" || fmt.Sprint(counts["page"]) != "5" {
+		t.Errorf("the blank form of browse gives the kind %v with %v pages, want the pages, 5", props(blank)["kind"], counts["page"])
 	}
-	if cousins := browse(t, h, "/browse?in=Cousins&kind=page"); !strings.Contains(cousins, `<nav class="crumbs" aria-label="Where"><a href="/browse?kind=page">Browse</a><a href="/browse?in=Family&amp;kind=page">Family</a><span aria-current="page">Cousins</span></nav>`) || !strings.Contains(cousins, `<h1>Cousins</h1>`) ||
-		!strings.Contains(cousins, `<a href="/browse?in=Cousins&amp;kind=page" aria-current="page">Pages <small>1</small></a>`) {
-		t.Errorf("/browse?in=Cousins&kind=page lacks its path or its chip")
-	} else if !strings.Contains(cousins, `<details open><summary><span class="sr">Categories in Family</span>`) {
-		t.Error("the fold of Family is not open on the path to Cousins")
-	}
-
-	people := browse(t, h, "/browse?kind=person")
-	for _, want := range []string{
-		fmt.Sprintf(`<a class="entry named face" href="/pages/%d"><span class="face-picture" aria-hidden="true">`, ids["Ana"]),
-		`<span class="first">Ana</span><span class="meta">mentioned on 1 page, last `, `<span class="meta">not mentioned yet</span>`,
-		`<form id="pick" method="POST" action="/pages/file" class="inline" data-action="file-pages">`,
-		fmt.Sprintf(`<input type="checkbox" name="ids" value="%d" form="pick" aria-label="Select Ana">`, ids["Ana"]),
-		`<datalist id="pick-category"><option value="Family"><option value="Cousins">Family › Cousins</datalist>`, `<a href="/browse?kind=person" aria-current="page">People <small>2</small></a>`,
-		`<a class="entry" href="/browse?kind=person" aria-current="page"><span class="first">Everything</span>`,
-	} {
-		if !strings.Contains(people, want) {
-			t.Errorf("/browse?kind=person lacks %s", want)
-		}
-	}
-	if strings.Contains(people, `formaction="/pages/tombstone"`) || strings.Contains(people, "delete them") {
-		t.Error("the people list offers Delete")
-	}
-
-	media := browse(t, h, "/browse?kind=media")
-	for _, want := range []string{`<ul class="plain tiles">`, `<li class="tile pick">`, `<span class="first">memo.m4a</span><span class="meta">recording · `,
-		`<nav class="kinds" aria-label="Media kind"><a href="/browse?kind=media" aria-current="page">All media</a><a href="/browse?kind=media&amp;media=image">Pictures</a>`,
-		`formaction="/pages/tombstone"`} {
-		if !strings.Contains(media, want) {
-			t.Errorf("/browse?kind=media lacks %s", want)
-		}
-	}
-	if strings.Contains(media, `accept="`) {
-		t.Error("the media list limits the kinds of file it keeps")
-	}
-	if docs := browse(t, h, "/browse?kind=document"); !strings.Contains(docs, `<span class="first">scan.pdf</span><span class="meta">application/pdf · `) {
-		t.Error("the documents lack their row")
-	}
-	if metrics := browse(t, h, "/browse?kind=metric"); !strings.Contains(metrics, `<span class="first">Weight</span><span class="meta">kg<span class="badge category">Cousins</span></span>`) ||
-		!strings.Contains(metrics, `<span class="first">Mood</span><span class="meta">of 5</span>`) || !strings.Contains(metrics, `<a href="/metrics">The values are on the Metrics board</a>`) {
-		t.Errorf("the metrics lack their rows or the way to the board: %s", metrics[strings.Index(metrics, "<main"):])
-	}
-	pages := browse(t, h, "/browse")
-	// On Pages in Everything a category is a row with its box and its badge; the fold of Family is closed.
-	for _, want := range []string{`<a href="/browse?ghosts=1&amp;kind=page">Ghost pages 0</a>`,
-		fmt.Sprintf(`<li class="pick"><label class="pick-box"><input type="checkbox" name="ids" value="%d" form="pick" aria-label="Select Family"></label>`, ids["Family"]),
-		`<span class="first">Family</span><span class="meta"><span class="badge category">category</span></span>`,
-		`<details><summary><span class="sr">Categories in Family</span>`,
-		`formaction="/pages/tombstone"`, "type a category or delete them"} {
-		if !strings.Contains(pages, want) {
-			t.Errorf("/browse lacks %s", want)
-		}
-	}
-	// The form of the catalog's browse, on /actions: an optional select starts empty, so the form sends only what the
-	// reader picks, and the empty values it sends are the defaults.
-	actions := browse(t, h, "/actions")
-	for _, want := range []string{`<form method="GET" action="/browse" data-action="browse">`, `<select name="kind"><option></option><option>page</option>`,
-		`<select name="media"><option></option><option>image</option>`} {
-		if !strings.Contains(actions, want) {
-			t.Errorf("/actions lacks %s", want)
-		}
-	}
-	if blank := browse(t, h, "/browse?kind=&in=&media=&limit=&offset="); !strings.Contains(blank, `<a href="/browse?kind=page" aria-current="page">Pages <small>5</small></a>`) {
-		t.Error("the blank form of browse does not give the pages")
-	}
-	// The ghost list looks at everything: the tree marks Everything.
-	if ghosts := browse(t, h, "/browse?ghosts=1&kind=page"); !strings.Contains(ghosts, `<a class="entry" href="/browse?kind=page" aria-current="page"><span class="first">Everything</span>`) {
-		t.Error("the ghost list marks no branch of the tree")
-	}
-	for path, want := range map[string]string{
-		"/browse?ghosts=1":                "No ghost page: every page has text or a link.",
-		"/browse?kind=document&unfiled=1": "Everything of this kind is in a category.",
-		"/browse?in=Cousins&kind=person":  "Nothing of this kind is filed in Cousins.",
-		"/browse?kind=media&in=Alpha":     "Nothing of this kind is filed in Alpha.",
-	} {
-		if body := browse(t, h, path); !strings.Contains(body, `<p class="empty">`+want+`</p>`) {
-			t.Errorf("%s lacks its empty state %q", path, want)
-		}
+	ghosts := apitest.Must(t)(c.Get(ctx, "/browse?ghosts=1&kind=page"))
+	if got := apitest.Href(ghosts, "everything"); got != "/browse?kind=page" {
+		t.Errorf("the ghost list links everything to %q, want /browse?kind=page", got)
 	}
 }
 
@@ -619,7 +525,7 @@ func TestTheBrowsePageDrawsTheTreeTheChipsAndTheRows(t *testing.T) {
 // beside the list, and Not filed at its end.
 
 func TestBrowseDrawsTheTreeAndTheUnfiledPages(t *testing.T) {
-	c, h, _ := apitest.FreshOn(t, "cli", fixedToday)
+	c, _, _ := apitest.FreshOn(t, "cli", fixedToday)
 	ctx := t.Context()
 	root := apitest.Must(t)(c.Get(ctx, "/"))
 	ids := map[string]string{}
@@ -657,55 +563,17 @@ func TestBrowseDrawsTheTreeAndTheUnfiledPages(t *testing.T) {
 		t.Errorf("links: %v, want %s", links, want)
 	}
 
-	body := browse(t, h, "/browse?unfiled=1")
-	rows := regexp.MustCompile(`<li(?: class="branch")?><a class="entry" href="/browse\?in=(\w+)"><span class="first">([^<]*)</span><span class="meta">(\d+)</span></a>`).FindAllStringSubmatch(body, -1)
-	var got []string
-	for _, r := range rows {
-		got = append(got, r[2]+"="+r[3])
-	}
-	// The tree is drawn once: a fold that a wide column holds open.
-	if want := "Life=1 Travel=2"; strings.Join(got, " ") != want {
-		t.Errorf("tree rows: %v, want %s", got, want)
-	}
-	// Travel is in the fold of Life (docs/plans/118-fold-and-find.md, rule 1), closed: the list is not on either.
-	if want := `<li class="branch"><a class="entry" href="/browse?in=Life"><span class="first">Life</span><span class="meta">1</span></a><a class="tree-new" href="/browse?in=Life&amp;kind=page&amp;new=create-page" aria-label="New page in Life">+</a><details><summary><span class="sr">Categories in Life</span></summary><ul class="plain rows tree"><li><a class="entry" href="/browse?in=Travel">`; strings.Count(body, want) != 1 {
-		t.Errorf("the tree does not hold Travel in the closed fold of Life")
-	}
-	if !strings.Contains(body, `<a class="entry" href="/browse?unfiled=1" aria-current="page"><span class="first">Not filed</span>`) ||
-		!strings.Contains(body, `href="/pages/`+ids["Loose note"]+`"><span class="first">Loose note</span>`) {
-		t.Error("Not filed is not marked, or does not list the loose page")
-	}
-	if strings.Contains(body, `<span class="first">Gone</span>`) || strings.Contains(body, `<span class="first">Japan 2031</span>`) {
-		t.Error("Not filed lists a filed page or a tombstone")
-	}
 }
 
 func TestBrowseWithNoCategory(t *testing.T) {
-	c, h, _ := apitest.FreshOn(t, "cli", fixedToday)
+	c, _, _ := apitest.FreshOn(t, "cli", fixedToday)
 	e := apitest.Must(t)(c.Get(t.Context(), "/browse"))
 	if cs := props(e)["categories"].([]any); len(cs) != 0 {
 		t.Errorf("categories: %v", cs)
 	}
-	body := browse(t, h, "/browse?unfiled=1")
-	tree := regexp.MustCompile(`(?s)<nav aria-label="Categories">(.*?)</nav>`).FindStringSubmatch(body)
-	if tree == nil || strings.Count(tree[1], "<li") != 4 || !strings.Contains(tree[1], "Everything") || !strings.Contains(tree[1], "Not filed") || !strings.Contains(tree[1], `<span class="first">Deleted, every kind</span><span class="meta">0</span>`) {
-		t.Errorf("an empty tree is not Everything and Not filed: %v", tree)
-	}
-	if !strings.Contains(body, `<p class="empty">Everything of this kind is in a category.</p>`) {
-		t.Error("an empty Not filed says nothing")
-	}
-}
-
-// TestTheGhostPagesSayWhatTheyAre: the ghost list of Browse says what a ghost page is under its title, and an empty
-// list says why it is empty, not how to make a page.
-func TestTheGhostPagesSayWhatTheyAre(t *testing.T) {
-	_, h, _ := apitest.FreshOn(t, "cli", fixedToday)
-	body := browse(t, h, "/browse?ghosts=1")
-	for _, want := range []string{`<nav class="crumbs" aria-label="Where"><a href="/browse">Browse</a><span aria-current="page">Ghost pages</span></nav>`, `<h1>Ghost pages</h1>`, `<p class="sub"><span>Empty pages, older than 30 days, that nothing links to or from.</span></p>`,
-		`<p class="empty">No ghost page: every page has text or a link.</p>`} {
-		if !strings.Contains(body, want) {
-			t.Errorf("the ghost pages lack %s", want)
-		}
+	unfiled := apitest.Must(t)(c.Get(t.Context(), "/browse?unfiled=1"))
+	if rows := props(unfiled)["rows"].([]any); len(rows) != 0 || len(unfiled.Entities) != 0 {
+		t.Errorf("an empty file lists %v", rows)
 	}
 }
 
@@ -739,7 +607,7 @@ func TestHomeLinksTheListsOfBrowse(t *testing.T) {
 // its row opens its page, which offers revive (docs/plans/131-the-pareto-pass.md, part 1). The list of pages counts
 // and links it; a live page is not in it.
 func TestBrowseListsTheDeletedSoTheyCanBeRestored(t *testing.T) {
-	c, h, _ := apitest.Fresh(t, "cli")
+	c, _, _ := apitest.Fresh(t, "cli")
 	ctx := t.Context()
 	root := apitest.Must(t)(c.Get(ctx, "/"))
 	gone := apitest.Must(t)(c.Do(ctx, apitest.Action(t, root, "create-page"), map[string]string{"title": "Gone"}))
@@ -759,57 +627,18 @@ func TestBrowseListsTheDeletedSoTheyCanBeRestored(t *testing.T) {
 	}
 	page := apitest.Must(t)(c.Get(ctx, deleted.Entities[0].Href))
 	apitest.Action(t, page, "revive")
-	body := browse(t, h, "/browse?deleted=1")
-	if !strings.Contains(body, `href="`+deleted.Entities[0].Href+`"`) {
-		t.Errorf("the page of the deleted list does not link Gone:\n%s", body)
-	}
 	if _, err := c.Get(ctx, "/browse?deleted=1&kind=page"); apitest.Status(err) != 422 {
 		t.Errorf("deleted with a kind: %v, want 422", err)
 	}
 }
 
-// TestBrowseMovesAndFilesFromTheList: a row offers Move and its other categories; inside a category the bar moves and
-// removes; in Everything it adds; the Move link opens the one bar with the row checked and returns to the quiet list.
-func TestBrowseMovesAndFilesFromTheList(t *testing.T) {
-	_, h, s := apitest.Fresh(t, "cli")
+// TestAMoveLinkOpensTheBarForTheRow: the Move link of a row asks for the form of file-pages with the id of the row
+// filled in (?new=file-pages&ids=ID). The address is served, and the list offers file-pages with the categories.
+func TestAMoveLinkOpensTheBarForTheRow(t *testing.T) {
+	c, _, s := apitest.Fresh(t, "cli")
 	ids := browseFixture(t, s)
-	ana := fmt.Sprint(ids["Ana"])
-	people := browse(t, h, "/browse?kind=person")
-	for _, want := range []string{
-		`<a class="row-move" href="/browse?ids=` + ana + `&amp;kind=person&amp;new=file-pages">Move</a>`,
-		`<span class="first">Ana</span><span class="meta">mentioned on 1 page, last `,
-		`<span class="badge category">Family</span></span></a>`,
-		`<button class="primary">Add to</button>`,
-	} {
-		if !strings.Contains(people, want) {
-			t.Errorf("/browse?kind=person lacks %s", want)
-		}
-	}
-	if strings.Contains(people, `name="from"`) || strings.Contains(people, `class="pick-on" checked`) {
-		t.Error("Everything offers Remove from, or opens Select without being asked")
-	}
-	in := browse(t, h, "/browse?in=Family&kind=page")
-	for _, want := range []string{`name="move" value="1" checked`, `<button class="primary">Move to</button>`,
-		`<button form="pick" name="from" value="Family" formnovalidate>Remove from Family</button>`} {
-		if !strings.Contains(in, want) {
-			t.Errorf("/browse?in=Family&kind=page lacks %s", want)
-		}
-	}
-	if strings.Contains(in, `<span class="badge category">Family</span>`) {
-		t.Error("a row in Family is badged with Family")
-	}
-	asked := browse(t, h, "/browse?ids="+ana+"&kind=person&new=file-pages")
-	for _, want := range []string{`class="pick-on" checked`, `name="ids" value="` + ana + `" form="pick" checked aria-label="Select Ana"`,
-		`<input type="hidden" name="back" value="/browse?kind=person">`} {
-		if !strings.Contains(asked, want) {
-			t.Errorf("the Move link's page lacks %s", want)
-		}
-	}
-	unfiled := browse(t, h, "/browse?unfiled=1")
-	for _, want := range []string{`<nav class="crumbs" aria-label="Where"><a href="/browse">Browse</a><span aria-current="page">Not filed</span></nav>`, `<h1>Not filed</h1>`,
-		`<li class="tree-foot"><a href="/browse?kind=page&amp;new=file-pages">New category</a></li>`} {
-		if !strings.Contains(unfiled, want) {
-			t.Errorf("/browse?unfiled=1 lacks %s", want)
-		}
+	e := apitest.Must(t)(c.Get(t.Context(), fmt.Sprintf("/browse?ids=%d&kind=person&new=file-pages", ids["Ana"])))
+	if a := apitest.Action(t, e, "file-pages"); !hasOption(a, "category", "Family") {
+		t.Errorf("file-pages on the list offers %+v", a.Field("category"))
 	}
 }

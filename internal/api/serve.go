@@ -15,40 +15,34 @@ import (
 	"strings"
 	"time"
 
-	"lifelog/internal/api/view"
 	"lifelog/internal/core"
 	"lifelog/siren"
 )
 
-// server is the API on one store. The store's clock is the server's one clock: today is core.Store.Today, the words
-// for a time and the name of a snapshot are in the zone of core.Store.Local, and the life of a feedback receipt is
-// measured with core.Store.Now.
+// server is the API on one store. The store's clock is the server's one clock: today is core.Store.Today, and the words
+// for a time and the name of a snapshot are in the zone of core.Store.Local.
 type server struct {
-	s        *core.Store
-	feedback feedbackStore
-	mux      *http.ServeMux
-	with     *Apps // the connected apps (with.go); shared with the other handler of the same serve
+	s    *core.Store
+	mux  *http.ServeMux
+	with *Apps // the connected apps (with.go); shared with the other handler of the same serve
 }
 
 // New returns the whole API as one handler: lifelog serve mounts it on a socket, the CLI and the MCP server
-// call it in-process. It trusts no browser origin other than its own. A public listener uses Public, which builds the
-// API with the origins that the owner allows (docs/plans/078-network-server.md). A test gives a store with a fixed
-// clock, so today is a fixed day and a time is written in fixed words.
+// call it in-process. It trusts no browser origin other than its own. A test gives a store with a fixed clock, so
+// today is a fixed day and a time is written in fixed words.
 func New(s *core.Store) http.Handler {
 	return NewWith(s, NewApps())
 }
 
-// NewWith is New with the connected apps of apps: their actions are in the catalog, and /with/NAME leads to them. A
-// serve with a public listener gives the same apps to this handler and to Public (PublicOptions.Apps).
+// NewWith is New with the connected apps of apps: their actions are in the catalog, and /with/NAME leads to them.
+//
+// The guard refuses a write that a page of another origin sends through the browser of the owner. It trusts no
+// origin: a server that has no token must not take a form post from a page in the owner's browser. A program sends no
+// Origin and no Sec-Fetch-Site, so the guard lets it through.
 func NewWith(s *core.Store, apps *Apps) http.Handler {
-	return newOn(s, http.NewCrossOriginProtection(), apps)
-}
-
-// newOn builds the API behind guard, which refuses a browser write from an origin that it does not trust. Public
-// gives the guard that trusts the allowed origins; New gives one that trusts no other origin.
-func newOn(s *core.Store, guard *http.CrossOriginProtection, apps *Apps) http.Handler {
 	h := newServer(s)
 	h.with = apps
+	guard := http.NewCrossOriginProtection()
 	guard.SetDenyHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, crossOriginRefusal())
 	}))
@@ -111,7 +105,7 @@ func (b stallBody) Read(p []byte) (int, error) {
 // newServer is the server with its routes: mount gives each action of the catalog its route, then the routes that are
 // not actions follow.
 func newServer(s *core.Store) *server {
-	h := &server{s: s, feedback: feedbackStore{now: s.Now}, with: NewApps()}
+	h := &server{s: s, with: NewApps()}
 	m := http.NewServeMux()
 	h.mux = m
 	h.mount(m, catalog, map[string]actionFunc{
@@ -123,7 +117,7 @@ func newServer(s *core.Store) *server {
 		"random-page": h.randomPage, "snapshot": h.snapshot,
 		"rebuild-search": h.rebuildSearch, "resync-links": h.resyncLinks, "say": h.say, "settings": h.saveSettings,
 	})
-	// The routes that are not actions: the resources, the editor's helpers and the files of the browser.
+	// The routes that are not actions: the resources and the files (a picture, a snapshot).
 	m.HandleFunc("GET /{$}", h.serve(h.root))
 	m.HandleFunc("GET /actions", h.serve(h.actions))
 	m.HandleFunc("GET /days", h.serve(h.days))
@@ -151,40 +145,19 @@ func newServer(s *core.Store) *server {
 	m.HandleFunc("GET /metrics", h.serve(h.metrics))
 	m.HandleFunc("GET /metrics/{name}", h.serve(h.series))
 	m.HandleFunc("GET /measurements/{id}", h.serve(h.measurement))
-	m.HandleFunc("POST /render", h.render)
 	h.mountWith(m)
 	h.mountTasks(m)
-	m.HandleFunc("GET /assets/fonts/{file}", fonts)
-	m.HandleFunc("GET /manifest.webmanifest", install("manifest.webmanifest", "application/manifest+json", "public, max-age=3600"))
-	// The rules of speculation. JSON has no comments, so the reasons are here. No address with a query string: a
-	// ?feedback= receipt is read once, and ?new= opens a form. The pattern is "/*\?*=*", with the "=" every query of
-	// this app has: a URLPattern "/*\?*" alone has the search "*", which an empty search matches too, so it would
-	// exclude every address (probed with a URLPattern implementation on 2026-10-28; no Go test can run one). The
-	// others are the routes that redirect (today, go, random, find), the pictures, the downloads of a snapshot, the install file and the integrity
-	// check, which a hover must not run. A browser without speculation rules ignores the header.
-	m.HandleFunc("GET /assets/speculation.json", install("speculation.json", "application/speculationrules+json", "public, max-age=3600"))
-	m.HandleFunc("GET /assets/chat.js", install("chat.js", "text/javascript; charset=utf-8", "public, max-age=300"))
-	m.HandleFunc("GET /assets/lock.js", install("lock.js", "text/javascript; charset=utf-8", "public, max-age=300"))
-	m.HandleFunc("GET /assets/icon.svg", install("icon.svg", "image/svg+xml", "public, max-age=31536000, immutable"))
-	m.HandleFunc("GET /assets/icon-192.png", install("icon-192.png", "image/png", "public, max-age=31536000, immutable"))
-	m.HandleFunc("GET /assets/icon-512.png", install("icon-512.png", "image/png", "public, max-age=31536000, immutable"))
-	m.HandleFunc("GET /assets/wood.png", install("wood.png", "image/png", "public, max-age=31536000, immutable"))
-	m.HandleFunc("GET /assets/ground.png", install("ground.png", "image/png", "public, max-age=31536000, immutable"))
-	m.HandleFunc("GET /assets/embers.png", install("embers.png", "image/png", "public, max-age=31536000, immutable"))
-	m.HandleFunc("GET /assets/sprites.png", install("sprites.png", "image/png", "public, max-age=31536000, immutable"))
-	m.HandleFunc("GET /assets/icons.png", install("icons.png", "image/png", "public, max-age=31536000, immutable"))
 	return h
 }
 
 // crossOriginRefusal is the refusal of a browser write from an origin that the server does not trust: the guard of
-// the API and the login forms of a public listener write it. Each call gives a new error, so no caller can change the
-// refusal of another.
+// the API writes it. Each call gives a new error, so no caller can change the refusal of another.
 func crossOriginRefusal() error {
 	return &core.Error{Status: http.StatusForbidden, Msg: "cross-origin browser write refused", Code: siren.CodeCrossOrigin}
 }
 
-// authorityRefusal is the refusal of a request whose authority the listener does not take: the local listener and the
-// public one write it. Each call gives a new error, as crossOriginRefusal does.
+// authorityRefusal is the refusal of a request whose authority the listener does not take (NetworkAuthority). Each call
+// gives a new error, as crossOriginRefusal does.
 func authorityRefusal() error {
 	return &core.Error{Status: http.StatusForbidden, Msg: "HTTP authority refused"}
 }
@@ -234,52 +207,29 @@ func (h *server) mount(m *http.ServeMux, cat []spec, handlers map[string]actionF
 	}
 }
 
+// serve is the route of one resource: it runs f and answers its entity as Siren JSON. A redirect of f is a 303. A POST
+// that made a thing answers it, with its address in Location. A read that asks for embed gets the sub-entities in the
+// answer (embed.go).
 func (h *server) serve(f func(*http.Request) (*siren.Entity, error)) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var e *siren.Entity
-		var err error
-		if r.Method == "GET" && wantsHTML(r) && r.URL.Query().Has(embedField) { // refused, not ignored: a page reads its sub-entities itself
-			err = core.Invalid("embed is for the Siren answer: send Accept: application/vnd.siren+json")
-		} else {
-			e, err = guarded(f, r)
-		}
+		e, err := guarded(f, r)
 		status := http.StatusOK
 		var rd redirect
 		switch {
 		case errors.As(err, &rd):
-			if token := r.URL.Query().Get("feedback"); token != "" { // the toast follows the redirect
-				if to, perr := url.Parse(rd.to); perr == nil {
-					h.feedback.move(token, r.URL.Path, to.Path)
-				}
-			}
 			http.Redirect(w, r, rd.to, http.StatusSeeOther)
 			return
 		case err != nil:
 			e, status = errorEntity(r, err)
 		case r.Method == "POST":
 			if self := selfOf(e); self != "" {
-				if wantsHTML(r) { // a browser form: post, then redirect, so a reload never posts again
-					to := self
-					if back := backOf(r); back != "" {
-						to = back
-					}
-					http.Redirect(w, r, h.feedback.put(to, e.Result), http.StatusSeeOther)
-					return
-				}
 				w.Header().Set("Location", self)
 			}
 		}
-		if r.Method == "GET" && status < 400 && !wantsHTML(r) {
-			h.embed(r, e) // the Siren answer only: a page reads its sub-entities itself (shellFacts)
+		if r.Method == "GET" && status < 400 {
+			h.embed(r, e)
 		}
-		if r.Method == "GET" && wantsHTML(r) && status < 400 {
-			if feedback := h.feedback.take(r.URL.Path, r.URL.Query().Get("feedback")); feedback != "" {
-				e.Result = feedback
-				w.Header().Set("Cache-Control", "no-store")
-				w.Header().Set("Referrer-Policy", "no-referrer")
-			}
-		}
-		answer(w, r, status, e, frame{srv: h, submitted: submittedText(r)})
+		answer(w, r, status, e)
 	}
 }
 
@@ -297,63 +247,6 @@ func guarded(f func(*http.Request) (*siren.Entity, error), r *http.Request) (e *
 		}
 	}()
 	return f(r)
-}
-
-// textareas are the names of the long-text fields of the catalog (a body, an entry), sorted, so the first with a value
-// does not depend on the order of the catalog.
-var textareas = func() []string {
-	var names []string
-	for _, s := range catalog {
-		for _, f := range s.Fields {
-			if f.Type == "textarea" && !slices.Contains(names, f.Name) {
-				names = append(names, f.Name)
-			}
-		}
-	}
-	slices.Sort(names)
-	return names
-}()
-
-// submittedText is the long text that a POST sent, for the page of a refusal to show it again: the value of the first
-// long-text field of the catalog that has one. A request that is not a POST sent none.
-func submittedText(r *http.Request) string {
-	if r.Method != "POST" {
-		return ""
-	}
-	for _, name := range textareas {
-		if v := r.PostForm.Get(name); v != "" {
-			return v
-		}
-	}
-	return ""
-}
-
-// maxBack is the longest return path a browser form may send.
-const maxBack = 2048
-
-// backFragment is the id that a return path may end with: a browser never sends a fragment to a server, so it only
-// names where the page opens (the row that a write came from).
-var backFragment = regexp.MustCompile(`^[A-Za-z0-9_-]{1,64}$`)
-
-// backOf is the page a browser form asks to return to after its write (docs/plans/091-the-browser-for-daily-use.md):
-// the form field back, when it is a path on this server, "" otherwise. Only a path that starts with one slash is
-// kept: "//host" and "/\host" name another host to a browser, and a scheme, a host or a control character makes the
-// value something other than a path here. The path may end with one id fragment (backFragment). Any other "#" makes
-// the value not a path. A value that is not kept is ignored, not refused: the write is done, and the browser goes to
-// the resource it changed.
-func backOf(r *http.Request) string {
-	b := r.PostForm.Get("back")
-	path, fragment, hasFragment := strings.Cut(b, "#")
-	if b == "" || len(b) > maxBack || !strings.HasPrefix(b, "/") || strings.HasPrefix(b, "//") ||
-		strings.Contains(b, "\\") || hasFragment && !backFragment.MatchString(fragment) ||
-		strings.IndexFunc(b, func(c rune) bool { return c < 0x20 || c == 0x7f }) >= 0 {
-		return ""
-	}
-	u, err := url.Parse(path)
-	if err != nil || u.Scheme != "" || u.Host != "" || u.User != nil || u.Opaque != "" || !strings.HasPrefix(u.Path, "/") {
-		return ""
-	}
-	return b
 }
 
 // errorEntity is the one error representation: status, a code a client branches on, and the message. An error that
@@ -399,20 +292,12 @@ func errorEntity(r *http.Request, err error) (*siren.Entity, int) {
 // its path, because a path can name a metric or a title. A request that a guard answers before the routes has no
 // pattern: its method stands for the route.
 func logFault(r *http.Request, what string, err error) {
-	if r.Context().Value(quietKey{}) != nil {
-		return
-	}
 	route := r.Pattern
 	if route == "" {
 		route = r.Method
 	}
 	log.Printf("lifelog: %s: %s: %v", route, what, err)
 }
-
-// quietKey marks the context of a read whose faults the log does not repeat: the reads that the page of an error makes
-// for its shell (shellFacts). The error has logged its own cause already, and a fault that has the same cause again
-// would be a second line for one failure.
-type quietKey struct{}
 
 // codeOf is the general code of a status, for an error that names no more specific one.
 func codeOf(status int) string {
@@ -448,45 +333,19 @@ func codeOf(status int) string {
 // before the next try is enough for both.
 const retryAfter = "1"
 
-// writeError answers with the error entity of err, as JSON or as a page with no shell. The guards, the pictures and
-// /render use it. A route that serve wraps answers its error in serve: there a browser gets the page in the shell.
+// writeError answers with the error entity of err. The guards and the pictures use it. A route that serve wraps answers
+// its error in serve.
 func writeError(w http.ResponseWriter, r *http.Request, err error) {
 	e, status := errorEntity(r, err)
-	answer(w, r, status, e, frame{submitted: submittedText(r)})
+	answer(w, r, status, e)
 }
 
-// frame says how answer draws an entity as a page, and for whom. The zero frame gives a program JSON and a browser a
-// page with no sidebar: the answer of a guard, of a picture's error and of a refusal before the routes.
-type frame struct {
-	// srv is the server whose own handler gives the page its shell (shellFacts); nil: no sidebar, so the page shows
-	// nothing of the database.
-	srv      *server
-	pageOnly bool // a page for every client, a program too: the answer is presentation and has no JSON form
-	// submitted is the long text that a refused browser form sent (submittedText), which the page of the refusal shows
-	// again. It is used only when the answer is the error of a POST.
-	submitted string
-}
-
-// hasShell reports a page that has the sidebar. A server with no store has no database to show.
-func (fr frame) hasShell() bool { return fr.srv != nil && fr.srv.s != nil }
-
-// answer is the one way an entity leaves the API: the answer of every route, guard and error. A program gets Siren
-// JSON; a browser, and every client of a pageOnly frame, gets a page, and only then is the shell read. The answer is
-// held whole before its first byte, so a fault found while it is made can still answer 500. A failed write is
-// logged: the client went away, and nothing else can be done.
-func answer(w http.ResponseWriter, r *http.Request, status int, e *siren.Entity, fr frame) {
-	typ, b := sirenType, []byte(nil)
-	if fr.pageOnly || wantsHTML(r) {
-		typ = "text/html; charset=utf-8"
-		status, b = pageAnswer(r, status, e, fr)
-	} else {
-		status, b = sirenAnswer(r, status, e)
-	}
-	w.Header().Set("Content-Type", typ)
-	w.Header().Add("Vary", "Accept") // one URL, two representations
-	if fr.hasShell() && typ == "text/html; charset=utf-8" {
-		w.Header().Set("Speculation-Rules", `"/assets/speculation.json"`) // a quoted URL string
-	}
+// answer is the one way an entity leaves the API: the answer of every route, guard and error, as Siren JSON. The
+// answer is held whole before its first byte, so a fault found while it is made can still answer 500. A failed write
+// is logged: the client went away, and nothing else can be done.
+func answer(w http.ResponseWriter, r *http.Request, status int, e *siren.Entity) {
+	status, b := sirenAnswer(r, status, e)
+	w.Header().Set("Content-Type", sirenType)
 	if status == http.StatusServiceUnavailable {
 		w.Header().Set("Retry-After", retryAfter)
 	}
@@ -494,27 +353,6 @@ func answer(w http.ResponseWriter, r *http.Request, status int, e *siren.Entity,
 	if _, err := w.Write(b); err != nil {
 		logFault(r, "the answer was not sent", err)
 	}
-}
-
-// pageAnswer is the status and the HTML of the page of e. When the page cannot be drawn, a defect of this program,
-// the owner reads the cause in the log and a client never does: the page is DrawFailed, with 500.
-func pageAnswer(r *http.Request, status int, e *siren.Entity, fr frame) (int, []byte) {
-	f := view.Facts{URL: r.URL}
-	if fr.hasShell() {
-		fr.srv.shellFacts(r, status, e, &f)
-	}
-	if status >= 400 && r.Method == "POST" {
-		f.Submitted = fr.submitted
-		if ref, err := url.Parse(r.Referer()); err == nil && ref.Host == r.Host && strings.HasPrefix(ref.Path, "/") {
-			f.Back = ref.RequestURI()
-		}
-	}
-	b, err := view.Draw(e, f)
-	if err != nil {
-		logFault(r, "the view "+view.TemplateOf(e)+" cannot be drawn", err)
-		return http.StatusInternalServerError, []byte(view.DrawFailed)
-	}
-	return status, b
 }
 
 // sirenAnswer is the status and the Siren JSON of e. A value that JSON cannot carry (a NaN, an infinity) is a fault
@@ -543,22 +381,13 @@ func sirenJSON(e *siren.Entity) ([]byte, error) {
 	return b.Bytes(), nil
 }
 
-func wantsHTML(r *http.Request) bool {
-	a := r.Header.Get("Accept")
-	return strings.Contains(a, "text/html") && !strings.Contains(a, "json")
-}
-
-// source is the writer of a request: its header, else "ui" for a browser and "api". The name is not checked here.
+// source is the writer of a request: its header, else "api". The name is not checked here. A client that is a browser
+// sends its own name (the extension lifelog-web sends "ui").
 func source(r *http.Request) string {
-	s := r.Header.Get(siren.SourceHeader)
-	switch {
-	case s != "":
-	case wantsHTML(r):
-		s = "ui"
-	default:
-		s = "api"
+	if s := r.Header.Get(siren.SourceHeader); s != "" {
+		return s
 	}
-	return s
+	return "api"
 }
 
 // writerRE is the grammar of a writer name: entities_source, measurements_source and links_source.
@@ -581,8 +410,8 @@ func requireOwner(source string) error {
 
 // actions is the catalog: every action with its templated href. The action that new names is filled in instead,
 // when the query names a value for each of its path fields (GET /actions?new=rename&id=12): its href is then an
-// address that a form can post to. A browser cannot fill a path from a form, so this is how /actions offers every
-// action to a browser (docs/plans/131-the-pareto-pass.md).
+// address that a form can post to. A form cannot fill a path, so this is how /actions offers every action to a UI
+// (docs/plans/131-the-pareto-pass.md).
 func (h *server) actions(r *http.Request) (*siren.Entity, error) {
 	q := r.URL.Query()
 	e := &siren.Entity{Class: []string{"actions"}, Title: "Actions", Links: []siren.Link{link("self", "/actions", "Actions"), link("index", "/", "Home")}}

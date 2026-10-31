@@ -83,6 +83,47 @@ func TestSettingsAreTheOwnersFile(t *testing.T) {
 	}
 }
 
+// TestTheSettingsOfTheBrowserAreNotTheCores: the ground, the lock and the PIN are the settings of the browser
+// extension. The action takes four fields. A request that names one of the others is 422 and writes nothing, and the
+// settings resource shows none of them. A file of an older version that holds them still reads, and the next save
+// drops them.
+func TestTheSettingsOfTheBrowserAreNotTheCores(t *testing.T) {
+	c, _, s := apitest.Fresh(t, "cli")
+	act := apitest.Action(t, apitest.Must(t)(c.Get(t.Context(), "/actions")), "settings")
+	var fields []string
+	for _, f := range act.Fields {
+		fields = append(fields, f.Name)
+	}
+	if got := strings.Join(fields, ","); got != "model_url,model,model_key,owner_number" {
+		t.Errorf("the fields of settings: %s", got)
+	}
+	for _, name := range []string{"ground", "lock_after", "lock_pin"} {
+		_, err := c.Do(t.Context(), act, map[string]string{"model": "x", name: "1234"})
+		if apitest.Status(err) != 422 || !strings.Contains(err.Error(), "unknown field "+name) {
+			t.Errorf("a request with %s: %v, want 422 that names the field", name, err)
+		}
+	}
+	if _, err := os.Stat(s.SettingsPath); !os.IsNotExist(err) {
+		t.Errorf("a refused save wrote the file: %v", err)
+	}
+	old := `{"model_url": "http://127.0.0.1:1/v1", "ground": "embers", "lock_after": "15", "lock_pin_hash": "pbkdf2-sha256$1$AA$AA"}`
+	if err := os.WriteFile(s.SettingsPath, []byte(old), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	read := apitest.Must(t)(c.Get(t.Context(), "/settings"))
+	props, _ := read.Properties.(map[string]any)
+	if props["model_url"] != "http://127.0.0.1:1/v1" || props["ground"] != nil || props["lock_after"] != nil || props["lock_pin_hash"] != nil {
+		t.Errorf("the settings of an older file: %v", props)
+	}
+	if _, err := c.Do(t.Context(), act, map[string]string{"model": "synthetic-model"}); err != nil {
+		t.Fatal(err)
+	}
+	b, err := os.ReadFile(s.SettingsPath)
+	if err != nil || strings.Contains(string(b), "ground") || strings.Contains(string(b), "lock_") || !strings.Contains(string(b), "synthetic-model") {
+		t.Errorf("the file after a save: %q %v, want the model and none of the settings of the browser", b, err)
+	}
+}
+
 // TestTheOwnerNumberIsDigits: digits with the country code are kept and read back; letters, a plus sign and spaces are
 // 422 with the sentence, and a refused save leaves the setting as it was; an empty value clears it.
 func TestTheOwnerNumberIsDigits(t *testing.T) {

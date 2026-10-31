@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -15,7 +14,6 @@ import (
 	"lifelog/client"
 	"lifelog/internal/api"
 	"lifelog/internal/api/apitest"
-	"lifelog/internal/api/view"
 	"lifelog/siren"
 )
 
@@ -85,7 +83,7 @@ func TestDeletePagesAtOnce(t *testing.T) {
 	if !deleted(ids[2]) {
 		t.Error("an agent's delete did nothing")
 	}
-	// The browser's form sends the field once per checked box.
+	// A form sends the field once per checked box.
 	if _, err := c.Do(ctx, apitest.Action(t, apitest.Must(t)(c.Get(ctx, "/pages/"+ids[2])), "revive"), nil); err != nil {
 		t.Fatal(err)
 	}
@@ -98,126 +96,34 @@ func TestDeletePagesAtOnce(t *testing.T) {
 	}
 }
 
-// TestTheListsDeleteWhatIsChecked follows the browser: the media list of Browse draws a box on each tile for one
-// form, the form's Delete pages posts what the form sends with the checked ids to tombstone-pages and returns to the
-// list with the count, and a post with no box checked comes back to the list with the refusal.
-func TestTheListsDeleteWhatIsChecked(t *testing.T) {
-	c, h, _ := apitest.Fresh(t, "cli")
-	ctx := t.Context()
-	root := apitest.Must(t)(c.Get(ctx, "/"))
-	var files []string
-	for i, title := range []string{"Scan 1.jpg", "Scan 2.jpg"} {
-		e := apitest.Must(t)(c.Do(ctx, apitest.Action(t, root, "add-file"), map[string]string{"title": title, "sha256": strings.Repeat(fmt.Sprintf("%02x", i+7), 32), "mime": "image/jpeg"}))
-		files = append(files, idOfSelf(t, apitest.Href(e, "self")))
-	}
-
-	list := browse(t, h, "/browse?kind=media")
-	for _, want := range []string{`<form id="pick" method="POST" action="/pages/file" class="inline" data-action="file-pages">`,
-		`<input type="hidden" name="back" value="/browse?kind=media">`, `<span class="desc">Check the rows, then type a category or delete them. A new name makes a new category.</span>`,
-		`<button class="danger" formaction="/pages/tombstone" formnovalidate data-action="tombstone-pages">Delete</button></form></div></div>`,
-		`<input type="checkbox" name="ids" value="` + files[0] + `" form="pick" aria-label="Select Scan 1.jpg">`, `name="ids" value="` + files[1] + `"`} {
-		if !strings.Contains(list, want) {
-			t.Errorf("the media list lacks %s", want)
-		}
-	}
-	if strings.Contains(browse(t, h, "/browse?kind=person"), `formaction="/pages/tombstone"`) {
-		t.Error("the people list draws Delete")
-	}
-	// The bar comes after the rows, so a CSS counter can count the checked boxes on its button (plan 108).
-	if bar, last := strings.Index(list, `class="pick-bar"`), strings.LastIndex(list, `name="ids"`); bar < last || !strings.Contains(list[bar:], "</form>") {
-		t.Error("the bar is not after the rows")
-	}
-	// With no box checked, Delete is refused: the error page says so and leads back to the list.
-	rec := submit(h, "/pages/tombstone", formSends(t, list, `id="pick"`, nil), "/browse?kind=media")
-	if body := rec.Body.String(); rec.Code != http.StatusUnprocessableEntity || !strings.Contains(body, `role="alert"`) || !strings.Contains(body, "missing field ids") ||
-		!strings.Contains(body, `<a href="/browse?kind=media">Back</a>`) {
-		t.Errorf("no box checked: %d %.300s", rec.Code, body)
-	}
-	rec = submit(h, "/pages/tombstone", formSends(t, list, `id="pick"`, url.Values{"ids": files}), "")
-	if rec.Code != http.StatusSeeOther {
-		t.Fatalf("the form: %d %.300s", rec.Code, rec.Body.String())
-	}
-	loc := rec.Header().Get("Location")
-	if !feedbackLocation(loc, "/browse?kind=media") {
-		t.Fatalf("the form returned to %q", loc)
-	}
-	after := browse(t, h, loc)
-	if !strings.Contains(after, "Deleted 2 pages.") || !strings.Contains(after, `<a href="/browse?deleted=1">See the deleted pages</a>`) || strings.Contains(after, ">Undo<") || strings.Contains(after, `href="/pages/`+files[0]+`"`) || strings.Contains(after, `href="/pages/`+files[1]+`"`) {
-		t.Errorf("the list after the delete: %.600s", after)
-	}
-}
-
 // deletedCount is the count of the result of a tombstone-pages, as the client decodes it.
 func deletedCount(result any) string {
 	m, _ := result.(map[string]any)
 	return fmt.Sprint(m["count"])
 }
 
-// TestDeletingOnePageOffersItsUndo: the toast of a delete of one page carries a form that restores that page and
-// returns to where the owner is; the page is live again after the form is sent.
-func TestDeletingOnePageOffersItsUndo(t *testing.T) {
+// TestTombstonePagesTakesNoFieldOfFilePages: the pick bar of a list posts to file-pages or to tombstone-pages. The
+// second takes the field ids alone: a field of the first (category) is 422 for every client and every body type, and
+// nothing is deleted.
+func TestTombstonePagesTakesNoFieldOfFilePages(t *testing.T) {
 	c, h, _ := apitest.Fresh(t, "cli")
 	ctx := t.Context()
-	e := apitest.Must(t)(c.Do(ctx, apitest.Action(t, apitest.Must(t)(c.Get(ctx, "/")), "create-page"), map[string]string{"title": "Old idea"}))
-	pageID := idOfSelf(t, apitest.Href(e, "self"))
-	rec := submit(h, "/pages/tombstone", url.Values{"ids": {pageID}, "back": {"/browse"}}, "")
-	if rec.Code != http.StatusSeeOther {
-		t.Fatalf("the delete: %d %.300s", rec.Code, rec.Body.String())
-	}
-	toast := browse(t, h, rec.Header().Get("Location"))
-	want := `<form class="undo" method="post" action="/pages/` + pageID + `/revive">`
-	if !strings.Contains(toast, "Deleted 1 page.") || !strings.Contains(toast, want) || !strings.Contains(toast, ">Undo<") || strings.Contains(toast, "See the deleted pages") {
-		t.Fatalf("the toast: %.900s", toast)
-	}
-	if rec = submit(h, "/pages/"+pageID+"/revive", url.Values{"back": {"/browse"}}, ""); rec.Code != http.StatusSeeOther {
-		t.Fatalf("the undo: %d %.300s", rec.Code, rec.Body.String())
-	}
-	if slices.Contains(apitest.Must(t)(c.Get(ctx, "/pages/"+pageID)).Class, "deleted") {
-		t.Error("the page is still deleted after the Undo")
-	}
-}
-
-// TestThePickBarSendsOnlyWhatTheAPIAllows: every control of the pick bar of a list is a field of file-pages or a field
-// of a browser, its Delete button leads to tombstone-pages, and the exception for that shared form is a browser's alone.
-func TestThePickBarSendsOnlyWhatTheAPIAllows(t *testing.T) {
-	c, h, _ := apitest.Fresh(t, "cli")
-	ctx := t.Context()
-	root := apitest.Must(t)(c.Get(ctx, "/"))
-	e := apitest.Must(t)(c.Do(ctx, apitest.Action(t, root, "add-file"), map[string]string{"title": "Scan 1.jpg", "sha256": strings.Repeat("07", 32), "mime": "image/jpeg"}))
+	e := apitest.Must(t)(c.Do(ctx, apitest.Action(t, apitest.Must(t)(c.Get(ctx, "/")), "add-file"), map[string]string{"title": "Scan 1.jpg", "sha256": strings.Repeat("07", 32), "mime": "image/jpeg"}))
 	id := idOfSelf(t, apitest.Href(e, "self"))
-	list := browse(t, h, "/browse?kind=media")
-	m := regexp.MustCompile(`(?s)<form id="pick"[^>]*>(.*?)</form>`).FindStringSubmatch(list)
-	if m == nil {
-		t.Fatal("the media list has no pick bar")
-	}
-	allowed := append(api.FieldNamesOf("file-pages"), api.BrowserFields...)
-	for _, n := range regexp.MustCompile(`name="([^"]+)"`).FindAllStringSubmatch(m[1], -1) {
-		if !slices.Contains(allowed, n[1]) {
-			t.Errorf("the pick bar sends %s, which file-pages does not list", n[1])
+	for name, tc := range map[string]struct{ ctype, body string }{
+		"a form": {"application/x-www-form-urlencoded", url.Values{"ids": {id}, "category": {"x"}}.Encode()},
+		"JSON":   {"application/json", `{"ids":"` + id + `","category":"x"}`},
+	} {
+		req := httptest.NewRequest("POST", api.PathOf("tombstone-pages"), strings.NewReader(tc.body))
+		req.Header.Set("Content-Type", tc.ctype)
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		if rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), "unknown field category") {
+			t.Errorf("%s with category: %d %.300s", name, rec.Code, rec.Body.String())
 		}
 	}
-	for _, n := range regexp.MustCompile(`name="([^"]+)"[^>]*\sform="pick"`).FindAllStringSubmatch(list, -1) {
-		if !slices.Contains(allowed, n[1]) {
-			t.Errorf("a box of the list sends %s, which file-pages does not list", n[1])
-		}
-	}
-	if want := `<button class="danger" formaction="` + api.PathOf("tombstone-pages") + `"`; !strings.Contains(m[1], want) {
-		t.Errorf("the Delete button does not lead to tombstone-pages: want %s", want)
-	}
-	if view.SharedForms["tombstone-pages"] != "file-pages" {
-		t.Errorf("SharedForms = %v", view.SharedForms)
-	}
-	// A browser form may carry the fields of the shared form; another client is refused them.
-	if rec := submit(h, "/pages/tombstone", url.Values{"ids": {id}, "category": {"x"}}, ""); rec.Code != http.StatusSeeOther {
-		t.Errorf("a browser form with category: %d %.300s", rec.Code, rec.Body.String())
-	}
-	req := httptest.NewRequest("POST", "/pages/tombstone", strings.NewReader(`{"ids":"`+id+`","category":"x"}`))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Accept", "application/vnd.siren+json")
-	rec := httptest.NewRecorder()
-	h.ServeHTTP(rec, req)
-	if rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), "unknown field category") {
-		t.Errorf("an API client with category: %d %.300s", rec.Code, rec.Body.String())
+	if slices.Contains(apitest.Must(t)(c.Get(ctx, "/pages/"+id)).Class, "deleted") {
+		t.Error("a refused delete deleted the page")
 	}
 }
 
@@ -239,5 +145,26 @@ func TestTheDeleteOfOnePageCarriesTheAddressOfItsRevive(t *testing.T) {
 	two := apitest.Must(t)(c.Do(t.Context(), apitest.Action(t, pages[1], "tombstone-pages"), map[string]string{"ids": ids}))
 	if _, has := two.Result.(map[string]any)["revive"]; has {
 		t.Errorf("a delete of two pages carries revive: %v", two.Result)
+	}
+}
+
+// TestThePostOfTheReviveOfAPageRestoresIt: the address that the result of the delete names takes a plain POST, and the
+// page is live again.
+func TestThePostOfTheReviveOfAPageRestoresIt(t *testing.T) {
+	c, h, _ := apitest.Fresh(t, "cli")
+	ctx := t.Context()
+	e := apitest.Must(t)(c.Do(ctx, apitest.Action(t, apitest.Must(t)(c.Get(ctx, "/")), "create-page"), map[string]string{"title": "Old idea"}))
+	id := idOfSelf(t, apitest.Href(e, "self"))
+	done := apitest.Must(t)(c.Do(ctx, apitest.Action(t, e, "tombstone-pages"), nil))
+	revive, _ := done.Result.(map[string]any)["revive"].(string)
+	if revive != "/pages/"+id+"/revive" {
+		t.Fatalf("the result names the revive %q", revive)
+	}
+	rec := request(h, "POST", revive, "", map[string]string{"Host": "localhost"})
+	if rec.Code != http.StatusOK || rec.Header().Get("Location") != "/pages/"+id {
+		t.Fatalf("the revive: %d, Location %q: %.300s", rec.Code, rec.Header().Get("Location"), rec.Body.String())
+	}
+	if slices.Contains(apitest.Must(t)(c.Get(ctx, "/pages/"+id)).Class, "deleted") {
+		t.Error("the page is still deleted after the revive")
 	}
 }

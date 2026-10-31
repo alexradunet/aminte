@@ -31,7 +31,7 @@ const version = "0.1.0"
 // opts are the flags of a command line and its words. A flag may stand anywhere on the line; a command takes the
 // global flags and its own (command.flags), and refuses any other.
 type opts struct {
-	db, url, source, mood, day, snapshots, token string // token: $LIFELOG_TOKEN, of --url and serve --public
+	db, url, source, mood, day, snapshots, token string // token: $LIFELOG_TOKEN, of --url and of serve
 	human, dbExplicit                            bool
 	args                                         []string // the words of the line that are no flag
 	given                                        []string // the flags the line named
@@ -41,12 +41,11 @@ type opts struct {
 
 // serveFlags are the flags that only serve reads.
 type serveFlags struct {
-	addr                       string
-	tokenFile, tlsCert, tlsKey string
-	allowOrigins, with         []string // with: the names of the extensions that serve runs (--with)
-	addrExplicit, public       bool
-	pub                        *api.PublicOptions // set by prepareServe from the flags of --public
-	withPaths                  []string           // set by prepareServe: the program of each --with, in the order of the line
+	addr      string
+	tokenFile string
+	with      []string // the names of the extensions that serve runs (--with)
+	token     string   // set by prepareServe: the token of the server, "" for none (tokenOf)
+	withPaths []string // set by prepareServe: the program of each --with, in the order of the line
 }
 
 // fileFlags are the flags that only file and cover read. --day, which capture reads too, is opts.day.
@@ -61,7 +60,7 @@ var globalFlags = []string{"--db", "--url", "--source", "--human"}
 const globalUsage = `
 Global flags, anywhere on the line:
   --db PATH      the life.db (default $LIFELOG_DB, else the life.db beside this program)
-  --url URL      talk to a running "lifelog serve" instead of opening the file ($LIFELOG_TOKEN if it is --public)
+  --url URL      talk to a running "lifelog serve" instead of opening the file ($LIFELOG_TOKEN if it has a token)
   --source NAME  the writer recorded on new rows (default cli; lifelog_meta.source)
   --human        print a readable summary instead of JSON
 `
@@ -111,11 +110,10 @@ var commands = []command{
 	{name: "init", setup: true, gap: true, refuses: []string{"--url", "--source"},
 		usage: "  lifelog init [PATH]                 create a new life.db from docs/schema/schema.sql (default: beside this program)",
 		run:   initDB},
-	{name: "serve", ownHandler: true, refuses: []string{"--human"}, flags: []string{"--addr", "--snapshots", "--public", "--token-file", "--allow-origin", "--tls-cert", "--tls-key", "--with"},
-		usage: "  lifelog serve [--addr 127.0.0.1:7777] [--snapshots DIR]   the API: Siren JSON, or HTML in a browser; this machine only\n" +
-			"  lifelog serve --public [--addr 0.0.0.0:7777] [--allow-origin O]... [--tls-cert F --tls-key F]\n" +
-			"                                      the API for other devices: every request needs the owner's token\n" +
-			"                                      (--token-file PATH or $LIFELOG_TOKEN); a browser logs in at /login\n" +
+	{name: "serve", ownHandler: true, refuses: []string{"--human"}, flags: []string{"--addr", "--snapshots", "--token-file", "--with"},
+		usage: "  lifelog serve [--addr 127.0.0.1:7777] [--snapshots DIR] [--token-file PATH]\n" +
+			"                                      the API: Siren JSON, on a loopback address; a token (--token-file PATH or\n" +
+			"                                      $LIFELOG_TOKEN) turns on the bearer check\n" +
 			"  lifelog serve ... --with NAME       also run the extension lifelog-NAME as a child, and start it again when it fails",
 		prepare: prepareServe, run: serve},
 	{name: "get", gap: true,
@@ -263,8 +261,8 @@ func parse(argv []string, getenv func(string) string) (opts, error) {
 	vals := map[string]*string{"--db": &o.db, "--url": &o.url, "--source": &o.source, "--addr": &o.serve.addr,
 		"--mood": &o.mood, "--day": &o.day,
 		"--title": &o.file.title, "--text": &o.file.text, "--preview": &o.file.preview, "--mime": &o.file.mime,
-		"--token-file": &o.serve.tokenFile, "--tls-cert": &o.serve.tlsCert, "--tls-key": &o.serve.tlsKey, "--snapshots": &o.snapshots}
-	bools := map[string]*bool{"--human": &o.human, "--dry-run": &o.file.dryRun, "--public": &o.serve.public}
+		"--token-file": &o.serve.tokenFile, "--snapshots": &o.snapshots}
+	bools := map[string]*bool{"--human": &o.human, "--dry-run": &o.file.dryRun}
 	for i := 0; i < len(argv); i++ {
 		a := argv[i]
 		if len(o.args) > 0 && o.args[0] != "help" && commandNamed(o.args[0]) == nil {
@@ -306,7 +304,7 @@ func parse(argv []string, getenv func(string) string) (opts, error) {
 			continue
 		}
 		p, ok := vals[name]
-		if !ok && name != "--allow-origin" && name != "--with" {
+		if !ok && name != "--with" {
 			if strings.HasPrefix(a, "--") {
 				return o, fmt.Errorf("unknown flag %s", a)
 			}
@@ -322,14 +320,10 @@ func parse(argv []string, getenv func(string) string) (opts, error) {
 		}
 		o.given = append(o.given, name)
 		switch name {
-		case "--allow-origin":
-			o.serve.allowOrigins = append(o.serve.allowOrigins, val)
 		case "--with":
 			o.serve.with = append(o.serve.with, val)
 		case "--db":
 			*p, o.dbExplicit = val, true
-		case "--addr":
-			*p, o.serve.addrExplicit = val, true
 		default:
 			*p = val
 		}

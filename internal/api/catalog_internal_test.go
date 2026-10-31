@@ -59,9 +59,9 @@ func TestEveryNumericOptionIsANumber(t *testing.T) {
 	}
 }
 
-// TestEveryTextAreaOfTheCatalogIsBodyOrText: a form with a text area offers Preview (TestPreviewKeysOnATextArea, in
-// the tests of the view), which sends the form to POST /render, and POST /render reads the field body or text. So each
-// text area of the catalog has one of these names.
+// TestEveryTextAreaOfTheCatalogIsBodyOrText: the long texts of the API have two names, body and text. A UI that previews
+// a text (the browser extension, POST /render of its own) reads these two names, so each text area of the catalog has
+// one of them.
 func TestEveryTextAreaOfTheCatalogIsBodyOrText(t *testing.T) {
 	areas := 0
 	for _, s := range catalog {
@@ -69,7 +69,7 @@ func TestEveryTextAreaOfTheCatalogIsBodyOrText(t *testing.T) {
 			if fd.Type == "textarea" {
 				areas++
 				if fd.Name != "body" && fd.Name != "text" {
-					t.Errorf("%s: the text area %s is not body or text, which POST /render reads", s.Name, fd.Name)
+					t.Errorf("%s: the text area %s is not body or text, which a preview reads", s.Name, fd.Name)
 				}
 			}
 		}
@@ -79,13 +79,14 @@ func TestEveryTextAreaOfTheCatalogIsBodyOrText(t *testing.T) {
 	}
 }
 
-// TestNoActionHasAFieldNamedFormOrBack: a browser form sends its id in form and the page to return to in back, and the
-// handlers ignore both, so no action of the catalog has a field of either name.
+// TestNoActionHasAFieldNamedFormOrBack: a browser form sends its id in form and the page to return to in back. The
+// browser extension keeps both to itself, and the core refuses back as an unknown field, so no action of the catalog
+// has a field of either name.
 func TestNoActionHasAFieldNamedFormOrBack(t *testing.T) {
 	for _, s := range catalog {
 		for _, fd := range s.Fields {
 			if fd.Name == "form" || fd.Name == "back" {
-				t.Errorf("%s has a field named %s, which the browser sends for itself", s.Name, fd.Name)
+				t.Errorf("%s has a field named %s, which the browser extension sends for itself", s.Name, fd.Name)
 			}
 		}
 	}

@@ -3,7 +3,6 @@ package api
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"io"
 	"mime/multipart"
 	"net/http/httptest"
@@ -30,7 +29,7 @@ func TestMultipartUnknownNameProjection(t *testing.T) {
 	}
 	sum := strings.Repeat("ab", 32)
 	for _, f := range [][2]string{{"title", "Scan"}, {"sha256", sum}, {"mime", "application/pdf"}, {"body", "the text"},
-		{"day", "2031-05-14"}, {"dry_run", "1"}, {"back", "/browse?kind=document"}} {
+		{"day", "2031-05-14"}, {"dry_run", "1"}} {
 		field(f[0], f[1])
 	}
 	// "original" and "preview" with no file name are file inputs left empty.
@@ -48,9 +47,23 @@ func TestMultipartUnknownNameProjection(t *testing.T) {
 	if err != nil || !f.Sent || !f.Dry || !reflect.DeepEqual(f.In, want) {
 		t.Errorf("parseFileForm = %+v, %v; want %+v, dry and sent", f, err, want)
 	}
-	// Only the body and the page to return to are kept for the browser.
-	if got := fmt.Sprint(r.PostForm); got != "map[back:[/browse?kind=document] body:[the text]]" {
-		t.Errorf("the form kept for the browser: %s", got)
+	// The names of a browser (back, feedback, new) are no names of a file form: each is refused.
+	for _, name := range []string{"back", "feedback", "new"} {
+		var other bytes.Buffer
+		mw := multipart.NewWriter(&other)
+		if w, err := mw.CreateFormField(name); err != nil {
+			t.Fatal(err)
+		} else if _, err := io.WriteString(w, "/browse"); err != nil {
+			t.Fatal(err)
+		}
+		if err := mw.Close(); err != nil {
+			t.Fatal(err)
+		}
+		r := httptest.NewRequest("POST", "/files", &other)
+		r.Header.Set("Content-Type", mw.FormDataContentType())
+		if _, err := parseFileForm(r, specOf("add-file")); err == nil || !strings.Contains(err.Error(), "unknown field "+name) {
+			t.Errorf("a part named %s: %v, want the refusal that names it", name, err)
+		}
 	}
 }
 

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -15,7 +14,7 @@ import (
 	"lifelog/siren"
 )
 
-// The categories (D26). A category page shows what is filed in it and opens in Browse, and a new page is filed where
+// The categories (D26). A category page lists what is filed in it and opens in Browse, and a new page is filed where
 // it is made (docs/plans/115-categories-to-browse.md). file-pages files several pages in one write
 // (docs/plans/112-metrics-as-cards.md), and never a day page.
 
@@ -40,7 +39,7 @@ func filedFixture(t *testing.T, c *client.Client) map[string]string {
 }
 
 func TestACategoryPageListsWhatIsFiledInIt(t *testing.T) {
-	c, h, _ := apitest.FreshOn(t, "cli", fixedToday)
+	c, _, _ := apitest.FreshOn(t, "cli", fixedToday)
 	ctx := t.Context()
 	ids := filedFixture(t, c)
 	travel, life := ids["Travel"], ids["Life"]
@@ -66,47 +65,16 @@ func TestACategoryPageListsWhatIsFiledInIt(t *testing.T) {
 		t.Errorf("Travel's part-of backlinks: %v, want %s", filed, want)
 	}
 
-	// The page: one section, Filed here, the sub-categories first, a type badge on what is not a page; the margin's
-	// Backlinks has no part-of group.
-	row := regexp.MustCompile(`<li><a class="entry" href="/pages/(\d+)"><span class="first">([^<]*)</span><span class="meta">(?:<span class="badge">([^<]*)</span>)?</span></a></li>`)
-	section := func(body string) string {
-		t.Helper()
-		i := strings.Index(body, `<section class="group filed" aria-label="Filed here">`)
-		if i < 0 {
-			t.Fatal("no Filed here section")
+	// A page in no category is filed under nobody.
+	for _, l := range apitest.Must(t)(c.Get(ctx, "/pages/"+ids["Japan 2031"])).Entities {
+		if l.Rel[0] == "backlink" && l.Rel[1] == "part-of" {
+			t.Errorf("a page that is no category has the part-of backlink %s", l.Title)
 		}
-		body = body[i:]
-		return body[:strings.Index(body, "</section>")]
-	}
-	var rows []string
-	for _, m := range row.FindAllStringSubmatch(section(browse(t, h, "/pages/"+life)), -1) {
-		rows = append(rows, m[2]+":"+m[3])
-	}
-	if want := "Travel:category"; strings.Join(rows, " ") != want {
-		t.Errorf("Life's Filed here: %v, want %s", rows, want)
-	}
-	body := browse(t, h, "/pages/"+travel)
-	rows = nil
-	for _, m := range row.FindAllStringSubmatch(section(body), -1) {
-		rows = append(rows, m[2]+":"+m[3])
-	}
-	if want := "Alps 2030: Japan 2031: Sam:person"; strings.Join(rows, " ") != want {
-		t.Errorf("Travel's Filed here: %v, want %s", rows, want)
-	}
-	if strings.Contains(body, `<p class="sub">part-of</p>`) {
-		t.Error("the margin's Backlinks still lists part-of")
-	}
-	if !strings.Contains(body, `<h2>Filed here <small>3</small></h2>`) {
-		t.Error("Filed here has no count")
-	}
-	// A page in no category has no section.
-	if strings.Contains(browse(t, h, "/pages/"+ids["Japan 2031"]), `aria-label="Filed here"`) {
-		t.Error("a page that is no category has a Filed here section")
 	}
 }
 
 func TestANewPageIsFiledWhereItIsMade(t *testing.T) {
-	c, h, _ := apitest.FreshOn(t, "cli", fixedToday)
+	c, _, _ := apitest.FreshOn(t, "cli", fixedToday)
 	ctx := t.Context()
 	ids := filedFixture(t, c)
 	travel := ids["Travel"]
@@ -125,11 +93,6 @@ func TestANewPageIsFiledWhereItIsMade(t *testing.T) {
 	here := apitest.Action(t, apitest.Must(t)(c.Get(ctx, "/pages/"+travel)), "create-page")
 	if here.Fields[2].Value != "Travel" {
 		t.Fatalf("Travel offers create-page as %+v", here)
-	}
-	body := browse(t, h, "/pages/"+travel)
-	if !regexp.MustCompile(`<form method="POST" action="/pages"[^>]*>(?s:.*?)<input type="hidden" name="category" value="Travel">`).MatchString(body) ||
-		!strings.Contains(body, `<summary class="button">New page here</summary>`) {
-		t.Error("Travel has no New page here form with its title filled")
 	}
 	if hasAction(apitest.Must(t)(c.Get(ctx, "/pages/"+ids["Japan 2031"])), "create-page") {
 		t.Error("a page that is no category offers create-page")
@@ -171,32 +134,17 @@ func titled(links []siren.Link, title string) bool {
 	return false
 }
 
-// TestACategoryPageOpensInBrowse: Filed here links the category's list in Browse, its title escaped in the query.
-func TestACategoryPageOpensInBrowse(t *testing.T) {
-	c, h, _ := apitest.FreshOn(t, "cli", fixedToday)
+// TestBrowseOpensTheCategoryOfAnyTitle: the list of a category is the address /browse?in=TITLE, with the title escaped
+// in the query, whatever the title says.
+func TestBrowseOpensTheCategoryOfAnyTitle(t *testing.T) {
+	c, _, _ := apitest.FreshOn(t, "cli", fixedToday)
 	ctx := t.Context()
-	ids := filedFixture(t, c)
-	if body := browse(t, h, "/pages/"+ids["Travel"]); !strings.Contains(body, `<h2>Filed here <small>3</small></h2><a href="/browse?in=Travel">Open in Browse</a>`) {
-		t.Error("Travel's Filed here has no link to Browse")
-	}
+	filedFixture(t, c)
 	note := apitest.Must(t)(c.Do(ctx, apitest.Action(t, apitest.Must(t)(c.Get(ctx, "/")), "create-page"), map[string]string{"title": "A note"}))
 	apitest.Must(t)(c.Do(ctx, apitest.Action(t, note, "file-pages"), map[string]string{"category": "Rock & roll 2031"}))
-	cat := apitest.Must(t)(c.Get(ctx, "/pages?title="+url.QueryEscape("Rock & roll 2031")))
-	body := browse(t, h, apitest.Href(cat, "self"))
-	m := regexp.MustCompile(`<a href="(/browse\?in=[^"]*)">Open in Browse</a>`).FindStringSubmatch(body)
-	if m == nil {
-		t.Fatal("the category page has no link to Browse")
-	}
-	u, err := url.Parse(strings.ReplaceAll(m[1], "&amp;", "&"))
-	if err != nil || u.Query().Get("in") != "Rock & roll 2031" || len(u.Query()) != 1 {
-		t.Fatalf("the link %s does not name the category: %v", m[1], err)
-	}
-	if got := browseRows(t, apitest.Must(t)(c.Get(ctx, u.String()))); got != "A note:" {
+	list := apitest.Must(t)(c.Get(ctx, "/browse?"+url.Values{"in": {"Rock & roll 2031"}}.Encode()))
+	if got := browseRows(t, list); got != "A note:" {
 		t.Errorf("Browse in the category: %s", got)
-	}
-	// A page with nothing filed in it has no Filed here, and no link.
-	if strings.Contains(browse(t, h, apitest.Href(note, "self")), "Open in Browse") {
-		t.Error("a page with nothing filed in it links Browse")
 	}
 }
 
@@ -267,7 +215,7 @@ func TestADayAsTheCategoryWritesNothingOverHTTP(t *testing.T) {
 
 // Browse inside a category fills category in its New page; the New of another kind has no category.
 func TestBrowseNewFormsInACategoryCarryIt(t *testing.T) {
-	c, h, s := apitest.Fresh(t, "cli")
+	c, _, s := apitest.Fresh(t, "cli")
 	browseFixture(t, s)
 	ctx := t.Context()
 	made := apitest.Action(t, apitest.Must(t)(c.Get(ctx, "/browse?in=family&kind=page")), "create-page")
@@ -276,11 +224,6 @@ func TestBrowseNewFormsInACategoryCarryIt(t *testing.T) {
 	}
 	if v := fieldOf(apitest.Action(t, apitest.Must(t)(c.Get(ctx, "/browse?kind=page")), "create-page"), "category"); v != "" {
 		t.Errorf("pages everywhere: create-page has category %q, want none", v)
-	}
-	body := browse(t, h, "/browse?in=Family&kind=page")
-	form := regexp.MustCompile(`(?s)<form method="POST" action="` + regexp.QuoteMeta(made.Href) + `"[ >].*?</form>`).FindString(body)
-	if !regexp.MustCompile(`<input[^>]*name="category"[^>]*value="Family"`).MatchString(form) {
-		t.Errorf("pages in Family: the page's create-page form has no category Family: %s", form)
 	}
 	if person := apitest.Action(t, apitest.Must(t)(c.Get(ctx, "/browse?in=family&kind=person")), "create-person"); person.Field("category") != nil {
 		t.Errorf("people in Family: create-person has a category field: %+v", person.Fields)

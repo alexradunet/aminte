@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -155,7 +156,7 @@ func TestAConnectedAppIsInTheCatalogOfTheServer(t *testing.T) {
 		}
 	})
 
-	t.Run("the browser shows the app", func(t *testing.T) {
+	t.Run("a client that accepts HTML gets the entity of the app", func(t *testing.T) {
 		req, err := http.NewRequestWithContext(ctx, "GET", w.base+"/with/testapp/", nil)
 		if err != nil {
 			t.Fatal(err)
@@ -167,14 +168,21 @@ func TestAConnectedAppIsInTheCatalogOfTheServer(t *testing.T) {
 		}
 		defer res.Body.Close()
 		b, _ := io.ReadAll(res.Body)
-		page := string(b)
-		if res.StatusCode != 200 {
-			t.Fatalf("status %d, want 200\n%s", res.StatusCode, page)
+		var e siren.Entity
+		if res.StatusCode != 200 || res.Header.Get("Content-Type") != "application/vnd.siren+json" || json.Unmarshal(b, &e) != nil {
+			t.Fatalf("status %d, type %q, want 200 and Siren JSON\n%s", res.StatusCode, res.Header.Get("Content-Type"), b)
 		}
-		for _, want := range []string{"Test app", `action="/with/testapp/items"`, `href="/with/testapp"`} {
-			if !strings.Contains(page, want) {
-				t.Errorf("the page does not hold %q", want)
+		var add string
+		for _, a := range e.Actions {
+			if a.Name == "testapp-add-item" {
+				add = a.Href
 			}
+		}
+		if e.Title != "Test app" || add != "/with/testapp/items" {
+			t.Errorf("the entity of the app: title %q, add-item at %q, want Test app and /with/testapp/items", e.Title, add)
+		}
+		if l := mustGet(t, w, "", "/").LinkByRel("app"); l == nil || l.Href != "/with/testapp" {
+			t.Errorf("the root links the app as %+v, want /with/testapp", l)
 		}
 	})
 
@@ -211,10 +219,9 @@ func TestAConnectedAppIsInTheCatalogOfTheServer(t *testing.T) {
 	})
 }
 
-// TestTheBrowserDrawsTheRowsOfAnApp: an embedded link of an app carries a properties and an action; the server puts
-// the action in its namespace, and the generic view draws the quick-add, the row with its round button, and the side
-// column. The form of the row posts through /with/testapp and the app runs the action.
-func TestTheBrowserDrawsTheRowsOfAnApp(t *testing.T) {
+// TestTheRowsOfAnAppCarryTheirActions: an embedded link of an app carries a properties and an action; the server puts
+// the action in its namespace. The form of the row posts through /with/testapp and the app runs the action.
+func TestTheRowsOfAnAppCarryTheirActions(t *testing.T) {
 	w := startWithAppServer(t)
 	ctx := t.Context()
 	e, _, _ := testEnv(t)
@@ -235,48 +242,17 @@ func TestTheBrowserDrawsTheRowsOfAnApp(t *testing.T) {
 	if c := home.Entities[0].Actions[0].Class; len(c) != 1 || c[0] != "toggle" {
 		t.Errorf("the class of the action of the row = %v, want [toggle]", c)
 	}
-
-	get := func(path string) string {
-		req, err := http.NewRequestWithContext(ctx, "GET", w.base+path, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		req.Header.Set("Accept", "text/html")
-		res, err := http.DefaultClient.Do(req)
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer res.Body.Close()
-		b, _ := io.ReadAll(res.Body)
-		if res.StatusCode != 200 {
-			t.Fatalf("GET %s: status %d\n%s", path, res.StatusCode, b)
-		}
-		return string(b)
-	}
-	page := get("/with/testapp/")
-	for _, want := range []string{
-		`<form method="POST" action="/with/testapp/items/1/done" class="round">`, `aria-label="Done"`,
-		`<span class="chip">n: 1</span>`, `<nav class="side" aria-label="Links">`, `aria-current="page"`, `class="quick-add"`,
-	} {
-		if !strings.Contains(page, want) {
-			t.Errorf("the page does not hold %q", want)
-		}
-	}
-	if n := strings.Count(page, `action="/with/testapp/items"`); n != 1 {
-		t.Errorf("add-item is drawn %d times, want once (the quick-add, not Actions again)", n)
-	}
-	if strings.Index(page, `class="quick-add"`) > strings.Index(page, `<li class="row">`) {
-		t.Error("the quick-add is not at the top of the main column")
+	if p := home.Entities[0].Properties; p == nil {
+		t.Error("the row carries no properties")
 	}
 
-	noRedirect := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
-	res, err := noRedirect.PostForm(w.base+"/with/testapp/items/1/done", map[string][]string{"back": {"/with/testapp/"}})
+	res, err := http.PostForm(w.base+"/with/testapp/items/1/done", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	res.Body.Close()
-	if res.StatusCode != 200 && (res.StatusCode < 300 || res.StatusCode > 399) {
-		t.Errorf("the form of the row: status %d, want 200 or a redirect", res.StatusCode)
+	if res.StatusCode != 200 {
+		t.Errorf("the form of the row: status %d, want 200", res.StatusCode)
 	}
 	if p, _ := countsOf(t, w)["done"].(interface{ Float64() (float64, error) }); p == nil {
 		t.Error("the home has no done count")
@@ -284,7 +260,6 @@ func TestTheBrowserDrawsTheRowsOfAnApp(t *testing.T) {
 		t.Errorf("done = %v, want 1: the app did not run the action", f)
 	}
 }
-
 func countsOf(t *testing.T, w *withServer) map[string]any {
 	t.Helper()
 	e, err := client.Remote(w.base, "", "").Get(t.Context(), "/with/testapp/")

@@ -212,8 +212,8 @@ func TestEmbedReadsAsAnAgentInTheContextOfTheRequest(t *testing.T) {
 	}
 }
 
-// TestAReadTakesEmbedButAWriteDoesNot: embed is a name that every GET takes, an action's read included. A request for
-// a page that names it, and a POST that names it, are refused: the answer that embeds is the Siren answer of a read.
+// TestAReadTakesEmbedButAWriteDoesNot: embed is a name that every GET takes, an action's read included, whatever the
+// client accepts. A POST that names it is refused: only a read embeds.
 func TestAReadTakesEmbedButAWriteDoesNot(t *testing.T) {
 	h := embedServer(t, func() []siren.Link { return nil })
 	for _, target := range []string{"/search?q=a&embed=item", "/browse?embed=item", "/days?embed=item", "/?embed=today"} {
@@ -229,8 +229,8 @@ func TestAReadTakesEmbedButAWriteDoesNot(t *testing.T) {
 	asked := httptest.NewRequest("GET", "/probe?embed=item", nil)
 	asked.Header.Set("Accept", "text/html")
 	h.mux.ServeHTTP(page, asked)
-	if page.Code != 422 || !strings.Contains(page.Body.String(), "embed") {
-		t.Errorf("a page that asks for embed: %d, want 422 naming embed", page.Code)
+	if page.Code != 200 || page.Header().Get("Content-Type") != sirenType {
+		t.Errorf("a client that accepts HTML and asks for embed: %d %q, want 200 and Siren JSON", page.Code, page.Header().Get("Content-Type"))
 	}
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest("POST", "/days/2031-05-14/capture", strings.NewReader(url.Values{"text": {"x"}, "embed": {"item"}}.Encode()))

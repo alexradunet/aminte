@@ -13,7 +13,7 @@ import (
 // TestTheMonthIsACalendar: each day of a month, whether it has a live day page, its first line and its mood; the
 // months around it, across a year; the current month; and a month that is not one.
 func TestTheMonthIsACalendar(t *testing.T) {
-	c, h, _ := apitest.FreshOn(t, "cli", fixedToday)
+	c, _, _ := apitest.FreshOn(t, "cli", fixedToday)
 	capture := func(day string, v map[string]string) {
 		apitest.Must(t)(c.Do(t.Context(), apitest.Action(t, apitest.Must(t)(c.Get(t.Context(), "/days/"+day)), "capture"), v))
 	}
@@ -68,24 +68,6 @@ func TestTheMonthIsACalendar(t *testing.T) {
 			t.Errorf("/months/%s: %v", bad, err)
 		}
 	}
-
-	body := browse(t, h, "/months/2031-05")
-	for _, w := range []string{`<table class="calendar">`,
-		`<td class="written" aria-current="date"><a href="/days/2031-05-14"><span class="n">14</span><span class="meta">mood 3 · okay</span></a></td>`,
-		`<td class="written"><a href="/days/2031-05-01"><span class="n">1</span><span class="first">(00:00) May day: a walk by the lake.</span><span class="meta">mood 4 · good</span></a></td>`,
-		`<td><a href="/days/2031-05-20"><span class="n">20</span></a></td>`,
-		`aria-label="Previous month, April 2031"`, `aria-label="Next month, June 2031"`} {
-		if !strings.Contains(body, w) {
-			t.Errorf("the calendar lacks %s", w)
-		}
-	}
-	if strings.Contains(body, `action="/days/go"`) {
-		t.Error("the month draws Go to a day: the day and the stream have it")
-	}
-	// May 2031 starts on a Thursday: three empty cells before it.
-	if !strings.Contains(body, "<tr><td></td><td></td><td></td><td") {
-		t.Error("the first week does not start on Monday")
-	}
 }
 
 // TestOpenDayGoesToTheDay: open-day goes to the day it names, and to today when it names no day or names the word
@@ -116,7 +98,7 @@ func TestOpenDayGoesToTheDay(t *testing.T) {
 // TestTheFirstMonthOfTheDaysIsACalendar: January 0000 holds the first day that a date can name. Its calendar has its
 // 31 days, a day page on its first day and a reading on its third day.
 func TestTheFirstMonthOfTheDaysIsACalendar(t *testing.T) {
-	c, h, _ := apitest.FreshOn(t, "cli", fixedToday)
+	c, _, _ := apitest.FreshOn(t, "cli", fixedToday)
 	apitest.Must(t)(c.Do(t.Context(), apitest.Action(t, apitest.Must(t)(c.Get(t.Context(), "/days/0000-01-01")), "capture"), map[string]string{"text": "The first day."}))
 	root := apitest.Must(t)(c.Get(t.Context(), "/"))
 	apitest.Must(t)(c.Do(t.Context(), apitest.Action(t, root, "register-metric"), map[string]string{"name": "weight", "unit": "kg"}))
@@ -136,14 +118,12 @@ func TestTheFirstMonthOfTheDaysIsACalendar(t *testing.T) {
 	if third["day"] != "0000-01-03" || third["page"] != false || said(third["readings"]) != "1" {
 		t.Errorf("the third day: %v", third)
 	}
-	browse(t, h, "/months/0000-01")
 }
 
 // TestTheZoomLinksEveryLevel: a week, a month and a year link Days, Week, Month and Year: the period of today when
-// today is in it, else of its first day (a week's Thursday), and the stream before the day after the period. The page
-// marks its own level.
+// today is in it, else of its first day (a week's Thursday), and the stream before the day after the period.
 func TestTheZoomLinksEveryLevel(t *testing.T) {
-	c, h, _ := apitest.FreshOn(t, "cli", fixedToday) // 2031-05-14
+	c, _, _ := apitest.FreshOn(t, "cli", fixedToday) // 2031-05-14
 	for _, tc := range []struct {
 		page, days, week, month, year string
 	}{
@@ -158,9 +138,5 @@ func TestTheZoomLinksEveryLevel(t *testing.T) {
 		if want := strings.Join([]string{tc.days, tc.week, tc.month, tc.year}, " "); got != want {
 			t.Errorf("%s zooms to %s, want %s", tc.page, got, want)
 		}
-	}
-	body := browse(t, h, "/months/2031-04")
-	if n := strings.Count(body, `aria-current="page">`); !strings.Contains(body, `<a href="/months/2031-04" aria-current="page">Month</a>`) || !strings.Contains(body, `<a href="/weeks/2031-W14">Week</a>`) || n != 2 {
-		t.Errorf("the month's zoom marks %d links (want its Month and the sidebar's Calendar): %.300s", n, body[strings.Index(body, `aria-label="Zoom"`):])
 	}
 }

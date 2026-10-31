@@ -2,7 +2,6 @@ package api_test
 
 import (
 	"database/sql"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,9 +10,9 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"lifelog/client"
 	"lifelog/internal/api/apitest"
@@ -29,6 +28,25 @@ func scalar(t *testing.T, s *core.Store, query string) string {
 		t.Fatalf("%s: %v", query, err)
 	}
 	return v
+}
+
+// fieldOf is the value of an action's field, "" when it has none.
+func fieldOf(a siren.Action, name string) string {
+	for _, f := range a.Fields {
+		if f.Name == name && f.Value != nil {
+			return fmt.Sprint(f.Value)
+		}
+	}
+	return ""
+}
+
+// fixedToday is the server's local day in the tests of a day: a Wednesday.
+const fixedToday = "2031-05-14"
+
+// dayOf is the local day n days from fixedToday.
+func dayOf(n int) string {
+	t, _ := time.Parse(time.DateOnly, fixedToday)
+	return t.AddDate(0, 0, n).Format(time.DateOnly)
 }
 
 func names(e *siren.Entity) string {
@@ -379,25 +397,10 @@ func measurementID(e *siren.Entity) string {
 	return strings.TrimPrefix(apitest.Href(e, "self"), "/measurements/")
 }
 
-func TestBrowserGetsHTMLAndSourceUI(t *testing.T) {
-	_, h, s := apitest.Fresh(t, "cli")
-	req := httptest.NewRequest("POST", "/days/2026-09-29/capture", strings.NewReader("text=hello"))
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.Header.Set("Accept", "text/html,application/xhtml+xml")
-	rec := httptest.NewRecorder()
-	h.ServeHTTP(rec, req)
-	if rec.Code != http.StatusSeeOther || !feedbackLocation(rec.Header().Get("Location"), "/days/2026-09-29") {
-		t.Errorf("a browser form is answered %d, Location %q: post, then redirect", rec.Code, rec.Header().Get("Location"))
-	}
-	if body := browse(t, h, "/days/2026-09-29"); !strings.Contains(body, `<form method="POST" action="/days/2026-09-29/capture" data-action="capture">`) {
-		t.Errorf("HTML: %.300s", body)
-	}
-	if got := scalar(t, s, "SELECT CAST(count(*) AS text) FROM entities WHERE source = 'ui'"); got != "1" {
-		t.Errorf("rows a browser form wrote as ui: %s, want 1", got)
-	}
-}
-
-func TestBrowserOriginProtection(t *testing.T) {
+// TestOriginProtection: the guard of the API refuses a write that a page of another origin sends through the browser
+// of the owner. A write of the same origin and a write with no browser header (a program) pass. The answer to the
+// same-origin write is the entity, as it is for any client.
+func TestOriginProtection(t *testing.T) {
 	_, h, s := apitest.Fresh(t, "cli")
 	postForm := func(path string, vals url.Values, headers map[string]string) *httptest.ResponseRecorder {
 		t.Helper()
@@ -416,8 +419,8 @@ func TestBrowserOriginProtection(t *testing.T) {
 		"Origin":         "http://lifelog.local",
 		"Sec-Fetch-Site": "same-origin",
 	})
-	if sameOrigin.Code != http.StatusSeeOther || !feedbackLocation(sameOrigin.Header().Get("Location"), "/days/2026-10-10") {
-		t.Fatalf("same-origin browser form got %d, Location %q", sameOrigin.Code, sameOrigin.Header().Get("Location"))
+	if sameOrigin.Code != http.StatusOK || sameOrigin.Header().Get("Location") != "/days/2026-10-10" {
+		t.Fatalf("same-origin browser form got %d, Location %q, want 200 and the day", sameOrigin.Code, sameOrigin.Header().Get("Location"))
 	}
 
 	headerless := postForm("/days/2026-10-11/capture", url.Values{"text": {"cli"}}, map[string]string{
@@ -536,7 +539,7 @@ func TestViewsOfferEveryLiveMetric(t *testing.T) {
 }
 
 func TestMetricsAreGroupedByCategory(t *testing.T) {
-	c, h, _ := apitest.Fresh(t, "cli")
+	c, _, _ := apitest.Fresh(t, "cli")
 	root := apitest.Must(t)(c.Get(t.Context(), "/"))
 	for _, m := range []map[string]string{{"name": "TSH", "unit": "µUI/mL", "note": "thyroid-stimulating hormone"}, {"name": "Weight", "unit": "kg"},
 		{"name": "Walk"}, {"name": "Steps", "unit": "n"}} {
@@ -572,20 +575,26 @@ func TestMetricsAreGroupedByCategory(t *testing.T) {
 	if want := "Biomarkers: Thyroid:TSH Body:Walk,Weight Not filed:Mood,Steps"; strings.Join(got, " ") != want {
 		t.Errorf("groups %q, want %q: each category in tree order with those under it, the rest last", strings.Join(got, " "), want)
 	}
-	page := browse(t, h, "/metrics")
-	for _, s := range []string{"<h3>Thyroid <small>1</small></h3>", `<datalist id="pick-category"><option value="Biomarkers"><option value="Thyroid"><option value="Body"></datalist>`,
-		"<h2>Not filed", `title="thyroid-stimulating hormone"`} {
-		if !strings.Contains(page, s) {
-			t.Errorf("/metrics lacks %q", s)
-		}
+	// The data that the page of the metrics draws: the count of a group, the note of a metric on its card, the
+	// categories that the pick bar offers (in the order of the tree), and the categories of a metric as links of its page.
+	metrics := apitest.Must(t)(c.Get(t.Context(), "/metrics"))
+	groups := metrics.Properties.(map[string]any)["groups"].([]any)
+	if g := groups[1].(map[string]any); g["title"] != "Thyroid" || len(g["metrics"].([]any)) != 1 {
+		t.Errorf("the group Thyroid holds %v, want one metric", g["metrics"])
 	}
-	// The metric's view holds its note and its categories, each a badge with its x.
-	s := browse(t, h, "/metrics/TSH")
-	if !regexp.MustCompile(`<span class="badge category"><a href="/pages/\d+">Thyroid</a><form method="POST" action="/pages/file" class="tiny">\s*<input type="hidden" name="ids" value="\d+"><input type="hidden" name="from" value="Thyroid">`).MatchString(s) {
-		t.Error("a metric's page does not show its category as a badge with its x")
+	if m := groups[1].(map[string]any)["metrics"].([]any)[0].(map[string]any); m["name"] != "TSH" || m["note"] != "thyroid-stimulating hormone" || fmt.Sprint(m["categories"]) != "[Biomarkers/Thyroid]" {
+		t.Errorf("the card of TSH is %v: the note and the category are data of the metric", m)
 	}
-	if !strings.Contains(s, "thyroid-stimulating hormone") {
-		t.Error("a metric's view does not hold its note")
+	pick := apitest.Action(t, metrics, "file-pages")
+	if f := pick.Field("category"); f == nil || fmt.Sprint(f.Options) != "[Biomarkers Thyroid Body]" {
+		t.Errorf("the pick bar offers %+v, want the categories in the order of the tree", f)
+	}
+	page := apitest.Must(t)(c.Get(t.Context(), pageOf(tsh)))
+	if page.Properties.(map[string]any)["body"] != "thyroid-stimulating hormone" {
+		t.Errorf("the page of the metric does not hold its note: %v", page.Properties)
+	}
+	if part := partOfLinks(page); fmt.Sprint(part) != "[Thyroid]" {
+		t.Errorf("the page of TSH is part of %v, want [Thyroid]", part)
 	}
 }
 
@@ -663,30 +672,6 @@ func TestRenamedIdentityRetainsActionsAndAliasWrites(t *testing.T) {
 	if apitest.Href(alias, "self") != oldHref || alias.Title != "Correct" || alias.Properties.(map[string]any)["body"] != "#REDIRECT [[Other]]" {
 		t.Fatalf("retained alias: %+v", alias)
 	}
-}
-
-// feedbackLocation reports a Location that is the page back (a path, with its query when it has one) and one
-// receipt of feedback.
-func feedbackLocation(location, back string) bool {
-	want, err := url.Parse(back)
-	if err != nil {
-		return false
-	}
-	u, err := url.Parse(location)
-	if err != nil || u.Scheme != "" || u.Host != "" || u.Path != want.Path || u.Fragment != "" {
-		return false
-	}
-	q, err := url.ParseQuery(u.RawQuery)
-	if err != nil {
-		return false
-	}
-	values := q["feedback"]
-	q.Del("feedback")
-	if q.Encode() != want.Query().Encode() || len(values) != 1 || len(values[0]) != 64 {
-		return false
-	}
-	_, err = hex.DecodeString(values[0])
-	return err == nil
 }
 
 // withoutTrigger runs one statement with a trigger dropped and restores it: deliberate damage, or a row a file

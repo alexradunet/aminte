@@ -25,7 +25,7 @@ import (
 // TestTheStoresClockIsTheOneClock: the store's clock is in a zone far from UTC, at an instant where the UTC day and
 // the local day are not the same. Each read of today or now agrees with the local day or the instant of that clock:
 // the root's today, the redirect of /days/today, the day page that a capture with no day makes, the day of a page and
-// of a kept file that have no day, the words for a time, the name of a snapshot, and the life of a feedback receipt.
+// of a kept file that have no day, and the name of a snapshot.
 func TestTheStoresClockIsTheOneClock(t *testing.T) {
 	d := dbtest.New(t)
 	const today, utcDay = "2026-03-11", "2026-03-10"
@@ -46,27 +46,13 @@ func TestTheStoresClockIsTheOneClock(t *testing.T) {
 		t.Errorf("/days/today: %d to %q, want 303 to /days/%s", rec.Code, rec.Header().Get("Location"), today)
 	}
 
-	// A capture with no day, from a browser: it writes on the local day, and the answer carries a receipt.
-	capture := func() string {
-		t.Helper()
-		form := url.Values{"text": {"Woke before the sun."}}
-		req := httptest.NewRequest("POST", "/days/today/capture", strings.NewReader(form.Encode()))
-		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-		req.Header.Set("Accept", "text/html")
-		rec := httptest.NewRecorder()
-		h.ServeHTTP(rec, req)
-		to := rec.Header().Get("Location")
-		if rec.Code != http.StatusSeeOther || !strings.HasPrefix(to, "/days/"+today+"?feedback=") {
-			t.Fatalf("a capture with no day: %d to %q, want 303 to /days/%s with a receipt", rec.Code, to, today)
-		}
-		return to
-	}
-	feedbackOf := func(to string) bool {
-		t.Helper()
-		return strings.Contains(browse(t, h, to), "<h2>Result</h2>")
-	}
-	if !feedbackOf(capture()) {
-		t.Error("a receipt is not shown at the instant it was made")
+	// A capture with no day: it writes on the local day, and the answer names that day.
+	req := httptest.NewRequest("POST", "/days/today/capture", strings.NewReader(url.Values{"text": {"Woke before the sun."}}.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK || rec.Header().Get("Location") != "/days/"+today {
+		t.Fatalf("a capture with no day: %d to %q, want 200 and /days/%s", rec.Code, rec.Header().Get("Location"), today)
 	}
 	if id, err := s.PageID(ctx, today); err != nil || id == 0 {
 		t.Errorf("the capture made no day page %s: %v", today, err)
@@ -92,14 +78,6 @@ func TestTheStoresClockIsTheOneClock(t *testing.T) {
 		}
 	}
 
-	// The words for a time are in the zone of the clock: a reading taken at the instant of the clock was taken today
-	// at 01:30, not yesterday at 11:30.
-	apitest.Must(t)(c.Do(ctx, apitest.Action(t, root, "register-metric"), map[string]string{"name": "weight", "unit": "kg"}))
-	m := apitest.Must(t)(c.Do(ctx, apitest.Action(t, root, "record"), map[string]string{"metric": "weight", "day": today, "value": "71", "taken_at": "2026-03-10T11:30:00.000Z"}))
-	if want := `>today, 01:30</time>`; !strings.Contains(browse(t, h, apitest.Href(m, "self")), want) {
-		t.Errorf("the page of a reading taken now does not say %s", want)
-	}
-
 	// A snapshot is named by the local day, and a second one of that day by the local time too.
 	var names []string
 	for range 2 {
@@ -109,13 +87,6 @@ func TestTheStoresClockIsTheOneClock(t *testing.T) {
 	}
 	if want := "life-2026-03-11.db life-2026-03-11T013000.db"; strings.Join(names, " ") != want {
 		t.Errorf("the snapshots are %v, want %s", names, want)
-	}
-
-	// A receipt lives for some minutes of the store's clock: an hour later by that clock, it is gone.
-	to := capture()
-	now = now.Add(time.Hour)
-	if feedbackOf(to) {
-		t.Error("a receipt is shown an hour after it was made, by the store's clock")
 	}
 }
 

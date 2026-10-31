@@ -13,7 +13,7 @@ import (
 
 // Embedding (API.md, "Embedding"): GET ?embed=rel1,rel2 replaces each sub-entity that is a reference with one of those
 // rels by the entity that its href answers. The server asks its own handler, in the process, so a client gets in one
-// answer what it would read in many. The page of a browser reads the same way (pageAnswer).
+// answer what it would read in many. The browser extension reads the shell and the cards of its pages this way.
 
 // embedField is the name of the query parameter that asks for the embedding.
 const embedField = "embed"
@@ -42,21 +42,18 @@ func embedRels(q url.Values) []string {
 	return rels
 }
 
-// embed embeds the sub-entities of e that the query of r asks for.
+// embed replaces, in place, each reference in the sub-entities of e that has one of the rels that the query of r asks
+// for, by the entity that its href answers (siren.Link.Embedding). The depth is 1: an embedded read asks for no
+// embedding of its own. At most maxEmbedded reads are made, in the order of the links. A reference whose read fails
+// stays as it is.
 func (h *server) embed(r *http.Request, e *siren.Entity) {
-	if rels := embedRels(r.URL.Query()); len(rels) > 0 {
-		h.embedLinks(r, e.Entities, maxEmbedded, rels...)
+	rels := embedRels(r.URL.Query())
+	if len(rels) == 0 {
+		return
 	}
-}
-
-// embedLinks replaces, in place, each reference in links that has one of rels by the entity that its href answers
-// (siren.Link.Embedding). The depth is 1: an embedded read asks for no embedding of its own. At most limit reads are
-// made, in the order of the links; the API's limit is maxEmbedded, and a page that draws fewer asks for fewer. A
-// reference whose read fails stays as it is.
-func (h *server) embedLinks(r *http.Request, links []siren.Link, limit int, rels ...string) {
 	reads := 0
-	for i, l := range links {
-		if reads == limit {
+	for i, l := range e.Entities {
+		if reads == maxEmbedded {
 			return
 		}
 		if l.Href == "" || l.Embedded() || !slices.ContainsFunc(rels, l.HasRel) {
@@ -65,7 +62,7 @@ func (h *server) embedLinks(r *http.Request, links []siren.Link, limit int, rels
 		reads++
 		if sub := h.entityAt(r, l.Href, 1); sub != nil {
 			if embedded := l.Embedding(sub); embedded.Embedded() { // an entity with no content is no representation
-				links[i] = embedded
+				e.Entities[i] = embedded
 			}
 		}
 	}

@@ -2,7 +2,6 @@ package api_test
 
 import (
 	"fmt"
-	"strings"
 	"testing"
 
 	"lifelog/internal/api/apitest"
@@ -11,7 +10,7 @@ import (
 // TestPeopleListCarriesItsMentions: the rows of the people list of Browse say how many pages link to each person and
 // the newest day page among them, in the order of the item links. The sheet says it in words.
 func TestPeopleListCarriesItsMentions(t *testing.T) {
-	c, h, _ := apitest.FreshOn(t, "cli", "2026-10-12") // the day the words are read against: a day of this year has no year
+	c, _, _ := apitest.FreshOn(t, "cli", "2026-10-12") // the day the words are read against: a day of this year has no year
 	root := apitest.Must(t)(c.Get(t.Context(), "/"))
 	catalog := apitest.Must(t)(c.Get(t.Context(), "/actions"))
 	for _, name := range []string{"Ana", "Sam", "Zed"} {
@@ -46,24 +45,12 @@ func TestPeopleListCarriesItsMentions(t *testing.T) {
 	if _, has := rows[2].(map[string]any)["last_day"]; has {
 		t.Errorf("a person with no day page has last_day: %v", rows[2])
 	}
-
-	body := browse(t, h, "/browse?kind=person")
-	for _, s := range []string{
-		"mentioned on 3 pages, last Fri 9 Oct",
-		"mentioned on 1 page, last Fri 9 Oct",
-		"not mentioned yet",
-		`<a class="entry named face" href="` + list.Entities[0].Href + `">`,
-	} {
-		if !strings.Contains(body, s) {
-			t.Errorf("the people sheet lacks %q", s)
-		}
-	}
 }
 
 // TestPeopleListShowsThePictureAPersonEmbeds: in the people list of Browse, a person whose page embeds a picture has
 // that picture's preview in its row, and the sheet draws it round before the name; a person with none has the icon of a person.
 func TestPeopleListShowsThePictureAPersonEmbeds(t *testing.T) {
-	c, h, _ := apitest.FreshOn(t, "cli", fixedToday)
+	c, _, _ := apitest.FreshOn(t, "cli", fixedToday)
 	ctx := t.Context()
 	root := apitest.Must(t)(c.Get(ctx, "/"))
 	jpg, _ := jpegFile(t, "ana.jpg", 40, 30)
@@ -83,23 +70,21 @@ func TestPeopleListShowsThePictureAPersonEmbeds(t *testing.T) {
 	if _, has := rows[1].(map[string]any)["picture"]; has {
 		t.Errorf("Sam has a picture: %v", rows[1])
 	}
-	body := browse(t, h, "/browse?kind=person")
-	for _, s := range []string{`<img class="face-picture" src="` + want + `" alt="" loading="lazy">`, `<span class="face-picture" aria-hidden="true">`} {
-		if !strings.Contains(body, s) {
-			t.Errorf("the people sheet lacks %q", s)
-		}
-	}
 }
 
 // TestMentionsHaveNoDayWhenNoDayPageLinks: a page that is not a day page gives a count and no last day.
 func TestMentionsHaveNoDayWhenNoDayPageLinks(t *testing.T) {
-	c, h, _ := apitest.FreshOn(t, "cli", "2026-10-12") // the day the words are read against: a day of this year has no year
+	c, _, _ := apitest.FreshOn(t, "cli", "2026-10-12") // the day the words are read against: a day of this year has no year
 	root := apitest.Must(t)(c.Get(t.Context(), "/"))
 	apitest.Must(t)(c.Do(t.Context(), apitest.Action(t, root, "create-person"), map[string]string{"title": "Lake"}))
 	apitest.Must(t)(c.Do(t.Context(), apitest.Action(t, root, "create-page"), map[string]string{"title": "Trip", "body": "At [[Lake]]"}))
 	apitest.Must(t)(c.Do(t.Context(), apitest.Action(t, root, "create-page"), map[string]string{"title": "Swim", "body": "In [[Lake]]"}))
-	if body := browse(t, h, "/browse?kind=person"); !strings.Contains(body, "mentioned on 2 pages</span>") {
-		t.Errorf("the people sheet lacks the count without a day:\n%.2000s", body)
+	rows, _ := props(apitest.Must(t)(c.Get(t.Context(), "/browse?kind=person")))["rows"].([]any)
+	if len(rows) != 1 || fmt.Sprint(rows[0].(map[string]any)["mentions"]) != "2" {
+		t.Errorf("the people rows are %v, want Lake mentioned on 2 pages", rows)
+	}
+	if _, has := rows[0].(map[string]any)["last_day"]; has {
+		t.Errorf("a person mentioned by no day page has last_day: %v", rows[0])
 	}
 }
 

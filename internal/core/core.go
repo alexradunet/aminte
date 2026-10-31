@@ -30,9 +30,8 @@ func nullIfEmpty(s string) any {
 }
 
 // Store is one open life.db. SnapshotDir is the folder the snapshot action writes to; empty means beside the file.
-// Clock and Zone are the clock of the writer. Every surface reads from them today (Today), the zone of the words for a
-// time and the name of a snapshot (Local), and the life of a feedback receipt (Now). A nil Clock is time.Now and a nil
-// Zone is time.Local, the clock of this device; a test gives a fixed clock. The instants that a write stores in a row
+// Clock and Zone are the clock of the writer. Every surface reads from them today (Today), and the zone of the words
+// for a time and the name of a snapshot (Local). A nil Clock is time.Now and a nil Zone is time.Local, the clock of this device; a test gives a fixed clock. The instants that a write stores in a row
 // (created_at, updated_at and deleted_at) do not come from this clock: SQLite writes them from its own clock (nowSQL
 // and the triggers of the schema). The taken_at of a reading is the client's.
 type Store struct {
@@ -45,9 +44,8 @@ type Store struct {
 	Zone         *time.Location
 }
 
-// Now is the instant of the store's clock. The clock of this device (a nil Clock) gives time.Now with its monotonic
-// reading, so a span between two instants (the life of a feedback receipt) does not change when the wall clock is set.
-func (s *Store) Now() time.Time {
+// now is the instant of the store's clock: the Clock, else time.Now.
+func (s *Store) now() time.Time {
 	if s.Clock == nil {
 		return time.Now()
 	}
@@ -55,13 +53,13 @@ func (s *Store) Now() time.Time {
 }
 
 // Local is the instant of the store's clock in the store's zone: its day is today, and the words for a time and the
-// name of a snapshot are in its zone. Time.In removes the monotonic reading, so a span is measured with Now, not Local.
+// name of a snapshot are in its zone.
 func (s *Store) Local() time.Time {
 	zone := s.Zone
 	if zone == nil {
 		zone = time.Local
 	}
-	return s.Now().In(zone)
+	return s.now().In(zone)
 }
 
 // Today is the local calendar day of the store's clock (lifelog_meta.days).

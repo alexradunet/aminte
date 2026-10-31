@@ -10,7 +10,6 @@ import (
 	"math"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"slices"
 	"strings"
 	"testing"
@@ -18,88 +17,6 @@ import (
 	"lifelog/internal/core"
 	"lifelog/siren"
 )
-
-// backCases are the values of the field back that a browser form can send, and what backOf keeps of each: the value
-// when it is a path on this server, "" otherwise. They are also the seed corpus of FuzzBackOf.
-var backCases = []struct{ back, want string }{
-	{"/days?limit=5&offset=10", "/days?limit=5&offset=10"},
-	{"/", "/"},
-	{"/days/2026-09-29?x=%2F%2F", "/days/2026-09-29?x=%2F%2F"},
-	{"/" + strings.Repeat("a", 2047), "/" + strings.Repeat("a", 2047)}, // 2048 bytes: maxBack
-	{"", ""},
-	{"/" + strings.Repeat("a", 2048), ""}, // 2049 bytes
-	{"//evil.example/", ""},
-	{"///evil.example/", ""},
-	{"/\\evil.example/", ""},
-	{"https://evil.example/", ""},
-	{"javascript:alert(1)", ""},
-	{"evil", ""},
-	{" /days", ""},
-	{"/a\r\nSet-Cookie: x=1", ""},
-	{"/\t/evil.example/", ""},
-	{"/a\x7fb", ""},
-	{"/page#part", "/page#part"}, // an id fragment names where the page opens
-	{"/metrics#row-1-3", "/metrics#row-1-3"},
-	{"/metrics?order=page#row-1-3", "/metrics?order=page#row-1-3"},
-	{"/metrics#", ""},
-	{"/metrics#a b", ""},
-	{"/#<script>", ""},
-	{"/metrics#a#b", ""},
-	{"/metrics#" + strings.Repeat("a", 64), "/metrics#" + strings.Repeat("a", 64)},
-	{"/metrics#" + strings.Repeat("a", 65), ""},
-	{"/%zz", ""}, // not a URL: the escape is not hex
-}
-
-// requestWithBack is a POST whose form has the field back.
-func requestWithBack(back string) *http.Request {
-	r := httptest.NewRequest("POST", "/days/2026-09-29/capture", nil)
-	r.PostForm = url.Values{"back": {back}}
-	return r
-}
-
-// TestBackOf: backOf keeps a path on this server and drops every other value (docs/metrics/091-the-browser-for-daily-use.md).
-func TestBackOf(t *testing.T) {
-	for _, tc := range backCases {
-		if got := backOf(requestWithBack(tc.back)); got != tc.want {
-			t.Errorf("backOf(%q) = %q, want %q", tc.back, got, tc.want)
-		}
-	}
-}
-
-// FuzzBackOf: whatever a form sends, backOf gives the fallback "" or the value itself, and a value it keeps stays on
-// this server when a browser follows it. The check reads the value as a browser does (the WHATWG URL standard): it
-// removes a tab and a newline, and it reads a backslash as a slash. It then resolves the value against a page of this
-// server, and the host must not change. A kept value has no control character either: it goes into the header
-// Location.
-func FuzzBackOf(f *testing.F) {
-	for _, tc := range backCases {
-		f.Add(tc.back)
-	}
-	base, err := url.Parse("http://lifelog.local/days/2026-09-29")
-	if err != nil {
-		f.Fatal(err)
-	}
-	f.Fuzz(func(t *testing.T, back string) {
-		got := backOf(requestWithBack(back))
-		if got == "" {
-			return
-		}
-		if got != back {
-			t.Fatalf("backOf(%q) = %q, want the value or \"\"", back, got)
-		}
-		if strings.ContainsFunc(got, func(r rune) bool { return r < 0x20 || r == 0x7f }) {
-			t.Fatalf("backOf kept %q, which has a control character", got)
-		}
-		read := strings.NewReplacer("\t", "", "\n", "", "\r", "", "\\", "/").Replace(got)
-		ref, err := url.Parse(read)
-		if err != nil {
-			t.Fatalf("backOf kept %q, which a browser reads as %q, not a URL: %v", got, read, err)
-		}
-		if u := base.ResolveReference(ref); u.Scheme != base.Scheme || u.Host != base.Host {
-			t.Fatalf("backOf kept %q, and a browser goes to %s", got, u)
-		}
-	})
-}
 
 // TestErrorEntity: each error becomes one error entity, with the status, the code and the message. An error that
 // core did not type is a fault: the client gets "internal error", and the log gets the cause one time, under the
@@ -171,7 +88,7 @@ func TestAnAnswerThatJSONCannotCarryIsAFault(t *testing.T) {
 			prev := log.Writer()
 			log.SetOutput(&logged) // no test of this package runs in parallel
 			t.Cleanup(func() { log.SetOutput(prev) })
-			answer(rec, req, http.StatusOK, e, frame{})
+			answer(rec, req, http.StatusOK, e)
 			if n := strings.Count(logged.String(), "cannot be encoded"); n != 1 || !strings.Contains(logged.String(), "GET /things/{id}") ||
 				strings.Contains(logged.String(), "/things/1") {
 				t.Errorf("the log does not have the cause one time with the route's pattern, or names the path: %q", logged.String())
@@ -196,71 +113,27 @@ func TestAnAnswerThatJSONCannotCarryIsAFault(t *testing.T) {
 	}
 }
 
-// TestAnswerDrawsByTheFrame: answer gives a program JSON and a browser a page; a page-only frame gives a program the
-// page too. A page with no shell has no sidebar. The GET of a refused form gets the entity and the status, no bytes.
-func TestAnswerDrawsByTheFrame(t *testing.T) {
+// TestAnswerIsSirenForEveryAccept: answer gives every client the Siren JSON of the entity with the status it was
+// given, whatever the client accepts. It adds no Vary and no rules of speculation: the core draws no page.
+func TestAnswerIsSirenForEveryAccept(t *testing.T) {
 	e := &siren.Entity{Class: []string{"preview"}, Title: "Preview", Properties: map[string]any{"body": "words"}}
-	for _, c := range []struct {
-		name, accept string
-		fr           frame
-		want         string // the Content-Type
-	}{
-		{"a program", "application/vnd.siren+json", frame{}, "application/vnd.siren+json"},
-		{"a browser", "text/html", frame{}, "text/html; charset=utf-8"},
-		{"a program, a page-only frame", "application/vnd.siren+json", frame{pageOnly: true}, "text/html; charset=utf-8"},
-	} {
-		t.Run(c.name, func(t *testing.T) {
+	for _, accept := range []string{"", "application/vnd.siren+json", "text/html", "text/html,application/xhtml+xml,*/*;q=0.8"} {
+		t.Run(accept, func(t *testing.T) {
 			req := httptest.NewRequest("GET", "/preview", nil)
-			req.Header.Set("Accept", c.accept)
+			if accept != "" {
+				req.Header.Set("Accept", accept)
+			}
 			rec := httptest.NewRecorder()
-			answer(rec, req, http.StatusAccepted, e, c.fr)
-			body := rec.Body.String()
-			if rec.Code != http.StatusAccepted || rec.Header().Get("Content-Type") != c.want {
-				t.Errorf("%d %q, want 202 %q", rec.Code, rec.Header().Get("Content-Type"), c.want)
+			answer(rec, req, http.StatusAccepted, e)
+			if rec.Code != http.StatusAccepted || rec.Header().Get("Content-Type") != "application/vnd.siren+json" {
+				t.Errorf("%d %q, want 202 and Siren JSON", rec.Code, rec.Header().Get("Content-Type"))
 			}
-			if strings.HasPrefix(c.want, "text/html") && (!strings.Contains(body, "<h1>Preview</h1>") || strings.Contains(body, `class="rail"`)) {
-				t.Errorf("not the page with no sidebar: %.300s", body)
+			if !strings.Contains(rec.Body.String(), `"title": "Preview"`) {
+				t.Errorf("not the entity: %.300s", rec.Body.String())
 			}
-			if !strings.HasPrefix(c.want, "text/html") && !strings.Contains(body, `"title": "Preview"`) {
-				t.Errorf("not the entity: %.300s", body)
-			}
-		})
-	}
-}
-
-// TestAPageThatCannotBeDrawnNamesNoCause: when a page cannot be drawn (its properties or its result do not encode as
-// JSON, or its template fails on them), the browser gets a 500 that says no word of the internal cause. The server's
-// log has the cause one time, with the pattern of the route and not the path.
-func TestAPageThatCannotBeDrawnNamesNoCause(t *testing.T) {
-	for name, e := range map[string]*siren.Entity{
-		"properties that are not JSON": {Class: []string{"thing"}, Title: "Thing", Properties: map[string]any{"value": math.NaN()}},
-		"a result that is not JSON":    {Class: []string{"thing"}, Title: "Thing", Properties: map[string]any{"value": 1}, Result: map[string]any{"value": math.Inf(1)}},
-		"a template that fails":        {Class: []string{"error"}, Title: "Error", Properties: "not an object"},
-	} {
-		t.Run(name, func(t *testing.T) {
-			req := httptest.NewRequest("GET", "/things/1", nil)
-			req.Pattern = "GET /things/{id}" // as the routes set it
-			req.Header.Set("Accept", "text/html")
-			rec := httptest.NewRecorder()
-			var logged bytes.Buffer
-			prev := log.Writer()
-			log.SetOutput(&logged) // no test of this package runs in parallel
-			t.Cleanup(func() { log.SetOutput(prev) })
-			answer(rec, req, http.StatusOK, e, frame{})
-			body := rec.Body.String()
-			if n := strings.Count(logged.String(), "cannot be drawn"); n != 1 || !strings.Contains(logged.String(), "GET /things/{id}") ||
-				strings.Contains(logged.String(), "/things/1") {
-				t.Errorf("the log does not have the cause one time with the route's pattern, or names the path: %q", logged.String())
-			}
-			if rec.Code != http.StatusInternalServerError {
-				t.Errorf("status %d, want 500", rec.Code)
-			}
-			if !strings.HasPrefix(rec.Header().Get("Content-Type"), "text/html") || !strings.Contains(body, "</html>") {
-				t.Errorf("the answer is not a page: %q %.200s", rec.Header().Get("Content-Type"), body)
-			}
-			for _, cause := range []string{"template:", "executing", "evaluate", "json:", "unsupported value"} {
-				if strings.Contains(body, cause) {
-					t.Errorf("the page names the cause (%q): %.300s", cause, body)
+			for _, h := range []string{"Vary", "Speculation-Rules"} {
+				if v := rec.Header().Values(h); len(v) != 0 {
+					t.Errorf("the header %s is %v: the core has one representation", h, v)
 				}
 			}
 		})

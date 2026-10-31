@@ -65,13 +65,15 @@ func authorityOf(authority string) (host string, ip netip.Addr, port int, ok boo
 }
 
 // absoluteForm reports a request target in absolute form (GET http://host/path). Go then replaces Host with the
-// authority of the target. No proxy deployment is supported, so both listeners refuse it instead of trusting it.
+// authority of the target. No proxy deployment is supported, so the listener refuses it instead of trusting it.
 func absoluteForm(r *http.Request) bool {
 	return r.URL == nil || r.URL.IsAbs() || r.URL.Host != ""
 }
 
 // NetworkAuthority wraps only socket serving; api.New remains usable by the
-// in-process CLI (client.InProcess). The listener's actual port includes ephemeral port binds.
+// in-process CLI (client.InProcess). The listener's actual port includes ephemeral port binds. It is the outer handler
+// of every serve, also one with a token (RequireToken): a request to a Host that is not the address of the listener is
+// refused with 403 before the token is looked at, so a page that rebinds a name to the loopback learns nothing.
 func NetworkAuthority(addr net.Addr, next http.Handler) (http.Handler, error) {
 	_, port, ok := loopbackAuthority(addr.String(), false)
 	if !ok {

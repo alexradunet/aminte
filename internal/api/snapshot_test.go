@@ -20,7 +20,7 @@ import (
 	"lifelog/siren"
 )
 
-// The owner's snapshot action, from the client and from a browser form; refused to an agent.
+// The owner's snapshot action, from any client; refused to an agent.
 func TestSnapshotIsTheOwnersFromAnySurface(t *testing.T) {
 	d := dbtest.New(t)
 	dir := t.TempDir()
@@ -69,32 +69,6 @@ func TestSnapshotIsTheOwnersFromAnySurface(t *testing.T) {
 		t.Fatalf("an agent's refusal wrote a file: %d -> %d", len(before), len(after))
 	}
 
-	// A browser form is answered home with the path as feedback. The second file is removed first: a third
-	// snapshot at the same instant of the clock would find its time-named file in use, a refusal of its own.
-	if err := os.Remove(again); err != nil {
-		t.Fatal(err)
-	}
-	req := httptest.NewRequest("POST", "/snapshots", nil)
-	req.Header.Set("Accept", "text/html")
-	req.Header.Set("Sec-Fetch-Site", "same-origin")
-	rec := httptest.NewRecorder()
-	h.ServeHTTP(rec, req)
-	if rec.Code != 303 || !strings.HasPrefix(rec.Header().Get("Location"), "/?feedback=") {
-		t.Fatalf("browser form: %d %q", rec.Code, rec.Header().Get("Location"))
-	}
-	req = httptest.NewRequest("GET", rec.Header().Get("Location"), nil) // Home is the page of today
-	req.Header.Set("Accept", "text/html")
-	rec = httptest.NewRecorder()
-	h.ServeHTTP(rec, req)
-	if !strings.Contains(rec.Body.String(), "life-"+today) || !strings.Contains(rec.Body.String(), "Took a snapshot: <code>") || !strings.Contains(rec.Body.String(), "<dt>restore check</dt>") {
-		t.Fatalf("feedback lacks the snapshot: %.500s", rec.Body.String())
-	}
-	// The rail's Snapshot link opens this form, now that Home is the page of today.
-	body := browse(t, h, "/actions?new=snapshot")
-	if !strings.Contains(body, `<details class="action" open><summary class="button">Take a snapshot <span class="owner">owner</span></summary>`) ||
-		!strings.Contains(body, `action="/snapshots"`) {
-		t.Fatalf("the rail's Snapshot link does not open the snapshot form:\n%.800s", body)
-	}
 }
 
 // A snapshot that fails its restore check is an error on every surface, not a 200 with ok false inside: the file is
@@ -185,7 +159,7 @@ func TestOnlyARefusedSnapshotIsSnapshotRefused(t *testing.T) {
 
 // TestASnapshotIsDownloadedByTheOwner: the answer of a snapshot links to its download, which sends the file as it was
 // written. Only a good snapshot's name in the snapshot folder is sent: not the live file, not a failed copy, not a
-// path. An agent is refused. Settings links to the snapshot form, and the toast offers the download.
+// path. An agent is refused.
 func TestASnapshotIsDownloadedByTheOwner(t *testing.T) {
 	d := dbtest.New(t)
 	dir := t.TempDir()
@@ -238,18 +212,5 @@ func TestASnapshotIsDownloadedByTheOwner(t *testing.T) {
 		if rec := get(path, ""); rec.Code != 404 {
 			t.Errorf("GET %s: %d, want 404", path, rec.Code)
 		}
-	}
-
-	// The browser: Settings links to the snapshot form, and the toast of the snapshot offers the download.
-	if body := browse(t, h, "/settings"); !strings.Contains(body, `<a class="button" href="/actions?new=snapshot">Take a snapshot</a>`) {
-		t.Errorf("Settings has no link to the snapshot form:\n%.1500s", body)
-	}
-	req := httptest.NewRequest("POST", "/snapshots", nil)
-	req.Header.Set("Accept", "text/html")
-	req.Header.Set("Sec-Fetch-Site", "same-origin")
-	rec = httptest.NewRecorder()
-	h.ServeHTTP(rec, req)
-	if body := browse(t, h, rec.Header().Get("Location")); !strings.Contains(body, `<a href="/snapshots/life-2026-10-02T143005.db" download>Download it</a>`) {
-		t.Errorf("the toast does not offer the download:\n%.1500s", body)
 	}
 }

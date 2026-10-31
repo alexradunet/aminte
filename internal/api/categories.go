@@ -11,7 +11,7 @@ import (
 
 // filePages is file-pages: every page named is filed in the category page, in one write (D26). The answer is the
 // class filed: the category, whether it was made, the ids, and how many links were added and removed (with from, how many were removed from it), with an item
-// link to each page. A browser form returns to its list (back), with the sentence as its feedback.
+// link to each page. The result is the sentence that a UI shows after the write.
 func (h *server) filePages(r *http.Request, act spec, src string) (*siren.Entity, error) {
 	v, err := fieldsOf(r, act)
 	if err != nil {

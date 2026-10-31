@@ -39,9 +39,7 @@ func HoldWriteLock(t *testing.T, s *core.Store, busyMs int) {
 	})
 }
 
-// BrowserFields and FieldNamesOf let a test of package api_test compare a form with the catalog.
-var BrowserFields = browserFields
-
+// FieldNamesOf lets a test of package api_test compare a form with the catalog.
 func FieldNamesOf(action string) []string { return fieldNames(specOf(action)) }
 
 // PathOf is the route of a catalog action.

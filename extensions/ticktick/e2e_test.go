@@ -515,46 +515,56 @@ func holdsTheWholeLine(t *testing.T, b bins, noCompleted bool) {
 		}
 	})
 
-	t.Run("Today is a page of the browser with the task due today, and it does not name the service", func(t *testing.T) {
+	t.Run("Today lists the task due today as a Siren entity, and it does not name the service", func(t *testing.T) {
 		res, page := get(t, s, "/tasks")
-		if res.StatusCode != 200 || !strings.Contains(page, "Write report") {
-			t.Errorf("status %d; the page holds Write report: %v", res.StatusCode, strings.Contains(page, "Write report"))
+		if res.StatusCode != 200 || res.Header.Get("Content-Type") != "application/vnd.siren+json" {
+			t.Fatalf("status %d, type %q, want 200 and Siren JSON", res.StatusCode, res.Header.Get("Content-Type"))
+		}
+		var today siren.Entity
+		if err := json.Unmarshal([]byte(page), &today); err != nil {
+			t.Fatalf("the answer is no entity: %v\n%s", err, page)
+		}
+		titles := []string{}
+		for _, l := range today.Entities {
+			titles = append(titles, l.Title)
+		}
+		if !slices.Contains(titles, "Write report") {
+			t.Errorf("the rows of Today are %v, want Write report among them", titles)
 		}
 		if strings.Contains(strings.ToLower(page), "ticktick") {
-			t.Errorf("the page names the service:\n%s", page)
+			t.Errorf("the answer names the service:\n%s", page)
 		}
 	})
 
-	t.Run("a list page has its tasks as links and the round Complete form, and it does not name the service", func(t *testing.T) {
+	t.Run("a list has its tasks as links with the Complete action of each, and it does not name the service", func(t *testing.T) {
 		res, page := get(t, s, "/tasks/lists/p-home")
 		if res.StatusCode != 200 {
 			t.Fatalf("status %d, want 200", res.StatusCode)
 		}
-		if !regexp.MustCompile(`<a [^>]*href="/tasks/items/t-mom"[^>]*>[^<]*Call mom`).MatchString(page) {
-			t.Errorf("the page has no link to /tasks/items/t-mom with the title Call mom:\n%s", page)
+		var list siren.Entity
+		if err := json.Unmarshal([]byte(page), &list); err != nil {
+			t.Fatalf("the answer is no entity: %v\n%s", err, page)
 		}
-		round := `<form method="POST" action="/tasks/items/t-mom/complete" class="round">`
-		if !strings.Contains(page, round) {
-			t.Fatalf("the page has no round form %s:\n%s", round, page)
+		var mom *siren.Link
+		for i, l := range list.Entities {
+			if l.Href == "/tasks/items/t-mom" {
+				mom = &list.Entities[i]
+			}
+		}
+		if mom == nil || mom.Title != "Call mom" {
+			t.Fatalf("the list has no link to /tasks/items/t-mom with the title Call mom:\n%s", page)
+		}
+		if len(mom.Actions) != 1 || mom.Actions[0].Name != "complete-task" || mom.Actions[0].Method != "POST" || mom.Actions[0].Href != "/tasks/items/t-mom/complete" {
+			t.Fatalf("the actions of the row are %+v, want complete-task, POST /tasks/items/t-mom/complete", mom.Actions)
 		}
 		if strings.Contains(strings.ToLower(page), "ticktick") {
-			t.Errorf("the page names the service:\n%s", page)
+			t.Errorf("the answer names the service:\n%s", page)
 		}
 
-		// The owner posts the form of the row: a browser POST is answered with a redirect, and TickTick has the task done.
-		post, err := http.NewRequestWithContext(t.Context(), "POST", s.base+"/tasks/items/t-mom/complete", nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		post.Header.Set("Accept", "text/html")
-		noFollow := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
-		done, err := noFollow.Do(post)
-		if err != nil {
-			t.Fatal(err)
-		}
-		done.Body.Close()
-		if done.StatusCode != http.StatusSeeOther {
-			t.Errorf("the form answered %d, want 303", done.StatusCode)
+		// The owner posts the action of the row: the core answers the entity with 200, and TickTick has the task done.
+		done, _ := post(t, s, "/tasks/items/t-mom/complete")
+		if done.StatusCode != http.StatusOK {
+			t.Errorf("the action answered %d, want 200", done.StatusCode)
 		}
 		if mom, _ := fake.byTitle("Call mom"); mom.Status != 2 {
 			t.Errorf("Call mom in TickTick has status %d, want 2", mom.Status)
@@ -604,7 +614,7 @@ func holdsTheWholeLine(t *testing.T, b bins, noCompleted bool) {
 		}
 	})
 
-	t.Run("an error page does not name the task manager", func(t *testing.T) {
+	t.Run("an error does not name the task manager", func(t *testing.T) {
 		fake.mu.Lock()
 		fake.failRead = true
 		fake.mu.Unlock()
@@ -619,22 +629,22 @@ func holdsTheWholeLine(t *testing.T, b bins, noCompleted bool) {
 			t.Fatalf("status %d, want an error", res.StatusCode)
 		}
 		if !strings.Contains(page, "the task manager answered 500") {
-			t.Errorf("the error page lacks the words of the status:\n%s", page)
+			t.Errorf("the error lacks the words of the status:\n%s", page)
 		}
 		if strings.Contains(strings.ToLower(page), "ticktick") {
-			t.Errorf("the error page names the task manager:\n%s", page)
+			t.Errorf("the error names the task manager:\n%s", page)
 		}
 	})
 }
 
-// get reads a page as a browser does and returns the response and its body.
+// get reads a resource as a Siren client does and returns the response and its body.
 func get(t *testing.T, s *server, path string) (*http.Response, string) {
 	t.Helper()
 	req, err := http.NewRequestWithContext(t.Context(), "GET", s.base+path, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	req.Header.Set("Accept", "text/html")
+	req.Header.Set("Accept", "application/vnd.siren+json")
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatal(err)
@@ -644,14 +654,14 @@ func get(t *testing.T, s *server, path string) (*http.Response, string) {
 	return res, string(raw)
 }
 
-// post sends a form as a browser does and returns the response and its body, with no redirect followed.
+// post sends an action as a Siren client does and returns the response and its body.
 func post(t *testing.T, s *server, path string) (*http.Response, string) {
 	t.Helper()
 	req, err := http.NewRequestWithContext(t.Context(), "POST", s.base+path, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	req.Header.Set("Accept", "text/html")
+	req.Header.Set("Accept", "application/vnd.siren+json")
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatal(err)

@@ -20,12 +20,13 @@ import (
 func TestLoopbackAddress(t *testing.T) {
 	for _, tc := range []struct{ input, want string }{
 		{"127.0.0.1:7777", "127.0.0.1:7777"}, {"127.2.3.4:0", "127.2.3.4:0"}, {"localhost:0", "127.0.0.1:0"}, {"LOCALHOST:7777", "127.0.0.1:7777"}, {"[::1]:0", "[::1]:0"},
+		{"[0:0::1]:007", "[0:0::1]:7"}, // a long IPv6 form and a port with zeros: the host stays as it is typed
 	} {
 		if got, err := api.LoopbackAddress(tc.input); err != nil || got != tc.want {
 			t.Errorf("LoopbackAddress(%q) = %q, %v; want %q", tc.input, got, err, tc.want)
 		}
 	}
-	for _, addr := range []string{"", ":7777", "0.0.0.0:7777", "[::]:7777", "192.0.2.1:7777", "custom.invalid:7777", "localhoſt:7777", "localhost:http", "localhost:65536", "localhost:-1", "localhost:+1", "localhost.", "[::1%zone]:7777", "[localhost]:7777", "127.0.0.1", "localhost:"} {
+	for _, addr := range []string{"", ":7777", "0.0.0.0:7777", "[::]:7777", "192.0.2.1:7777", "custom.invalid:7777", "localhoſt:7777", "localhost:http", "localhost:65536", "localhost:-1", "localhost:+1", "localhost.", "[::1%zone]:7777", "[localhost]:7777", "127.0.0.1", "localhost:", "[127.0.0.1]:7777", "::1:7777"} {
 		if got, err := api.LoopbackAddress(addr); err == nil || !strings.Contains(err.Error(), "serve address") {
 			t.Errorf("LoopbackAddress(%q) = %q, %v; want the refusal", addr, got, err)
 		}
