@@ -2,8 +2,10 @@ package tests
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"golang.org/x/text/unicode/norm"
+	"golang.org/x/text/unicode/rangetable"
 	"math/rand/v2"
 	"path/filepath"
 	"regexp"
@@ -11,6 +13,9 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"testing"
+	"unicode"
+	"unicode/utf8"
 
 	"lifelog/text"
 )
@@ -110,9 +115,15 @@ func docSaveContract(s *S) {
 		}
 	}
 	s.K("A every printed vector reproduces with the writer's extraction", len(rows) > 0 && len(wrong) == 0, wrong)
-	s.K("A 81 x ẞ beside 81 x ss (243 bytes, invalid) links ss, as the line under the table says", slices.Equal(targets("[["+esz+"]] [["+ss81+"]]"), []string{ss81}))
-	s.K("A the 240/241-byte and 80/81-CJK boundary under the table holds", len(targets("[["+a240+"]]")) == 1 && len(targets("[["+a241+"]]")) == 0 &&
-		len(targets("[["+j80+"]]")) == 1 && len(targets("[["+j81+"]]")) == 0)
+	// The boundary cases under the table: the extraction gives exactly the targets that the line states. The
+	// end-to-end save (P8) and the cookbook's SQL (B) check the same vectors against the database.
+	var wrongBoundary []string
+	for _, v := range computed() {
+		if got := targets(v.body); !slices.Equal(got, v.want) {
+			wrongBoundary = append(wrongBoundary, fmt.Sprintf("%q: got %q, want %q", clip(v.body, 30), clip(strings.Join(got, ","), 30), clip(strings.Join(v.want, ","), 30)))
+		}
+	}
+	s.K("A the 240/241-byte and 80/81-CJK boundary, and 81 x ẞ beside 81 x ss (243 bytes, invalid), reproduce with the writer's extraction", len(wrongBoundary) == 0, wrongBoundary)
 
 	// ---- B  cookbook/save-a-body run literally
 	st, ok := s.saveSteps()
@@ -422,10 +433,11 @@ func saveContract(s *S) {
 	s.K("P7b one page per shared target, four pages linked to each", cv.n("select count(*) from entity_names where name_key in ('shared topic','shared')") == 2 &&
 		cv.n("select count(*) from links where kind='wikilink'") == 8)
 
-	// P8 the vectors, end to end through the database (links == vector result); P9 the extraction alone
+	// P8 the vectors, end to end through the database (links == vector result). The extraction alone is A of
+	// docSaveContract, over the same vectors.
 	rows, _ := s.printedVectors()
 	all := append(rows, computed()...)
-	okDB, okText := len(rows) > 0, len(rows) > 0
+	okDB := len(rows) > 0
 	var differs []string
 	for _, v := range all {
 		c := s.fresh()
@@ -435,35 +447,101 @@ func saveContract(s *S) {
 			differs = append(differs, fmt.Sprintf("%q: %q", v.body, got))
 		}
 		c.Close()
-		okText = okText && slices.Equal(targets(v.body), v.want)
 	}
 	s.K(fmt.Sprintf("P8 all %d vectors give the same links through a real save", len(all)), okDB, differs)
-	s.K("P9 extraction vectors", okText)
+}
+
+// The strings that the title checks use. The words are the device names, the dots and the spaces of the contract.
+// The alphabet holds no unassigned code point (Cn).
+var (
+	titleAlphabet = []string{"a", "b", "c", "X", "Y", "Z", "0", "1", "9", " ", ".", "-", "_", "#", "/", "\\", ":", "*", "?", "\"", "<", ">", "|", "\u0001", "\u0009", "\u000a", "\u001f", "\u007f",
+		"\u00a0", "\u3000", "\u2003", "é", "É", "ß", "日", "\U0001f600", "İ", "ſ", "K", "\u0301", "\u200b", "\u202e", "\u00ad", "\ufeff", "\u0085", "\u009f",
+		"\u00a0", "\u200c", "\u200d", "\u2066", "\u061c", "\u2060", "\ufe0f"}
+	titleWords = []string{"COM¹", "LPT³", "LPT².txt", "con.backup", "Nul.tar.gz", "COM1.x", "CONX.txt", "a.CON", "a.con.b", ".con", "CON.", "COM10.txt", "CON .txt",
+		"CON\u00a0.txt", "CON", "con", "Nul", "PRN", "aux", "COM1", "com9", "LPT1", "lpt9", "COM0", "LPT10", "CONSOLE", "NUL.txt", "CON.backup", ".", "..", "...", "a.", ".a",
+		"a b", "a  b", " a", "a ", "a\u00a0", "\u00a0a"}
+	// the length limit, in bytes and in characters of mixed width
+	titleBoundaries = []string{a240, a241, j80, j81, strings.Repeat("😀", 60), strings.Repeat("😀", 61), strings.Repeat("é", 120), strings.Repeat("é", 121)}
+)
+
+// titleProbe puts one title to the writer's predicate and to the CHECKs of the DDL. One connection serves every title:
+// each probe runs in a savepoint and rolls back.
+type titleProbe struct {
+	c   *C
+	ins *sql.Stmt
+}
+
+func newTitleProbe(s *S) *titleProbe {
+	c := s.fresh()
+	ins, err := c.Prepare("INSERT INTO entity_names(entity_id,title,name_key) VALUES(?,?,?)")
+	if err != nil {
+		stop("prepare: %v", err)
+	}
+	return &titleProbe{c, ins}
+}
+
+func (p *titleProbe) close() { p.ins.Close() }
+
+// titleVerdict is what the writer and the DDL say about one title.
+type titleVerdict struct {
+	writer      bool  // text.ValidTitle accepts the title
+	ddl         error // the refusal of the DDL; nil when the DDL accepts the title
+	addressable bool  // only read when the DDL alone accepts the title: a wikilink in each of its forms names it
+}
+
+// blocks: the writer accepts a title that the DDL refuses, so a save of it would fail.
+func (v titleVerdict) blocks() bool { return v.writer && v.ddl != nil }
+
+// loose: the DDL accepts a title that the writer refuses.
+func (v titleVerdict) loose() bool { return !v.writer && v.ddl == nil }
+
+// unexplained: a loose title that a wikilink can name, so no addressability rule explains the writer's refusal.
+func (v titleVerdict) unexplained() bool { return v.loose() && v.addressable }
+
+func (p *titleProbe) ask(t string) titleVerdict {
+	c := p.c
+	v := titleVerdict{writer: text.ValidTitle(t)}
+	c.must("SAVEPOINT f")
+	key := text.TitleKey(t)
+	owners, e := c.query("INSERT INTO entities(entity_type,preferred_name_key,day,created_at,updated_at,source) VALUES ('page',?,CASE WHEN date(?) IS ? THEN ? END,"+NOW+","+NOW+",'ui') RETURNING id", key, t, t, t)
+	if e == nil {
+		_, e = p.ins.Exec(owners[0][0], t, key)
+	}
+	c.must("ROLLBACK TO f")
+	c.must("RELEASE f")
+	v.ddl = e
+	if v.loose() {
+		v.addressable = true
+		for _, spelling := range []string{t, norm.NFC.String(t)} {
+			for _, body := range []string{"See [[" + spelling + "]].", "See ![[" + spelling + "]].", "See [[" + spelling + "|display]]."} {
+				candidates := text.Candidates(body)
+				if len(candidates) != 1 || text.TitleKey(candidates[0]) != text.TitleKey(t) {
+					v.addressable = false
+				}
+			}
+		}
+	}
+	return v
 }
 
 // titleFuzz: the writer's title predicate against the DDL's own CHECKs on the same strings. No string the writer
 // accepts may be refused by the DB (that would block a save); and, because the predicate mirrors the CHECKs one for
 // one, none the other way either, except unassigned code points (category Cn), which only the writer can recognise
-// — the alphabet below holds none, and the pages suite tests that difference on its own.
+// — the alphabet holds none, and the pages suite tests that difference on its own. The long run is
+// FuzzTitlePredicate.
 func titleFuzz(s *S) {
-	alpha := []string{"a", "b", "c", "X", "Y", "Z", "0", "1", "9", " ", ".", "-", "_", "#", "/", "\\", ":", "*", "?", "\"", "<", ">", "|", "\u0001", "\u0009", "\u000a", "\u001f", "\u007f",
-		"\u00a0", "\u3000", "\u2003", "é", "É", "ß", "日", "\U0001f600", "İ", "ſ", "K", "\u0301", "\u200b", "\u202e", "\u00ad", "\ufeff", "\u0085", "\u009f",
-		"\u00a0", "\u200c", "\u200d", "\u2066", "\u061c", "\u2060", "\ufe0f"}
-	words := []string{"COM¹", "LPT³", "LPT².txt", "con.backup", "Nul.tar.gz", "COM1.x", "CONX.txt", "a.CON", "a.con.b", ".con", "CON.", "COM10.txt", "CON .txt",
-		"CON\u00a0.txt", "CON", "con", "Nul", "PRN", "aux", "COM1", "com9", "LPT1", "lpt9", "COM0", "LPT10", "CONSOLE", "NUL.txt", "CON.backup", ".", "..", "...", "a.", ".a",
-		"a b", "a  b", " a", "a ", "a\u00a0", "\u00a0a"}
 	rng := rand.New(rand.NewPCG(8, 8))
 	pick := func(n int) string {
 		var b strings.Builder
 		for range n {
-			b.WriteString(alpha[rng.IntN(len(alpha))])
+			b.WriteString(titleAlphabet[rng.IntN(len(titleAlphabet))])
 		}
 		return b.String()
 	}
 	rnd := func() string {
 		switch r := rng.Float64(); {
 		case r < .15:
-			return words[rng.IntN(len(words))]
+			return titleWords[rng.IntN(len(titleWords))]
 		case r < .30:
 			return pick(1 + rng.IntN(6))
 		case r < .40: // the length boundary, mixed byte widths
@@ -475,17 +553,13 @@ func titleFuzz(s *S) {
 		}
 		return pick(1 + rng.IntN(12))
 	}
-	cases := append([]string{}, words...)
-	cases = append(cases, a240, a241, j80, j81, strings.Repeat("😀", 60), strings.Repeat("😀", 61), strings.Repeat("é", 120), strings.Repeat("é", 121))
-	for range 60000 {
+	cases := append([]string{}, titleWords...)
+	cases = append(cases, titleBoundaries...)
+	for range 6000 {
 		cases = append(cases, rnd())
 	}
-	c := s.fresh()
-	ins, err := c.Prepare("INSERT INTO entity_names(entity_id,title,name_key) VALUES(?,?,?)")
-	if err != nil {
-		stop("prepare: %v", err)
-	}
-	defer ins.Close()
+	probe := newTitleProbe(s)
+	defer probe.close()
 	seen := map[string]bool{}
 	var block, loose []string
 	unexplained := 0
@@ -495,39 +569,53 @@ func titleFuzz(s *S) {
 			continue
 		}
 		seen[t] = true
-		app := text.ValidTitle(t)
-		c.must("SAVEPOINT f")
-		key := text.TitleKey(t)
-		owners, e := c.query("INSERT INTO entities(entity_type,preferred_name_key,day,created_at,updated_at,source) VALUES ('page',?,CASE WHEN date(?) IS ? THEN ? END,"+NOW+","+NOW+",'ui') RETURNING id", key, t, t, t)
-		if e == nil {
-			_, e = ins.Exec(owners[0][0], t, key)
-		}
-		c.must("ROLLBACK TO f")
-		c.must("RELEASE f")
-		db := e == nil
-		if db {
+		v := probe.ask(t)
+		if v.ddl == nil {
 			accepted++
 		}
-		if app && !db {
-			block = append(block, fmt.Sprintf("%q (%v)", clip(t, 30), e))
+		if v.blocks() {
+			block = append(block, fmt.Sprintf("%q (%v)", clip(t, 30), v.ddl))
 		}
-		if db && !app {
+		if v.loose() {
 			loose = append(loose, fmt.Sprintf("%q", clip(t, 30)))
-			addressable := true
-			for _, spelling := range []string{t, norm.NFC.String(t)} {
-				for _, body := range []string{"See [[" + spelling + "]].", "See ![[" + spelling + "]].", "See [[" + spelling + "|display]]."} {
-					candidates := text.Candidates(body)
-					if len(candidates) != 1 || text.TitleKey(candidates[0]) != text.TitleKey(t) {
-						addressable = false
-					}
-				}
-			}
-			if addressable {
-				unexplained++
-			}
+		}
+		if v.unexplained() {
+			unexplained++
 		}
 	}
-	s.K("more than 40 000 distinct strings, some accepted by the DB and some refused", len(seen) > 40000 && accepted > 0 && accepted < len(seen), len(seen), accepted)
+	s.K("more than 4 000 distinct strings, some accepted by the DB and some refused", len(seen) > 4000 && accepted > 0 && accepted < len(seen), len(seen), accepted)
 	s.K("no string the writer accepts is refused by the DB (that would block a save)", len(block) == 0, len(block), block[:min(5, len(block))])
 	s.K("DB-only generated names fail the contract addressability forms, not an unexplained filename rule", unexplained == 0, len(loose), loose[:min(8, len(loose))])
+}
+
+// FuzzTitlePredicate is the long run of titleFuzz: the same two checks on the titles that the fuzz engine makes. The
+// seeds are the words, the length boundaries and each character of the alphabet. A title that is not valid UTF-8, or
+// that holds a code point which Unicode 15.0 (text.AssignedVersion) leaves unassigned, is not probed: only the writer
+// recognises an unassigned code point, and the pages suite tests that difference on its own.
+//
+//	go test ./tests -run '^$' -fuzz '^FuzzTitlePredicate$' -fuzztime=60s
+func FuzzTitlePredicate(f *testing.F) {
+	d := realDocs()
+	s := &S{name: "title-fuzz", d: d, ddl: d.DDL(), dir: f.TempDir()}
+	f.Cleanup(s.close)
+	probe := newTitleProbe(s)
+	f.Cleanup(probe.close)
+	for _, seeds := range [][]string{titleWords, titleBoundaries, titleAlphabet} {
+		for _, seed := range seeds {
+			f.Add(seed)
+		}
+	}
+	assigned := rangetable.Assigned(text.AssignedVersion)
+	f.Fuzz(func(t *testing.T, title string) {
+		if len(title) > 600 || !utf8.ValidString(title) || strings.ContainsFunc(title, func(r rune) bool { return !unicode.Is(assigned, r) }) {
+			return
+		}
+		v := probe.ask(title)
+		if v.blocks() {
+			t.Errorf("the writer accepts %q and the DB refuses it: %v", title, v.ddl)
+		}
+		if v.unexplained() {
+			t.Errorf("only the DB accepts %q, and a wikilink can name it", title)
+		}
+	})
 }

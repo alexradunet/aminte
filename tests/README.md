@@ -56,14 +56,14 @@ the document (a broken block makes a later step impossible) reports that as one 
 | `imports_test.go` | `imports` | the import block of contract/imports on 1 000 CSV rows, and its traps |
 | `snapshots_test.go` | `snapshots` | cookbook/take-a-snapshot on a live file: `VACUUM INTO` through a read-only connection while the writer writes, its target, the restore check left byte for byte, the restore and the old `-wal` beside it (D25) |
 | `evolution_test.go` | `evolution` | named CHECKs, widening, partial dates, the tokenizer switch, reader compatibility, a generated column that leaves the file once the partial index that names it is dropped, comments inside statements (D13, D17, architecture/non-goals) |
-| `streak_test.go` | `streaks` | cookbook/streaks run literally on hand-checked days: a run of 3 ending today after a gap and an earlier run of 12 is 3; the run ends yesterday when today has no words; an empty page, a tombstone and an earlier run do not count; the look back stops at 3660 days |
+| `streak_test.go` | `streaks` | cookbook/streaks run literally on hand-checked days: a run of 3 ending today after a gap and an earlier run of 12 is 3; the run ends yesterday when today has no words; an empty page, a tombstone and an earlier run do not count; the look back stops at 3660 days (the run of 3661 days is one labelled bulk insert, compared with the rows of `dayPage`) |
 | `cookbook_test.go` | `cookbook` | measurement lifecycle and recorded-time cutoffs; every cookbook block prepares and runs, on a plain and on a hardened connection; every block that only reads runs on a reader (`mode=ro`, `trusted_schema=OFF`) |
 | `document_test.go` | `document` | the 2075 test, the `lifelog_meta` rows name only what the file has, the stored `CREATE` texts name only registered link kinds, the rules live in the file, the tree holds together (one record per decision, every relative link and anchor resolves, every page reachable from `docs/README.md`), the totals in `schema/README.md` |
-| `diagrams_test.go` | `diagrams` | the eight mermaid diagrams say what the DDL says (keys, relationships, the link map, the correction story, the capture key) |
+| `diagrams_test.go` | `diagrams` | the mermaid diagrams of the docs say what the DDL says (keys, relationships, the link map, the correction story, the capture key) |
 | `wikilinks_test.go` | `doc-save-contract` | the save contract as the docs print it: the vector table of contract/titles-and-wikilinks, cookbook/save-a-body run literally (and equal to a writer's own save after 400 random edits), a full file at `SAVEPOINT` or `RELEASE` that fails the save (and the links a save loses when it goes on), cookbook/backlinks |
 | | `save-contract` | the save contract through a writer's own save against the DDL: invalid targets, the `SAVEPOINT` backstop, set equality, ordinary REDIRECT prose, revival, 400 random edits against a rebuild, 4 concurrent writers, every vector |
-| | `title-fuzz` | writer acceptance is a subset of the DDL's filename checks over 60 000 generated strings; DB-only names independently fail reference addressability |
-| `mutants_test.go` | `TestMutants` | 284 broken copies of the docs tree, one rule each; a completed owning suite must fail the mutant's explicit rule witness |
+| | `title-fuzz`, `FuzzTitlePredicate` | writer acceptance is a subset of the DDL's filename checks over 6 000 generated strings, and over the strings of the fuzz target; DB-only names independently fail reference addressability |
+| `mutants_test.go` | `TestMutants` | broken copies of the docs tree, one rule each; a completed owning suite must fail the mutant's explicit rule witness; `-v` logs how many there are |
 | `render_test.go` | `TestMermaidRender` | optional: every diagram renders |
 | `kit_test.go`, `suites_test.go` | | reading the tree (a page, the cookbook blocks by recipe key, an overlay of broken files for a mutant); fresh databases and the insert conventions (entity first, `RETURNING`, named entities); the runner |
 
@@ -91,6 +91,9 @@ The graph model runs three deterministic 160-operation sequences in the baseline
 minimizable byte-encoded operations, caps each input at 64 transitions, and creates a fresh hardened file for every
 input. Seeds run normally; a campaign is explicit:
 `go test ./tests -run '^$' -fuzz '^FuzzGraphTransitions$' -fuzztime=30s -parallel=2`.
+The title fuzz target `FuzzTitlePredicate` holds the long run of `title-fuzz`: its seeds are the word list, the length
+boundaries and the alphabet of the suite, and they run normally. A campaign is explicit:
+`go test ./tests -run '^$' -fuzz '^FuzzTitlePredicate$' -fuzztime=60s`.
 The temporal model compares 40 correction chains at 17 clock cutoffs with independent insertion-order histories.
 These bounded models supplement the contract's literal vectors and rule mutants; agreement does not prove every
 possible input or SQLite version correct.

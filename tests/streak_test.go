@@ -1,6 +1,9 @@
 package tests
 
-import "time"
+import (
+	"strings"
+	"time"
+)
 
 // streaks: cookbook/streaks run literally on hand-checked days. The answer is the run of day pages with words that
 // ends today, or yesterday when today has no words yet; an earlier run, a gap, an empty page, a tombstone and a day
@@ -64,7 +67,24 @@ func streaks(s *S) {
 	c.must("UPDATE entities SET deleted_at="+NOW+" WHERE is_journal AND day=?", back(2))
 	s.K("a tombstoned day page breaks the run: today, yesterday and the day before count 2", answer(c) == "2|1", answer(c))
 
+	// BULK SETUP: 3661 days in a row, the look back stops at 3660 days. One statement writes all the entities and one
+	// writes their names, in one transaction, in place of one savepoint for each day (1.1 s against 0.1 s). The rows
+	// are those of dayPage, and the K below compares them on a sample of days.
 	c = s.fresh()
-	run(c, 0, 3660) // 3661 days in a row: the look back stops at 3660 days
+	c.must("BEGIN IMMEDIATE")
+	c.must(`WITH RECURSIVE d(n) AS (SELECT 0 UNION ALL SELECT n + 1 FROM d WHERE n < 3660)
+		INSERT INTO entities(entity_type, preferred_name_key, day, created_at, updated_at, source, body)
+		SELECT 'page', date(?, '-' || n || ' days'), date(?, '-' || n || ' days'), '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z', 'ui', 'Synthetic words.' FROM d`, today, today)
+	c.must("INSERT INTO entity_names(entity_id, title, name_key) SELECT id, preferred_name_key, preferred_name_key FROM entities WHERE is_journal")
+	c.must("COMMIT")
+	sample, days := s.fresh(), []string{}
+	for _, n := range []int{0, 1, 59, 1830, 3659, 3660} {
+		sample.dayPage(back(n), "Synthetic words.")
+		days = append(days, "'"+back(n)+"'")
+	}
+	rows := func(c *C) string {
+		return c.tab("SELECT e.entity_type, e.preferred_name_key, e.day, e.body, e.source, e.created_at, e.updated_at, e.revision, e.deleted_at, n.title, n.name_key FROM entities e JOIN entity_names n ON n.entity_id = e.id WHERE e.day IN (" + strings.Join(days, ",") + ") ORDER BY e.day")
+	}
+	s.K("the bulk insert writes the rows of dayPage: 3661 day pages, and the same columns on six days of the run", c.n("SELECT count(*) FROM entities WHERE is_journal") == 3661 && c.n("SELECT count(*) FROM entity_names n JOIN entities e ON e.id = n.entity_id WHERE e.is_journal") == 3661 && rows(c) == rows(sample) && rows(sample) != "", rows(c), rows(sample))
 	s.K("a run longer than the look back reads as 3660", answer(c) == "3660|1", answer(c))
 }

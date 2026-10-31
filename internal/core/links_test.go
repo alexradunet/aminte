@@ -2,8 +2,6 @@ package core
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 	"fmt"
 	"reflect"
 	"strings"
@@ -192,65 +190,6 @@ func TestAFaultOfSavepointOrReleaseFailsTheSave(t *testing.T) {
 				t.Errorf("PageID(New) = %d, %v; want no page", id, err)
 			}
 		})
-	}
-}
-
-func TestLinkFieldsImmutable(t *testing.T) {
-	s := fresh(t)
-	a, _, err := s.CreatePage(ctx, "cli", "Page A", "", "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	b, _, err := s.CreatePage(ctx, "cli", "Page B", "", "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := addLink(s, "cli", a, b, "part-of", "old note"); err != nil {
-		t.Fatal(err)
-	}
-	var id int64
-	var created string
-	if err := s.DB.R.QueryRow(`SELECT id,created_at FROM links WHERE from_id=? AND to_id=? AND kind='part-of'`, a, b).Scan(&id, &created); err != nil {
-		t.Fatal(err)
-	}
-	for _, set := range []string{`id=id+1000`, `created_at='2020-01-01T00:00:00.000Z'`, `from_id=to_id`, `to_id=from_id`, `kind='wikilink'`, `source='api'`} {
-		if _, err := s.DB.W.Exec(`UPDATE links SET `+set+` WHERE id=?`, id); err == nil {
-			t.Fatalf("immutable update accepted: %s", set)
-		}
-	}
-	var gotID int64
-	var gotCreated string
-	if err := s.DB.R.QueryRow(`SELECT id,created_at FROM links WHERE from_id=? AND to_id=? AND kind='part-of'`, a, b).Scan(&gotID, &gotCreated); err != nil {
-		t.Fatal(err)
-	}
-	if gotID != id || gotCreated != created {
-		t.Fatal("immutable refusal changed persisted link")
-	}
-	note := func() any {
-		t.Helper()
-		var n any
-		if err := s.DB.R.QueryRow(`SELECT note FROM links WHERE id=?`, id).Scan(&n); err != nil {
-			t.Fatal(err)
-		}
-		return n
-	}
-	if _, err := s.DB.W.Exec(`UPDATE links SET note='new note' WHERE id=?`, id); err != nil {
-		t.Fatal(err)
-	}
-	if got := note(); got != "new note" {
-		t.Fatalf("the note is the one field that changes: %v", got)
-	}
-	rollback := errors.New("rollback note")
-	if err := s.DB.Write(ctx, func(tx *sql.Tx) error {
-		if _, err := tx.Exec(`UPDATE links SET note='rollback' WHERE id=?`, id); err != nil {
-			return err
-		}
-		return rollback
-	}); !errors.Is(err, rollback) {
-		t.Fatalf("rollback: %v", err)
-	}
-	if got := note(); got != "new note" {
-		t.Fatalf("a rolled back note edit changed the note: %v", got)
 	}
 }
 

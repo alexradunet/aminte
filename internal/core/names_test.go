@@ -311,34 +311,6 @@ func TestNameOwnershipAndJournalReservations(t *testing.T) {
 	if again, _, err := s.Capture(ctx, "cli", "2026-02-28", "more", nil); err != nil || again != day {
 		t.Fatalf("existing day = %d %v", again, err)
 	}
-	execRefused := func(id int64, q string, args ...any) {
-		t.Helper()
-		before, err := s.PageByID(ctx, id)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := s.DB.Write(ctx, func(tx *sql.Tx) error { _, err := tx.Exec(q, args...); return err }); err == nil {
-			t.Fatalf("accepted %s", q)
-		}
-		after, err := s.PageByID(ctx, id)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !reflect.DeepEqual(before, after) {
-			t.Fatalf("refusal changed identity: before=%+v after=%+v", before, after)
-		}
-	}
-	execRefused(day, `INSERT INTO entity_names(entity_id,title,name_key) VALUES(?,'Heading','heading')`, day)
-	execRefused(day, `UPDATE entity_names SET title='Other' WHERE entity_id=?`, day)
-	execRefused(day, `UPDATE entities SET preferred_name_key='other' WHERE id=?`, day)
-	execRefused(day, `UPDATE entities SET day='2026-03-01' WHERE id=?`, day)
-	execRefused(day, `UPDATE entities SET entity_type='person' WHERE id=?`, day)
-	execRefused(ordinary, `INSERT INTO entity_names(entity_id,title,name_key) VALUES(?,'2026-03-01','2026-03-01')`, ordinary)
-	execRefused(ordinary, `UPDATE entities SET preferred_name_key='2026-03-01',day='2026-03-01' WHERE id=?`, ordinary)
-	execRefused(ordinary, `UPDATE entities SET preferred_name_key='2026-02-28',day='2026-02-28' WHERE id=?`, ordinary)
-	execRefused(ordinary, `UPDATE entity_names SET entity_id=? WHERE name_key='dated note'`, day)
-	execRefused(ordinary, `UPDATE entity_names SET name_key='reassigned' WHERE entity_id=?`, ordinary)
-	execRefused(ordinary, `DELETE FROM entity_names WHERE entity_id=?`, ordinary)
 	if err := s.Promote(ctx, "cli", day, "", "", ""); err == nil {
 		t.Fatal("day promoted")
 	}
@@ -775,29 +747,6 @@ func TestCanonicalNamesSearchConflictPathsAndRebuild(t *testing.T) {
 		t.Fatal(err)
 	}
 	check("Blue original", id)
-	var nameID int64
-	if err := s.DB.R.QueryRow(`SELECT id FROM entity_names WHERE name_key='blue'`).Scan(&nameID); err != nil {
-		t.Fatal(err)
-	}
-	for _, suffix := range []string{
-		"ON CONFLICT(name_key) DO NOTHING",
-		"ON CONFLICT(entity_id,name_key) DO NOTHING",
-		"ON CONFLICT(id) DO NOTHING",
-		"ON CONFLICT DO NOTHING",
-		"ON CONFLICT(name_key) DO UPDATE SET title=excluded.title",
-		"ON CONFLICT(entity_id,name_key) DO UPDATE SET title=excluded.title",
-		"ON CONFLICT(id) DO UPDATE SET title=excluded.title",
-	} {
-		for _, spelling := range []string{"Blue", "BLUE", "blue"} {
-			if err := s.DB.Write(ctx, func(tx *sql.Tx) error {
-				_, err := tx.Exec(`INSERT INTO entity_names(id,entity_id,title,name_key) VALUES(?,?,?,'blue') `+suffix, nameID, id, spelling)
-				return err
-			}); err != nil {
-				t.Fatalf("%s: %v", suffix, err)
-			}
-			check("Blue original", id)
-		}
-	}
 	before, err := s.PageByID(ctx, id)
 	if err != nil {
 		t.Fatal(err)

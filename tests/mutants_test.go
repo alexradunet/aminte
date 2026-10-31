@@ -3,7 +3,7 @@ package tests
 // A suite that cannot fail proves nothing. Each mutant is the docs tree with one rule broken — in schema.sql, in a
 // cookbook block or in the text of a page — and the suite that owns the rule must notice: it must run to its end
 // and fail its explicitly named rule witness (stopping on the broken document is not "noticed"). Every suite named
-// here must first pass on the unmutated document. A new rule gets a mutant here (tests/README.md keeps the count).
+// here must first pass on the unmutated document. A new rule gets a mutant here.
 
 import (
 	"fmt"

@@ -365,13 +365,13 @@ won>.`
   the `diagrams` suite: the ER diagrams draw tables, key columns and foreign keys only, and the link map must
   equal `link_kinds`. Each diagram starts with a `%% diagram: <id>` line; keep to `erDiagram`, `flowchart`
   and `stateDiagram-v2` with quoted labels. A new concept gets a diagram before it gets a paragraph (the working
-  agreement above says why); a new diagram in `docs/` is counted in `tests/README.md`.
+  agreement above says why).
 - **Suites change with the docs, never to make them pass.** The suites are grouped by subject
   (`tests/README.md`). If a suite must change because the docs legitimately changed, change it in
   the same edit and say so in the commit message — a suite loosened to pass proves nothing, and
   `tests/` is validation, not a migration runner. A new cross-table rule needs a `lifelog_meta` key and
   a row in the 2075 table of the [threat model](docs/contract/threat-model.md); a new rule of any kind gets a mutant in
-  `tests/mutants_test.go`. Keep the counts in `tests/README.md` (diagrams, mutants) true.
+  `tests/mutants_test.go`.
 - **Current truth and nothing else** in every folder of `docs/` except `issues/`, `rfcs/` and `plans/`, which are
   dated records: no review rounds, validation records, addenda, "superseded" notes, finding ids, version narrative
   or changelog. When a decision changes, rewrite it in place —
