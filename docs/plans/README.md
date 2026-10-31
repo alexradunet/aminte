@@ -8,7 +8,7 @@ Earlier closed plans live in git history (`git log -- docs/plans`). The next pla
 
 | Plan | Title | Priority | Effort | Depends on | Status |
 |------|-------|----------|--------|------------|--------|
-| [161](161-the-browser-as-an-extension.md) | The browser as an extension: a core with no HTML | P2 | XL | owner word 2026-10-31; plan 135; `4899fbe` | BUILT, NOT LIVE |
+| [161](161-the-browser-as-an-extension.md) | The browser as an extension: a core with no HTML | P2 | XL | owner word 2026-10-31; plan 135; `4899fbe` | DONE |
 | [160](160-the-lock.md) | The lock: a journal left open closes itself | P2 | M | owner word 2026-10-30; `ff0f1c7`; A `6d43b9e`, B `6f665f3`, review `c926d91` | LIVE 2026-10-30 |
 | [159](159-the-class-of-an-action.md) | The class of an action: the browser places an action by what it does, not by where Siren lists it | P2 | L | owner word 2026-10-30; plan 157; `5046b38`; A `016adb5`, C `57016f9`, B1 `8c865ad`, B2 `1124bdf` | LIVE 2026-10-30 (`9d0e15f`; not seen in a browser) |
 | [155](155-ticktick-the-first-connected-app.md) | TickTick: the first connected app, in this repo | P1 | M | owner word 2026-10-29; plan 154; `054138b`; live 2026-10-29 | IN REVIEW (owner) |

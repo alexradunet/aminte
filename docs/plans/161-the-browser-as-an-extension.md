@@ -9,10 +9,15 @@
 - **Priority:** P2. **Effort:** XL, in three stages. **Risk:** LOW for the file: nothing of `schema.sql` changes.
   HIGH for ring 2 and the service: the browser moves to a second process, the core loses `--public`, and the proxy
   points to a new port.
-- **Status:** BUILT, NOT LIVE. Stages 1, 2 and 3 are built and committed on the branch `plan-161-stage3`, and the
-  findings of both counter-reviews (Opus, 2026-10-31) are fixed. The live move (item 6 of stage 2) waits for the owner:
-  the new core refuses the line of the old unit, so the unit, the settings of the browser and the proxy change in one
-  step.
+- **Status:** DONE. Stages 1, 2 and 3 are built, and the findings of both counter-reviews (Opus, 2026-10-31) are
+  fixed. Live on 2026-10-31 at 19:33, built from `946c0c9`. The owner ran the move in one step: the service stopped;
+  the seven programs built into `/home/cico/.local/bin` (each old one kept as `.prev`); the one-off copy of the
+  settings of the browser; the drop-in `/etc/systemd/system/lifelog.service.d/plan-161.conf` (the new `ExecStart` with
+  `--with web`, `LIFELOG_WEB_LISTEN`, `LIFELOG_WEB_ORIGINS` and `ReadWritePaths` for `~/.config/lifelog-web`); the
+  start; and `tailscale serve --bg http://127.0.0.1:7780`. The log of the service: `serving ... on
+  http://127.0.0.1:7777 (token required)`, `with web: started`, `the browser is on http://127.0.0.1:7780`, `with web: a
+  catalog of 1 actions`, `with ticktick: the task service, 3 lists`. The owner logged in through the proxy and
+  confirmed that it works.
 
 | part | commit | what it holds | page time on a synthetic file (60 GETs, median) |
 |---|---|---|---|
