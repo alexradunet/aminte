@@ -9,7 +9,7 @@ import (
 	"log"
 	"net/http"
 	"net/http/httptest"
-	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -19,8 +19,6 @@ import (
 	"lifelog/siren"
 )
 
-const owner = "40712345678"
-
 // token is the bearer token of the owner, as both clients of the rig send it.
 const token = "owner-token"
 
@@ -29,8 +27,14 @@ const wait = 30 * time.Second
 
 var fixedNow = time.Date(2031, 5, 20, 9, 30, 0, 0, time.UTC)
 
-// page is a page of the fake API.
-type page struct {
+// today is the day that the fake API calls today, unless a test moves it (setToday).
+const today = "2031-05-20"
+
+// todayTitle is the title of the conversation page of that day.
+const todayTitle = "Conversation 2031-05-20"
+
+// fakePage is a page of the fake API.
+type fakePage struct {
 	id       int
 	title    string
 	body     string
@@ -47,16 +51,89 @@ type seen struct{ Method, Path, Source, Auth, Body string }
 type fakeAPI struct {
 	mu    sync.Mutex
 	reqs  []seen
-	pages []*page
+	pages []*fakePage
 	// sneak, when it is not empty, is added to the body of the page by someone else just before the next save
 	// (the version changes, so the save is stale). alwaysStale does it before every save.
 	sneak       string
 	alwaysStale bool
 	// the settings of the model, as GET /settings answers them (an empty value is absent)
 	modelURL, model, modelKey string
-	ownerNumber               string         // owner_number of the settings
 	extra                     []siren.Action // actions that a connected app added to the catalog
+	without                   []string       // actions that the catalog lacks
 	catalogFails              bool           // GET /actions answers 503
+	saveFails                 bool           // save-body answers 500
+	day                       string         // the local day of the server; "" is today
+	change                    chan struct{}  // closed at each change of a page
+}
+
+// notify tells the waiters that a page changed. The caller holds the lock.
+func (f *fakeAPI) notify() {
+	if f.change != nil {
+		close(f.change)
+	}
+	f.change = make(chan struct{})
+}
+
+// waitBody waits until cond is true of the body of the page, and returns the body. It waits for a change, not for a
+// time: the deadline is a guard against a deadlock.
+func (f *fakeAPI) waitBody(t *testing.T, title string, cond func(body string) bool) string {
+	t.Helper()
+	deadline := time.After(wait)
+	for {
+		f.mu.Lock()
+		body := ""
+		if p := f.find(title); p != nil {
+			body = p.body
+		}
+		if f.change == nil {
+			f.change = make(chan struct{})
+		}
+		ch := f.change
+		f.mu.Unlock()
+		if cond(body) {
+			return body
+		}
+		select {
+		case <-ch:
+		case <-deadline:
+			t.Fatalf("the page %q did not reach the awaited state; body %q", title, body)
+		}
+	}
+}
+
+// waitReplies waits until the page holds n replies of the agent.
+func (f *fakeAPI) waitReplies(t *testing.T, title string, n int) string {
+	t.Helper()
+	return f.waitBody(t, title, func(body string) bool { return strings.Count(body, "\n**lifelog** (") >= n })
+}
+
+// setToday moves the local day of the server.
+func (f *fakeAPI) setToday(day string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.day = day
+}
+
+// localDay is the local day of the server. The caller holds the lock.
+func (f *fakeAPI) localDay() string {
+	if f.day == "" {
+		return today
+	}
+	return f.day
+}
+
+// say adds a turn of the owner to the page of today, as the action say does: it makes the page on the first turn.
+func (f *fakeAPI) say(text string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	day := f.localDay()
+	p := f.find("Conversation " + day)
+	if p == nil {
+		p = &fakePage{id: len(f.pages) + 1, title: "Conversation " + day, body: "[[" + day + "]]", category: "Conversations", version: 1}
+		f.pages = append(f.pages, p)
+	}
+	p.body, p.version = p.body+"\n\n**Owner** (09:30): "+text, p.version+1
+	f.notify()
 }
 
 // addAction adds an action to the catalog, as a connected app does when it registers.
@@ -66,6 +143,13 @@ func (f *fakeAPI) addAction(a siren.Action) {
 	f.extra = append(f.extra, a)
 }
 
+// dropAction removes an action from the catalog.
+func (f *fakeAPI) dropAction(name string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.without = append(f.without, name)
+}
+
 // failCatalog makes GET /actions fail (or work again).
 func (f *fakeAPI) failCatalog(on bool) {
 	f.mu.Lock()
@@ -73,11 +157,11 @@ func (f *fakeAPI) failCatalog(on bool) {
 	f.catalogFails = on
 }
 
-// setOwnerNumber changes the owner's number in the settings, as the owner would in lifelog.
-func (f *fakeAPI) setOwnerNumber(n string) {
+// setSaveFails makes the save of a page fail (or work again).
+func (f *fakeAPI) setSaveFails(on bool) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.ownerNumber = n
+	f.saveFails = on
 }
 
 // setModel changes the settings, as the owner would in lifelog.
@@ -87,37 +171,53 @@ func (f *fakeAPI) setModel(url, name, key string) {
 	f.modelURL, f.model, f.modelKey = url, name, key
 }
 
-// today is the day that the fake API calls today.
-const today = "2031-05-20"
-
-// conversation is the entity of GET /days/{day}/conversation and of say: the page's id, version and body when the
-// page exists.
+// conversation is the entity of GET /days/{day}/conversation: the day, and the page's id, version, body and turns when
+// the page exists. The turns are the paragraphs of the body, as the real API reads them: a marker starts a turn, a
+// block of tool lines belongs to the marker after it, and any other paragraph is part of the turn before.
 func (f *fakeAPI) conversation(day string) siren.Entity {
+	if day == "today" {
+		day = f.localDay()
+	}
 	props := map[string]any{"day": day, "turns": []any{}}
-	if p := f.find("Conversation " + day); p != nil {
-		props["id"], props["version"], props["body"] = p.id, p.version, p.body
-		// The turns are the paragraphs of the body, with the mark as who. The real API does the same.
-		turns := []any{}
-		for _, para := range strings.Split(p.body, "\n\n") {
-			who := "text"
-			switch {
-			case strings.HasPrefix(para, "**Owner**"):
-				who = "owner"
-			case strings.HasPrefix(para, "**lifelog**"):
-				who = "lifelog"
-			}
-			text := para // the real API gives the words after the mark
-			if i := strings.Index(para, "): "); who != "text" && i >= 0 {
+	p := f.find("Conversation " + day)
+	if p == nil {
+		return siren.Entity{Class: []string{"conversation"}, Properties: props}
+	}
+	props["id"], props["version"], props["body"] = p.id, p.version, p.body
+	type turn struct{ who, text string }
+	var turns []*turn
+	for _, para := range strings.Split(strings.ReplaceAll(p.body, "\r\n", "\n"), "\n\n") { // the real API reads CRLF as LF
+		who := ""
+		switch {
+		case strings.HasPrefix(para, "**Owner**"):
+			who = "owner"
+		case strings.HasPrefix(para, "**lifelog**"):
+			who = "lifelog"
+		}
+		switch {
+		case who != "":
+			text := para
+			if i := strings.Index(para, "): "); i >= 0 {
 				text = para[i+3:]
 			}
-			turns = append(turns, map[string]any{"who": who, "text": text})
+			turns = append(turns, &turn{who, text})
+		case strings.HasPrefix(para, "[["+day+"]]"), strings.HasPrefix(para, "- `"):
+			// the first line, or the tool lines of the marker that follows
+		case len(turns) == 0:
+			turns = append(turns, &turn{"text", para})
+		default:
+			turns[len(turns)-1].text += "\n\n" + para
 		}
-		props["turns"] = turns
 	}
+	out := []any{}
+	for _, t := range turns {
+		out = append(out, map[string]any{"who": t.who, "text": t.text})
+	}
+	props["turns"] = out
 	return siren.Entity{Class: []string{"conversation"}, Properties: props}
 }
 
-func (f *fakeAPI) find(title string) *page {
+func (f *fakeAPI) find(title string) *fakePage {
 	for _, p := range f.pages {
 		if p.title == title {
 			return p
@@ -127,11 +227,12 @@ func (f *fakeAPI) find(title string) *page {
 }
 
 // add makes a page, as another surface would.
-func (f *fakeAPI) add(title, body string) *page {
+func (f *fakeAPI) add(title, body string) *fakePage {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	p := &page{id: len(f.pages) + 1, title: title, body: body, version: 1}
+	p := &fakePage{id: len(f.pages) + 1, title: title, body: body, version: 1}
 	f.pages = append(f.pages, p)
+	f.notify()
 	return p
 }
 
@@ -141,6 +242,7 @@ func (f *fakeAPI) edit(title, body string) {
 	defer f.mu.Unlock()
 	p := f.find(title)
 	p.body, p.version = body, p.version+1
+	f.notify()
 }
 
 func (f *fakeAPI) body(title string) string {
@@ -152,7 +254,7 @@ func (f *fakeAPI) body(title string) string {
 	return ""
 }
 
-func (p *page) entity() siren.Entity {
+func (p *fakePage) entity() siren.Entity {
 	return siren.Entity{Title: p.title, Properties: map[string]any{"id": p.id, "version": p.version, "body": p.body},
 		Links: []siren.Link{{Rel: []string{"self"}, Href: fmt.Sprintf("/pages/%d", p.id)}}}
 }
@@ -179,14 +281,20 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			fail(503, "unavailable")
 			break
 		}
-		e = siren.Entity{Actions: append(catalog(), f.extra...)}
+		var list []siren.Action
+		for _, a := range append(catalog(), f.extra...) {
+			if !slices.Contains(f.without, a.Name) {
+				list = append(list, a)
+			}
+		}
+		e = siren.Entity{Actions: list}
 	case r.URL.Path == "/settings" && r.Method == "GET":
 		if notOwner {
 			fail(403, "forbidden")
 			break
 		}
 		props := map[string]any{}
-		for k, v := range map[string]string{"model_url": f.modelURL, "model": f.model, "model_key": f.modelKey, "owner_number": f.ownerNumber} {
+		for k, v := range map[string]string{"model_url": f.modelURL, "model": f.model, "model_key": f.modelKey} {
 			if v != "" {
 				props[k] = v
 			}
@@ -194,33 +302,13 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		e = siren.Entity{Class: []string{"settings"}, Properties: props}
 	case strings.HasSuffix(r.URL.Path, "/conversation") && r.Method == "GET":
 		e = f.conversation(strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/days/"), "/conversation"))
-	case strings.HasSuffix(r.URL.Path, "/say") && r.Method == "POST":
-		if notOwner {
-			fail(403, "forbidden")
-			break
-		}
-		if refuseUnknown(r, "say") {
-			fail(422, "invalid")
-			break
-		}
-		day := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/days/"), "/say")
-		if day == "today" {
-			day = today
-		}
-		p := f.find("Conversation " + day)
-		if p == nil {
-			p = &page{id: len(f.pages) + 1, title: "Conversation " + day, body: "[[" + day + "]]", category: "Conversations", version: 1}
-			f.pages = append(f.pages, p)
-		}
-		stamp := "(09:30)"
-		if via := r.PostForm.Get("via"); via != "" {
-			stamp = "(09:30, via " + via + ")"
-		}
-		p.body, p.version = p.body+"\n\n**Owner** "+stamp+": "+r.PostForm.Get("text"), p.version+1
-		e = f.conversation(day)
 	case strings.HasSuffix(r.URL.Path, "/body") && r.Method == "POST":
 		if refuseUnknown(r, "save-body") {
 			fail(422, "invalid")
+			break
+		}
+		if f.saveFails {
+			fail(500, "internal")
 			break
 		}
 		fmt.Sscanf(r.URL.Path, "/pages/%d/body", &id)
@@ -228,12 +316,14 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if f.sneak != "" || f.alwaysStale {
 			p.body, p.version = p.body+"\n\n"+f.sneak+"x", p.version+1
 			f.sneak = ""
+			f.notify()
 		}
 		if r.PostForm.Get("version") != fmt.Sprint(p.version) {
 			fail(409, "stale_version")
 			break
 		}
 		p.body, p.version = r.PostForm.Get("body"), p.version+1
+		f.notify()
 		e = p.entity()
 	case strings.HasSuffix(r.URL.Path, "/big"):
 		e.Title = strings.Repeat("é", maxResult)
@@ -249,13 +339,13 @@ func (f *fakeAPI) requests() []seen {
 	return append([]seen(nil), f.reqs...)
 }
 
-// writes are the requests that are not a GET and not a write of a conversation page (save-body or say).
+// writes are the requests that are not a GET and not a write of a page (save-body).
 func (f *fakeAPI) writes() []seen {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	var out []seen
 	for _, r := range f.reqs {
-		if r.Method != "GET" && !strings.HasPrefix(r.Path, "/pages") && !strings.HasSuffix(r.Path, "/say") {
+		if r.Method != "GET" && !strings.HasPrefix(r.Path, "/pages") {
 			out = append(out, r)
 		}
 	}
@@ -289,7 +379,7 @@ func catalog() []siren.Action {
 			{Name: "id", Type: "number", In: "path", Required: true}, {Name: "body", Type: "textarea", Required: true}, {Name: "version", Type: "hidden", Required: true}}},
 		{Name: "snapshot", Owner: true, Method: "POST", Href: "/snapshot"},
 		{Name: "settings", Owner: true, Method: "POST", Href: "/settings", Fields: []siren.Field{
-			{Name: "model_url", Type: "text"}, {Name: "model", Type: "text"}, {Name: "model_key", Type: "password"}, {Name: "owner_number", Type: "text"}}},
+			{Name: "model_url", Type: "text"}, {Name: "model", Type: "text"}, {Name: "model_key", Type: "password"}}},
 	}
 }
 
@@ -342,64 +432,10 @@ func toolCall(name, args string) (int, string) {
 		name + `","arguments":` + string(a) + `}}]},"finish_reason":"tool_calls"}]}`
 }
 
-// fakeChat is a chat that the test drives: in carries the messages, sent holds the replies.
-type fakeChat struct {
-	in   chan Message
-	sent chan string
-	mu   sync.Mutex
-	typ  []bool
-}
-
-func newFakeChat() *fakeChat { return &fakeChat{in: make(chan Message), sent: make(chan string, 100)} }
-
-func (c *fakeChat) Messages() <-chan Message { return c.in }
-
-func (c *fakeChat) Send(_ context.Context, s string) error { c.sent <- s; return nil }
-
-func (c *fakeChat) Typing(_ context.Context, on bool) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.typ = append(c.typ, on)
-	return nil
-}
-
-func (c *fakeChat) typing() []bool {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	return append([]bool(nil), c.typ...)
-}
-
-// say puts a text of the owner in the chat.
-func (c *fakeChat) say(t *testing.T, s string) {
-	c.deliver(t, Message{Sender: owner, Text: s, Kind: KindText, At: fixedNow})
-}
-
-func (c *fakeChat) deliver(t *testing.T, m Message) {
-	t.Helper()
-	select {
-	case c.in <- m:
-	case <-time.After(wait):
-		t.Fatal("the agent did not take the message")
-	}
-}
-
-func (c *fakeChat) reply(t *testing.T) string {
-	t.Helper()
-	select {
-	case s := <-c.sent:
-		return s
-	case <-time.After(wait):
-		t.Fatal("no reply")
-		return ""
-	}
-}
-
 // rig is an agent on fakes, started.
 type rig struct {
 	api    *fakeAPI
 	mod    *fakeModel
-	chat   *fakeChat
-	state  string
 	tick   chan time.Time
 	cancel context.CancelFunc
 	done   chan error
@@ -413,8 +449,8 @@ func (r *rig) clock() time.Time {
 	return r.now
 }
 
-// setDay moves the clock of the agent to a later day.
-func (r *rig) setDay(t time.Time) {
+// setClock moves the clock of the agent.
+func (r *rig) setClock(t time.Time) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.now = t
@@ -422,23 +458,21 @@ func (r *rig) setDay(t time.Time) {
 
 func start(t *testing.T, script func(n int, r chatReq) (int, string)) *rig {
 	t.Helper()
-	return startOn(t, script, &fakeAPI{}, filepath.Join(t.TempDir(), "state.json"))
+	return startOn(t, script, &fakeAPI{}, fixedNow)
 }
 
-// startOn starts an agent on an API and a state file that may have been used before.
-func startOn(t *testing.T, script func(n int, r chatReq) (int, string), api *fakeAPI, state string) *rig {
+// startOn starts an agent on an API that may have been used before, with its clock at now.
+func startOn(t *testing.T, script func(n int, r chatReq) (int, string), api *fakeAPI, now time.Time) *rig {
 	t.Helper()
-	r := &rig{api: api, mod: &fakeModel{script: script}, chat: newFakeChat(), state: state, tick: make(chan time.Time),
-		done: make(chan error, 1), now: fixedNow}
+	r := &rig{api: api, mod: &fakeModel{script: script}, tick: make(chan time.Time), done: make(chan error, 1), now: now}
 	modSrv := httptest.NewServer(r.mod)
 	t.Cleanup(modSrv.Close)
 	r.api.setModel(modSrv.URL, "test-model", "")
 	apiSrv := httptest.NewServer(r.api)
 	t.Cleanup(apiSrv.Close)
 	a := &Agent{
-		Chat: r.chat, Client: client.Remote(apiSrv.URL, siren.AgentPrefix+Source, token),
-		AsOwner: client.Remote(apiSrv.URL, "", token),
-		Owner:   owner, State: r.state, Now: r.clock, Log: log.New(io.Discard, "", 0), Tick: r.tick,
+		Client: client.Remote(apiSrv.URL, siren.AgentPrefix+Source, token), AsOwner: client.Remote(apiSrv.URL, "", token),
+		Now: r.clock, Log: log.New(io.Discard, "", 0), Tick: r.tick,
 	}
 	ctx, cancel := context.WithCancel(t.Context())
 	r.cancel = cancel
@@ -454,29 +488,22 @@ func startOn(t *testing.T, script func(n int, r chatReq) (int, string), api *fak
 	return r
 }
 
-// poll makes the worker look at the page and waits until it has taken the tick.
+// poll makes the agent look at the page and waits until it has taken the tick. The agent takes a tick only after the
+// look before it is done.
 func (r *rig) poll(t *testing.T) {
 	t.Helper()
 	select {
 	case r.tick <- fixedNow:
 	case <-time.After(wait):
-		t.Fatal("the worker did not take the tick")
+		t.Fatal("the agent did not take the tick")
 	}
 }
 
-// settle polls twice: the second tick is taken only after the first look is done.
-func (r *rig) settle(t *testing.T) { r.poll(t); r.poll(t) }
-
-// finish closes the chat and waits for Run, which answers what is queued first.
-func (r *rig) finish(t *testing.T) error {
+// settle polls three times: the third tick is taken only after the second look is done, so the agent has had one
+// full look at the page as it is now.
+func (r *rig) settle(t *testing.T) {
 	t.Helper()
-	close(r.chat.in)
-	select {
-	case err := <-r.done:
-		r.done <- err // the cleanup reads it again
-		return err
-	case <-time.After(wait):
-		t.Fatal("Run did not return")
-		return nil
-	}
+	r.poll(t)
+	r.poll(t)
+	r.poll(t)
 }

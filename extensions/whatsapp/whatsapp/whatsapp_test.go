@@ -15,7 +15,7 @@ import (
 	"google.golang.org/protobuf/proto"
 	"rsc.io/qr"
 
-	"lifelog-whatsapp/agent"
+	"lifelog-whatsapp/relay"
 )
 
 var (
@@ -37,32 +37,32 @@ func TestFilter(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
 		mutate func(*events.Message)
-		want   agent.Message
+		want   relay.Message
 		pass   bool
 	}{
-		{"text", func(*events.Message) {}, agent.Message{Sender: "40712345678", Text: "hello", Kind: agent.KindText, At: t0}, true},
+		{"text", func(*events.Message) {}, relay.Message{Sender: "40712345678", Text: "hello", Kind: relay.KindText, At: t0}, true},
 		{"extended text", func(e *events.Message) {
 			e.Message = &waE2E.Message{ExtendedTextMessage: &waE2E.ExtendedTextMessage{Text: proto.String("a link")}}
-		}, agent.Message{Sender: "40712345678", Text: "a link", Kind: agent.KindText, At: t0}, true},
+		}, relay.Message{Sender: "40712345678", Text: "a link", Kind: relay.KindText, At: t0}, true},
 		{"image", func(e *events.Message) { e.Message = &waE2E.Message{ImageMessage: &waE2E.ImageMessage{}} },
-			agent.Message{Sender: "40712345678", Kind: agent.KindImage, At: t0}, true},
+			relay.Message{Sender: "40712345678", Kind: relay.KindImage, At: t0}, true},
 		{"audio", func(e *events.Message) { e.Message = &waE2E.Message{AudioMessage: &waE2E.AudioMessage{}} },
-			agent.Message{Sender: "40712345678", Kind: agent.KindAudio, At: t0}, true},
+			relay.Message{Sender: "40712345678", Kind: relay.KindAudio, At: t0}, true},
 		{"document", func(e *events.Message) { e.Message = &waE2E.Message{DocumentMessage: &waE2E.DocumentMessage{}} },
-			agent.Message{Sender: "40712345678", Kind: agent.KindDocument, At: t0}, true},
+			relay.Message{Sender: "40712345678", Kind: relay.KindDocument, At: t0}, true},
 		{"a sticker", func(e *events.Message) { e.Message = &waE2E.Message{StickerMessage: &waE2E.StickerMessage{}} },
-			agent.Message{Sender: "40712345678", Kind: agent.KindOther, At: t0}, true},
+			relay.Message{Sender: "40712345678", Kind: relay.KindOther, At: t0}, true},
 		{"a hidden id with a number", func(e *events.Message) {
 			e.Info.Sender = types.NewJID("1234", types.HiddenUserServer)
 			e.Info.SenderAlt = types.NewJID("40799999999", types.DefaultUserServer)
-		}, agent.Message{Sender: "40799999999", Text: "hello", Kind: agent.KindText, At: t0}, true},
-		{"from me", func(e *events.Message) { e.Info.IsFromMe = true }, agent.Message{}, false},
-		{"a group", func(e *events.Message) { e.Info.IsGroup = true }, agent.Message{}, false},
-		{"history", func(e *events.Message) { e.SourceWebMsg = &waWeb.WebMessageInfo{} }, agent.Message{}, false},
-		{"old", func(e *events.Message) { e.Info.Timestamp = after }, agent.Message{}, false},
-		{"an edit", func(e *events.Message) { e.IsEdit = true }, agent.Message{}, false},
-		{"a reaction", func(e *events.Message) { e.Message = &waE2E.Message{ReactionMessage: &waE2E.ReactionMessage{}} }, agent.Message{}, false},
-		{"a protocol message", func(e *events.Message) { e.Message = &waE2E.Message{ProtocolMessage: &waE2E.ProtocolMessage{}} }, agent.Message{}, false},
+		}, relay.Message{Sender: "40799999999", Text: "hello", Kind: relay.KindText, At: t0}, true},
+		{"from me", func(e *events.Message) { e.Info.IsFromMe = true }, relay.Message{}, false},
+		{"a group", func(e *events.Message) { e.Info.IsGroup = true }, relay.Message{}, false},
+		{"history", func(e *events.Message) { e.SourceWebMsg = &waWeb.WebMessageInfo{} }, relay.Message{}, false},
+		{"old", func(e *events.Message) { e.Info.Timestamp = after }, relay.Message{}, false},
+		{"an edit", func(e *events.Message) { e.IsEdit = true }, relay.Message{}, false},
+		{"a reaction", func(e *events.Message) { e.Message = &waE2E.Message{ReactionMessage: &waE2E.ReactionMessage{}} }, relay.Message{}, false},
+		{"a protocol message", func(e *events.Message) { e.Message = &waE2E.Message{ProtocolMessage: &waE2E.ProtocolMessage{}} }, relay.Message{}, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			e := event(text)

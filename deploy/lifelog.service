@@ -7,7 +7,7 @@ After=network.target
 Type=simple
 # Replace OWNER and the paths.
 User=OWNER
-ExecStart=/home/OWNER/.local/bin/lifelog --db /home/OWNER/lifelog/life.db serve --token-file /home/OWNER/life/token --snapshots /home/OWNER/snapshots --with web
+ExecStart=/home/OWNER/.local/bin/lifelog --db /home/OWNER/lifelog/life.db serve --token-file /home/OWNER/life/token --snapshots /home/OWNER/snapshots --with web --with agent --with whatsapp
 # the core listens on 127.0.0.1:7777 only. The token file turns on its bearer check: one line of 32 characters or more,
 # with no space or tab at its start or end
 # --with web runs the browser (extensions/web) beside the server: lifelog-web must be beside lifelog
@@ -16,8 +16,12 @@ ExecStart=/home/OWNER/.local/bin/lifelog --db /home/OWNER/lifelog/life.db serve 
 Environment=LIFELOG_WEB_LISTEN=127.0.0.1:7780
 Environment=LIFELOG_WEB_ORIGINS=https://lifelog.example
 # with ProtectHome=read-only, the browser's state folder must be writable: ReadWritePaths=/home/OWNER/.config/lifelog-web
-# add --with whatsapp to run the WhatsApp agent beside the server (extensions/whatsapp)
-# with ProtectHome=read-only, the agent's state folder must be writable: ReadWritePaths=/home/OWNER/.config/lifelog-whatsapp
+# --with agent runs the agent beside the server (extensions/agent): it answers the owner on the conversation page, with the
+# model of the Settings. It keeps no state folder: lifelog-agent must be beside lifelog
+# --with whatsapp runs the WhatsApp transport beside the server (extensions/whatsapp): it carries the messages of the owner
+# to the page and the turns of the page to the phone. Run lifelog whatsapp login once, as OWNER, before the first start
+# with ProtectHome=read-only, the transport's state folder must be writable: ReadWritePaths=/home/OWNER/.config/lifelog-whatsapp
+# remove --with whatsapp when the number is not paired yet; the chat of the browser works with --with agent alone
 # add --with ticktick to run TickTick, a connected app, beside the server (extensions/ticktick)
 # with ProtectHome=read-only, its state folder must be writable: ReadWritePaths=/home/OWNER/.config/lifelog-ticktick
 # the same holds for the state folder of any connected app: ReadWritePaths=/home/OWNER/.config/lifelog-NAME

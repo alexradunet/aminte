@@ -18,13 +18,13 @@ import (
 	waLog "go.mau.fi/whatsmeow/util/log"
 	"google.golang.org/protobuf/proto"
 
-	"lifelog-whatsapp/agent"
+	"lifelog-whatsapp/relay"
 )
 
 // libraryLog is the log of whatsmeow: its warnings and errors only.
 func libraryLog() waLog.Logger { return waLog.Stdout("whatsmeow", "WARN", false) }
 
-// Login pairs the device of s as a linked device of the agent's number. It draws each QR code on out and returns
+// Login pairs the device of s as a linked device of the number of lifelog. It draws each QR code on out and returns
 // when the owner of the phone scans it (nil), when the codes time out, or when ctx ends. A store that is paired
 // already is an error.
 func Login(ctx context.Context, s *Session, out io.Writer) error {
@@ -97,7 +97,7 @@ func drawCode(out io.Writer, code string) error {
 		return err
 	}
 	var b strings.Builder
-	b.WriteString("\nOpen WhatsApp on the agent's phone, Linked devices, Link a device, and scan this.\n\n")
+	b.WriteString("\nOpen WhatsApp on the phone of lifelog, Linked devices, Link a device, and scan this.\n\n")
 	for _, l := range lines {
 		b.WriteString("\x1b[30;107m" + l + "\x1b[0m\n")
 	}
@@ -119,7 +119,7 @@ type Chat struct {
 	owner   types.JID
 	after   time.Time
 	log     *log.Logger
-	msgs    chan agent.Message
+	msgs    chan relay.Message
 	handler uint32
 	done    chan struct{}
 	stop    sync.Once
@@ -138,7 +138,7 @@ func Connect(ctx context.Context, s *Session, owner string, after time.Time, l *
 	}
 	c := &Chat{
 		cl: whatsmeow.NewClient(s.dev, libraryLog()), owner: types.NewJID(owner, types.DefaultUserServer), after: after, log: l,
-		msgs: make(chan agent.Message, 32), done: make(chan struct{}), ended: make(chan Ended, 1), ctx: ctx,
+		msgs: make(chan relay.Message, 32), done: make(chan struct{}), ended: make(chan Ended, 1), ctx: ctx,
 	}
 	c.handler = c.cl.AddEventHandler(c.handle)
 	if err := c.cl.Connect(); err != nil {
@@ -154,7 +154,7 @@ func (c *Chat) Ended() <-chan Ended { return c.ended }
 // end records the end of the connection: the first reason only.
 func (c *Chat) end(e Ended) { c.endOnce.Do(func() { c.ended <- e }) }
 
-// Close disconnects and waits for the read receipts in flight. The channel of Messages stays open: the agent ends
+// Close disconnects and waits for the read receipts in flight. The channel of Messages stays open: the relay ends
 // with its context.
 func (c *Chat) Close() {
 	c.stop.Do(func() {
@@ -166,21 +166,12 @@ func (c *Chat) Close() {
 }
 
 // Messages gives the messages that Filter lets through.
-func (c *Chat) Messages() <-chan agent.Message { return c.msgs }
+func (c *Chat) Messages() <-chan relay.Message { return c.msgs }
 
 // Send sends a text to the owner.
 func (c *Chat) Send(ctx context.Context, text string) error {
 	_, err := c.cl.SendMessage(ctx, c.owner, &waE2E.Message{Conversation: proto.String(text)})
 	return err
-}
-
-// Typing shows, or hides, that the agent is writing.
-func (c *Chat) Typing(ctx context.Context, on bool) error {
-	state := types.ChatPresencePaused
-	if on {
-		state = types.ChatPresenceComposing
-	}
-	return c.cl.SendChatPresence(ctx, c.owner, state, types.ChatPresenceMediaText)
 }
 
 // handle is the handler of the events of whatsmeow.
@@ -189,7 +180,7 @@ func (c *Chat) handle(evt any) {
 	case *events.LoggedOut:
 		c.end(Ended{Reason: "logged out: the device was unlinked on the phone; run lifelog whatsapp login again"})
 	case *events.StreamReplaced:
-		c.end(Ended{Reason: "another client took this session over; one agent runs on a session"})
+		c.end(Ended{Reason: "another client took this session over; one relay runs on a session"})
 	case *events.TemporaryBan:
 		c.end(Ended{Reason: fmt.Sprintf("WhatsApp banned the number for %s (reason %v)", e.Expire, e.Code)})
 	case *events.ClientOutdated:

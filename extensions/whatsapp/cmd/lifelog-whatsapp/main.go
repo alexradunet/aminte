@@ -1,5 +1,6 @@
-// Command lifelog-whatsapp is an always-on agent for lifelog: the owner talks to it on WhatsApp (or on a terminal),
-// a model answers and calls the actions of the lifelog API. It is a client of the lifelog HTTP API. See README.md.
+// Command lifelog-whatsapp is the transport between WhatsApp and lifelog: the owner talks to lifelog on WhatsApp, and
+// the answer of lifelog-agent comes back to the phone. It is a client of the lifelog HTTP API and calls no model. See
+// README.md.
 package main
 
 import (
@@ -16,16 +17,14 @@ import (
 	"syscall"
 	"time"
 
-	"lifelog-whatsapp/agent"
-	"lifelog-whatsapp/terminal"
+	"lifelog-whatsapp/relay"
 	"lifelog-whatsapp/whatsapp"
 	"lifelog/app"
 	"lifelog/client"
-	"lifelog/siren"
 )
 
-// Exit codes: 0 an interrupt or the end of the input, 1 an error (a new process may try again), app.ExitOwnerActs
-// (78) not paired, 3 the connection ended for good (logged out, replaced, banned, outdated: the owner acts first).
+// Exit codes: 0 an interrupt, 1 an error (a new process may try again), app.ExitOwnerActs (78) not paired or a
+// server with no say, 3 the connection ended for good (logged out, replaced, banned, outdated: the owner acts first).
 const (
 	exitError     = 1
 	exitNotPaired = app.ExitOwnerActs
@@ -44,21 +43,23 @@ func (e *exitCode) Unwrap() error { return e.err }
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	err := run(ctx, os.Args[1:], os.Getenv, os.Stdin, os.Stdout, os.Stderr)
+	err := run(ctx, os.Args[1:], os.Getenv, os.Stdout, os.Stderr)
 	if err == nil || errors.Is(err, context.Canceled) {
-		return // an interrupt ends the agent cleanly: the signal is the owner's word
+		return // an interrupt ends the relay cleanly: the signal is the owner's word
 	}
 	fmt.Fprintln(os.Stderr, "lifelog-whatsapp:", err)
 	code := exitError
 	var ec *exitCode
 	if errors.As(err, &ec) {
 		code = ec.code
+	} else if errors.Is(err, relay.ErrNoAction) {
+		code = exitNotPaired // the owner acts first, as for a pairing: a restart does not help
 	}
 	stop()
 	os.Exit(code)
 }
 
-func run(ctx context.Context, args []string, getenv func(string) string, stdin io.ReadCloser, stdout, stderr io.Writer) error {
+func run(ctx context.Context, args []string, getenv func(string) string, stdout, stderr io.Writer) error {
 	if len(args) > 0 && args[0] == "login" {
 		if len(args) > 1 {
 			return fmt.Errorf("login takes no argument, got %q", args[1])
@@ -71,7 +72,6 @@ func run(ctx context.Context, args []string, getenv func(string) string, stdin i
 	// 127.0.0.1:7777 could be the owner's service, and a stale config with a missing file would then write there.
 	base := fs.String("url", getenv("LIFELOG_URL"), "address of lifelog (default $LIFELOG_URL)")
 	tokenFile := fs.String("token-file", "", "a file with the bearer token ($LIFELOG_TOKEN wins when it is set)")
-	terminalMode := fs.Bool("terminal", false, "answer on this terminal, not on WhatsApp")
 	if err := fs.Parse(args); errors.Is(err, flag.ErrHelp) {
 		return nil // the usage is printed: help is not an error
 	} else if err != nil {
@@ -100,19 +100,10 @@ func run(ctx context.Context, args []string, getenv func(string) string, stdin i
 		return err
 	}
 	logger := log.New(stderr, "lifelog-whatsapp: ", log.LstdFlags)
-	a := &agent.Agent{
-		Client: client.Remote(*base, siren.AgentPrefix+agent.Source, token),
-		// The settings hold the key of the model and the owner's number, and the phone's message is the owner's
-		// turn: both go as the owner, with no source.
-		AsOwner: client.Remote(*base, "", token),
-		State:   statePath,
-		Log:     logger,
-	}
-	if *terminalMode {
-		a.Owner = terminal.Sender
-		return serveTerminal(ctx, a, stdin, stdout)
-	}
-	return serveWhatsApp(ctx, a, sessionPath, logger)
+	// The owner's words go to the page with say, and the owner's number is in the settings: both are the owner's, so
+	// the client has the owner's token and no source.
+	r := &relay.Relay{API: client.Remote(*base, "", token), State: statePath, Log: logger}
+	return serve(ctx, r, sessionPath, logger)
 }
 
 func login(ctx context.Context, stdout io.Writer) (err error) {
@@ -132,18 +123,11 @@ func login(ctx context.Context, stdout io.Writer) (err error) {
 	if err := whatsapp.Login(ctx, s, stdout); err != nil {
 		return err
 	}
-	fmt.Fprintln(stdout, "Paired. Start the agent with: lifelog whatsapp")
+	fmt.Fprintln(stdout, "Paired. Start the relay with: lifelog serve --with whatsapp")
 	return nil
 }
 
-func serveTerminal(ctx context.Context, a *agent.Agent, stdin io.ReadCloser, stdout io.Writer) (err error) {
-	chat := terminal.New(ctx, stdin, stdout, a.Owner, time.Now)
-	defer func() { err = errors.Join(err, chat.Close()) }()
-	a.Chat = chat
-	return a.Run(ctx)
-}
-
-func serveWhatsApp(ctx context.Context, a *agent.Agent, sessionPath string, logger *log.Logger) (err error) {
+func serve(ctx context.Context, r *relay.Relay, sessionPath string, logger *log.Logger) (err error) {
 	s, err := whatsapp.Open(ctx, sessionPath)
 	if err != nil {
 		return err
@@ -152,25 +136,25 @@ func serveWhatsApp(ctx context.Context, a *agent.Agent, sessionPath string, logg
 	if s.Number() == "" {
 		return &exitCode{exitNotPaired, whatsapp.ErrNotPaired}
 	}
-	// A message is answered when it is newer than the earlier of the start and the last save of the page: an
-	// offline message is answered once, and a restart does not answer what the page holds. The start is taken
-	// before the wait for the number, so a message sent during that wait is answered too.
+	// A message is said when it is newer than the earlier of the start and the last message that was said: a message
+	// that came while the relay was off is said once, and a restart does not say it again. The start is taken before
+	// the wait for the number, so a message sent during that wait is said too.
 	after := time.Now()
-	if saved, ok, err := agent.LastSave(a.State); err != nil {
+	if said, ok, err := relay.LastSaid(r.State); err != nil {
 		return err
-	} else if ok && saved.Before(after) {
-		after = saved
+	} else if ok && said.Before(after) {
+		after = said
 	}
 	// The number comes from the settings, before the connection. A number that is set is used for the whole run.
-	if a.Owner, err = agent.WaitOwner(ctx, a.AsOwner, logger, nil); err != nil {
+	if r.Owner, err = relay.WaitOwner(ctx, r.API, logger, nil); err != nil {
 		return err
 	}
-	chat, err := whatsapp.Connect(ctx, s, a.Owner, after, logger)
+	chat, err := whatsapp.Connect(ctx, s, r.Owner, after, logger)
 	if err != nil {
 		return err
 	}
 	defer chat.Close()
-	a.Chat = chat
+	r.Chat = chat
 
 	runCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -186,7 +170,7 @@ func serveWhatsApp(ctx context.Context, a *agent.Agent, sessionPath string, logg
 		case <-runCtx.Done():
 		}
 	}()
-	runErr := a.Run(runCtx)
+	runErr := r.Run(runCtx)
 	cancel()
 	wg.Wait()
 	if ended != nil {

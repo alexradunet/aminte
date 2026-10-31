@@ -11,7 +11,7 @@ import (
 //     (docs/plans/145-whatsapp.md, "text only").
 //
 // say is the owner's action, so tools.Of leaves it out: a model that could call it would write owner turns that the
-// watcher answers, a loop.
+// agent answers, a loop.
 func toolsOf(list []siren.Action) ([]tools.Tool, error) {
 	return tools.Of(list, func(a siren.Action) bool { return !takesFile(a) })
 }

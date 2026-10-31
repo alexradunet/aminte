@@ -931,6 +931,10 @@ answer is this entity, and `result` is the [save result](#result-of-capture-crea
 `say` is for today: a `day` that is not the server's local today is 422 `say is for today: the agent answers today's
 conversation`, and writes nothing. A `text` that is empty or only blanks is 422 and writes nothing. The optional field
 `via` names the relay, the program that carries the owner's words (`[a-z0-9_:.-]{1,64}`); another value is 422.
+`say` answers at once and calls no model. When the agent runs (`lifelog-agent`, started by `serve --with agent`), it reads
+the page, finds the turn of the owner that nobody has answered (the last turn is the owner's), and writes its reply on the
+page as `agent:lifelog`. A client reads the page to see the reply. Only `say` starts a turn of the agent: text that
+`save-body` adds is an edit.
 
 **The format of the page.** An agent in any language reads and writes the conversation with `save-body`, or with `say`
 for the owner's turn. The page:

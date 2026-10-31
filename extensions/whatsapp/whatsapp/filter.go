@@ -6,38 +6,38 @@ import (
 	"go.mau.fi/whatsmeow/types"
 	"go.mau.fi/whatsmeow/types/events"
 
-	"lifelog-whatsapp/agent"
+	"lifelog-whatsapp/relay"
 )
 
-// Filter turns an event into a message of the chat, or says that the agent must not see it. A message is passed
+// Filter turns an event into a message of the chat, or says that the relay must not see it. A message is passed
 // on when it is not from this device, not from a history sync, not an edit, not a group message and newer than
 // after (the newest turn of the transcript, so that a restart does not answer again what it answered). A reaction
 // and a protocol message (a delete, a read marker) are not messages. A message that is not text is passed on with
-// its kind, so that the agent can refuse it with a line.
-func Filter(evt *events.Message, after time.Time) (agent.Message, bool) {
+// its kind, so that the relay can refuse it with a line.
+func Filter(evt *events.Message, after time.Time) (relay.Message, bool) {
 	info := evt.Info
 	switch {
 	case info.IsFromMe, info.IsGroup, evt.SourceWebMsg != nil, evt.IsEdit:
-		return agent.Message{}, false
+		return relay.Message{}, false
 	case !info.Timestamp.After(after):
-		return agent.Message{}, false
+		return relay.Message{}, false
 	}
 	m := evt.Message
 	if m.GetReactionMessage() != nil || m.GetProtocolMessage() != nil {
-		return agent.Message{}, false
+		return relay.Message{}, false
 	}
-	out := agent.Message{Sender: senderNumber(info), At: info.Timestamp, Kind: agent.KindOther}
+	out := relay.Message{Sender: senderNumber(info), At: info.Timestamp, Kind: relay.KindOther}
 	switch {
 	case m.GetConversation() != "":
-		out.Kind, out.Text = agent.KindText, m.GetConversation()
+		out.Kind, out.Text = relay.KindText, m.GetConversation()
 	case m.GetExtendedTextMessage() != nil:
-		out.Kind, out.Text = agent.KindText, m.GetExtendedTextMessage().GetText()
+		out.Kind, out.Text = relay.KindText, m.GetExtendedTextMessage().GetText()
 	case m.GetImageMessage() != nil:
-		out.Kind = agent.KindImage
+		out.Kind = relay.KindImage
 	case m.GetAudioMessage() != nil:
-		out.Kind = agent.KindAudio
+		out.Kind = relay.KindAudio
 	case m.GetDocumentMessage() != nil:
-		out.Kind = agent.KindDocument
+		out.Kind = relay.KindDocument
 	}
 	return out, true
 }

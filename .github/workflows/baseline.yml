@@ -1,8 +1,9 @@
 name: Baseline
 
 # The baseline of AGENTS.md on Linux, on every push and pull request: gofmt, go vet and the full tests, at the root
-# and in each extension (an extension's end-to-end test builds the real lifelog). The Windows baseline stays a manual
-# run (windows-validation.yml).
+# and in each extension (an extension's end-to-end test builds the real lifelog). The loop runs every folder of
+# extensions/ that has a go.mod: a new extension needs no edit here. The Windows baseline stays a manual run
+# (windows-validation.yml).
 on:
   push:
     branches: [master]
@@ -26,12 +27,7 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
-          cache-dependency-path: |
-            go.sum
-            extensions/googlephotos/go.sum
-            extensions/mcp/go.sum
-            extensions/whatsapp/go.sum
-            extensions/web/go.sum
+          cache-dependency-path: '**/go.sum'
       - name: Report environment
         run: go version; go env GOOS GOARCH
       - name: gofmt
@@ -44,7 +40,11 @@ jobs:
         run: go test -count=1 -timeout=30m ./...
       - name: Extensions
         run: |
-          for dir in extensions/mcp extensions/whatsapp extensions/agentic extensions/googlephotos extensions/web; do
+          for dir in extensions/*/; do
+            if [ ! -f "$dir/go.mod" ]; then
+              echo "== $dir: no go.mod, skipped"
+              continue
+            fi
             echo "== $dir"
             (cd "$dir" && go vet ./... && go test -count=1 -timeout=20m ./...)
           done

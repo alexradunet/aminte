@@ -300,11 +300,18 @@ An extension writes as `import:NAME` (an importer) or `agent:NAME` (a model), wi
 `Lifelog-Source: import:NAME` or `Lifelog-Source: agent:NAME`. The owner-only actions are refused to such a writer by
 the rule that exists already ([API.md](../API.md)). `GET /actions` of the server is the catalog of the actions.
 
+One kind of extension writes as the owner: a transport that carries the words of the owner from a chat. It sends the
+action `say` with the owner's token and no source, and with `via` set to its own name. `say` is the owner's action, so an
+agent cannot write a turn of the owner. A model reads the turn on the page and answers there: `lifelog-agent` is the
+agent, and `lifelog-whatsapp` is the transport.
+
 ## Tests
 
 - Use synthetic data. Fake the third party.
 - Build the real `lifelog` for an end-to-end test: `go build -C ../.. -o $TMP/lifelog ./cmd/lifelog`.
 - Do not open the owner's `life.db`.
+- CI runs `go vet ./... && go test ./...` in every folder of `extensions/` that has a `go.mod`
+  ([`baseline.yml`](../.github/workflows/baseline.yml)). A new extension needs no edit of the workflow.
 
 ## The extensions
 
@@ -314,5 +321,6 @@ the rule that exists already ([API.md](../API.md)). `GET /actions` of the server
 | `extensions/agentic` | `lifelog-agentic-init` | `lifelog agentic-init [--force]` | nothing | no: it reads `LIFELOG_EXE` and `LIFELOG_DB`, and refuses to run without them |
 | `extensions/mcp` | `lifelog-mcp` | `lifelog mcp [--agent NAME]` | `agent:NAME`, default `agent:mcp` | yes: `LIFELOG_URL`, else `--url`, else it refuses; `--source` is refused as today |
 | `extensions/ticktick` | `lifelog-ticktick` | `lifelog ticktick login`, `lifelog ticktick sync [--url U]`, and `lifelog serve --with ticktick` (the always-on way, as the task service) | `import:ticktick` | yes: `LIFELOG_URL`, else `--url`, else it refuses; `login` needs none |
-| `extensions/whatsapp` | `lifelog-whatsapp` | `lifelog serve --with whatsapp` (the always-on way), `lifelog whatsapp login` and `lifelog whatsapp [--terminal] [--url U] [--token-file F]` (the number is the setting `owner_number`) | `agent:whatsapp` | yes: `LIFELOG_URL`, else `--url`, else it refuses; `login` needs none |
+| `extensions/agent` | `lifelog-agent` | `lifelog serve --with agent` (the always-on way) and `lifelog agent` (a try on a `life.db` that exists) | `agent:lifelog` (the read of the settings is the owner's) | yes: `LIFELOG_URL`, else `--url`, else it refuses; `LIFELOG_TOKEN` is its bearer token |
+| `extensions/whatsapp` | `lifelog-whatsapp` | `lifelog serve --with whatsapp` (the always-on way), `lifelog whatsapp login` and `lifelog whatsapp [--url U] [--token-file F]` (the number is the setting `owner_number`) | the owner, with `via=whatsapp`: it only carries the words ([`say`](../API.md#conversation)); it calls no model | yes: `LIFELOG_URL`, else `--url`, else it refuses; `login` needs none |
 | `extensions/web` | `lifelog-web` | `lifelog serve --token-file F --with web` (the always-on way) and `lifelog web` (a trial on a `life.db` that exists) | `ui` (the writer of the browser) | yes: `LIFELOG_URL` and `LIFELOG_TOKEN` (the login of the browser), else it refuses; `LIFELOG_WEB_LISTEN` is its door (`127.0.0.1:7780`, a loopback address only); `LIFELOG_LISTEN` is its catalog (the settings of the browser) |

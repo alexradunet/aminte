@@ -1,4 +1,4 @@
-// Package whatsapp is the adapter between the agent and WhatsApp. It uses whatsmeow, the Go client of the WhatsApp
+// Package whatsapp is the adapter between the relay and WhatsApp. It uses whatsmeow, the Go client of the WhatsApp
 // Web protocol. The state folder holds the session store, which has the keys of the account.
 //
 // The connection to WhatsApp has no test: it needs a real number. The filter, the QR renderer and the state folder
@@ -23,7 +23,7 @@ import (
 // ErrNotPaired is the error of a store with no device: run the login first.
 var ErrNotPaired = errors.New("not paired: run lifelog whatsapp login")
 
-// StateDir is the state folder of the agent: os.UserConfigDir()/lifelog-whatsapp.
+// StateDir is the state folder of the relay: os.UserConfigDir()/lifelog-whatsapp.
 func StateDir() (string, error) {
 	base, err := os.UserConfigDir()
 	if err != nil {

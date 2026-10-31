@@ -24,11 +24,7 @@ The database it writes is specified independently of it, so another program — 
 
 ```
 go build -o lifelog ./cmd/lifelog   # Go >= 1.27, no cgo
-go build -C extensions/web -o ../../lifelog-web ./cmd/lifelog-web   # the browser, beside lifelog (an extension)
-go build -C extensions/mcp -o ../../lifelog-mcp ./cmd/lifelog-mcp   # the MCP server, beside lifelog (an extension)
-go build -C extensions/agentic -o ../../lifelog-agentic-init ./cmd/lifelog-agentic-init   # agentic-init, beside lifelog (an extension)
-go build -C extensions/whatsapp -o ../../lifelog-whatsapp ./cmd/lifelog-whatsapp   # the WhatsApp agent, beside lifelog (an extension)
-go build -C extensions/ticktick -o ../../lifelog-ticktick ./cmd/lifelog-ticktick   # TickTick, the first connected app, beside lifelog (an extension)
+for d in extensions/*/; do go build -C "$d" -o "$PWD/" ./cmd/...; done   # every extension, beside lifelog: lifelog-web, lifelog-mcp, lifelog-agent, lifelog-whatsapp, lifelog-ticktick, ...
 lifelog init                               # life.db beside the program; --db PATH or $LIFELOG_DB names another
 lifelog agentic-init                       # AGENTS.md, skills and MCP configs here, for a coding agent opened here
 
@@ -38,7 +34,7 @@ lifelog day --human
 mkdir -p ~/life && (umask 077; head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n' > ~/life/token)   # a token file: 64 characters
 lifelog serve                              # the API on http://127.0.0.1:7777: Siren JSON, this machine only
 lifelog serve --token-file ~/life/token --with web   # the browser too, on http://127.0.0.1:7780: log in with the token
-lifelog serve --token-file ~/life/token --with web --with whatsapp   # and the WhatsApp agent beside them
+lifelog serve --token-file ~/life/token --with web --with agent --with whatsapp   # and the agent that answers, and the WhatsApp transport, beside them
 lifelog mcp --agent lmstudio               # MCP on stdio (the extension lifelog-mcp); rows are written as agent:lmstudio
 lifelog snapshot --snapshots ~/snapshots --human  # life-YYYY-MM-DD.db and its restore check
 lifelog file memo.m4a --text memo.txt     # keep a file: its text, the original hashed and never stored
@@ -99,7 +95,7 @@ These are this application's own engineering decisions ([D14](docs/decisions/D14
       K["internal/api and cmd/lifelog: the API and the CLI"]
     end
     subgraph R3["ring 3: extensions"]
-      X["lifelog-web, lifelog-mcp, lifelog-agentic-init, lifelog-gphotos, lifelog-whatsapp, lifelog-ticktick: clients of API.md; they may serve a catalog of their own"]
+      X["lifelog-web, lifelog-mcp, lifelog-agentic-init, lifelog-gphotos, lifelog-agent, lifelog-whatsapp, lifelog-ticktick: clients of API.md; they may serve a catalog of their own"]
     end
     S --> C --> K --> X
   ```
@@ -244,8 +240,8 @@ These are this application's own engineering decisions ([D14](docs/decisions/D14
   the body, with the page's properties, links and actions when the page exists (as a series carries a metric's page,
   [plan 144](docs/plans/144-one-view-for-a-metric.md)), and `say`. The page of a live conversation links to it (rel
   `conversation`). A live conversation page keeps its title: it offers no
-  `rename` or `promote`, and `rename` to such a title is 409. The agent (`lifelog whatsapp`) watches today's page
-  and answers on it; the core calls no model. The conversation names each address in the tool lines of a turn as a
+  `rename` or `promote`, and `rename` to such a title is 409. The agent (`lifelog-agent`, run by `serve --with agent`) reads
+  today's page, answers a turn of the owner on it and writes as `agent:lifelog`; the core calls no model. The conversation names each address in the tool lines of a turn as a
   `ref`, and `?embed=ref` ([embedding](API.md#embedding)) replaces it by the entity that the server's own handler
   answers, as the writer `agent:embed`: an owner-only read such as `/settings` or `/integrity` is refused, and its
   `ref` stays a link. A client draws the entity that answers as a card by its class.
@@ -405,7 +401,8 @@ which the CLI's `get` and the MCP tool `get` read.
 | `client/tools` | the catalog as the functions of a model: a tool for each action that is not the owner's, its JSON Schema from the fields, the arguments flattened to form values; public: the MCP server and the chat agent build their lists from it | its table tests |
 | `extensions/web` | its own module, `lifelog-web`: the browser; it draws the answers of the API as HTML and owns the login, the lock, the forms and its settings; it imports `lifelog/siren`, `lifelog/client`, `lifelog/app` and `lifelog/text` of the root module (a `replace` directive), and nothing of `lifelog/internal` | the tests of its packages (`go test ./...` in the folder); `e2e_test.go` builds the real `lifelog` and `lifelog-web` and runs `lifelog serve --with web`; `web/parity_test.go` holds a form for each action |
 | `extensions/mcp` | its own module, `lifelog-mcp`: the catalog as MCP tools, over HTTP; it imports `lifelog/siren`, `lifelog/client` and `lifelog/client/tools` of the root module (a `replace` directive), and nothing of `lifelog/internal` | `mcp.New` on a fake catalog (`go test ./...` in the folder); `TestTheMCPServerOnTheRealLifelog` builds the real `lifelog` and `lifelog-mcp` and runs `lifelog mcp --agent test` |
-| `extensions/whatsapp` | its own module, `lifelog-whatsapp`: an always-on agent; the owner writes on WhatsApp, a model answers through the action catalog; it imports `lifelog/siren`, `lifelog/client` and `lifelog/client/tools` of the root module (a `replace` directive), and nothing of `lifelog/internal` | the tests of its packages (`go test ./...` in the folder); `e2e_test.go` builds the real `lifelog` |
+| `extensions/agent` | its own module, `lifelog-agent`: the agent; it reads the conversation page, calls a model through the action catalog, and writes the answer on the page as `agent:lifelog`; it imports `lifelog/siren`, `lifelog/client` and `lifelog/client/tools` of the root module (a `replace` directive), and nothing of `lifelog/internal` | the tests of its packages on a fake catalog and a fake model (`go test ./...` in the folder); `e2e_test.go` builds the real `lifelog` and `lifelog-agent` and runs `lifelog serve --with agent` with a fake model server |
+| `extensions/whatsapp` | its own module, `lifelog-whatsapp`: the transport between WhatsApp and the conversation page; a message of the owner becomes `say`, and each new turn of the page goes to the phone; it calls no model; it imports `lifelog/siren` and `lifelog/client` of the root module (a `replace` directive), and nothing of `lifelog/internal` | the tests of its packages (`go test ./...` in the folder); `e2e_test.go` builds the real `lifelog`, and runs the relay with a fake chat against the real `lifelog serve` |
 | `extensions/ticktick` | its own module, `lifelog-ticktick`: TickTick, the task service ([a task service](extensions/README.md#a-task-service)); it polls the done tasks into the day pages as `import:ticktick` and serves the task protocol (`lifelog` builds the entities of Tasks under `/tasks`, and `lifelog-web` draws them); it imports `lifelog/siren`, `lifelog/client` and `lifelog/app` of the root module (a `replace` directive), and nothing of `lifelog/internal` | the tests of its packages against a fake TickTick (`go test ./...` in the folder); `e2e_test.go` builds the real `lifelog` and runs `lifelog serve --with ticktick` |
 | `extensions/agentic` | its own module, `lifelog-agentic`: `lifelog agentic-init`, the texts and MCP configs for a coding agent opened in the folder of the program; it reads `LIFELOG_EXE` and `LIFELOG_DB`, and imports nothing of `lifelog/internal` | `agentic.Files` and `agentic.Init` on the `Paths` of a temporary folder (`go test ./...` in the folder); `e2e_test.go` builds the real `lifelog`, `lifelog-mcp` and `lifelog-agentic-init` |
 | `internal/scaletest` | the synthetic personas and the lifetime workload of `tools/lifescale`: generators, an oracle and the timed checks | `scaletest.Run` with the profile `small`, in the baseline |
@@ -450,9 +447,12 @@ the program `LIFELOG_URL` (the API of the file), `LIFELOG_EXE` and `LIFELOG_DB`.
   catalog that is not the owner's is a tool.
 - [`extensions/agentic`](extensions/agentic/README.md): `lifelog agentic-init [--force]`. It writes `AGENTS.md`, the
   skills and the MCP configs for a coding agent opened in the folder of the program.
-- [`extensions/whatsapp`](extensions/whatsapp/README.md): an always-on agent on WhatsApp, `lifelog whatsapp`. It answers
-  the owner's number through a model at an OpenAI-compatible endpoint and writes through the catalog as
-  `agent:whatsapp`.
+- [`extensions/agent`](extensions/agent/README.md): the agent that answers, `lifelog serve --with agent`. It reads the
+  conversation page, calls a model at an OpenAI-compatible endpoint, and writes through the catalog as `agent:lifelog`.
+  The chat of the browser and the chat of WhatsApp both get their answer from it.
+- [`extensions/whatsapp`](extensions/whatsapp/README.md): the WhatsApp transport, `lifelog serve --with whatsapp`. A
+  message from the owner's number becomes `say` with `via=whatsapp`, and each new turn of the conversation goes to the
+  phone. It calls no model.
 - [`extensions/ticktick`](extensions/ticktick/README.md): TickTick, the task service. What you finish in
   TickTick comes back as a `Done:` entry of its day, once. It is the task service:
   `lifelog` builds the entities of Tasks under `/tasks`, and `lifelog-web` draws them. `add-task` and the other actions
