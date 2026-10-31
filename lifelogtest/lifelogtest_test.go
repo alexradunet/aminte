@@ -7,8 +7,10 @@ import (
 	"strings"
 	"testing"
 
+	"lifelog/app"
 	"lifelog/client"
 	"lifelog/lifelogtest"
+	"lifelog/siren"
 )
 
 // TestTheServerAnswersAtItsAddressAndInProcess: one server answers the same entity over its socket and through its
@@ -63,5 +65,48 @@ func TestTwoServersAreTwoFiles(t *testing.T) {
 		if got := strings.Contains(string(body), "only in the first file"); got != want {
 			t.Errorf("%s: day holds the capture = %v, want %v", url, got, want)
 		}
+	}
+}
+
+// TestAConnectedAppIsInTheCatalogAndAnswersItsRoutes: Connect registers an app as the server does for a child of
+// `serve --with`: its action is in GET /actions with the prefix of the app, a write to /with/NAME/... reaches the app, and
+// the owner mark of the action is kept.
+func TestAConnectedAppIsInTheCatalogAndAnswersItsRoutes(t *testing.T) {
+	s := lifelogtest.New(t, "2026-03-04")
+	var got string
+	ping := siren.Action{Name: "ping", Title: "Ping", Method: "POST", Href: "/ping", Owner: true,
+		Fields: []siren.Field{{Name: "word", Type: "text", Title: "Word"}}}
+	s.Connect(t, "demo", app.Catalog("Demo", func(*http.Request) (*siren.Entity, error) {
+		return &siren.Entity{Class: []string{"demo"}, Title: "Demo"}, nil
+	}, []siren.Action{ping}, map[string]func(*http.Request) (*siren.Entity, error){
+		"ping": func(r *http.Request) (*siren.Entity, error) {
+			got = r.FormValue("word")
+			return &siren.Entity{Class: []string{"demo"}, Title: "Demo", Result: "pinged"}, nil
+		},
+	}))
+	c := client.Remote(s.URL, "ui", "")
+	catalog, err := c.Catalog(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var found *siren.Action
+	for i := range catalog {
+		if catalog[i].Name == "demo-ping" {
+			found = &catalog[i]
+		}
+	}
+	if found == nil || found.Href != "/with/demo/ping" || !found.Owner {
+		t.Fatalf("the action demo-ping in the catalog: %+v", found)
+	}
+	if _, err := c.Do(t.Context(), *found, map[string]string{"word": "hello"}); err != nil {
+		t.Fatal(err)
+	}
+	if got != "hello" {
+		t.Errorf("the app got the word %q, want hello", got)
+	}
+	// The owner rule is the server's: an agent is refused and the app is not called.
+	got = ""
+	if _, err := client.Remote(s.URL, "agent:test", "").Do(t.Context(), *found, map[string]string{"word": "no"}); err == nil || got != "" {
+		t.Errorf("an agent ran the owner action: err=%v, the app got %q", err, got)
 	}
 }

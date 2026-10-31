@@ -5,7 +5,10 @@ package web_test
 // both give a page, and the pages are compared byte for byte. Stage 3 deletes the browser of the core and this test with it.
 
 import (
+	"html"
+	"html/template"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"regexp"
 	"strings"
@@ -17,14 +20,52 @@ import (
 // is not a function of its entity, so the test replaces it by the same word in both pages.
 var importKey = regexp.MustCompile(`name="import_key" value="[A-Z2-7]{26}"`)
 
+// receipt is the one-use receipt of a toast: 64 characters of crypto/rand in the address of the page that a write returns to.
+var receipt = regexp.MustCompile(`feedback=[0-9a-f]{64}`)
+
+// wallTime finds a time element of a page. The database stamps a row it creates with its own wall clock, and not with
+// the fixed clock of the store, so two files made at two moments show two times. The fixed clock stands in 2031.
+var wallTime = regexp.MustCompile(`<time datetime="[^"]*" title="[^"]*">[^<]*</time>`)
+
+// withoutKeys replaces the parts of a page that are random or stamped by the wall clock: the key of a form, the receipt of
+// a toast and the times of the rows that the test made. It is the same word on both sides of a comparison.
 func withoutKeys(page string) string {
-	return importKey.ReplaceAllString(page, `name="import_key" value="KEY"`)
+	page = importKey.ReplaceAllString(page, `name="import_key" value="KEY"`)
+	page = receipt.ReplaceAllString(page, "feedback=RECEIPT")
+	return wallTime.ReplaceAllStringFunc(page, func(t string) string {
+		if strings.HasPrefix(t, `<time datetime="2031-`) {
+			return t
+		}
+		return "<time>WALL</time>"
+	})
 }
 
-// allowedHeaderDifferences are the headers that the two answers may not share, each with its reason. A difference that
-// is not here fails the test.
-var allowedHeaderDifferences = map[string]string{
-	"Vary": "the core answers one URL as JSON or as HTML, so it sends Vary: Accept; web answers HTML only",
+// multipartForm finds, in a page of web, the form of a file: the page to return to (back) is in the query of its address,
+// and not in a hidden field. Web streams the body of a file to the core and reads none of it (view.formView.ActionHref).
+// Before 'its hidden fields' the page has the start tag; the tail of the line holds the fields that stay hidden.
+var multipartForm = regexp.MustCompile(`(<form [^>]*action="[^"?]*)\?back=([^"]*)("[^>]*enctype="multipart/form-data"[^>]*>\n(?:<input type="hidden"[^>]*>)*)\n`)
+
+// withBackInTheBody turns the one difference of the copy of the view into the page of the core: it moves back from the
+// query of the address of a form of a file to the hidden field that the core draws, in its place.
+func withBackInTheBody(page string) string {
+	return multipartForm.ReplaceAllStringFunc(page, func(form string) string {
+		m := multipartForm.FindStringSubmatch(form)
+		back, _ := url.QueryUnescape(html.UnescapeString(m[2]))
+		return m[1] + m[3] + `<input type="hidden" name="back" value="` + template.HTMLEscapeString(back) + `">` + "\n"
+	})
+}
+
+// allowedHeaderDifferences are the headers that the two answers may not share, each with its reason and the check of
+// the difference. The check gets the header of web and the header of the core, and says whether the difference is the
+// one allowed. A difference that is not here fails the test.
+var allowedHeaderDifferences = map[string]struct {
+	reason string
+	check  func(web, core []string) bool
+}{
+	"Vary": {"the core answers one URL as JSON or as HTML, so it sends Vary: Accept; web answers HTML only",
+		func(web, core []string) bool { return len(web) == 0 && strings.Join(core, "|") == "Accept" }},
+	"Cache-Control": {"every answer of a session but an asset is no-store (lock.go); the local handler of the core sets none for a page",
+		func(web, core []string) bool { return strings.Join(web, "|") == "no-store" && len(core) == 0 }},
 }
 
 // allowedExtraHeaders are the headers that web may send and the core did not, each with its reason.
@@ -61,31 +102,41 @@ func TestPagesSideBySide(t *testing.T) {
 	l := richLife(t)
 	for _, uri := range routes(l) {
 		t.Run(uri, func(t *testing.T) {
-			want := ask(l.core.Handler, http.MethodGet, uri)
-			got := ask(l.web, http.MethodGet, uri)
-			if got.Code != want.Code {
-				t.Fatalf("status %d, want %d\n%.300s", got.Code, want.Code, got.Body.String())
-			}
-			for name, values := range want.Header() {
-				if _, allowed := allowedHeaderDifferences[name]; allowed {
-					continue
-				}
-				if strings.Join(got.Header()[name], "|") != strings.Join(values, "|") {
-					t.Errorf("header %s: %q, want %q", name, got.Header()[name], values)
-				}
-			}
-			for name := range got.Header() {
-				if _, ok := want.Header()[name]; !ok && allowedExtraHeaders[name] == "" {
-					t.Errorf("header %s: %q, which the core does not send", name, got.Header()[name])
-				}
-			}
-			if g, w := withoutKeys(got.Body.String()), withoutKeys(want.Body.String()); g != w {
-				t.Errorf("the page differs from the page of the core:\n%s", firstDifference(g, w))
-			}
-			if want.Code == http.StatusOK && want.Body.Len() == 0 {
-				t.Error("the page is empty")
-			}
+			samePage(t, ask(l.web, http.MethodGet, uri), ask(l.core.Handler, http.MethodGet, uri))
 		})
+	}
+}
+
+// samePage fails the test when the answer of web is not the answer of the core: the status, the headers and the bytes. The
+// differences that it allows are the entries of allowedHeaderDifferences and allowedExtraHeaders, the random keys (withoutKeys)
+// and the place of back in a form of a file (withBackInTheBody).
+func samePage(t *testing.T, got, want *httptest.ResponseRecorder) {
+	t.Helper()
+	if got.Code != want.Code {
+		t.Fatalf("status %d, want %d\n%.300s", got.Code, want.Code, got.Body.String())
+	}
+	names := map[string]bool{}
+	for name := range want.Header() {
+		names[name] = true
+	}
+	for name := range got.Header() {
+		names[name] = true
+	}
+	for name := range names {
+		web, core := got.Header()[name], want.Header()[name]
+		switch allowed, ok := allowedHeaderDifferences[name]; {
+		case strings.Join(web, "|") == strings.Join(core, "|"):
+		case ok && allowed.check(web, core):
+		case len(core) == 0 && allowedExtraHeaders[name] != "":
+		default:
+			t.Errorf("header %s: web %q, the core %q", name, web, core)
+		}
+	}
+	if g, w := withoutKeys(withBackInTheBody(got.Body.String())), withoutKeys(want.Body.String()); g != w {
+		t.Errorf("the page differs from the page of the core:\n%s", firstDifference(g, w))
+	}
+	if want.Code == http.StatusOK && want.Body.Len() == 0 {
+		t.Error("the page is empty")
 	}
 }
 

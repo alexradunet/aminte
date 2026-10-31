@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"lifelog-web/view"
 	"lifelog/siren"
@@ -15,14 +16,25 @@ import (
 const retryAfter = "1"
 
 // fail answers with the page of an error that web found itself: the core did not answer, or answered what is not a
-// core's answer. The page has no shell, because the shell is read from the core.
+// core's answer, or a guard of the door refused the request. The page has no shell, because the shell is read from the
+// core.
 func (b *Browser) fail(w http.ResponseWriter, r *http.Request, status int, code, msg string) {
 	e := &siren.Entity{Class: []string{"error"}, Title: "Error",
 		Links:      []siren.Link{{Rel: []string{"index"}, Href: "/", Title: "Home"}},
 		Properties: map[string]any{"status": status, "code": code, "message": msg}}
-	body, err := view.Draw(e, view.Facts{URL: r.URL})
+	b.bare(w, r, status, e)
+}
+
+// bare answers with the page of e with no shell: the page of an error that web found itself, the login and the lock. A
+// refusal of a form has a link back to the page that the form came from (backOf).
+func (b *Browser) bare(w http.ResponseWriter, r *http.Request, status int, e *siren.Entity) {
+	f := view.Facts{URL: r.URL}
+	if status >= http.StatusBadRequest {
+		f.Back = refererOf(r)
+	}
+	body, err := view.Draw(e, f)
 	if err != nil {
-		logFault(r, "the error page cannot be drawn", err)
+		logFault(r, "the page cannot be drawn", err)
 		status, body = http.StatusInternalServerError, []byte(view.DrawFailed)
 	}
 	var wait string
@@ -30,6 +42,18 @@ func (b *Browser) fail(w http.ResponseWriter, r *http.Request, status int, code,
 		wait = retryAfter
 	}
 	write(w, r, status, body, wait, false)
+}
+
+// refererOf is the page that a refused form came from, when it is a page of this server: the Referer of a POST that has
+// the host of the request. "" for any other request, and for a Referer of another host.
+func refererOf(r *http.Request) string {
+	if r.Method != http.MethodPost {
+		return ""
+	}
+	if ref, err := url.Parse(r.Referer()); err == nil && ref.Host == r.Host && strings.HasPrefix(ref.Path, "/") {
+		return ref.RequestURI()
+	}
+	return ""
 }
 
 // unreachable answers when a read of the core did not give an answer. A browser that went away gets nothing. A core that

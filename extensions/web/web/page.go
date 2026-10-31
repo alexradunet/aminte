@@ -18,8 +18,8 @@ import (
 // never takes it: the cards of a page are read by web itself.
 const embedField = "embed"
 
-// feedbackField is the one-use receipt of the toast after a write. Web alone reads it (the write side of web), so
-// web does not send it to the core.
+// feedbackField is the one-use receipt of the toast after a write (feedback.go). Web alone reads it, so web does not send
+// it to the core.
 const feedbackField = "feedback"
 
 // refRel is the rel of the sub-entities of a conversation that name what its agent touched.
@@ -56,25 +56,35 @@ func (b *Browser) page(w http.ResponseWriter, r *http.Request) {
 			b.fail(w, r, http.StatusBadGateway, siren.CodeUpstream, "the core gave an answer that is not an entity")
 			return
 		}
-		b.draw(w, r, res.StatusCode, e, res.Header.Get("Retry-After"))
+		b.draw(w, r, res.StatusCode, e, res.Header.Get("Retry-After"), view.Facts{URL: r.URL})
 	default:
 		stream(w, r, res)
 	}
 }
 
-// draw answers with the page of e, which the core answered with status. retryAfter is the header of that answer.
-func (b *Browser) draw(w http.ResponseWriter, r *http.Request, status int, e *siren.Entity, retryAfter string) {
+// draw answers with the page of e, which the core answered with status. retryAfter is the header of that answer. f holds
+// the facts that the caller knows: the address, and for the error of a form the text it sent and the page it came from.
+// The parts of a page that a GET adds (the day of Home, the view of a metric, the cards of a conversation, the form of
+// the settings of this browser, the toast) are not added to the answer of a POST.
+func (b *Browser) draw(w http.ResponseWriter, r *http.Request, status int, e *siren.Entity, retryAfter string, f view.Facts) {
 	var root *siren.Entity // the root of the API with the day of today and the chat embedded, when this page asked for it
-	if r.URL.Path == "/" && status < http.StatusBadRequest {
+	reading := r.Method != http.MethodPost
+	if reading && r.URL.Path == "/" && status < http.StatusBadRequest {
 		var ok bool
 		if root, e, ok = b.homeOf(r.Context(), e); !ok {
 			b.fail(w, r, http.StatusBadGateway, siren.CodeUpstream, "the core gave no day of today")
 			return
 		}
 	}
-	if status < http.StatusBadRequest {
+	if reading && status < http.StatusBadRequest {
 		if to := ownView(e); to != "" {
-			b.redirect(w, r, withQuery(to, coreQuery(r.URL)), http.StatusSeeOther)
+			// The query goes with the page, the receipt of the toast too: the toast is drawn where the browser lands.
+			if token := r.URL.Query().Get(feedbackField); token != "" {
+				if u, err := url.Parse(to); err == nil {
+					b.feedback.move(token, r.URL.Path, u.Path)
+				}
+			}
+			b.redirect(w, r, withQuery(to, r.URL.RawQuery), http.StatusSeeOther)
 			return
 		}
 		if slices.Contains(e.Class, "conversation") {
@@ -84,8 +94,17 @@ func (b *Browser) draw(w http.ResponseWriter, r *http.Request, status int, e *si
 				e = full
 			}
 		}
+		if r.URL.Path == "/settings" && slices.Contains(e.Class, "settings") {
+			b.offerBrowserSettings(r, e)
+		}
+		if r.Method == http.MethodGet {
+			if text := b.feedback.take(r.URL.Path, r.URL.Query().Get(feedbackField)); text != "" {
+				e.Result = text
+				w.Header().Set("Cache-Control", "no-store")
+				w.Header().Set("Referrer-Policy", "no-referrer")
+			}
+		}
 	}
-	f := view.Facts{URL: r.URL}
 	b.shellFacts(r, status, root, e, &f)
 	body, err := view.Draw(e, f)
 	if err != nil {
@@ -93,6 +112,24 @@ func (b *Browser) draw(w http.ResponseWriter, r *http.Request, status int, e *si
 		status, body = http.StatusInternalServerError, []byte(view.DrawFailed)
 	}
 	write(w, r, status, body, retryAfter, true)
+}
+
+// browserSettingsAction is the name that the core gives the action settings of this program: web is its name as a
+// connected app (extensions/README.md, "A catalog of its own"), and the core prefixes each name of an app.
+const browserSettingsAction = "web-settings"
+
+// offerBrowserSettings adds the form of this browser to the settings page, under the form of the core: the action
+// web-settings of the catalog of the core, with the values that this program keeps. Without `serve --with web` the core
+// has no such action, and the page is the page of the core.
+func (b *Browser) offerBrowserSettings(r *http.Request, e *siren.Entity) {
+	actions, err := b.core.catalog(r.Context())
+	if err != nil {
+		logFault(r, "the catalog of the core cannot be read", err)
+		return
+	}
+	if i := slices.IndexFunc(actions, func(a siren.Action) bool { return a.Name == browserSettingsAction }); i >= 0 {
+		e.Actions = append(e.Actions, withValues(actions[i], b.settings()))
+	}
 }
 
 // homeOf is the page of Home, from the root of the API read with ?embed=today,conversation: the day of today. The
@@ -157,10 +194,10 @@ func stream(w http.ResponseWriter, r *http.Request, res *http.Response) {
 }
 
 // relayed are the headers of a streamed answer that web passes to the browser: the ones that describe the content, how
-// long a browser keeps it, what a conditional or a range request needs, and the nosniff of the plain text of a route
-// that does not exist.
+// long a browser keeps it, what a conditional or a range request needs, and the nosniff and the Allow of the plain text of
+// a route that does not exist or does not take the method.
 var relayed = []string{"Content-Type", "Content-Length", "Content-Disposition", "Cache-Control", "ETag", "Last-Modified",
-	"Accept-Ranges", "Content-Range", "Retry-After", "X-Content-Type-Options"}
+	"Accept-Ranges", "Content-Range", "Retry-After", "X-Content-Type-Options", "Allow"}
 
 // write sends the page: its status, its body and its headers. A page of the shell asks the browser to prerender the
 // links of the rules in speculation.json. A 503 of the core keeps the Retry-After that the core sent.

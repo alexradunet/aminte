@@ -2,6 +2,8 @@ package view
 
 import (
 	"bytes"
+	"html"
+	"net/url"
 	"regexp"
 	"strings"
 	"testing"
@@ -429,5 +431,32 @@ func TestAFieldDrawsItsPlaceholderFromTheCatalog(t *testing.T) {
 	var b bytes.Buffer
 	if err := templates.ExecuteTemplate(&b, "form", f.Prompt("name", "kg")); err != nil || !strings.Contains(b.String(), `placeholder="kg"`) {
 		t.Errorf("Prompt does not replace the placeholder: %v\n%s", err, b.String())
+	}
+}
+
+// TestAMultipartFormCarriesBackInItsAddress: the page to return to is a hidden field of a form, and the query of the
+// address of a form with a file. Web streams the body of a file to the core and reads none of it, so it reads back from
+// the address. The form has one home for back: never both.
+func TestAMultipartFormCarriesBackInItsAddress(t *testing.T) {
+	const back = "/browse?kind=media&x=a b#row-1"
+	got, _ := drawForm(t, addFile(), "back", back)
+	m := regexp.MustCompile(` action="([^"]*)"`).FindStringSubmatch(got)
+	if m == nil {
+		t.Fatalf("the form has no address: %s", got)
+	}
+	u, err := url.Parse(html.UnescapeString(m[1]))
+	if err != nil || u.Path != "/files" || u.Query().Get("back") != back || len(u.Query()) != 1 {
+		t.Errorf("the address of a multipart form %q does not carry back %q (%v)", m[1], back, err)
+	}
+	if strings.Contains(got, `name="back"`) {
+		t.Errorf("a multipart form has back in its body too: %s", got)
+	}
+	got, _ = drawForm(t, addFile())
+	if !strings.Contains(got, `action="/files"`) || strings.Contains(got, "?back=") {
+		t.Errorf("a multipart form with no back has a query: %s", got)
+	}
+	got, _ = drawForm(t, filePages(nil), "back", "/browse")
+	if !strings.Contains(got, `action="/pages/file"`) || !strings.Contains(got, `<input type="hidden" name="back" value="/browse">`) {
+		t.Errorf("a form of text lost its hidden back: %s", got)
 	}
 }

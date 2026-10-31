@@ -12,10 +12,13 @@ import (
 	"image/jpeg"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"lifelog-web/web"
 	"lifelog/client"
@@ -25,13 +28,80 @@ import (
 
 const today = "2031-05-14"
 
-// life is a lifelog server with a synthetic file, and web in front of it.
+// testToken is the owner's token of the tests: 36 characters of no meaning.
+const testToken = "synthetic-token-synthetic-token-1234"
+
+// life is a lifelog server with a synthetic file, and web in front of it. web is a browser that has logged in: it sends
+// its session cookie with each request. browser is the handler itself, for a test that needs no cookie, or another.
 type life struct {
 	core    *lifelogtest.Server
 	api     *client.Client
-	web     *web.Browser
+	web     http.Handler
+	browser *web.Browser
+	cookie  string // the Cookie header of the logged-in browser
+	clock   *clock
+	state   string            // the state folder of web
 	hrefs   map[string]string // the addresses of the things that the file holds, by a short name
 	picture string            // the title of the file page that has a picture
+}
+
+// clock is the clock of web in the tests: it stands at 9 o'clock of the day, and a test moves it.
+type clock struct {
+	mu sync.Mutex
+	t  time.Time
+}
+
+func newClock() *clock { return &clock{t: time.Date(2031, 5, 14, 9, 0, 0, 0, time.UTC)} }
+
+func (c *clock) Now() time.Time {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.t
+}
+
+func (c *clock) add(d time.Duration) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.t = c.t.Add(d)
+}
+
+// newBrowser is a web over the core at coreURL, with its settings in the folder state.
+func newBrowser(t *testing.T, coreURL string, c *clock, state string) *web.Browser {
+	t.Helper()
+	b, err := web.New(web.Options{CoreURL: coreURL, Token: testToken, StateDir: state, Now: c.Now})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return b
+}
+
+// signedIn is a browser that has logged in to h: it adds its cookie to each request that has none.
+type signedIn struct {
+	h      http.Handler
+	cookie string
+}
+
+func (s signedIn) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if r.Header.Get("Cookie") == "" {
+		r.Header.Set("Cookie", s.cookie)
+	}
+	s.h.ServeHTTP(w, r)
+}
+
+// login logs in to h with the token of the tests and returns the Cookie header of the browser.
+func login(t *testing.T, h http.Handler) string {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodPost, "/login", strings.NewReader(url.Values{"token": {testToken}}.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	for _, c := range rec.Result().Cookies() {
+		if c.Name == "lifelog_session" {
+			return c.Name + "=" + c.Value
+		}
+	}
+	t.Fatalf("the login set no session cookie: %d", rec.Code)
+	return ""
 }
 
 // must returns the entity of a call of the client, or fails the test.
@@ -68,11 +138,11 @@ func href(e *siren.Entity, rel string) string {
 func emptyLife(t *testing.T) *life {
 	t.Helper()
 	core := lifelogtest.New(t, today)
-	browser, err := web.New(web.Options{CoreURL: core.URL})
-	if err != nil {
-		t.Fatal(err)
-	}
-	return &life{core: core, api: client.Remote(core.URL, "cli", ""), web: browser, hrefs: map[string]string{}}
+	clk := newClock()
+	state := t.TempDir()
+	browser := newBrowser(t, core.URL, clk, state)
+	cookie := login(t, browser)
+	return &life{core: core, api: client.Remote(core.URL, "cli", ""), web: signedIn{browser, cookie}, browser: browser, cookie: cookie, clock: clk, state: state, hrefs: map[string]string{}}
 }
 
 // do runs the action of the resource at from.

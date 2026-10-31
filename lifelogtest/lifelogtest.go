@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"lifelog/client"
 	"lifelog/internal/api"
 	"lifelog/internal/core"
 	"lifelog/internal/db/dbtest"
@@ -23,6 +24,7 @@ type Server struct {
 	// Handler is the handler that answers at URL. A test calls it in the process to compare its answer with the
 	// answer of another program that reads through URL.
 	Handler http.Handler
+	apps    *api.Apps
 }
 
 // New makes a fresh life.db in the folder of t, and a server over it. The clock of the server stands at the start of
@@ -36,8 +38,31 @@ func New(t testing.TB, day string) *Server {
 	}
 	store := &core.Store{DB: dbtest.New(t), Clock: func() time.Time { return start }, Zone: time.UTC}
 	store.SettingsPath = core.SettingsPathFor(store.DB.Path()) // beside the file, as the program puts it
-	handler := api.New(store)
+	apps := api.NewApps()
+	handler := api.NewWith(store, apps)
 	server := httptest.NewServer(handler)
 	t.Cleanup(server.Close) // t.Cleanup runs last in, first out: the server closes before the file
-	return &Server{URL: server.URL, Handler: handler}
+	return &Server{URL: server.URL, Handler: handler, apps: apps}
+}
+
+// Connect registers h as the connected app name, as `lifelog serve --with name` does when the program answers its
+// handshake (extensions/README.md, "A catalog of its own"): its actions join GET /actions as name-action, and the routes
+// under /with/name forward to it. h runs in the process, on a loopback socket that the cleanup of t closes before the
+// server. It fails t when the catalog is refused, with the words of the server.
+func (s *Server) Connect(t testing.TB, name string, h http.Handler) {
+	t.Helper()
+	app := httptest.NewServer(h)
+	t.Cleanup(app.Close)
+	c := client.Remote(app.URL, "", "")
+	catalog, err := c.Get(t.Context(), "/actions")
+	if err != nil {
+		t.Fatalf("lifelogtest.Connect %s: GET /actions: %v", name, err)
+	}
+	title := name
+	if home, err := c.Get(t.Context(), "/"); err == nil && home.Title != "" {
+		title = home.Title
+	}
+	if err := s.apps.Set(name, app.URL, title, catalog.Actions); err != nil {
+		t.Fatalf("lifelogtest.Connect %s: %v", name, err)
+	}
 }

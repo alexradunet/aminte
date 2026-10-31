@@ -3,6 +3,7 @@ package view
 import (
 	"cmp"
 	"fmt"
+	"net/url"
 	"slices"
 	"strings"
 	"unicode/utf8"
@@ -137,6 +138,15 @@ func (f *formView) Multipart() bool {
 		}
 	}
 	return false
+}
+
+// ActionHref is the address the form posts to. The page to return to (back) is a hidden field of the form; a multipart
+// form puts it in the query of the address instead (web streams the body of a file and does not read it).
+func (f *formView) ActionHref() string {
+	if f.Back == "" || !f.Multipart() {
+		return f.Href
+	}
+	return f.Href + "?back=" + url.QueryEscape(f.Back)
 }
 
 // fieldView is a field as the "field" template draws it: the field, and whether the browser starts in it.

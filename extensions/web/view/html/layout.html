@@ -165,9 +165,11 @@
      field, so a form needs no layout of its own; the catalog says how tall an area is and which action is a danger.
      The optional fields a view folds are under "More fields": still in the form, so they are sent with no script
      (docs/plans/095-the-leaf-and-its-margin.md). A second action of the form (formView.Or) is a button after its own, which
-     sends the form to that action's address. */}}
-{{define "form"}}{{with .}}<form{{with .ID}} id="{{.}}"{{end}} method="{{.Method}}" action="{{.Href}}"{{with .Class}} class="{{.}}"{{end}}{{with .Autocomplete}} autocomplete="{{.}}"{{end}}{{if .Multipart}} enctype="multipart/form-data"{{end}}{{if not .Aria}} data-action="{{.Name}}"{{end}}>
-{{range .Hidden}}<input type="hidden" name="{{.Name}}" value="{{num .Value}}">{{end}}{{with .Back}}<input type="hidden" name="back" value="{{.}}">{{end}}
+     sends the form to that action's address. The page to return to (back) is a hidden field. A multipart form (a file)
+     puts it in the query of the action instead: web streams the body to the core and does not read it, so it must read
+     back from the address. */}}
+{{define "form"}}{{with .}}<form{{with .ID}} id="{{.}}"{{end}} method="{{.Method}}" action="{{.ActionHref}}"{{with .Class}} class="{{.}}"{{end}}{{with .Autocomplete}} autocomplete="{{.}}"{{end}}{{if .Multipart}} enctype="multipart/form-data"{{end}}{{if not .Aria}} data-action="{{.Name}}"{{end}}>
+{{range .Hidden}}<input type="hidden" name="{{.Name}}" value="{{num .Value}}">{{end}}{{with .Back}}{{if not $.Multipart}}<input type="hidden" name="back" value="{{.}}">{{end}}{{end}}
 {{range .Fields false}}{{template "field" .}}{{end}}{{with .Fields true}}<details class="more-fields"{{if $.MoreOpen}} open{{end}}><summary>{{count (len .) "more field" "more fields"}}</summary>
 {{range .}}{{template "field" .}}{{end}}</details>
 {{end}}{{if .Preview}}<button type="submit" class="quiet" formaction="/render" formmethod="POST" formenctype="application/x-www-form-urlencoded" formtarget="_blank">Preview</button>{{end}}<button{{if .Aria}} class="remove" aria-label="{{.Aria}}"{{else if .Danger}} class="danger"{{else if .Primary}} class="primary"{{end}}>{{if .Opens}}Open{{else}}{{.Button}}{{end}}</button>{{with .Also}}<button{{if .Danger}} class="danger"{{end}} formaction="{{.Href}}" formnovalidate data-action="{{.Name}}">{{.Button}}</button>{{end}}</form>{{end}}{{end}}

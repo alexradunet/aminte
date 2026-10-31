@@ -49,7 +49,7 @@ func (b *Browser) shellFacts(r *http.Request, status int, root, e *siren.Entity,
 		return
 	}
 	settings := b.settings()
-	shell.Ground, shell.LockMinutes = settings.Ground, settings.LockMinutes
+	shell.Ground, shell.LockMinutes = groundOf(settings), settings.lockMinutes()
 	if good && shell.Strip == nil {
 		logFault(r, "the Today strip cannot be read", errors.New("the root gave no day of today"))
 	}

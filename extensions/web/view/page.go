@@ -177,7 +177,7 @@ var viewOf = map[string]placing{
 	"browse":       {"browse", []string{"file-pages", "tombstone-pages", "random-page"}},
 	"metrics":      {"metrics", []string{"file-pages"}},
 	"conversation": {"conversation", []string{"save-body", "say", "file-pages"}},
-	"settings":     {"settings", []string{"settings"}},
+	"settings":     {"settings", []string{"settings", "web-settings"}},
 	"measurement":  {"measurement", []string{"correct"}},
 	"month":        {"month", []string{"create-page", "save-body"}},
 	"year":         {"year", []string{"create-page", "save-body"}},

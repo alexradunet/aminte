@@ -11,8 +11,11 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
+	"sync"
 	"syscall"
 	"time"
+	"unicode"
 
 	"lifelog-web/web"
 	"lifelog/app"
@@ -55,15 +58,31 @@ func (e *configError) Error() string { return e.msg }
 
 // run serves the browser until ctx ends. started is called with the address of the front door once it listens.
 //
-// The environment is LIFELOG_URL (the address of the core; required), LIFELOG_TOKEN (the bearer token of the core, when
-// the core checks one) and LIFELOG_WEB_LISTEN (a loopback address, 127.0.0.1:7780 by default).
+// The environment is LIFELOG_URL (the address of the core; required), LIFELOG_TOKEN (the owner's token; required: it is
+// the login of the browser and the bearer token of the core), LIFELOG_WEB_LISTEN (a loopback address, 127.0.0.1:7780 by
+// default), LIFELOG_WEB_ORIGINS (the origins that the guard of the writes trusts, separated by commas or spaces),
+// LIFELOG_WEB_STATE (the state folder; os.UserConfigDir()/lifelog-web by default) and LIFELOG_LISTEN (the loopback
+// address where the catalog of this program is served, which `lifelog serve --with web` sets; without it there is no
+// catalog).
+//
+// Two goroutines serve: the front door and the catalog. Each has one owner, which is this function. When either ends,
+// for an error or for the end of ctx, the context of both ends, both drain, and this function returns when both are done.
 func run(ctx context.Context, getenv func(string) string, started func(addr string)) error {
 	base := getenv("LIFELOG_URL")
 	if base == "" {
 		// There is no default: a guess such as 127.0.0.1:7777 may be the server of another file (extensions/README.md).
 		return &configError{"no LIFELOG_URL: run it as `lifelog serve --with web`, or as `lifelog web` on a life.db that exists"}
 	}
-	browser, err := web.New(web.Options{CoreURL: base, Token: getenv("LIFELOG_TOKEN")})
+	token := getenv("LIFELOG_TOKEN")
+	if token == "" {
+		// The token is the login of the browser. The core hands it to a child of `serve --public`.
+		return &configError{"no LIFELOG_TOKEN: it is the login of the browser. `lifelog serve --public --with web` gives it; for `lifelog web`, set it in the environment"}
+	}
+	state, err := stateDir(getenv)
+	if err != nil {
+		return &configError{"the state folder: " + err.Error()}
+	}
+	browser, err := web.New(web.Options{CoreURL: base, Token: token, Origins: strings.FieldsFunc(getenv("LIFELOG_WEB_ORIGINS"), isSeparator), StateDir: state})
 	if err != nil {
 		return &configError{err.Error()}
 	}
@@ -74,18 +93,44 @@ func run(ctx context.Context, getenv func(string) string, started func(addr stri
 	if err := checkLoopback(addr); err != nil {
 		return &configError{"LIFELOG_WEB_LISTEN: " + err.Error()}
 	}
+	catalog := getenv("LIFELOG_LISTEN") // app.Listen reads the same variable, and checks it again
+	if catalog != "" {
+		if err := checkLoopback(catalog); err != nil {
+			return &configError{"LIFELOG_LISTEN: " + err.Error()}
+		}
+	}
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
 		return err
 	}
 	started(ln.Addr().String())
-	// The next part of the extension serves the catalog of web on LIFELOG_LISTEN (app.Listen) beside this door, and
-	// ends both when either ends.
-	return serve(ctx, ln, browser)
+
+	ctx, stop := context.WithCancel(ctx)
+	defer stop()
+	var door, cat error
+	var wg sync.WaitGroup
+	wg.Go(func() { door = serve(ctx, ln, browser); stop() })
+	if catalog != "" {
+		wg.Go(func() { cat = app.Listen(ctx, browser.Catalog()); stop() })
+	}
+	wg.Wait()
+	return errors.Join(door, cat)
 }
 
-// checkLoopback refuses an address that is not host:port with a loopback IP. The proxy of the owner reaches the
-// browser through the loopback, and nothing else may: the door has no login of its own yet.
+// isSeparator splits LIFELOG_WEB_ORIGINS: a comma or a space.
+func isSeparator(r rune) bool { return r == ',' || unicode.IsSpace(r) }
+
+// stateDir is the state folder: LIFELOG_WEB_STATE, else os.UserConfigDir()/lifelog-web. The unit of the service lists the
+// default in ReadWritePaths (extensions/README.md, "Run by serve").
+func stateDir(getenv func(string) string) (string, error) {
+	if dir := getenv("LIFELOG_WEB_STATE"); dir != "" {
+		return dir, os.MkdirAll(dir, 0o700)
+	}
+	return app.StateDir("web")
+}
+
+// checkLoopback refuses an address that is not host:port with a loopback IP. The proxy of the owner reaches the browser
+// through the loopback, and nothing else may: the door serves plain HTTP, and TLS ends at the proxy.
 func checkLoopback(addr string) error {
 	host, _, err := net.SplitHostPort(addr)
 	if err != nil {

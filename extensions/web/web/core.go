@@ -74,7 +74,7 @@ func newCore(rawURL, token string) (*core, error) {
 // caller closes the body. header holds the headers of the browser's request that make sense for a read of the core
 // (conditional and range requests): nil for none.
 func (c *core) get(ctx context.Context, uri, writer string, header http.Header) (*http.Response, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.base+uri, nil)
+	req, err := c.request(ctx, http.MethodGet, uri, writer, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -83,12 +83,41 @@ func (c *core) get(ctx context.Context, uri, writer string, header http.Header) 
 			req.Header.Set(name, v)
 		}
 	}
+	return c.hc.Do(req)
+}
+
+// post sends a write of the browser to the core: the body as it is, with its type and its size (-1 when it is not
+// known). A body that streams (a file) is never held whole. The core is asked once: a write that was sent may be done,
+// and the browser decides what to do (the same rule as for a connected app, extensions/README.md).
+func (c *core) post(ctx context.Context, uri, writer string, body io.Reader, size int64, contentType string) (*http.Response, error) {
+	if size == 0 {
+		body = http.NoBody // a zero length with a body means "unknown" to the client
+	}
+	req, err := c.request(ctx, http.MethodPost, uri, writer, body)
+	if err != nil {
+		return nil, err
+	}
+	if size >= 0 {
+		req.ContentLength = size
+	}
+	if contentType != "" {
+		req.Header.Set("Content-Type", contentType)
+	}
+	return c.hc.Do(req)
+}
+
+// request is a request to the core that asks for Siren JSON, as writer, with the bearer token.
+func (c *core) request(ctx context.Context, method, uri, writer string, body io.Reader) (*http.Request, error) {
+	req, err := http.NewRequestWithContext(ctx, method, c.base+uri, body)
+	if err != nil {
+		return nil, err
+	}
 	req.Header.Set("Accept", sirenType)
 	req.Header.Set(siren.SourceHeader, writer)
 	if c.token != "" {
 		req.Header.Set("Authorization", "Bearer "+c.token)
 	}
-	return c.hc.Do(req)
+	return req, nil
 }
 
 // sirenType is the media type of the JSON of an entity.
@@ -103,9 +132,9 @@ func isSiren(res *http.Response) bool {
 	return strings.HasPrefix(res.Header.Get("Content-Type"), sirenType)
 }
 
-// readEntity reads the Siren entity that res holds, with the limit maxEntity. Numbers are float64, as the view reads
-// them. An answer that is not one entity is an error, never a half entity.
-func (c *core) readEntity(res *http.Response) (*siren.Entity, error) {
+// readBody reads the body of an answer of the core with the limit maxEntity. An answer that is larger is an error, never
+// a half answer. A body that stalls is ended after entityWait.
+func (c *core) readBody(res *http.Response) ([]byte, error) {
 	stall := time.AfterFunc(c.entityWait, func() { res.Body.Close() }) // ends a Read that waits for the core
 	defer stall.Stop()
 	body, err := io.ReadAll(io.LimitReader(res.Body, maxEntity+1))
@@ -115,6 +144,21 @@ func (c *core) readEntity(res *http.Response) (*siren.Entity, error) {
 	if len(body) > maxEntity {
 		return nil, fmt.Errorf("the answer is larger than %d bytes", maxEntity)
 	}
+	return body, nil
+}
+
+// readEntity reads the Siren entity that res holds. Numbers are float64, as the view reads them. An answer that is not
+// one entity is an error, never a half entity.
+func (c *core) readEntity(res *http.Response) (*siren.Entity, error) {
+	body, err := c.readBody(res)
+	if err != nil {
+		return nil, err
+	}
+	return entityOf(res, body)
+}
+
+// entityOf decodes body, the body of res, as one Siren entity.
+func entityOf(res *http.Response, body []byte) (*siren.Entity, error) {
 	e := &siren.Entity{}
 	if err := json.Unmarshal(body, e); err != nil {
 		return nil, fmt.Errorf("HTTP %d, not a Siren entity (%s)", res.StatusCode, res.Header.Get("Content-Type")) // never the body: it may be a picture or a page
@@ -173,4 +217,25 @@ func isRedirect(status int) bool {
 func isPath(to string) bool {
 	return strings.HasPrefix(to, "/") && !strings.HasPrefix(to, "//") && !strings.Contains(to, `\`) &&
 		strings.IndexFunc(to, func(c rune) bool { return c < 0x20 || c == 0x7f }) < 0
+}
+
+// errAnswer marks a core that answered, but not with what web asked for.
+var errAnswer = errors.New("the core gave an answer that web cannot use")
+
+// catalog is the actions of the core, from GET /actions. The catalog is the one list of the fields of an action, and it
+// holds the actions of the connected apps too.
+func (c *core) catalog(ctx context.Context) ([]siren.Action, error) {
+	res, err := c.get(ctx, "/actions", pageWriter, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusOK || !isSiren(res) {
+		return nil, fmt.Errorf("GET /actions: HTTP %d: %w", res.StatusCode, errAnswer)
+	}
+	e, err := c.readEntity(res)
+	if err != nil {
+		return nil, fmt.Errorf("GET /actions: %v: %w", err, errAnswer)
+	}
+	return e.Actions, nil
 }

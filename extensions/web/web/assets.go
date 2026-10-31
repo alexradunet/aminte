@@ -5,7 +5,6 @@ package web
 
 import (
 	"bytes"
-	"errors"
 	"mime"
 	"net/http"
 	"strings"
@@ -15,8 +14,8 @@ import (
 	"lifelog/siren"
 )
 
-// maxRequestBody is the largest body that web reads for /render. It is the limit of the core for a body that is not
-// a file.
+// maxRequestBody is the largest body that web reads: the text of a form (write.go) and /render. It is the limit of the
+// core for a body that is not a file.
 const maxRequestBody = 20 << 20
 
 // immutable and the other values are the Cache-Control of a file. A picture never changes under its name: app.css
@@ -82,24 +81,14 @@ func serveFile(w http.ResponseWriter, r *http.Request, name string, b []byte, ty
 
 // render is POST /render: a page that shows the field body (or text, a capture's) as its page will show it saved, the
 // Preview of a form that writes a body, opened in a new tab so the form keeps its words. It writes nothing and asks the
-// core for nothing: the page has no shell. It is behind the same guard of the origin as every write of a browser.
+// core for nothing: the page has no shell. The guard of the origin and the session of the door come before it.
 func (b *Browser) render(w http.ResponseWriter, r *http.Request) {
-	if err := b.guard.Check(r); err != nil {
-		b.fail(w, r, http.StatusForbidden, siren.CodeCrossOrigin, "cross-origin browser write refused")
-		return
-	}
 	if ct, _, _ := mime.ParseMediaType(r.Header.Get("Content-Type")); ct != "application/x-www-form-urlencoded" {
 		b.fail(w, r, http.StatusUnsupportedMediaType, siren.CodeUnsupportedMedia, "send application/x-www-form-urlencoded")
 		return
 	}
-	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBody)
-	if err := r.ParseForm(); err != nil {
-		var limit *http.MaxBytesError
-		if errors.As(err, &limit) {
-			b.fail(w, r, http.StatusRequestEntityTooLarge, siren.CodeTooLarge, "request body is larger than 20 MiB")
-			return
-		}
-		b.fail(w, r, http.StatusBadRequest, siren.CodeBadRequest, "body: "+err.Error())
+	if err := readForm(w, r, maxRequestBody, formWithin); err != nil {
+		b.refuseBody(w, r, err)
 		return
 	}
 	body := r.Form.Get("body")

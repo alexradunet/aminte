@@ -42,16 +42,13 @@ func (r *recorder) requests() []*http.Request {
 	return append([]*http.Request(nil), r.seen...)
 }
 
-// webOver is a web in front of h, which stands for the core.
-func webOver(t *testing.T, h http.Handler, token string) *web.Browser {
+// webOver is a web in front of h, which stands for the core, and a browser that has logged in to it.
+func webOver(t *testing.T, h http.Handler) http.Handler {
 	t.Helper()
 	server := httptest.NewServer(h)
 	t.Cleanup(server.Close)
-	b, err := web.New(web.Options{CoreURL: server.URL, Token: token})
-	if err != nil {
-		t.Fatal(err)
-	}
-	return b
+	b := newBrowser(t, server.URL, newClock(), t.TempDir())
+	return signedIn{b, login(t, b)}
 }
 
 // TestWebAsksTheCoreForSirenAsTheUI: a page is one read of the core for the page and one for the shell, and one for each
@@ -61,7 +58,7 @@ func webOver(t *testing.T, h http.Handler, token string) *web.Browser {
 func TestWebAsksTheCoreForSirenAsTheUI(t *testing.T) {
 	l := richLife(t)
 	rec := &recorder{next: l.core.Handler}
-	b := webOver(t, rec, "synthetic-token-synthetic-token-1234")
+	b := webOver(t, rec)
 	if page := ask(b, http.MethodGet, "/browse?kind=person&feedback=once&unfiled=1"); page.Code != http.StatusOK {
 		t.Fatalf("GET /browse: %d", page.Code)
 	}
@@ -181,10 +178,13 @@ func TestAStreamKeepsItsTypeAndItsBytes(t *testing.T) {
 		if got.Body.String() != want.Body.String() {
 			t.Errorf("GET %s: the bytes differ from the bytes of the core", uri)
 		}
-		for _, name := range []string{"Content-Type", "Content-Length", "Cache-Control"} {
+		for _, name := range []string{"Content-Type", "Content-Length"} {
 			if got.Header().Get(name) != want.Header().Get(name) {
 				t.Errorf("GET %s: %s is %q, want %q", uri, name, got.Header().Get(name), want.Header().Get(name))
 			}
+		}
+		if got.Header().Get("Cache-Control") != "no-store" { // the core keeps a picture for a year, and a locked browser would show it from the cache
+			t.Errorf("GET %s: Cache-Control is %q, want no-store", uri, got.Header().Get("Cache-Control"))
 		}
 		head := ask(l.web, http.MethodHead, uri)
 		if head.Code != http.StatusOK || head.Body.Len() != 0 || head.Header().Get("Content-Type") != "image/jpeg" {
@@ -200,7 +200,7 @@ func TestAStreamKeepsItsTypeAndItsBytes(t *testing.T) {
 // fileCore is a core that serves what the real core serves rarely: a file download with a Content-Disposition, an ETag
 // and a modification time, that takes a range; and the answers a wrong core could give. It is a fake of the boundary,
 // for the cases that the real core cannot make.
-func fileCore(t *testing.T) (*web.Browser, *recorder) {
+func fileCore(t *testing.T) (http.Handler, *recorder) {
 	t.Helper()
 	body := strings.Repeat("0123456789", 100)
 	mux := http.NewServeMux()
@@ -222,16 +222,17 @@ func fileCore(t *testing.T) (*web.Browser, *recorder) {
 		io.WriteString(w, "{not json")
 	})
 	rec := &recorder{next: mux}
-	return webOver(t, rec, ""), rec
+	return webOver(t, rec), rec
 }
 
 // TestAFileKeepsItsHeadersAndTakesARange: the headers that describe a download reach the browser, and a conditional or
-// range request of the browser reaches the core, so the browser can resume a download.
+// range request of the browser reaches the core, so the browser can resume a download. The Cache-Control of the core is
+// "private, no-cache"; every answer of a session is no-store (lock.go), so a snapshot of the owner is not kept either.
 func TestAFileKeepsItsHeadersAndTakesARange(t *testing.T) {
 	b, rec := fileCore(t)
 	got := ask(b, http.MethodGet, "/snapshots/life-2031-05-14.db")
 	for name, want := range map[string]string{"Content-Type": "application/vnd.sqlite3", "Content-Disposition": `attachment; filename="life-2031-05-14.db"`,
-		"Cache-Control": "private, no-cache", "Etag": `"v1"`, "Content-Length": "1000", "Accept-Ranges": "bytes"} {
+		"Cache-Control": "no-store", "Etag": `"v1"`, "Content-Length": "1000", "Accept-Ranges": "bytes"} {
 		if got.Header().Get(name) != want {
 			t.Errorf("%s is %q, want %q", name, got.Header().Get(name), want)
 		}
@@ -279,10 +280,7 @@ func TestACoreThatIsDownIsAnErrorPage(t *testing.T) {
 	}
 	addr := ln.Addr().String()
 	ln.Close()
-	b, err := web.New(web.Options{CoreURL: "http://" + addr})
-	if err != nil {
-		t.Fatal(err)
-	}
+	b := signedBrowser(t, "http://"+addr)
 	for _, uri := range []string{"/", "/days/2031-05-14", "/pages/1/preview"} {
 		got := ask(b, http.MethodGet, uri)
 		if got.Code != http.StatusServiceUnavailable || got.Header().Get("Retry-After") != "1" || !strings.Contains(got.Body.String(), "</html>") {
@@ -310,10 +308,7 @@ func TestAContextThatEndsStopsTheRequestToTheCore(t *testing.T) {
 		}
 	}))
 	t.Cleanup(core.Close)
-	b, err := web.New(web.Options{CoreURL: core.URL})
-	if err != nil {
-		t.Fatal(err)
-	}
+	b := signedBrowser(t, core.URL)
 
 	ctx, cancel := context.WithCancel(t.Context())
 	done := make(chan *httptest.ResponseRecorder, 1)
@@ -347,19 +342,19 @@ func TestAContextThatEndsStopsTheRequestToTheCore(t *testing.T) {
 	}
 }
 
-// TestAPageTakesNoEmbedAndAWriteTakesNoPost: embed is a parameter of the Siren answer, and the forms are the next part
-// of web: both are refused with their reason, and the core is not asked.
-func TestAPageTakesNoEmbedAndAWriteTakesNoPost(t *testing.T) {
+// TestAPageTakesNoEmbedAndAMethodThatIsNoneOfTheThreeIsRefused: embed is a parameter of the Siren answer, and a page has
+// no PUT or DELETE: both are refused with their reason, and the core is not asked.
+func TestAPageTakesNoEmbedAndAMethodThatIsNoneOfTheThreeIsRefused(t *testing.T) {
 	l := richLife(t)
 	rec := &recorder{next: l.core.Handler}
-	b := webOver(t, rec, "")
+	b := webOver(t, rec)
 	if got := ask(b, http.MethodGet, "/days?embed=ref"); got.Code != http.StatusUnprocessableEntity || !strings.Contains(got.Body.String(), "embed") {
 		t.Errorf("a page with embed: %d, want 422 with its reason", got.Code)
 	}
-	for _, method := range []string{http.MethodPost, http.MethodPut, http.MethodDelete} {
+	for _, method := range []string{http.MethodPut, http.MethodDelete, http.MethodPatch} {
 		got := ask(b, method, "/days/2031-05-14/capture")
-		if got.Code != http.StatusMethodNotAllowed || got.Header().Get("Allow") != "GET, HEAD" {
-			t.Errorf("%s: %d, Allow %q, want 405 with GET, HEAD", method, got.Code, got.Header().Get("Allow"))
+		if got.Code != http.StatusMethodNotAllowed || got.Header().Get("Allow") != "GET, HEAD, POST" {
+			t.Errorf("%s: %d, Allow %q, want 405 with GET, HEAD, POST", method, got.Code, got.Header().Get("Allow"))
 		}
 	}
 	if n := len(rec.requests()); n != 0 {
@@ -428,7 +423,7 @@ func TestTheOwnFilesAreTheFilesOfTheCore(t *testing.T) {
 func TestRenderDrawsTheBodyAndWritesNothing(t *testing.T) {
 	l := richLife(t)
 	rec := &recorder{next: l.core.Handler}
-	b := webOver(t, rec, "")
+	b := webOver(t, rec)
 	post := func(h http.Handler, contentType, body string, header ...string) *httptest.ResponseRecorder {
 		req := httptest.NewRequest(http.MethodPost, "/render", strings.NewReader(body))
 		req.Header.Set("Content-Type", contentType)
@@ -475,32 +470,48 @@ func TestRenderDrawsTheBodyAndWritesNothing(t *testing.T) {
 
 // TestNewRefusesAnAddressThatIsNotTheCore: the address must be http or https with a host and nothing else.
 func TestNewRefusesAnAddressThatIsNotTheCore(t *testing.T) {
+	options := func(base string) web.Options {
+		return web.Options{CoreURL: base, Token: testToken, StateDir: t.TempDir()}
+	}
 	for _, base := range []string{"", "127.0.0.1:7777", "ftp://127.0.0.1", "http://", "http://user:pass@127.0.0.1", "http://127.0.0.1/path", "http://127.0.0.1?x=1", "http://127.0.0.1#x"} {
-		if _, err := web.New(web.Options{CoreURL: base}); err == nil {
+		if _, err := web.New(options(base)); err == nil {
 			t.Errorf("New(%q) is accepted", base)
 		}
 	}
-	if _, err := web.New(web.Options{CoreURL: "http://127.0.0.1:7777/"}); err != nil {
+	if _, err := web.New(options("http://127.0.0.1:7777/")); err != nil {
 		t.Errorf("New with a trailing slash: %v", err)
-	}
-	if _, err := web.New(web.Options{CoreURL: "http://127.0.0.1:7777", Token: "two\nlines"}); err == nil {
-		t.Error("New with a token of two lines is accepted")
 	}
 }
 
+// signedBrowser is a web over the core at coreURL and a browser that has logged in to it.
+func signedBrowser(t *testing.T, coreURL string) http.Handler {
+	t.Helper()
+	b := newBrowser(t, coreURL, newClock(), t.TempDir())
+	return signedIn{b, login(t, b)}
+}
+
 // TestTheScriptsAreSmallAndAlone: the rule of the scripts (README.md). A page of the shell carries the one script
-// chat.js, and lock.js only when the lock is on, which it is not until the browser keeps its own settings. Each script
-// is under 80 lines. The forms of the pages work without them, so the page has no script that a form needs.
+// chat.js, and lock.js only when the lock is on. Each script is under 80 lines. The forms of the pages work without
+// them, so the page has no script that a form needs.
 func TestTheScriptsAreSmallAndAlone(t *testing.T) {
 	l := richLife(t)
 	const chat = `<script src="/assets/chat.js" defer></script>`
-	for _, uri := range []string{"/", "/browse", "/days/today/conversation", "/pages/999999", "/settings", "/actions"} {
+	uris := []string{"/", "/browse", "/days/today/conversation", "/pages/999999", "/settings", "/actions"}
+	for _, uri := range uris {
 		page := ask(l.web, http.MethodGet, uri).Body.String()
 		if strings.Count(page, "<script") != 1 || !strings.Contains(page, chat) {
 			t.Errorf("GET %s has %d script elements, want %s alone", uri, strings.Count(page, "<script"), chat)
 		}
 		if strings.Contains(page, "lock.js") {
 			t.Errorf("GET %s has the script of the lock, and the lock is off", uri)
+		}
+	}
+	setLock(t, l, "5", "4242")
+	const lock = `<script src="/assets/lock.js" data-minutes="5" defer></script>`
+	for _, uri := range uris {
+		page := ask(l.web, http.MethodGet, uri).Body.String()
+		if strings.Count(page, "<script") != 2 || !strings.Contains(page, chat) || !strings.Contains(page, lock) {
+			t.Errorf("GET %s with the lock on has %d script elements, want %s and %s", uri, strings.Count(page, "<script"), chat, lock)
 		}
 	}
 	for _, name := range []string{"chat.js", "lock.js"} {

@@ -72,6 +72,7 @@ func TestTheCoreDialsOnlyItsServer(t *testing.T) {
 var remoteAllowed = map[string]bool{
 	"cmd/lifelog/main.go":             true, // the --url of the owner: the lifelog server that the command line talks to
 	"internal/api/apitest/apitest.go": true, // the server that a test started over its own handler
+	"lifelogtest/lifelogtest.go":      true, // the app that a test started over its own handler (Server.Connect), as serve probes a child
 	"internal/api/with.go":            true, // a connected app that `serve --with` started, on the loopback address it gave (plan 154)
 	"cmd/lifelog/with.go":             true, // the same children, when serve probes them before it registers them (plan 154)
 }

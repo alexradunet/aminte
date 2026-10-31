@@ -3,6 +3,7 @@ package web
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 )
@@ -23,14 +24,22 @@ func TestABodyThatStallsEndsTheRead(t *testing.T) {
 	}))
 	t.Cleanup(core.Close)
 	t.Cleanup(func() { close(release) })
-	b, err := New(Options{CoreURL: core.URL})
+	b, err := New(Options{CoreURL: core.URL, Token: "synthetic-token-synthetic-token-1234", StateDir: t.TempDir()})
 	if err != nil {
 		t.Fatal(err)
 	}
 	b.core.entityWait = 50 * time.Millisecond
+	in := httptest.NewRecorder() // the browser logs in
+	form := httptest.NewRequest(http.MethodPost, "/login", strings.NewReader("token=synthetic-token-synthetic-token-1234"))
+	form.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	b.ServeHTTP(in, form)
 	start := time.Now()
 	rec := httptest.NewRecorder()
-	b.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/days/2031-05-14", nil))
+	req := httptest.NewRequest(http.MethodGet, "/days/2031-05-14", nil)
+	for _, c := range in.Result().Cookies() {
+		req.AddCookie(c)
+	}
+	b.ServeHTTP(rec, req)
 	if rec.Code != http.StatusBadGateway {
 		t.Errorf("a core that stalls: %d, want 502", rec.Code)
 	}
