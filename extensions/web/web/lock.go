@@ -35,21 +35,6 @@ func countsAsActivity(r *http.Request) bool {
 	return false
 }
 
-// localPath is next when it is a path of this origin, else "". It must start with one "/" and no "\": a browser reads
-// "//host" and "/\host" as another origin. A control character is refused too: a browser drops a tab or a line
-// break from a URL, which could turn "/<tab>/host" into "//host".
-func localPath(next string) string {
-	if !strings.HasPrefix(next, "/") || strings.HasPrefix(next, "//") || strings.HasPrefix(next, `/\`) {
-		return ""
-	}
-	for _, c := range next {
-		if c < 0x20 || c == 0x7f || c == '\\' {
-			return ""
-		}
-	}
-	return next
-}
-
 // serveSession serves a request of a browser with a session cookie. The caller has checked the cookie.
 func (b *Browser) serveSession(w http.ResponseWriter, r *http.Request, id string) {
 	now := b.now()
@@ -106,7 +91,10 @@ func (b *Browser) lockNow(w http.ResponseWriter, r *http.Request, id string, now
 // lockedPage is GET /locked: the page with the PIN field and nothing of the life log. A session that is not locked goes
 // on to next.
 func (b *Browser) lockedPage(w http.ResponseWriter, r *http.Request, locked bool) {
-	next := localPath(r.URL.Query().Get("next"))
+	next := r.URL.Query().Get("next")
+	if !isPath(next) { // a path of this origin only
+		next = ""
+	}
 	if !locked {
 		if next == "" {
 			next = "/"
@@ -123,7 +111,10 @@ func (b *Browser) lockedPage(w http.ResponseWriter, r *http.Request, locked bool
 // fifth ends the session. The log gets one line for each wrong PIN and never the PIN.
 func (b *Browser) unlock(w http.ResponseWriter, r *http.Request, id string, now time.Time, hash string, lockOn bool) {
 	parseErr := readForm(w, r, 4096, smallWithin)
-	next := localPath(r.PostForm.Get("next"))
+	next := r.PostForm.Get("next")
+	if !isPath(next) { // a path of this origin only
+		next = ""
+	}
 	open := next // where the right PIN goes
 	if open == "" {
 		open = "/"

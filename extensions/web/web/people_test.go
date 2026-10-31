@@ -1,8 +1,7 @@
 package web_test
 
 // The people list of Browse and the page of a person as the browser draws them: the words about the mentions, the face
-// of a person, and the rename and the edit of a person through web. The claims are those of the HTML part of the people
-// tests of the core (plan 161, stage 3), held here against the real core.
+// of a person, and the rename and the edit of a person through web. They run against the real core.
 
 import (
 	"fmt"
@@ -29,7 +28,7 @@ func TestPeopleListCarriesItsMentions(t *testing.T) {
 			anaHref = item.Href
 		}
 	}
-	body := htmlPageAt(t, l.web, "/browse?kind=person", http.StatusOK)
+	body := pageAt(t, l.web, "/browse?kind=person")
 	for _, s := range []string{
 		"mentioned on 3 pages, last Fri 9 Oct",
 		"mentioned on 1 page, last Fri 9 Oct",
@@ -51,7 +50,7 @@ func TestPeopleListShowsThePictureAPersonEmbeds(t *testing.T) {
 	l.do(t, href(ana, "self"), "save-body", map[string]string{"body": "![[Ana face.jpg]]\n\nMet at school."})
 	l.do(t, "/", "create-person", map[string]string{"title": "Sam"})
 
-	wantInPage(t, "the people sheet", htmlPageAt(t, l.web, "/browse?kind=person", http.StatusOK),
+	wantInPage(t, "the people sheet", pageAt(t, l.web, "/browse?kind=person"),
 		`<img class="face-picture" src="`+href(photo, "preview")+`" alt="" loading="lazy">`, `<span class="face-picture" aria-hidden="true">`)
 }
 
@@ -61,7 +60,7 @@ func TestMentionsHaveNoDayWhenNoDayPageLinks(t *testing.T) {
 	l.do(t, "/", "create-person", map[string]string{"title": "Lake"})
 	l.do(t, "/", "create-page", map[string]string{"title": "Trip", "body": "At [[Lake]]"})
 	l.do(t, "/", "create-page", map[string]string{"title": "Swim", "body": "In [[Lake]]"})
-	if body := htmlPageAt(t, l.web, "/browse?kind=person", http.StatusOK); !strings.Contains(body, "mentioned on 2 pages</span>") {
+	if body := pageAt(t, l.web, "/browse?kind=person"); !strings.Contains(body, "mentioned on 2 pages</span>") {
 		t.Errorf("the people sheet lacks the count without a day:\n%.2000s", body)
 	}
 }
@@ -74,10 +73,10 @@ func TestBrowseRowsNameTheirPicture(t *testing.T) {
 	l.do(t, "/pages/"+ids["Bo"], "set-cover", map[string]string{"title": "lake.jpg"})
 	preview := href(lake, "preview")
 
-	if body := htmlPageAt(t, l.web, "/browse?kind=media", http.StatusOK); !strings.Contains(body, `<img src="`+preview+`" alt="" loading="lazy"><span class="first">lake.jpg</span>`) {
+	if body := pageAt(t, l.web, "/browse?kind=media"); !strings.Contains(body, `<img src="`+preview+`" alt="" loading="lazy"><span class="first">lake.jpg</span>`) {
 		t.Error("the media tile does not draw the picture")
 	}
-	people := htmlPageAt(t, l.web, "/browse?kind=person", http.StatusOK)
+	people := pageAt(t, l.web, "/browse?kind=person")
 	if !strings.Contains(people, fmt.Sprintf(`<a class="entry named face" href="/pages/%s"><img class="face-picture" src="%s" alt="" loading="lazy">`, ids["Bo"], preview)) {
 		t.Error("the face does not draw the picture")
 	}
@@ -98,10 +97,10 @@ func TestBrowserStableNameResolution(t *testing.T) {
 	if rec.Code != http.StatusSeeOther || locationWithoutFeedback(t, rec.Header().Get("Location")) != "/pages/"+person {
 		t.Fatalf("rename: %d %q", rec.Code, rec.Header().Get("Location"))
 	}
-	if page := htmlPageAt(t, l.web, "/pages/"+person, http.StatusOK); !strings.Contains(page, "New person") {
+	if page := pageAt(t, l.web, "/pages/"+person); !strings.Contains(page, "New person") {
 		t.Error("the new title is absent from the page of the person")
 	}
-	if page := htmlPageAt(t, l.web, "/pages/"+ref, http.StatusOK); !strings.Contains(page, `href="/pages/`+person+`"`) {
+	if page := pageAt(t, l.web, "/pages/"+ref); !strings.Contains(page, `href="/pages/`+person+`"`) {
 		t.Error("the old reference does not link the person at the same address")
 	}
 }
@@ -114,7 +113,7 @@ func TestEditPersonThroughTheAPIAndTheBrowser(t *testing.T) {
 	self := href(sam, "self")
 	edit := act(t, sam, "edit-person")
 
-	wantInPage(t, "the person's page", htmlPageAt(t, l.web, self, http.StatusOK), `Edit name and dates`, `value="Samuel Ortiz"`, `value="1980-02-03"`)
+	wantInPage(t, "the person's page", pageAt(t, l.web, self), `Edit name and dates`, `value="Samuel Ortiz"`, `value="1980-02-03"`)
 	// A form of the browser sends every field; an empty date removes it.
 	rec := postForm(l.web, edit.Href, url.Values{"name": {"Samuel A. Ortiz"}, "birth_day": {""}, "death_day": {"2020-01-01"}}, "Referer", refererOnWeb(self))
 	if rec.Code != http.StatusSeeOther {

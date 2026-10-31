@@ -22,8 +22,7 @@ func periodWords(period any) string {
 // PeriodViews are the links to the views of a period page: a week, a month or a year has one, and a quarter links its
 // three months. Nil for a page that is not a period page.
 func (v *view) PeriodViews() []siren.Link {
-	props, _ := v.Props.(map[string]any)
-	period, _ := props["period"].(string)
+	period, _ := v.Props["period"].(string)
 	switch period {
 	case "week":
 		return []siren.Link{{Href: "/weeks/" + v.Title, Title: "The week view"}}

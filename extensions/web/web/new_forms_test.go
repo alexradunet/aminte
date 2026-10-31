@@ -19,48 +19,13 @@ var (
 	formActionAttribute = regexp.MustCompile(`\saction="([^"]*)"`)
 )
 
-// TestEveryActionOpensInABrowser: /actions is the way of a browser to every action of the catalog. An action with path
-// fields is a GET form of /actions that names it, and that page draws the action with its address filled in and its form
-// open. The action settings has no path field: it opens on its resource, the Settings page, which draws its form. That no
-// form of /actions posts to a templated address is held by TestEveryActionOfTheCatalogHasItsFormInWeb.
-func TestEveryActionOpensInABrowser(t *testing.T) {
-	l := emptyLife(t)
-	if page := wholePageAt(t, l, "/settings", http.StatusOK); !strings.Contains(page, `<form method="POST" action="/settings" autocomplete="off" data-action="settings">`) {
-		t.Errorf("the action settings does not open on /settings:\n%s", mainPartOf(page))
-	}
-	values := map[string]string{"id": "7", "day": "2031-05-03"}
-	opened := 0
-	for _, a := range must(t)(l.api.Get(t.Context(), "/actions")).Actions {
-		q := url.Values{"new": {a.Name}}
-		want := a.Href
-		for _, f := range a.Fields {
-			if f.In == "path" {
-				q.Set(f.Name, values[f.Name])
-				want = strings.ReplaceAll(want, "{"+f.Name+"}", values[f.Name])
-			}
-		}
-		if want == a.Href {
-			continue
-		}
-		page := wholePageAt(t, l, "/actions?"+q.Encode(), http.StatusOK)
-		form := regexp.MustCompile(`<details class="action" open>.*?<form[^>]* action="([^"]*)"`).FindStringSubmatch(page)
-		if form == nil || form[1] != want {
-			t.Errorf("/actions?%s: the open form posts to %v, want %s", q.Encode(), form, want)
-		}
-		opened++
-	}
-	if opened < 5 {
-		t.Errorf("%d actions of the catalog have a path field, want many: the test reads the wrong catalog", opened)
-	}
-}
-
 // TestAnOpenedActionWritesFromTheBrowser: the action that /actions opens posts to its resource, and the write is done there,
 // as from the own page of the resource.
 func TestAnOpenedActionWritesFromTheBrowser(t *testing.T) {
 	l := emptyLife(t)
 	p := l.do(t, "/", "create-page", map[string]string{"title": "Old name"})
 	id := fmt.Sprint(p.Properties.(map[string]any)["id"])
-	page := wholePageAt(t, l, "/actions?new=rename&id="+id, http.StatusOK)
+	page := pageAt(t, l.web, "/actions?new=rename&id="+id)
 	form := regexp.MustCompile(`<form[^>]* action="(/pages/` + id + `/rename)"`).FindStringSubmatch(page)
 	if form == nil {
 		t.Fatalf("/actions?new=rename&id=%s draws no form of the rename of the page:\n%s", id, mainPartOf(page))
@@ -90,12 +55,12 @@ func TestSnapshotIsTheOwnersFromABrowser(t *testing.T) {
 		}
 	}
 	// The link of Snapshot opens this form.
-	body := wholePageAt(t, l, "/actions?new=snapshot", http.StatusOK)
+	body := pageAt(t, l.web, "/actions?new=snapshot")
 	if !strings.Contains(body, `<details class="action" open><summary class="button">Take a snapshot <span class="owner">owner</span></summary>`) ||
 		!strings.Contains(body, `action="/snapshots"`) {
 		t.Errorf("the link of Snapshot does not open the form of the snapshot:\n%.800s", mainPartOf(body))
 	}
-	if body := wholePageAt(t, l, "/settings", http.StatusOK); !strings.Contains(body, `<a class="button" href="/actions?new=snapshot">Take a snapshot</a>`) {
+	if body := pageAt(t, l.web, "/settings"); !strings.Contains(body, `<a class="button" href="/actions?new=snapshot">Take a snapshot</a>`) {
 		t.Errorf("Settings has no link to the form of the snapshot:\n%.1500s", mainPartOf(body))
 	}
 }
@@ -104,7 +69,7 @@ func TestSnapshotIsTheOwnersFromABrowser(t *testing.T) {
 // ?new=NAME opens the form of that action on any page.
 func TestEveryKindOfTheNewMenuOpensItsForm(t *testing.T) {
 	l := lifeStartingOn(t, today)
-	day := wholePageAt(t, l, "/days/"+today, http.StatusOK)
+	day := pageAt(t, l.web, "/days/"+today)
 	menu := day[strings.Index(day, `<div class="new-menu" id="new-menu" popover>`):]
 	menu = menu[:strings.Index(menu, "</nav></div>")]
 	for _, kind := range []struct{ title, href, action, post string }{ // post: the address that the form of the action posts to
@@ -120,7 +85,7 @@ func TestEveryKindOfTheNewMenuOpensItsForm(t *testing.T) {
 			continue
 		}
 		to, _, _ := strings.Cut(kind.href, "#") // a browser sends no fragment
-		page := wholePageAt(t, l, to, http.StatusOK)
+		page := pageAt(t, l.web, to)
 		// An asked form of a head is an open dialog, not a modal one, in the place of its popover. The day draws a reading in
 		// a place of its own: a form that is open.
 		open := regexp.MustCompile(`(?s)<dialog class="menu-dialog" id="new-` + kind.action + `" closedby="any" aria-label="[^"]*" open>.*?<form method="POST" action="` + kind.post + `"`)
@@ -140,7 +105,7 @@ func TestEveryKindOfTheNewMenuOpensItsForm(t *testing.T) {
 // names. With no ?new= every form stays closed. A name that no action has is refused (422) and opens nothing.
 func TestALinkOpensAFormAndFillsItsFields(t *testing.T) {
 	l := lifeStartingOn(t, today)
-	people := wholePageAt(t, l, "/browse?kind=person&new=create-person&title=Ana+Popescu&name=Ana", http.StatusOK)
+	people := pageAt(t, l.web, "/browse?kind=person&new=create-person&title=Ana+Popescu&name=Ana")
 	form := people[strings.Index(people, `<dialog class="menu-dialog" id="new-create-person"`):]
 	form = form[:strings.Index(form, "</dialog>")]
 	for _, want := range []string{`<form method="POST" action="/people"`, `name="title" value="Ana Popescu"`, `name="name" value="Ana"`, `autofocus`} {
@@ -152,15 +117,15 @@ func TestALinkOpensAFormAndFillsItsFields(t *testing.T) {
 		t.Error("more than the asked form is open")
 	}
 
-	if body := wholePageAt(t, l, "/browse?kind=person", http.StatusOK); strings.Contains(body, `<details class="action" open>`) {
+	if body := pageAt(t, l.web, "/browse?kind=person"); strings.Contains(body, `<details class="action" open>`) {
 		t.Error("a list with no ?new= opens a form")
 	}
-	if body := wholePageAt(t, l, "/browse?kind=person&new=nothing&title=Ana", http.StatusUnprocessableEntity); strings.Contains(body, `<details class="action" open>`) {
+	if body := pageWithStatus(t, l.web, "/browse?kind=person&new=nothing&title=Ana", http.StatusUnprocessableEntity); strings.Contains(body, `<details class="action" open>`) {
 		t.Error("a name that no action has opens a form")
 	}
 
 	// Home is the page of today: New page is in the New menu of the rail, and the page has no fold of every create form.
-	home := wholePageAt(t, l, "/days/"+today, http.StatusOK)
+	home := pageAt(t, l.web, "/days/"+today)
 	if strings.Contains(home, `<details id="new">`) {
 		t.Error(`Home draws <details id="new">`)
 	}
@@ -177,10 +142,10 @@ func TestALinkOpensAFormAndFillsItsFields(t *testing.T) {
 func TestAFormDrawsTheHintAndTheActionsPageTheDescription(t *testing.T) {
 	l := emptyLife(t)
 	hint := "Make a person. The title is the short name that links use. The name is the full name."
-	if page := wholePageAt(t, l, "/browse?kind=person", http.StatusOK); !strings.Contains(page, hint) {
+	if page := pageAt(t, l.web, "/browse?kind=person"); !strings.Contains(page, hint) {
 		t.Errorf("/browse?kind=person does not draw the hint of create-person")
 	}
-	page := wholePageAt(t, l, "/actions", http.StatusOK)
+	page := pageAt(t, l.web, "/actions")
 	if strings.Contains(page, hint) || !strings.Contains(page, "Create a person: title is the permanent handle") {
 		t.Errorf("/actions does not draw the description of create-person")
 	}

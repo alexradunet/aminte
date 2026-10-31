@@ -1,8 +1,8 @@
 package web_test
 
 // The covers and the pictures as the browser draws them: the way to the picker of a cover, the picker, the upload and the
-// tile that set a cover, the cover on a page and on a day, the cell of the calendar, and the form of a new file. The claims
-// are those of the HTML part of the cover and file tests of the core (plan 161, stage 3), held here against the real core.
+// tile that set a cover, the cover on a page and on a day, the cell of the calendar, and the form of a new file. They run
+// against the real core.
 
 import (
 	"bytes"
@@ -99,13 +99,13 @@ func TestSetCoverFromAnyPage(t *testing.T) {
 		title string
 		self  string
 	}{{"Ana", href(ana, "self")}, {"Lake", href(lake, "self")}, {"Trip", href(trip, "self")}} {
-		wantInPage(t, "the page of "+e.title, htmlPageAt(t, l.web, e.self, http.StatusOK), `<a href="`+e.self+`/cover">Set cover photo</a>`)
+		wantInPage(t, "the page of "+e.title, pageAt(t, l.web, e.self), `<a href="`+e.self+`/cover">Set cover photo</a>`)
 	}
-	wantNotInPage(t, "the people sheet", htmlPageAt(t, l.web, "/browse?kind=person", http.StatusOK), `/cover"`) // no form to set a cover
+	wantNotInPage(t, "the people sheet", pageAt(t, l.web, "/browse?kind=person"), `/cover"`) // no form to set a cover
 	self := href(ana, "self")
-	wantNotInPage(t, "the page of Ana", htmlPageAt(t, l.web, self, http.StatusOK), `<figure class="cover">`) // it has no cover yet
+	wantNotInPage(t, "the page of Ana", pageAt(t, l.web, self), `<figure class="cover">`) // it has no cover yet
 
-	picker := htmlPageAt(t, l.web, self+"/cover", http.StatusOK)
+	picker := pageAt(t, l.web, self+"/cover")
 	wantInPage(t, "the picker", picker, `action="`+self+`/cover?back=`, `enctype="multipart/form-data"`, `name="original"`, `accept="image/*"`,
 		`<input type="hidden" name="title" value="Scan.jpg">`, `<img src="`+href(scan, "preview")+`" alt="" loading="lazy">`)
 
@@ -122,12 +122,12 @@ func TestSetCoverFromAnyPage(t *testing.T) {
 	if !strings.HasSuffix(cover, "/preview") {
 		t.Fatalf("Ana's page has no cover link: %+v", page.Links)
 	}
-	body := htmlPageAt(t, l.web, self, http.StatusOK)
+	body := pageAt(t, l.web, self)
 	if !strings.Contains(body, `<section class="cover-box" aria-label="Cover photo">`+"\n"+`<figure class="cover"><img src="`+cover+`" alt="`+title+`"></figure>`) ||
 		!strings.Contains(body, `<a href="`+self+`/cover">Change cover photo</a>`) || strings.Contains(body, "/previews?title=") {
 		t.Errorf("the cover is not drawn once, at the head of the margin, with the way to the picker")
 	}
-	wantInPage(t, "the people sheet", htmlPageAt(t, l.web, "/browse?kind=person", http.StatusOK), `<img class="face-picture" src="`+cover+`" alt="" loading="lazy">`)
+	wantInPage(t, "the people sheet", pageAt(t, l.web, "/browse?kind=person"), `<img class="face-picture" src="`+cover+`" alt="" loading="lazy">`)
 
 	// A tile of the picker is a form of the picture's title; it sends the reader back to the page.
 	rec = postForm(l.web, self+"/cover", url.Values{"title": {"Scan.jpg"}, "back": {self}}, "Referer", refererOnWeb(self+"/cover"))
@@ -139,7 +139,7 @@ func TestSetCoverFromAnyPage(t *testing.T) {
 		t.Errorf("the cover after the tile = %v, want Scan.jpg", chosen)
 	}
 	// The picker then marks the tile of the cover, and only that one.
-	marked := htmlPageAt(t, l.web, self+"/cover", http.StatusOK)
+	marked := pageAt(t, l.web, self+"/cover")
 	wantInPage(t, "the picker after the tile", marked, `<li class="tile current"><form method="post" action="`+self+`/cover"><input type="hidden" name="back" value="`+self+`"><input type="hidden" name="title" value="Scan.jpg">`)
 	if n := strings.Count(marked, `<li class="tile current">`); n != 1 {
 		t.Errorf("the picker marks %d tiles as the cover, want 1", n)
@@ -153,15 +153,15 @@ func TestTheCoverOfADay(t *testing.T) {
 	l := emptyLife(t)
 	l.do(t, "/days/2026-01-02", "capture", map[string]string{"text": "Words."})
 	plain := must(t)(l.api.Get(t.Context(), "/days/2026-01-02"))
-	if body := htmlPageAt(t, l.web, "/days/2026-01-02", http.StatusOK); href(plain, "choose-cover") == "" ||
+	if body := pageAt(t, l.web, "/days/2026-01-02"); href(plain, "choose-cover") == "" ||
 		!strings.Contains(body, `<a href="`+href(plain, "choose-cover")+`">Set cover photo</a>`) {
 		t.Errorf("a day with no cover does not lead to the picker")
 	}
-	wantNotInPage(t, "a day with no day page", htmlPageAt(t, l.web, "/days/2026-01-03", http.StatusOK), "Set cover photo")
+	wantNotInPage(t, "a day with no day page", pageAt(t, l.web, "/days/2026-01-03"), "Set cover photo")
 	f := l.do(t, "/", "add-file", map[string]string{"title": "Lake.jpg", "day": today, "original": pictureFileOf(t, "lake.jpg", 40, 30)})
 	day := must(t)(l.api.Get(t.Context(), "/days/"+today))
 	for _, path := range []string{"/days/" + today, href(day, "page")} {
-		body := htmlPageAt(t, l.web, path, http.StatusOK)
+		body := pageAt(t, l.web, path)
 		if !strings.Contains(body, `<figure class="cover"><img src="`+href(f, "preview")+`"`) || strings.Contains(body, "/previews?title=Lake.jpg") ||
 			strings.Contains(body, "Set cover photo") {
 			t.Errorf("%s does not draw its cover once, above it, or still offers to set one", path)
@@ -179,10 +179,10 @@ func TestAPictureTheBodyEmbedsBecomesTheCover(t *testing.T) {
 	}
 	trip := l.do(t, "/", "create-page", map[string]string{"title": "Trip", "body": "![[A.jpg]]\n\nSwam. ![[B.jpg]]"})
 	self := href(trip, "self")
-	if body := htmlPageAt(t, l.web, self, http.StatusOK); strings.Count(body, "/preview\"") != 1 {
+	if body := pageAt(t, l.web, self); strings.Count(body, "/preview\"") != 1 {
 		t.Errorf("the page draws %d pictures besides its body, want the cover alone", strings.Count(body, "/preview\""))
 	}
-	wantInPage(t, "the picker", htmlPageAt(t, l.web, self+"/cover", http.StatusOK),
+	wantInPage(t, "the picker", pageAt(t, l.web, self+"/cover"),
 		`<form method="post" action="`+self+`/cover"><input type="hidden" name="back" value="`+self+`"><input type="hidden" name="title" value="B.jpg">`)
 	rec := postForm(l.web, self+"/cover", url.Values{"title": {"B.jpg"}, "back": {self}}, "Referer", refererOnWeb(self))
 	if rec.Code != http.StatusSeeOther || !strings.HasPrefix(rec.Header().Get("Location"), self) {
@@ -203,7 +203,7 @@ func TestTheCalendarShowsTheCovers(t *testing.T) {
 	l := emptyLife(t)
 	f := l.do(t, "/", "add-file", map[string]string{"title": "Lake.jpg", "day": "2031-05-02", "original": pictureFileOf(t, "lake.jpg", 40, 30)})
 	l.do(t, "/days/2031-05-01", "capture", map[string]string{"text": "No photo."})
-	body := htmlPageAt(t, l.web, "/months/2031-05", http.StatusOK)
+	body := pageAt(t, l.web, "/months/2031-05")
 	if !strings.Contains(body, `<td class="written pictured"><a href="/days/2031-05-02"><img class="cell-cover" src="`+href(f, "preview")+`" alt="" loading="lazy">`) ||
 		strings.Count(body, `class="cell-cover"`) != 1 {
 		t.Errorf("the month does not draw the one cover behind its day")
@@ -224,9 +224,9 @@ func TestFileViews(t *testing.T) {
 		// the first picture of a day page is its cover, drawn above it and not again in the body
 		href(day, "page"): {`<figure class="cover"><img src="` + href(f, "preview") + `" alt="Lake.jpg">`, "Swam."},
 	} {
-		wantInPage(t, path, htmlPageAt(t, l.web, path, http.StatusOK), want...)
+		wantInPage(t, path, pageAt(t, l.web, path), want...)
 	}
-	wantNotInPage(t, "the day page", htmlPageAt(t, l.web, href(day, "page"), http.StatusOK), `/previews?title=Lake.jpg`) // the cover is not drawn twice
+	wantNotInPage(t, "the day page", pageAt(t, l.web, href(day, "page")), `/previews?title=Lake.jpg`) // the cover is not drawn twice
 }
 
 // TestAPhotosDay: a photo's own day is read from the original: the file keeps that day, and the page of that day shows
@@ -238,13 +238,13 @@ func TestAPhotosDay(t *testing.T) {
 		t.Fatalf("the day of the photo is %q, want the day of its EXIF", day)
 	}
 	day := must(t)(l.api.Get(t.Context(), "/days/2019-06-03"))
-	wantInPage(t, "the day page of the photo", htmlPageAt(t, l.web, href(day, "page"), http.StatusOK), `<figure class="cover"><img src="`+href(e, "preview")+`"`)
+	wantInPage(t, "the day page of the photo", pageAt(t, l.web, href(day, "page")), `<figure class="cover"><img src="`+href(e, "preview")+`"`)
 }
 
 // TestTheFileFormAsksForTheFileFirst: the file is the first field of New file, and it says what is kept.
 func TestTheFileFormAsksForTheFileFirst(t *testing.T) {
 	l := emptyLife(t)
-	page := htmlPageAt(t, l.web, "/browse?kind=media&new=add-file", http.StatusOK)
+	page := pageAt(t, l.web, "/browse?kind=media&new=add-file")
 	form := regexp.MustCompile(`(?s)<form[^>]*action="/files".*?</form>`).FindString(page)
 	file, title := strings.Index(form, `name="original"`), strings.Index(form, `name="title"`)
 	if form == "" || file < 0 || title < 0 || file > title || !strings.Contains(form, "the original stays where it is") {
@@ -256,7 +256,7 @@ func TestTheFileFormAsksForTheFileFirst(t *testing.T) {
 func TestTheCoverChooserLabelsTheNewPhotoOnce(t *testing.T) {
 	l := emptyLife(t)
 	trip := l.do(t, "/", "create-page", map[string]string{"title": "Trip"})
-	page := htmlPageAt(t, l.web, href(trip, "self")+"/cover", http.StatusOK)
+	page := pageAt(t, l.web, href(trip, "self")+"/cover")
 	if strings.Count(page, ">A new photo<") != 1 || strings.Contains(page, "never stored") {
 		t.Errorf("the new photo is labelled twice, or the old label is back")
 	}

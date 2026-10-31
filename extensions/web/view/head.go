@@ -13,10 +13,9 @@ import (
 // a page, a person, a file and a metric the facts of the page (a person's full name and dates, a file's type and short
 // SHA-256) and when it was created. Any other view has none.
 func (v *view) Meta() []template.HTML {
-	props, _ := v.Props.(map[string]any)
 	if v.placing().template == "generic" {
 		var out []template.HTML
-		for _, it := range scalarItems(props) {
+		for _, it := range scalarItems(v.Props) {
 			out = append(out, template.HTML(template.HTMLEscapeString(it)))
 		}
 		return out
@@ -26,7 +25,7 @@ func (v *view) Meta() []template.HTML {
 	}
 	var out []template.HTML
 	esc := template.HTMLEscapeString
-	if person, ok := props["person"].(map[string]any); ok {
+	if person, ok := v.Props["person"].(map[string]any); ok {
 		if name, _ := person["name"].(string); name != "" {
 			out = append(out, template.HTML(esc(name)))
 		}
@@ -37,7 +36,7 @@ func (v *view) Meta() []template.HTML {
 			out = append(out, template.HTML("died "+esc(v.Date(day))))
 		}
 	}
-	if file, ok := props["file"].(map[string]any); ok {
+	if file, ok := v.Props["file"].(map[string]any); ok {
 		if mime, _ := file["mime"].(string); mime != "" {
 			out = append(out, template.HTML(esc(mime)))
 		}
@@ -45,29 +44,22 @@ func (v *view) Meta() []template.HTML {
 			out = append(out, template.HTML(`<span title="SHA-256 of the original: `+esc(sha)+`">`+esc(sha[:12])+`…</span>`))
 		}
 	}
-	if at, _ := props["created_at"].(string); at != "" {
+	if at, _ := v.Props["created_at"].(string); at != "" {
 		out = append(out, "created "+v.When(at))
 	}
 	return out
 }
 
 // Structured are the properties of the generic view that the meta line does not carry: the objects and the lists, a
-// panel of their own. Nil when there is none.
-func (v *view) Structured() any {
-	props, ok := v.Props.(map[string]any)
-	if !ok {
-		return v.Props
-	}
+// panel of their own. Empty when there is none.
+func (v *view) Structured() map[string]any {
 	rest := map[string]any{}
-	for name, x := range props {
+	for name, x := range v.Props {
 		switch x.(type) {
 		case string, float64, bool:
 		default:
 			rest[name] = x
 		}
-	}
-	if len(rest) == 0 {
-		return nil
 	}
 	return rest
 }

@@ -46,19 +46,14 @@ func (v *view) CardOf(href string) Card { return v.cardOf(href, v.cards[href]) }
 var cardIcons = map[string]string{"page": "files", "person": "people", "file": "image", "metric": "metrics",
 	"series": "metrics", "measurement": "metrics", "search": "search", "conversation": "chat", "day": "calendar"}
 
-// cardOf is the card of the entity e at href. A nil entity, an entity with a property that JSON cannot carry, and
-// an entity of no title give the plain link.
+// cardOf is the card of the entity e at href. A nil entity and an entity of no title give the plain link.
 func (v *view) cardOf(href string, e *siren.Entity) Card {
 	link := Card{Href: href, Kind: "link", Title: linkWords(href)}
 	if e == nil {
 		return link
 	}
-	shape, err := jsonShape(e.Properties)
-	if err != nil {
-		return link
-	}
-	props, _ := shape.(map[string]any)
-	cv := &view{Entity: e, Props: shape, Shell: v.Shell}
+	props, _ := e.Properties.(map[string]any)
+	cv := &view{Entity: e, Props: props, Shell: v.Shell}
 	c := Card{Href: href, Title: e.Title}
 	switch kind := cardKind(e.Class); {
 	case kind == "day" || kind == "day-page":

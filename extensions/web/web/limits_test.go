@@ -1,16 +1,13 @@
 package web
 
 // The limits that web puts on what a browser sends, and on what it keeps for the browser: the size of a form, the shape
-// of the page to return to (back) and the clock of the receipt of a toast. These are the tests of the browser of the core
-// (internal/api/request_limits_test.go, serve_internal_test.go and feedback_internal_test.go), ported to web with their
-// cases and their numbers.
+// of the page to return to (back) and the clock of the receipt of a toast.
 //
 // The file is in package web, because backOf and the clock of the receipts are not exported. So it makes its own small
 // web in front of the real core (newLimitsBrowser). It cannot use the life of world_test.go, which is in package web_test.
 //
-// Not ported from TestRequestBufferLimits and TestARefusedLargeRequestClosesTheConnection:
-//   - The rows of the JSON body. Web takes no JSON (415: TestAWriteThatWebCannotMakeIsRefusedAndTheCoreIsNotAsked).
-//   - The rows of a body at the limit. They are writes of 20 MiB to the core. The core holds its own limit.
+// It has no row for a JSON body: web takes no JSON (415: TestAWriteThatWebCannotMakeIsRefusedAndTheCoreIsNotAsked). It
+// has no row for a body at the limit either: that is a write of 20 MiB to the core, and the core holds its own limit.
 
 import (
 	"bufio"
@@ -97,7 +94,7 @@ var limitsRows = []struct{ name, path, head string }{
 	{"the preview", "/render", "body="},
 }
 
-// Core test: TestRequestBufferLimits (the rows of the urlencoded body and of /render). A form of 1 MiB more than the limit
+// A form of 1 MiB more than the limit
 // is refused with 413 and a page. Web reads the limit and one byte more, and no other byte. http.MaxBytesReader asks for
 // one byte past the limit. It refuses the request when it gets that byte. Web does not ask the core.
 func TestAFormOfMoreThanTheLimitIsRefusedAfterTheLimitAndOneByte(t *testing.T) {
@@ -124,7 +121,7 @@ func TestAFormOfMoreThanTheLimitIsRefusedAfterTheLimitAndOneByte(t *testing.T) {
 	}
 }
 
-// Core test: TestARefusedLargeRequestClosesTheConnection. Through a real server, a form of more than 20 MiB gets 413 with
+// Through a real server, a form of more than 20 MiB gets 413 with
 // "Connection: close". Then the server closes the connection and reads no other request from it. Each request has 1 KiB
 // more than the limit. Without the close, net/http reads the rest of so short a body after the handler, and it keeps the
 // connection open for the next request.
@@ -207,7 +204,7 @@ var backOfCases = []struct{ back, want string }{
 	{"/%zz", ""}, // not a URL: the escape is not hex
 }
 
-// Core test: TestBackOf. backOf keeps a path on this server and drops every other value (docs/plans/091-the-browser-for-daily-use.md).
+// backOf keeps a path on this server and drops every other value (docs/plans/091-the-browser-for-daily-use.md).
 func TestBackOfKeepsAPathOnThisServerAndDropsEveryOtherValue(t *testing.T) {
 	if len(backOfCases) != 26 {
 		t.Fatalf("%d cases, want the 26 of the core", len(backOfCases))
@@ -219,7 +216,7 @@ func TestBackOfKeepsAPathOnThisServerAndDropsEveryOtherValue(t *testing.T) {
 	}
 }
 
-// Core test: FuzzBackOf. Whatever a form sends, backOf gives the fallback "" or the value itself. A value that it keeps
+// Whatever a form sends, backOf gives the fallback "" or the value itself. A value that it keeps
 // stays on this server when a browser follows it. The check reads the value as a browser does (the WHATWG URL standard): it
 // removes a tab and a newline, and it reads a backslash as a slash. It then resolves the value against a page of this
 // server. The host must not change. A kept value has no control character, because it goes into the header Location.
@@ -253,7 +250,7 @@ func FuzzBackOf(f *testing.F) {
 	})
 }
 
-// Core test: TestTheFeedbackReceiptsKeepTheMonotonicReading. The clock of the receipts is the clock of web. When the program
+// The clock of the receipts is the clock of web. When the program
 // gives none, it is time.Now, which has a monotonic reading. A receipt lives ten minutes (feedbackLifetime). That life must
 // not change when someone sets the wall clock. A time that keeps the monotonic reading is not equal to its Round(0).
 func TestTheClockOfTheReceiptsKeepsTheMonotonicReading(t *testing.T) {

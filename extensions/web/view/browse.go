@@ -23,11 +23,10 @@ type treeNode struct {
 // BrowseTree is the category tree of Browse as branches: each category under the one its path names, in the order
 // of the paths.
 func (v *view) BrowseTree() []*treeNode {
-	props, _ := v.Props.(map[string]any)
-	cats, _ := props["categories"].([]any)
+	cats, _ := v.Props["categories"].([]any)
 	links := v.Embedded("category")
 	current := ""
-	if in, _ := props["in"].(map[string]any); in != nil {
+	if in, _ := v.Props["in"].(map[string]any); in != nil {
 		current = Num(in["id"])
 	}
 	byPath := map[string]*treeNode{}
@@ -151,10 +150,9 @@ type crumb struct{ Title, Href string }
 // Crumbs is the way to the list as steps: each category on the path of the category the list is in, then the
 // list itself. The lists Not filed, Ghost pages and Deleted are one step. Everything has none.
 func (v *view) Crumbs() []crumb {
-	props, _ := v.Props.(map[string]any)
-	if in, _ := props["in"].(map[string]any); in != nil {
+	if in, _ := v.Props["in"].(map[string]any); in != nil {
 		path, _ := in["path"].(string)
-		cats, _ := props["categories"].([]any)
+		cats, _ := v.Props["categories"].([]any)
 		links := v.Embedded("category")
 		var out []crumb
 		for _, title := range strings.Split(path, "/") {
@@ -171,7 +169,7 @@ func (v *view) Crumbs() []crumb {
 		return out
 	}
 	for _, key := range [...][2]string{{"deleted", "Deleted"}, {"ghosts", "Ghost pages"}, {"unfiled", "Not filed"}} {
-		if on, _ := props[key[0]].(bool); on {
+		if on, _ := v.Props[key[0]].(bool); on {
 			return []crumb{{Title: key[1]}}
 		}
 	}
@@ -180,8 +178,7 @@ func (v *view) Crumbs() []crumb {
 
 // OtherCategories are the categories of a row of the list without the one the list is in: the badges of the row.
 func (v *view) OtherCategories(cats any) []any {
-	props, _ := v.Props.(map[string]any)
-	in, _ := props["in"].(map[string]any)
+	in, _ := v.Props["in"].(map[string]any)
 	var out []any
 	rows, _ := cats.([]any)
 	for _, x := range rows {
@@ -227,8 +224,7 @@ func (v *view) hereWith(set url.Values, drop ...string) string {
 // CategoryPaths gives each category's title its path in words ("Family › Cousins"), for the choices of a field of
 // categories; a title without a parent says the same as its option, so it is left out.
 func (v *view) CategoryPaths() map[string]string {
-	props, _ := v.Props.(map[string]any)
-	cats, _ := props["categories"].([]any)
+	cats, _ := v.Props["categories"].([]any)
 	out := map[string]string{}
 	for _, x := range cats {
 		c, _ := x.(map[string]any)

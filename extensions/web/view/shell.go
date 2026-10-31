@@ -154,8 +154,7 @@ func (v *view) IsConversation() bool { return slices.Contains(v.Class, "conversa
 
 // Turns are the turns of the conversation view, read from the property turns of the entity.
 func (v *view) Turns() []Turn {
-	props, _ := v.Props.(map[string]any)
-	return turnsOf(props)
+	return turnsOf(v.Props)
 }
 
 // turnsOf reads the property turns of a conversation, as the JSON client reads it.
@@ -181,8 +180,7 @@ type dayChip struct {
 // ChatDays are the chips of the day bar: the days before today that have a conversation page (Facts.ChatDays), the
 // day of the view when it is another day, and Today last. The chip of the day of the view is marked.
 func (v *view) ChatDays() []dayChip {
-	props, _ := v.Props.(map[string]any)
-	shown, today := Num(props["day"]), v.Today()
+	shown, today := Num(v.Props["day"]), v.Today()
 	days := slices.Clone(v.chatDays)
 	if shown != today && !slices.Contains(days, shown) && text.IsDay(shown) {
 		days = append(days, shown)

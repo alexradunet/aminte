@@ -5,7 +5,6 @@ package web_test
 // owner's browser gets. The view tests hold the rail drawn from a hand-made shell; these hold it from a real file.
 
 import (
-	"net/http"
 	"regexp"
 	"strings"
 	"testing"
@@ -26,17 +25,6 @@ var (
 	railLinkRE = regexp.MustCompile(`<a href="([^"#]+)"|<button type="button" (popovertarget="sections")`)
 )
 
-// shellPageOf is the page of web at uri, as the logged-in browser gets it. It fails the test when the status is not
-// 200, so that a test of the markup never reads the page of an error.
-func shellPageOf(t *testing.T, l *life, uri string) string {
-	t.Helper()
-	rec := ask(l.web, http.MethodGet, uri)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("GET %s: %d, want 200:\n%.500s", uri, rec.Code, rec.Body.String())
-	}
-	return rec.Body.String()
-}
-
 // railLinksOf are the addresses of the links of a part of the rail, in order, and the button that opens the sheet.
 func railLinksOf(part string) string {
 	var out []string
@@ -52,7 +40,7 @@ func TestTheRailDrawsNoMonth(t *testing.T) {
 	l := emptyLife(t)
 	l.do(t, "/days/"+today, "capture", map[string]string{"text": "Synthetic entry"})
 	for _, path := range []string{"/days/" + today, "/browse", "/integrity"} {
-		rail := railAsideRE.FindString(shellPageOf(t, l, path))
+		rail := railAsideRE.FindString(pageAt(t, l.web, path))
 		if rail == "" {
 			t.Fatalf("%s: no rail", path)
 		}
@@ -67,10 +55,10 @@ func TestTheRailDrawsNoMonth(t *testing.T) {
 // TestTheRailMarksTodayOnTodaysDay: the day of today is Today, and any other day is in the Calendar.
 func TestTheRailMarksTodayOnTodaysDay(t *testing.T) {
 	l := emptyLife(t)
-	if body := shellPageOf(t, l, "/days/"+today); !strings.Contains(body, `<a href="/days/today" aria-current="page" accesskey="t">`) {
+	if body := pageAt(t, l.web, "/days/"+today); !strings.Contains(body, `<a href="/days/today" aria-current="page" accesskey="t">`) {
 		t.Errorf("the day of today does not mark Today:\n%s", railAsideRE.FindString(body))
 	}
-	if body := shellPageOf(t, l, "/days/2031-05-13"); !strings.Contains(body, `<a href="/days" aria-current="page">`) {
+	if body := pageAt(t, l.web, "/days/2031-05-13"); !strings.Contains(body, `<a href="/days" aria-current="page">`) {
 		t.Errorf("another day does not mark Calendar:\n%s", railAsideRE.FindString(body))
 	}
 }
@@ -80,7 +68,7 @@ func TestTheRailMarksTodayOnTodaysDay(t *testing.T) {
 // hides, with no script. Each link is drawn once, and More is marked when the page is in the sheet.
 func TestTheBottomBarAndTheMoreSheetOfAPhone(t *testing.T) {
 	l := emptyLife(t)
-	body := shellPageOf(t, l, "/browse?kind=person")
+	body := pageAt(t, l.web, "/browse?kind=person")
 	bar, sheet := railBarRE.FindStringSubmatch(body), railSheetRE.FindStringSubmatch(body)
 	if bar == nil || sheet == nil {
 		t.Fatalf("no bottom bar or no sheet:\n%s", railAsideRE.FindString(body))
@@ -97,10 +85,10 @@ func TestTheBottomBarAndTheMoreSheetOfAPhone(t *testing.T) {
 	if !strings.Contains(sheet[1], `<button type="button" class="button small" popovertarget="sections" popovertargetaction="hide">Close</button>`) {
 		t.Error("the sheet has no Close")
 	}
-	if !strings.Contains(shellPageOf(t, l, "/integrity"), `<button type="button" popovertarget="sections" class="here">`) {
+	if !strings.Contains(pageAt(t, l.web, "/integrity"), `<button type="button" popovertarget="sections" class="here">`) {
 		t.Error("More is not marked on a page of the sheet")
 	}
-	if strings.Contains(shellPageOf(t, l, "/days/"+today), `popovertarget="sections" class="here">`) {
+	if strings.Contains(pageAt(t, l.web, "/days/"+today), `popovertarget="sections" class="here">`) {
 		t.Error("More is marked on Today")
 	}
 	if !strings.Contains(body, `content="width=device-width, initial-scale=1, viewport-fit=cover"`) {
@@ -113,7 +101,7 @@ func TestTheBottomBarAndTheMoreSheetOfAPhone(t *testing.T) {
 // (closedby). The button is drawn once too.
 func TestTheSearchDialogIsInThePageOnce(t *testing.T) {
 	l := emptyLife(t)
-	body := shellPageOf(t, l, "/days/"+today)
+	body := pageAt(t, l.web, "/days/"+today)
 	for _, want := range []string{
 		`<dialog class="palette" id="palette" closedby="any" aria-label="Search">` + "\n" + `<search><form method="GET" action="/search"><input type="search" name="q" autocomplete="off" aria-label="Search" placeholder="A page's title, or words of a body"></form></search>`,
 		`<button type="button" class="rail-search-link button" commandfor="palette" command="show-modal" aria-label="Search">`,
@@ -128,7 +116,7 @@ func TestTheSearchDialogIsInThePageOnce(t *testing.T) {
 // the previous and next day, and the footer says so. There is no script to take any other key.
 func TestTheAccessKeysAreInThePage(t *testing.T) {
 	l := emptyLife(t)
-	day := shellPageOf(t, l, "/days/"+today)
+	day := pageAt(t, l.web, "/days/"+today)
 	for _, want := range []string{
 		`<button type="button" class="rail-search button" commandfor="palette" command="show-modal" accesskey="k">`,
 		`<button type="button" class="button primary rail-new" popovertarget="new-menu" accesskey="n">`,
@@ -154,7 +142,7 @@ func TestTheSectionsAreTheSameOnEveryPageAndTheRightOneIsMarked(t *testing.T) {
 		{"/browse", "Browse"}, {"/browse?kind=person", "Browse"}, {"/browse?ghosts=1", "Browse"}, {"/metrics", "Metrics"},
 		{"/metrics/Weight", "Metrics"}, {"/days/" + today, "Today"}, {"/months/2031-05", "Calendar"}, {"/search", ""},
 	} {
-		body := shellPageOf(t, l, c.path)
+		body := pageAt(t, l.web, c.path)
 		bar := railBarRE.FindStringSubmatch(body)
 		if bar == nil {
 			t.Errorf("%s: no sections:\n%s", c.path, railAsideRE.FindString(body))
@@ -183,20 +171,20 @@ func TestTheSectionsAreTheSameOnEveryPageAndTheRightOneIsMarked(t *testing.T) {
 // beside Snapshot in the line of the owner. Each is marked on its own page.
 func TestTheRailHasChatAndSettings(t *testing.T) {
 	l := emptyLife(t)
-	body := shellPageOf(t, l, "/browse")
+	body := pageAt(t, l.web, "/browse")
 	for _, want := range []string{`<a href="/days/today/conversation"><span class="icon icon-chat" aria-hidden="true"></span>Chat</a>`,
 		` · <a href="/settings">Settings</a> · <a href="/actions?new=snapshot">Snapshot</a>`} {
 		if !strings.Contains(body, want) {
 			t.Errorf("the rail lacks %s", want)
 		}
 	}
-	if !strings.Contains(shellPageOf(t, l, "/days/today/conversation"), `<a href="/days/today/conversation" aria-current="page">`) {
+	if !strings.Contains(pageAt(t, l.web, "/days/today/conversation"), `<a href="/days/today/conversation" aria-current="page">`) {
 		t.Error("Chat is not marked on the conversation")
 	}
-	if !strings.Contains(shellPageOf(t, l, "/days/"+today+"/conversation"), `<a href="/days/today/conversation" aria-current="page">`) {
+	if !strings.Contains(pageAt(t, l.web, "/days/"+today+"/conversation"), `<a href="/days/today/conversation" aria-current="page">`) {
 		t.Error("Chat is not marked on the conversation of a day by its date")
 	}
-	if !strings.Contains(shellPageOf(t, l, "/settings"), `<a href="/settings" aria-current="page">Settings</a>`) {
+	if !strings.Contains(pageAt(t, l.web, "/settings"), `<a href="/settings" aria-current="page">Settings</a>`) {
 		t.Error("Settings is not marked on /settings")
 	}
 }

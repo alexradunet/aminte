@@ -55,13 +55,12 @@ func (v *view) shown(a siren.Action) *shownAction {
 // value but not shown, "outside" lists fields that controls outside the form send (the boxes of a list join the form
 // by its id) and that the form does not draw, "autofocus" names the field the browser starts in ("" for none),
 // "more" lists optional fields folded under "More fields" (docs/plans/095-the-leaf-and-its-margin.md; "*" folds every
-// field that the action does not require), "group" names the exclusive group of a boxed form (the browser keeps one form of a name open), "send" (any word) marks the text areas as the ones whose Enter key sends (enterkeyhint), "back" is the
+// field that the action does not require), "send" (any word) marks the text areas as the ones whose Enter key sends (enterkeyhint), "back" is the
 // page the browser returns to after the write (no field of the action: the server reads it, see backOf), "label"
 // ("field=words") gives a field a title in this form only (the score form calls its unit Range), "key"
 // ("field=letter") gives a field its access key (the words of an empty field are its Placeholder in the catalog; Prompt
 // replaces them for one form), "required" lists fields
-// that the form requires though the action does not, "pattern" ("field=regexp") is what the browser accepts in a
-// field (a score's range), "aria" is the aria-label of an icon-only
+// that the form requires though the action does not, "aria" is the aria-label of an icon-only
 // button that removes something (the × of a list: the button then has the class remove), and any other name fixes a
 // field to a value (hidden).
 type formView struct {
@@ -74,7 +73,6 @@ type formView struct {
 	NoPreview     bool          // the form has a text area but offers no Preview (the chat column)
 	Asked         bool          // the form the page's link asked for (?new=<name>): open
 	Opens         bool          // the form names the path fields of a templated action, and opens its form (opener)
-	Group         string        // boxed gives its <details> this name: of the forms with one name, one is open
 	Send          bool          // the Enter key of a text area sends the form (the chat)
 	Primary       bool          // the button is the primary one: a form with fields to fill
 	Aria          string        // the aria-label of the button, for a button that is a glyph (the ×)
@@ -84,7 +82,6 @@ type formView struct {
 	Hidden        []siren.Field
 	prompts       map[string]string            // field name to placeholder words
 	keys          map[string]string            // field name to its access key
-	patterns      map[string]string            // field name to the pattern of its value
 	labels        map[string]map[string]string // field name to the words of each of its options (Labels)
 }
 
@@ -152,13 +149,12 @@ func (f *formView) ActionHref() string {
 // fieldView is a field as the "field" template draws it: the field, and whether the browser starts in it.
 type fieldView struct {
 	siren.Field
-	Focus   bool
-	Key     string            // the field's access key, which the browser's own modifier reaches
-	List    string            // the id of the datalist of a field of page titles with options (Pages): see Fields
-	Pattern string            // the browser sends the form only when the value matches it
-	Send    bool              // the Enter key sends the form (enterkeyhint of a text area)
-	Sole    bool              // the only field the form draws: it needs no mark "required"
-	Labels  map[string]string // the words shown beside each option of the datalist (formView.Labels)
+	Focus  bool
+	Key    string            // the field's access key, which the browser's own modifier reaches
+	List   string            // the id of the datalist of a field of page titles with options (Pages): see Fields
+	Send   bool              // the Enter key sends the form (enterkeyhint of a text area)
+	Sole   bool              // the only field the form draws: it needs no mark "required"
+	Labels map[string]string // the words shown beside each option of the datalist (formView.Labels)
 }
 
 // Fields are the fields the form shows (folded false) or folds under "More fields" (folded true). A field of page
@@ -175,7 +171,7 @@ func (f *formView) Fields(folded bool) []fieldView {
 		if w, ok := f.prompts[fd.Name]; ok {
 			fd.Placeholder = w
 		}
-		out[i] = fieldView{fd, fd.Name == f.Focus, f.keys[fd.Name], "", f.patterns[fd.Name], f.Send, sole, f.labels[fd.Name]}
+		out[i] = fieldView{fd, fd.Name == f.Focus, f.keys[fd.Name], "", f.Send, sole, f.labels[fd.Name]}
 		if fd.Pages && len(fd.Options) > 0 {
 			out[i].List = cmp.Or(f.ID, f.Name) + "-" + fd.Name
 		}
@@ -219,7 +215,6 @@ type formOptions struct {
 	button, class, id, back string
 	autocomplete, aria      string
 	plain                   bool // "plain" was given: the form offers no Preview
-	group                   string
 	send                    bool // "send" was given
 	hasButton               bool // "button" was given, also as ""
 	autofocus               string
@@ -227,7 +222,7 @@ type formOptions struct {
 	hide, outside           nameSet
 	more, required          nameSet
 	labels                  map[string]string   // field name to words
-	keys, patterns          map[string]string   // field name to letter, field name to regexp
+	keys                    map[string]string   // field name to letter
 	options                 map[string][]string // field name to the options that replace the action's own
 	fixed                   map[string]string   // any other option: field name to its fixed value
 }
@@ -244,10 +239,10 @@ func parseFormOptions(pairs []string) (formOptions, error) {
 		return formOptions{}, fmt.Errorf("options come in name/value pairs")
 	}
 	o := formOptions{hide: nameSet{}, outside: nameSet{}, more: nameSet{}, required: nameSet{},
-		labels: map[string]string{}, keys: map[string]string{}, patterns: map[string]string{},
+		labels: map[string]string{}, keys: map[string]string{},
 		options: map[string][]string{}, fixed: map[string]string{}}
 	lists := map[string]nameSet{"hide": o.hide, "outside": o.outside, "more": o.more, "required": o.required}
-	perField := map[string]map[string]string{"label": o.labels, "key": o.keys, "pattern": o.patterns}
+	perField := map[string]map[string]string{"label": o.labels, "key": o.keys}
 	for i := 0; i < len(pairs); i += 2 {
 		name, v := pairs[i], pairs[i+1]
 		switch name {
@@ -259,8 +254,6 @@ func parseFormOptions(pairs []string) (formOptions, error) {
 			o.autocomplete = v
 		case "aria":
 			o.aria = v
-		case "group":
-			o.group = v
 		case "send":
 			o.send = v != ""
 		case "plain":
@@ -275,7 +268,7 @@ func parseFormOptions(pairs []string) (formOptions, error) {
 			for _, field := range strings.Split(v, ",") {
 				lists[name][field] = true
 			}
-		case "label", "key", "pattern":
+		case "label", "key":
 			if field, words, ok := strings.Cut(v, "="); ok {
 				perField[name][field] = words
 			}
@@ -316,8 +309,8 @@ func formOf(x any, opts ...string) (*formView, error) {
 	if err != nil {
 		return nil, fmt.Errorf("form %s: %w", a.Name, err)
 	}
-	f := &formView{Action: a, Button: a.Title, Class: o.class, Autocomplete: o.autocomplete, Aria: o.aria, ID: o.id, Back: o.back, NoPreview: o.plain, Group: o.group, Send: o.send, Focus: o.autofocus,
-		keys: o.keys, patterns: o.patterns}
+	f := &formView{Action: a, Button: a.Title, Class: o.class, Autocomplete: o.autocomplete, Aria: o.aria, ID: o.id, Back: o.back, NoPreview: o.plain, Send: o.send, Focus: o.autofocus,
+		keys: o.keys}
 	if o.hasButton {
 		f.Button = o.button
 	} else if f.Button == "" {

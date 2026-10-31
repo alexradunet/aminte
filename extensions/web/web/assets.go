@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"mime"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -29,6 +30,42 @@ const (
 // fontTypes are the files the font route serves, by their extension: the faces and their licences.
 var fontTypes = map[string]string{"woff2": "font/woff2", "txt": "text/plain; charset=utf-8"}
 
+// staticFile is a file of view/html/ that web serves at path. install marks a file that a browser fetches without its
+// cookie to install the app: the manifest, the icon and the pictures of the sheet (the wood tile is one: it is an image
+// of the sheet, fetched like an icon). They are embedded and static, and they hold nothing of the life log. The door
+// serves a GET or a HEAD of them with no session (isInstallFile). The fonts are not here: the page fetches them with its
+// cookie.
+type staticFile struct {
+	path, name, typ, cache string
+	install                bool
+}
+
+// staticFiles is the one table of the files that web serves itself, apart from the fonts. The rules of speculation:
+// JSON has no comments, so the reasons are here. No address with a query string: a ?feedback= receipt is read once, and
+// ?new= opens a form. The pattern is "/*\?*=*", with the "=" every query of this app has: a URLPattern "/*\?*" alone has
+// the search "*", which an empty search matches too, so it would exclude every address. The others are the routes that
+// redirect (today, go, random, find), the pictures, the downloads of a snapshot, the install file and the integrity
+// check, which a hover must not run. A browser without speculation rules ignores the header.
+var staticFiles = []staticFile{
+	{"/manifest.webmanifest", "manifest.webmanifest", "application/manifest+json", hour, true},
+	{"/assets/speculation.json", "speculation.json", "application/speculationrules+json", hour, false},
+	{"/assets/chat.js", "chat.js", "text/javascript; charset=utf-8", script, false},
+	{"/assets/lock.js", "lock.js", "text/javascript; charset=utf-8", script, false},
+	{"/assets/icon.svg", "icon.svg", "image/svg+xml", immutable, true},
+	{"/assets/icon-192.png", "icon-192.png", "image/png", immutable, true},
+	{"/assets/icon-512.png", "icon-512.png", "image/png", immutable, true},
+	{"/assets/wood.png", "wood.png", "image/png", immutable, true},
+	{"/assets/ground.png", "ground.png", "image/png", immutable, true},
+	{"/assets/embers.png", "embers.png", "image/png", immutable, true},
+	{"/assets/sprites.png", "sprites.png", "image/png", immutable, true},
+	{"/assets/icons.png", "icons.png", "image/png", immutable, true},
+}
+
+// isInstallFile reports whether path is the path of a file that needs no session (staticFile).
+func isInstallFile(path string) bool {
+	return slices.ContainsFunc(staticFiles, func(f staticFile) bool { return f.install && f.path == path })
+}
+
 // ownRoutes registers the routes of web's own files and /render on m. A file takes GET and its HEAD, and /render takes
 // POST. Web answers any other method itself, with 405 and the Allow header (onlyAllow), and does not ask the core.
 func (b *Browser) ownRoutes(m *http.ServeMux) {
@@ -37,19 +74,8 @@ func (b *Browser) ownRoutes(m *http.ServeMux) {
 		m.HandleFunc(path, b.onlyAllow("GET, HEAD"))
 	}
 	readOnly("/assets/fonts/{file}", fonts)
-	readOnly("/manifest.webmanifest", file("manifest.webmanifest", "application/manifest+json", hour))
-	// The rules of speculation. JSON has no comments, so the reasons are here. No address with a query string: a
-	// ?feedback= receipt is read once, and ?new= opens a form. The pattern is "/*\?*=*", with the "=" every query of
-	// this app has: a URLPattern "/*\?*" alone has the search "*", which an empty search matches too, so it would
-	// exclude every address. The others are the routes that redirect (today, go, random, find), the pictures, the
-	// downloads of a snapshot, the install file and the integrity check, which a hover must not run. A browser
-	// without speculation rules ignores the header.
-	readOnly("/assets/speculation.json", file("speculation.json", "application/speculationrules+json", hour))
-	readOnly("/assets/chat.js", file("chat.js", "text/javascript; charset=utf-8", script))
-	readOnly("/assets/lock.js", file("lock.js", "text/javascript; charset=utf-8", script))
-	readOnly("/assets/icon.svg", file("icon.svg", "image/svg+xml", immutable))
-	for _, name := range []string{"icon-192.png", "icon-512.png", "wood.png", "ground.png", "embers.png", "sprites.png", "icons.png"} {
-		readOnly("/assets/"+name, file(name, "image/png", immutable))
+	for _, f := range staticFiles {
+		readOnly(f.path, file(f.name, f.typ, f.cache))
 	}
 	m.HandleFunc("POST /render", b.render)
 	m.HandleFunc("/render", b.onlyAllow("POST"))

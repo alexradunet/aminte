@@ -147,11 +147,7 @@ func TestAPageComparesADayWithTheTodayOfItsWords(t *testing.T) {
 		t.Fatal(err)
 	}
 	e := &siren.Entity{Class: []string{"day"}, Title: "2026-10-16", Properties: map[string]any{"day": "2026-10-16", "today": "2026-10-15", "view": []any{}}}
-	v, err := pageView(e, Facts{URL: u, Shell: shell})
-	if err != nil {
-		t.Fatal(err)
-	}
-	b, err := htmlOf(v)
+	b, err := htmlOf(pageView(e, Facts{URL: u, Shell: shell}))
 	if err != nil {
 		t.Fatal(err)
 	}

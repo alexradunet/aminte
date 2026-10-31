@@ -29,27 +29,23 @@ type resultForm struct {
 	Label  string
 }
 
-// ResultLines are the toast's lines for the view's result; a result that JSON cannot carry is an error.
-func (v *view) ResultLines() ([]resultLine, error) {
-	var x any
-	switch r := v.Result.(type) {
-	case string:
+// ResultLines are the toast's lines for the view's result. A result that is a string is the JSON text of the result
+// (the receipt of a write), or plain words when it is not JSON.
+func (v *view) ResultLines() []resultLine {
+	x := v.Result
+	if r, ok := x.(string); ok {
+		x = nil
 		if err := json.Unmarshal([]byte(r), &x); err != nil {
-			return []resultLine{{HTML: template.HTML(template.HTMLEscapeString(r))}}, nil
-		}
-	default:
-		var err error
-		if x, err = jsonShape(r); err != nil {
-			return nil, err
+			return []resultLine{{HTML: template.HTML(template.HTMLEscapeString(r))}}
 		}
 	}
 	m, ok := x.(map[string]any)
 	if !ok {
 		var sb strings.Builder
 		v.clock().writeValue(&sb, x)
-		return []resultLine{{HTML: template.HTML(sb.String())}}, nil
+		return []resultLine{{HTML: template.HTML(sb.String())}}
 	}
-	return resultSentences(m, v.clock(), v.Here), nil
+	return resultSentences(m, v.clock(), v.Here)
 }
 
 // resultSentences says a result object. Each key a sentence says is taken; what is left is drawn as facts. here is the

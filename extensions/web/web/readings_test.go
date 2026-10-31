@@ -2,7 +2,6 @@ package web_test
 
 // The readings of a day. Web draws them from the answers of the real core.
 // They are the form that records a reading, the tiles of the day, and the tile that asks for a daily metric.
-// Each test holds the markup that a test of the core held while the core drew the browser.
 // A test reads a form as a browser reads it (internal/formdoc), and sends it through web.
 
 import (
@@ -45,7 +44,6 @@ func placeWithoutReceipt(t *testing.T, location string) string {
 	return u.String()
 }
 
-// Core test: TestTheRecordFormAsksForAMetricWhenNoneIsNamed.
 // When no metric is named, the first option is an empty prompt and the select is required. So the browser makes the owner choose.
 // The form offers every live metric, read lately or not.
 // A link that names a metric selects it.
@@ -56,7 +54,7 @@ func TestTheRecordFormAsksForAMetricWhenNoneIsNamed(t *testing.T) {
 	for _, n := range []string{"Evening walk", "Meditate"} {
 		l.do(t, "/", "register-metric", map[string]string{"name": n})
 	}
-	body := browserPageAt(t, l.web, "/days/"+today)
+	body := pageAt(t, l.web, "/days/"+today)
 	want := `<select name="metric" required><option value="">Pick a metric</option><option>Evening walk</option><option>Meditate</option>`
 	if !strings.Contains(body, want) {
 		t.Errorf("the record form lacks %s:\n%s", want, regexp.MustCompile(`(?s)<div id="record">.*?</form>`).FindString(body))
@@ -64,7 +62,7 @@ func TestTheRecordFormAsksForAMetricWhenNoneIsNamed(t *testing.T) {
 	if sent := recordFormSends(t, body); sent.Get("metric") != "" {
 		t.Errorf("the browser sends metric %q before the owner chose", sent.Get("metric"))
 	}
-	if got := recordFormSends(t, browserPageAt(t, l.web, "/?new=record&metric=Nothing&value=1")).Get("metric"); got != "Nothing" {
+	if got := recordFormSends(t, pageAt(t, l.web, "/?new=record&metric=Nothing&value=1")).Get("metric"); got != "Nothing" {
 		t.Errorf("an unknown metric in the link is sent as %q, want Nothing", got)
 	}
 	rec := postForm(l.web, "/measurements", url.Values{"metric": {"Nothing"}, "day": {today}, "value": {"1"}})
@@ -73,7 +71,6 @@ func TestTheRecordFormAsksForAMetricWhenNoneIsNamed(t *testing.T) {
 	}
 }
 
-// Core test: TestALinkToTheRecordFormOfAMetricRecordsThatMetric.
 // A metric that was not read for years is not among the metrics read lately.
 // The link ?new=record&metric=X must still record X. It must never record the first metric of the list.
 func TestALinkToTheRecordFormOfAMetricRecordsThatMetric(t *testing.T) {
@@ -83,26 +80,25 @@ func TestALinkToTheRecordFormOfAMetricRecordsThatMetric(t *testing.T) {
 	}
 	l.do(t, "/days/"+dayFromToday(-1), "record", map[string]string{"metric": "Evening walk", "value": "1"}) // the one read; Meditate is not
 
-	sent := recordFormSends(t, browserPageAt(t, l.web, "/?new=record&metric=Meditate&value=1"))
+	sent := recordFormSends(t, pageAt(t, l.web, "/?new=record&metric=Meditate&value=1"))
 	if sent.Get("metric") != "Meditate" {
 		t.Fatalf("the browser sends metric %q, want Meditate", sent.Get("metric"))
 	}
 	if rec := postForm(l.web, "/measurements", sent); rec.Code != http.StatusSeeOther {
 		t.Fatalf("record: %d %.300s", rec.Code, rec.Body.String())
 	}
-	if got := browserPageAt(t, l.web, "/metrics/Meditate"); !strings.Contains(got, `/days/`+today) {
+	if got := pageAt(t, l.web, "/metrics/Meditate"); !strings.Contains(got, `/days/`+today) {
 		t.Errorf("the reading is not on Meditate:\n%.1500s", got)
 	}
-	if got := browserPageAt(t, l.web, "/metrics/Evening%20walk"); strings.Contains(got, `/days/`+today) {
+	if got := pageAt(t, l.web, "/metrics/Evening%20walk"); strings.Contains(got, `/days/`+today) {
 		t.Errorf("the reading is on Evening walk")
 	}
 }
 
-// Core test: TestTheRecordFieldsSayWhatToType.
 // The folded fields have plain titles with an example.
 func TestTheRecordFieldsSayWhatToType(t *testing.T) {
 	l := emptyLife(t)
-	body := browserPageAt(t, l.web, "/days/"+today)
+	body := pageAt(t, l.web, "/days/"+today)
 	for _, want := range []string{"Time taken, in UTC (2026-06-09T21:14:03.482Z)", "Time zone (Europe/Bucharest)"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("the record form lacks %q", want)
@@ -128,12 +124,11 @@ func lifeWithHabitsAndUnits(t *testing.T) *life {
 	return l
 }
 
-// Core test: TestHabitsAndUnitsAreSaid (the tiles of the day).
 // The tiles of a day show the unit. A scale shows in words.
 // A metric that is read again on the day links to its page. A reading of a habit has no unit.
 func TestTheTilesOfADayShowTheirUnits(t *testing.T) {
 	l := lifeWithHabitsAndUnits(t)
-	day := browserPageAt(t, l.web, "/days/"+today)
+	day := pageAt(t, l.web, "/days/"+today)
 	for _, want := range []string{`71 <span class="unit">kg</span>`, `4 <span class="unit">of 5</span>`,
 		`<a class="meta" href="/metrics/Weight">and 1 more this day</a>`} {
 		if !strings.Contains(day, want) {
@@ -145,7 +140,6 @@ func TestTheTilesOfADayShowTheirUnits(t *testing.T) {
 	}
 }
 
-// Core test: TestADailyMetricAsksInItsTileOnEveryDay.
 // A day draws one tile for each daily metric in name order. Then it draws the other metrics that were read that day.
 // A daily metric with no reading draws the record form fixed to that metric.
 // A save returns to the day. Then the tile shows the reading once.
@@ -158,7 +152,7 @@ func TestADailyMetricAsksInItsTileOnEveryDay(t *testing.T) {
 	page := "/days/" + today
 	l.do(t, page, "record", map[string]string{"metric": "Weight", "value": "70", "day": today})
 
-	body := browserPageAt(t, l.web, page)
+	body := pageAt(t, l.web, page)
 	names := regexp.MustCompile(`<a class="name" href="/metrics/[^"]*">([^<]+)</a>`).FindAllStringSubmatch(body, -1)
 	var got []string
 	for _, n := range names {
@@ -194,7 +188,7 @@ func TestADailyMetricAsksInItsTileOnEveryDay(t *testing.T) {
 	if rec.Code != http.StatusSeeOther || placeWithoutReceipt(t, rec.Header().Get("Location")) != page {
 		t.Fatalf("save: %d, returned to %q, want %q", rec.Code, rec.Header().Get("Location"), page)
 	}
-	after := browserPageAt(t, l.web, page)
+	after := pageAt(t, l.web, page)
 	if strings.Contains(after, `id="tile-Sleep"`) || !strings.Contains(after, "7.5") {
 		t.Errorf("after the save the Sleep tile still asks, or lacks 7.5")
 	}
@@ -202,23 +196,22 @@ func TestADailyMetricAsksInItsTileOnEveryDay(t *testing.T) {
 		t.Errorf("Sleep has %d tiles, want 1", n)
 	}
 
-	past := browserPageAt(t, l.web, "/days/"+dayFromToday(-1))
+	past := pageAt(t, l.web, "/days/"+dayFromToday(-1))
 	if !strings.Contains(past, `id="tile-Sleep"`) || !strings.Contains(past, `id="tile-Meditate"`) {
 		t.Errorf("a past day lacks the daily tiles")
 	}
 }
 
-// Core test: TestTheEmptyStateOfReadingsNeedsNoTile.
 // A day with no daily metric and no reading says so.
 // A day with a daily metric does not say so, because the tile asks.
 func TestTheEmptyStateOfReadingsNeedsNoTile(t *testing.T) {
 	l := emptyLife(t)
 	page := "/days/" + today
-	if !strings.Contains(browserPageAt(t, l.web, page), "No readings on this day") {
+	if !strings.Contains(pageAt(t, l.web, page), "No readings on this day") {
 		t.Error("an empty day lacks the empty state")
 	}
 	l.do(t, "/", "register-metric", map[string]string{"name": "Meditate", "daily": "1"})
-	if strings.Contains(browserPageAt(t, l.web, page), "No readings on this day") {
+	if strings.Contains(pageAt(t, l.web, page), "No readings on this day") {
 		t.Error("a day with a daily metric shows the empty state")
 	}
 }

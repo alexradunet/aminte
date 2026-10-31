@@ -20,7 +20,7 @@ func TestTheFormHelperHasNoLeadOption(t *testing.T) {
 // repeat the line.
 func TestTheGenericViewDrawsItsScalarPropertiesAsTheMetaLine(t *testing.T) {
 	e := &siren.Entity{Class: []string{"thing"}, Title: "A thing", Properties: map[string]any{
-		"count": 3, "colour": "red", "done": true, "late": false, "note": "", "nested": map[string]any{"depth": 2}, "tags": []any{"a", "b"}}}
+		"count": 3.0, "colour": "red", "done": true, "late": false, "note": "", "nested": map[string]any{"depth": 2.0}, "tags": []any{"a", "b"}}}
 	page := drawApp(t, e, "/with/app/")
 	if want := `<p class="meta-line">colour: red · count: 3 · done: yes</p>`; !strings.Contains(page, want) {
 		t.Errorf("the meta line is not %s:\n%.1500s", want, page)
@@ -30,7 +30,7 @@ func TestTheGenericViewDrawsItsScalarPropertiesAsTheMetaLine(t *testing.T) {
 	if !strings.Contains(panel, "nested") || !strings.Contains(panel, "tags") || strings.Contains(panel, "colour") || strings.Contains(panel, "count") {
 		t.Errorf("the panel is not the object and the list alone:\n%s", panel)
 	}
-	only := drawApp(t, &siren.Entity{Class: []string{"thing"}, Title: "Plain", Properties: map[string]any{"count": 1}}, "/with/app/")
+	only := drawApp(t, &siren.Entity{Class: []string{"thing"}, Title: "Plain", Properties: map[string]any{"count": 1.0}}, "/with/app/")
 	if strings.Contains(only, `aria-label="Properties"`) {
 		t.Error("an entity with scalar properties alone draws a panel of properties")
 	}

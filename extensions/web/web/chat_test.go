@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 
@@ -25,6 +26,15 @@ var chatCardRE = regexp.MustCompile(`(?s)<a class="card card-([a-z]+)" href="([^
 
 // chatCardsOf are the cards of a page, in the order that they are drawn.
 func chatCardsOf(page string) [][]string { return chatCardRE.FindAllStringSubmatch(page, -1) }
+
+// cardKinds are the kinds of the cards of a page, in the order they are drawn, with the address of each: "day /days/2031-05-01".
+func cardKinds(page string) []string {
+	var out []string
+	for _, card := range chatCardsOf(page) {
+		out = append(out, card[1]+" "+card[2])
+	}
+	return out
+}
 
 // chatFormOf is the first chat form of page, up to its end. It is empty when the page has none.
 func chatFormOf(page string) string {
@@ -87,7 +97,7 @@ func TestTheConversationViewIsTheChatScreen(t *testing.T) {
 	must(t)(l.api.Do(t.Context(), act(t, page, "save-body"), map[string]string{"body": body}))
 	l.do(t, "/", "create-page", map[string]string{"title": "Sleep log", "body": "I talked it over in [[Conversation " + today + "]].\n"}) // a page that links the conversation
 
-	view := shellPageOf(t, l, "/days/"+today+"/conversation")
+	view := pageAt(t, l.web, "/days/"+today+"/conversation")
 	order := []string{`<h1>Chat</h1><span class="day">Wed 14 May · today</span>`,
 		`<nav class="days" aria-label="Days"><a href="/days/2031-05-10/conversation">Sat 10</a><a href="/days/2031-05-12/conversation">Mon 12</a><a href="/days/2031-05-13/conversation">Tue 13</a><a href="/days/today/conversation" aria-current="page">Today</a></nav>`,
 		`<button type="button" class="more" popovertarget="chat-menu"`, `<div class="more-body" id="chat-menu" popover>`, `popovertargetaction="hide">Close</button>`,
@@ -140,7 +150,7 @@ func TestTheConversationViewIsTheChatScreen(t *testing.T) {
 	}
 	// The agent has answered last: the three dots are gone.
 	chatAppend(t, l, "\n\n**lifelog** (09:40): Last night you slept 7 hours.\n")
-	if strings.Contains(shellPageOf(t, l, "/days/"+today+"/conversation"), `class="thinking"`) {
+	if strings.Contains(pageAt(t, l.web, "/days/"+today+"/conversation"), `class="thinking"`) {
 		t.Error("the screen waits for an agent that has answered")
 	}
 }
@@ -148,7 +158,7 @@ func TestTheConversationViewIsTheChatScreen(t *testing.T) {
 // TestADayWithNoTurnsSaysWhereTheAgentAnswers: the empty state names the way forward.
 func TestADayWithNoTurnsSaysWhereTheAgentAnswers(t *testing.T) {
 	l := emptyLife(t)
-	view := shellPageOf(t, l, "/days/"+today+"/conversation")
+	view := pageAt(t, l.web, "/days/"+today+"/conversation")
 	for _, want := range []string{`class="empty"`, "It answers here when it runs", "lifelog whatsapp", `<textarea name="text"`} {
 		if !strings.Contains(view, want) {
 			t.Errorf("the empty conversation lacks %q", want)
@@ -163,7 +173,7 @@ func TestADayWithNoTurnsSaysWhereTheAgentAnswers(t *testing.T) {
 // invitation.
 func TestADayThatOffersNoSayIsToldNothingWasSaid(t *testing.T) {
 	l := emptyLife(t)
-	view := shellPageOf(t, l, "/days/2020-01-01/conversation")
+	view := pageAt(t, l.web, "/days/2020-01-01/conversation")
 	if !strings.Contains(view, "Nothing was said on this day.") || strings.Contains(view, "Write to the agent") || strings.Contains(view, `name="text"`) {
 		t.Errorf("the conversation of a past day invites a write, or lacks its empty state:\n%s", view)
 	}
@@ -178,7 +188,7 @@ func TestADayThatOffersNoSayIsToldNothingWasSaid(t *testing.T) {
 func TestEveryPageOfTheShellDrawsTheChatColumn(t *testing.T) {
 	l := emptyLife(t)
 	day := "/days/" + today
-	empty := shellPageOf(t, l, day)
+	empty := pageAt(t, l.web, day)
 	for _, want := range []string{`<div class="chat compact" id="chat" popover role="complementary" data-day="today" data-version="" aria-label="Chat">`, "Nothing is said today yet",
 		`<form method="POST" action="/days/today/say" class="chat-form" data-action="say">`, `<input type="hidden" name="back" value="` + day + `">`,
 		`popovertarget="chat"`, chatScriptTag} {
@@ -197,16 +207,16 @@ func TestEveryPageOfTheShellDrawsTheChatColumn(t *testing.T) {
 	if rec.Code != http.StatusSeeOther || !strings.HasPrefix(rec.Header().Get("Location"), day+"?feedback=") {
 		t.Fatalf("POST /days/today/say with back: %d to %q, want 303 to the page with a receipt", rec.Code, rec.Header().Get("Location"))
 	}
-	column := chatColumnRE.FindString(shellPageOf(t, l, day))
+	column := chatColumnRE.FindString(pageAt(t, l.web, day))
 	for _, want := range []string{`data-version="` + chatVersionOf(t, l) + `"`, `<li class="turn owner">`, "Anyone there?", `<div class="thinking" role="status"`} {
 		if !strings.Contains(column, want) {
 			t.Errorf("the column after a turn lacks %s:\n%s", want, column)
 		}
 	}
-	if !strings.Contains(shellPageOf(t, l, "/browse"), `<input type="hidden" name="back" value="/browse">`) {
+	if !strings.Contains(pageAt(t, l.web, "/browse"), `<input type="hidden" name="back" value="/browse">`) {
 		t.Error("the form of the column on /browse does not return to /browse")
 	}
-	if strings.Contains(shellPageOf(t, l, "/days/today/conversation"), `id="chat"`) {
+	if strings.Contains(pageAt(t, l.web, "/days/today/conversation"), `id="chat"`) {
 		t.Error("the conversation view draws the column")
 	}
 }
@@ -238,7 +248,7 @@ func TestTheConversationDrawsACardForEachThingTheAgentTouched(t *testing.T) {
 	seven := []string{"/pages/999999", "/days/2031-05-02", "/days/2031-05-03", "/days/2031-05-04", "/days/2031-05-05", "/days/2031-05-06", "/days/2031-05-07"}
 	chatAppend(t, l, "\n\n"+toolLines(refs...)+"\n**lifelog** (09:30): Here they are.\n\n"+toolLines(seven...)+"\n**lifelog** (09:31): And a week.\n\n"+toolLines("/days/today")+"\n**lifelog** (09:32): And today, by the word.\n")
 
-	page := shellPageOf(t, l, "/days/"+today+"/conversation")
+	page := pageAt(t, l.web, "/days/"+today+"/conversation")
 	cards := chatCardsOf(page)
 	if len(cards) != 13 {
 		t.Fatalf("the page draws %d cards, want 13 (five, a 404 and six days, the seventh as a plain link, and today)", len(cards))
@@ -291,15 +301,20 @@ func TestTheConversationDrawsACardForEachThingTheAgentTouched(t *testing.T) {
 	}
 }
 
-// TestTheColumnDrawsTheCards: the column of any page draws the newest cards, with the same markup as the screen.
+// TestTheColumnDrawsTheCards: the column of any page draws the newest cards, with the same markup as the screen: one card
+// for each kind of thing that the tool lines name, and the plain link for an address that answers 404.
 func TestTheColumnDrawsTheCards(t *testing.T) {
 	l, refs := chatCardsLife(t)
 	l.do(t, "/days/"+today+"/conversation", "say", map[string]string{"text": "Show me"})
-	chatAppend(t, l, "\n\n"+toolLines(refs[0], refs[3], "/pages/999999")+"\n**lifelog** (09:30): Here.\n")
-	column := chatColumnRE.FindString(shellPageOf(t, l, "/browse"))
+	chatAppend(t, l, "\n\n"+toolLines(append(slices.Clone(refs), "/pages/999999")...)+"\n**lifelog** (09:30): Here.\n")
+	column := chatColumnRE.FindString(pageAt(t, l.web, "/browse"))
 	cards := chatCardsOf(column)
-	if len(cards) != 3 || cards[0][1] != "day" || cards[1][1] != "series" || cards[2][1] != "link" {
-		t.Fatalf("the column draws the cards %v, want a day, a series and a plain link:\n%s", cards, column)
+	var kinds []string
+	for _, card := range cards {
+		kinds = append(kinds, card[1])
+	}
+	if got, want := strings.Join(kinds, " "), "day page person series search link"; got != want {
+		t.Fatalf("the column draws the cards %s, want %s:\n%s", got, want, column)
 	}
 	for _, want := range []string{`class="chat compact"`, "Weight", "71.2 kg · yesterday", "mood 4"} {
 		if !strings.Contains(column, want) {

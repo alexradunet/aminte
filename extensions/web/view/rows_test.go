@@ -80,7 +80,7 @@ func TestARowDrawsItsActionsAndChips(t *testing.T) {
 		Fields: []siren.Field{textField("to", true)}}
 	e := &siren.Entity{Title: "App", Entities: []siren.Link{
 		{Rel: []string{"item"}, Href: "/with/app/items/1", Title: "Buy milk",
-			Properties: map[string]any{"due": "2026-10-30", "n": 3, "flag": true, "off": false, "empty": "", "list": []any{1}},
+			Properties: map[string]any{"due": "2026-10-30", "n": 3.0, "flag": true, "off": false, "empty": "", "list": []any{1.0}},
 			Actions:    []siren.Action{round, boxed, noClass}},
 		{Rel: []string{"item"}, Href: "/with/app/items/2", Title: "Plain"},
 	}}

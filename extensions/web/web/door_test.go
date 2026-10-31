@@ -793,22 +793,6 @@ func TestThePageDrawsTheLockOnlyWhenTheLockIsOn(t *testing.T) {
 	}
 }
 
-// TestLockJSIsServedLikeChatJS: lock.js has the type, the cache and the nosniff header of chat.js, and it mentions what it
-// does: it sends /awake, it asks for /lock, it keeps the time in localStorage and it waits while a page prerenders.
-func TestLockJSIsServedLikeChatJS(t *testing.T) {
-	f := newLockFixture(t, "5")
-	rec := request(f.h, "GET", "/assets/lock.js", "", map[string]string{"Cookie": f.cookie})
-	if rec.Code != 200 || !strings.HasPrefix(rec.Header().Get("Content-Type"), "text/javascript") ||
-		rec.Header().Get("Cache-Control") != "public, max-age=300" || rec.Header().Get("X-Content-Type-Options") != "nosniff" {
-		t.Errorf("GET /assets/lock.js: %d %v", rec.Code, rec.Header())
-	}
-	for _, want := range []string{"/awake", "/lock", "localStorage", "prerendering"} {
-		if !strings.Contains(rec.Body.String(), want) {
-			t.Errorf("lock.js does not mention %s", want)
-		}
-	}
-}
-
 // TestOnlyTheLoginFieldOffersTheSavedLogin: a browser fills an empty password field with the saved login, and the settings
 // form then sends the token as the PIN. Every password field of the settings page says new-password; the login form keeps
 // current-password. The page has the key of the model (the form of the core) and the PIN (the form of this browser).

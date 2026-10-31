@@ -1,19 +1,9 @@
 package web_test
 
-// The pages of a form that the core refused, and the pages of a status that web draws for it. They are the HTML claims of
-// these tests of the core, which drew the same pages before web did: TestAnErrorIsAnAlertInWords,
-// TestBrowserKeepsWhatAFailedSaveSent, TestARefusedSaveAnswersWithTheErrorPage,
-// TestARefusalWithoutAPageToReturnToIsTheErrorView, TestAnEmptySaveIsRefused, TestARefusedCaptureKeepsItsText,
-// TestABusyFileAnswers503WithRetryAfter, TestAMultipartPostWithoutFileFieldsIsRefused,
-// TestAScoreRangeOutOfOrderIsRefused, TestANewPersonWithTheTitleOfAPlainPageOffersToPromoteIt,
-// TestAPeriodPageOrACategoryIsNotOfferedAsAPersonOrAMetric and TestARefusedReadingOfAnUnknownMetricLinksToTheFormOfTheMetric.
-// TestAVersionAboveTwoToThe53IsDrawnAndSentUnchanged ports TestBrowserFormCarriesRevisionAndRefusesOldClockToken.
-// The strings are the strings of those tests. The core is the real one (lifelogtest). Three answers cannot come from it,
-// so a fake core gives them: a busy file, a refusal of an owner-only action (web always writes as the owner), and a
-// version of more than 2^53.
-//
-// Not here: the half of a core test that asks the core for Siren JSON. The core keeps it, because web is the door of a
-// browser: a POST of a form gets a page, whatever it accepts.
+// The pages of a form that the core refused, and the pages of a status that web draws for it. The core is the real one
+// (lifelogtest). Three answers cannot come from it, so a fake core gives them: a busy file, a refusal of an owner-only
+// action (web always writes as the owner), and a version of more than 2^53. A POST of a form gets a page, whatever the
+// core accepts.
 
 import (
 	"bytes"
@@ -50,8 +40,7 @@ func staleSaveOf(t *testing.T, l *life, pageHref string) (action, version string
 // TestAStaleSaveIsTheErrorPageWithTheTextThatTheFormSent: the core refuses a save of an old version with 409. The browser
 // gets the page of the error in the shell: the status, an alert whose first words and tone the code picks, the text that
 // the form sent (which nothing has saved, escaped), and a link Back to the page the form came from. The field back changes
-// none of it and is not sent to the core. Core: TestAnErrorIsAnAlertInWords, TestBrowserKeepsWhatAFailedSaveSent,
-// TestARefusedSaveAnswersWithTheErrorPage, TestARefusalWithoutAPageToReturnToIsTheErrorView.
+// none of it and is not sent to the core.
 func TestAStaleSaveIsTheErrorPageWithTheTextThatTheFormSent(t *testing.T) {
 	l := richLife(t)
 	self := l.hrefs["river"]
@@ -108,8 +97,8 @@ func TestAStaleSaveIsTheErrorPageWithTheTextThatTheFormSent(t *testing.T) {
 
 // TestAnErrorIsAnAlertWhoseTonePicksTheCode: a refusal of the owner's rules is a danger alert that starts with Refused., and
 // a page that is not there is the message of the core alone, and the only thing on the page that takes the focus.
-// Core: TestAnErrorIsAnAlertInWords. A refusal of an owner-only action cannot come from the real core: web writes as the
-// owner, so a fake core gives the 403.
+// A refusal of an owner-only action cannot come from the real core: web writes as the owner, so a fake core gives the
+// 403.
 func TestAnErrorIsAnAlertWhoseTonePicksTheCode(t *testing.T) {
 	forbidden := fakeCore(t, http.StatusOK, func(w http.ResponseWriter, r *http.Request) {
 		sirenAnswer(w, http.StatusForbidden, `{"class":["error"],"title":"Error","properties":{"status":403,"code":"forbidden","message":"snapshot is for the owner"}}`)
@@ -132,7 +121,6 @@ func TestAnErrorIsAnAlertWhoseTonePicksTheCode(t *testing.T) {
 
 // TestAnEmptySaveIsRefusedAndThePageKeepsItsBody: the form marks the body required, but a client that does not check can send
 // an empty one. The save is 422 with the alert and the words of the core, and the page keeps its body and its version.
-// Core: TestAnEmptySaveIsRefused.
 func TestAnEmptySaveIsRefusedAndThePageKeepsItsBody(t *testing.T) {
 	l := richLife(t)
 	self := l.hrefs["river"]
@@ -151,7 +139,7 @@ func TestAnEmptySaveIsRefusedAndThePageKeepsItsBody(t *testing.T) {
 }
 
 // TestARefusedCaptureKeepsItsText: a capture that the core refuses (a mood out of range) is answered with the error page,
-// which keeps the text so that nothing is lost, and links Back to the page it came from. Core: TestARefusedCaptureKeepsItsText.
+// which keeps the text so that nothing is lost, and links Back to the page it came from.
 func TestARefusedCaptureKeepsItsText(t *testing.T) {
 	l := emptyLife(t)
 	got := postForm(l.web, "/days/"+today+"/capture", url.Values{"text": {"A note that must not be lost."}, "mood": {"9"}, "back": {"/"}},
@@ -169,8 +157,7 @@ func TestARefusedCaptureKeepsItsText(t *testing.T) {
 // TestABusyCoreIsAPageThatSaysARetryIsSafe: a core whose file is busy answers 503 with the code busy and Retry-After. The
 // browser gets a page with the same status and header, and the words of the view say that nothing was written and a retry
 // is safe. The words do not come from the message of the core (the fake core sends other words). A busy file is not a fault
-// of web, so the log has no line. Core: TestABusyFileAnswers503WithRetryAfter. The real core cannot be made busy from
-// outside, so a fake core gives the answer.
+// of web, so the log has no line. The real core cannot be made busy from outside, so a fake core gives the answer.
 func TestABusyCoreIsAPageThatSaysARetryIsSafe(t *testing.T) {
 	logs := captureLog(t)
 	busy := fakeCore(t, http.StatusOK, func(w http.ResponseWriter, r *http.Request) {
@@ -193,7 +180,7 @@ func TestABusyCoreIsAPageThatSaysARetryIsSafe(t *testing.T) {
 
 // TestAMultipartFormToAnActionWithoutFilesIsRefusedAndNothingIsStored: a multipart body to an action that takes no file is 415
 // from the core, never read as an empty form (the fields would be lost in silence). Web streams the body, so the page of
-// the refusal is the core's, with the first words of its code. Core: TestAMultipartPostWithoutFileFieldsIsRefused.
+// the refusal is the core's, with the first words of its code.
 func TestAMultipartFormToAnActionWithoutFilesIsRefusedAndNothingIsStored(t *testing.T) {
 	l := emptyLife(t)
 	var form bytes.Buffer
@@ -225,7 +212,6 @@ func TestAMultipartFormToAnActionWithoutFilesIsRefusedAndNothingIsStored(t *test
 
 // TestAScoreRangeOutOfOrderIsRefusedWithTheSentenceOfTheTrigger: a browser can send the range 5-1. The core answers 422 with the
 // sentence of the trigger metrics_range_order (D6), the page shows it with a link Back, and nothing is written.
-// Core: TestAScoreRangeOutOfOrderIsRefused.
 func TestAScoreRangeOutOfOrderIsRefusedWithTheSentenceOfTheTrigger(t *testing.T) {
 	l := emptyLife(t)
 	got := postForm(l.web, "/metrics", url.Values{"name": {"Pain"}, "unit": {"5-1"}}, "Referer", refererOnWeb("/metrics"))
@@ -243,7 +229,6 @@ func TestAScoreRangeOutOfOrderIsRefusedWithTheSentenceOfTheTrigger(t *testing.T)
 // TestANewPersonWithTheTitleOfAPlainPageOffersToPromoteIt: the 409 of New person keeps "open it" and adds a link to the promote
 // form of that page, with the fields typed. The link opens the form with the fields filled. A person that exists has
 // nothing to promote, and neither has a period page or a category (the schema refuses to change their type).
-// Core: TestANewPersonWithTheTitleOfAPlainPageOffersToPromoteIt, TestAPeriodPageOrACategoryIsNotOfferedAsAPersonOrAMetric.
 func TestANewPersonWithTheTitleOfAPlainPageOffersToPromoteIt(t *testing.T) {
 	l := emptyLife(t)
 	sam := l.do(t, "/", "create-page", map[string]string{"title": "Sam"})
@@ -284,7 +269,7 @@ func TestANewPersonWithTheTitleOfAPlainPageOffersToPromoteIt(t *testing.T) {
 }
 
 // TestARefusedReadingOfAnUnknownMetricLinksToTheFormOfTheMetric: the answer says the metric does not exist, in the words of the
-// buttons, and links to the form that adds it with the name filled. Core: TestARefusedReadingOfAnUnknownMetricLinksToTheFormOfTheMetric.
+// buttons, and links to the form that adds it with the name filled.
 func TestARefusedReadingOfAnUnknownMetricLinksToTheFormOfTheMetric(t *testing.T) {
 	l := emptyLife(t)
 	got := postForm(l.web, "/measurements", url.Values{"metric": {"Ghost"}, "day": {"2026-10-12"}, "value": {"3"}})
@@ -298,8 +283,7 @@ func TestARefusedReadingOfAnUnknownMetricLinksToTheFormOfTheMetric(t *testing.T)
 // 2^53, which a float64 cannot hold, is drawn with the whole number in the hidden field of its form, and web sends the
 // number to the core as the form carried it, so the core compares the right version. A fake core gives the version: the
 // real core reaches 2^53 after more saves than a test can make. The page is the page of the real core with its version
-// changed. Core: TestBrowserFormCarriesRevisionAndRefusesOldClockToken (the stale versions of that test are held by
-// TestAStaleSaveIsTheErrorPageWithTheTextThatTheFormSent).
+// changed. The stale versions are held by TestAStaleSaveIsTheErrorPageWithTheTextThatTheFormSent.
 func TestAVersionAboveTwoToThe53IsDrawnAndSentUnchanged(t *testing.T) {
 	const big = "9007199254740993" // 2^53 + 1
 	l := richLife(t)

@@ -18,21 +18,6 @@ import (
 // /login, /logout, /lock, /unlock, /locked and /awake are about one browser, not about the data, so they are not actions
 // of the catalog.
 
-// installFiles are the files that a browser fetches without its cookie to install the app. The wood tile is one: it is an
-// image of the sheet, fetched like an icon. They are embedded and static, and they hold nothing of the life log. A GET or
-// a HEAD of them needs no cookie. The fonts are not here: the page fetches them with its cookie.
-var installFiles = map[string]bool{
-	"/manifest.webmanifest": true,
-	"/assets/icon.svg":      true,
-	"/assets/icon-192.png":  true,
-	"/assets/icon-512.png":  true,
-	"/assets/wood.png":      true,
-	"/assets/ground.png":    true,
-	"/assets/embers.png":    true,
-	"/assets/sprites.png":   true,
-	"/assets/icons.png":     true,
-}
-
 // checkOrigin admits an exact browser origin: a scheme, a host, an optional port and nothing else.
 func checkOrigin(origin string) error {
 	// A browser sends its origin in lower case, and the guard compares the text as it is: an origin with an upper-case
@@ -80,7 +65,7 @@ func (b *Browser) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		b.login(w, r)
 	case r.URL.Path == "/logout" && r.Method == http.MethodPost:
 		b.logout(w, r)
-	case installFiles[b.routeOf(r)] && (r.Method == http.MethodGet || r.Method == http.MethodHead):
+	case isInstallFile(b.routeOf(r)) && (r.Method == http.MethodGet || r.Method == http.MethodHead):
 		b.mux.ServeHTTP(w, r)
 	default:
 		id, ok := b.sessions.idOf(r)

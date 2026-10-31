@@ -1,11 +1,9 @@
 package web_test
 
-// The login page, the rules of speculation and the ground. These are the tests of the browser of the core
-// (internal/api/speculation_test.go, ground_test.go, view_shell_test.go and view_chat_test.go), ported to web with their
-// strings. The ground is a setting of web (settings.go). A save goes to the catalog of web, not to the settings of the core.
+// The login page, the rules of speculation and the ground. The ground is a setting of web (settings.go). A save goes to
+// the catalog of web, not to the settings of the core.
 //
-// Not ported: the header Vary: Accept of the core. The core sent it because one address gave JSON or a page. Web sends no
-// Vary header. Every answer of a session is no-store (lock.go), so no cache holds two forms of one address.
+// Web sends no Vary header. Every answer of a session is no-store (lock.go), so no cache holds two forms of one address.
 
 import (
 	"encoding/json"
@@ -18,8 +16,6 @@ import (
 	"lifelog/siren"
 )
 
-// Core tests: TestTheLoginPageAsksForNoPrerender, TestThePageOfNoShellHasNoSidebar,
-// TestLoginDrawsNoScriptAndPagesOfTheShellDrawOne and the login part of TestThePageDrawsTheGroundOfTheSettings.
 // The login page shows nothing of the life log. It is a page with no shell: a bare column, no sidebar, no script, no
 // request for a prerender and no ground. A page of the shell has all four. The test checks this first, so that a wrong
 // string cannot make the absences below true by accident.
@@ -54,9 +50,9 @@ func TestTheLoginPageIsABarePageAndAPageOfTheShellIsNot(t *testing.T) {
 	}
 }
 
-// Core test: TestAShellPageAsksForPrerenderAndEveryAnswerVariesByAccept (plan 149). A page of the shell names the file of
-// the rules. An answer in Siren JSON does not. The file is JSON. Its first rule keeps the prerender away from an address
-// with a query string (a receipt of the toast is read once, and ?new= opens a form) and from the assets.
+// A page of the shell names the file of the rules (plan 149). An answer in Siren JSON does not. The file is JSON. Its
+// first rule keeps the prerender away from an address with a query string (a receipt of the toast is read once, and
+// ?new= opens a form) and from the assets.
 func TestAShellPageAsksForPrerenderAndTheRulesKeepItAwayFromAQueryAndTheAssets(t *testing.T) {
 	l := emptyLife(t)
 	for _, uri := range []string{"/actions", "/", "/days/" + today} {
@@ -94,10 +90,10 @@ func TestAShellPageAsksForPrerenderAndTheRulesKeepItAwayFromAQueryAndTheAssets(t
 // groundOnTheBody finds the ground in the body element of a page.
 var groundOnTheBody = regexp.MustCompile(`<body data-ground="([^"]*)">`)
 
-// Core tests: TestThePageDrawsTheGroundOfTheSettings and TestTheGroundIsOneOfFour. A page names its ground on the body.
-// With nothing set, the ground is boards. A save of embers shows on the next page and in the form of the settings. A
-// ground outside the four is refused with 422, and the words name the field. The ground that was set stays. An empty ground
-// clears the setting, and the page is on the boards again. The login page has no ground, whatever is set.
+// A page names its ground on the body. With nothing set, the ground is boards. A save of embers shows on the next page
+// and in the form of the settings. A ground outside the four is refused with 422, and the words name the field. The
+// ground that was set stays. An empty ground clears the setting, and the page is on the boards again. The login page has
+// no ground, whatever is set.
 func TestThePageDrawsTheGroundOfTheBrowserSettings(t *testing.T) {
 	l := emptyLife(t)
 	l.core.Connect(t, "web", l.browser.Catalog()) // the form "This browser" is drawn from the catalog of the core

@@ -1,8 +1,8 @@
 package web_test
 
 // A dated photo that a browser sends through web. The core reads the date from the EXIF of the file and says the result in
-// words. This is the HTML claim of the test of the core TestBrowserMutationFeedbackPhoto. The core is the real one, and the
-// photo is made in the test: a JPEG of the tests with the EXIF block of a camera that has a date and nothing else.
+// words. The core is the real one, and the photo is made in the test: a JPEG of the tests with the EXIF block of a camera
+// that has a date and nothing else.
 
 import (
 	"bytes"
@@ -76,7 +76,6 @@ func postPhotoToWeb(t *testing.T, h http.Handler, fields map[string]string, name
 // TestADatedPhotoTellsItsResultInWordsOnTheDryRunAndOnTheWrite: the dry run of a photo with a date writes nothing and the
 // page says so, with the result and the day that the photo has. The write is a redirect to a path with a receipt and
 // nothing private in it (no name of the file, no place), and the page where it lands draws the same result once.
-// Core: TestBrowserMutationFeedbackPhoto.
 func TestADatedPhotoTellsItsResultInWordsOnTheDryRunAndOnTheWrite(t *testing.T) {
 	l := emptyLife(t)
 	photo := jpegDatedByExif(t, "2019:06:04 10:00:00")

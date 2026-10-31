@@ -105,8 +105,8 @@ func (v *view) menuOptions(a siren.Action) []string {
 // pageHere is the address of the page of this view's entity: the view of a metric (a series) returns to its page,
 // which a deleted metric keeps, and any other page returns to itself.
 func (v *view) pageHere() string {
-	if props, ok := v.Props.(map[string]any); ok && v.IsSeries() {
-		return fmt.Sprintf("/pages/%s", Num(props["id"]))
+	if v.IsSeries() {
+		return fmt.Sprintf("/pages/%s", Num(v.Props["id"]))
 	}
 	return v.ReturnHere()
 }

@@ -14,8 +14,7 @@ type hitGroup struct {
 // HitGroups are the hits of the page by kind, in the order of the kind links; a kind with no hit on the page has no
 // group.
 func (v *view) HitGroups() []hitGroup {
-	props, _ := v.Props.(map[string]any)
-	byKind := group(props["hits"], "kind")
+	byKind := group(v.Props["hits"], "kind")
 	var out []hitGroup
 	for _, l := range v.LinksOf("kind") {
 		if len(l.Class) == 0 {

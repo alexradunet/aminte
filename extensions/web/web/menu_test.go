@@ -4,7 +4,6 @@ package web_test
 // actions that no template places, the pencil beside the title, the buttons that create, and the meta line.
 
 import (
-	"net/http"
 	"net/url"
 	"regexp"
 	"strings"
@@ -25,11 +24,11 @@ func headOfPage(t *testing.T, body string) string {
 // TestAnOwnerActionCarriesTheOwnerMark: the owner flag of the catalog, and not a template, puts the mark on the button.
 func TestAnOwnerActionCarriesTheOwnerMark(t *testing.T) {
 	l := emptyLife(t)
-	body := wholePageAt(t, l, "/actions", http.StatusOK)
+	body := pageAt(t, l.web, "/actions")
 	if want := `<summary class="button">Take a snapshot <span class="owner">owner</span></summary>`; !strings.Contains(body, want) {
 		t.Errorf("/actions lacks %s", want)
 	}
-	if m := wholePageAt(t, l, "/metrics", http.StatusOK); !regexp.MustCompile(`class="button primary" popovertarget="new-register-metric">[^/]*</span>New metric <span class="owner">owner</span></button>`).MatchString(m) {
+	if m := pageAt(t, l.web, "/metrics"); !regexp.MustCompile(`class="button primary" popovertarget="new-register-metric">[^/]*</span>New metric <span class="owner">owner</span></button>`).MatchString(m) {
 		t.Errorf("/metrics lacks the New metric button with the owner mark")
 	}
 	if strings.Contains(body, `New page <span class="owner">`) {
@@ -41,7 +40,7 @@ func TestAnOwnerActionCarriesTheOwnerMark(t *testing.T) {
 // other action; its menu marks both, on the button and in the dialog.
 func TestAnOwnerActionOfTheMenuCarriesTheOwnerMark(t *testing.T) {
 	l := emptyLife(t)
-	body := mainPartOf(wholePageAt(t, l, "/integrity", http.StatusOK))
+	body := mainPartOf(pageAt(t, l.web, "/integrity"))
 	for _, name := range []string{"rebuild-search", "resync-links"} {
 		btn := regexp.MustCompile(`<button type="button" class="menu-item" commandfor="do-` + name + `" command="show-modal">[^<]*<span class="owner">owner</span></button>`)
 		if !btn.MatchString(body) {
@@ -59,7 +58,7 @@ func TestAnOwnerActionOfTheMenuCarriesTheOwnerMark(t *testing.T) {
 func TestTheMenuHoldsTheActionsNoTemplatePlaces(t *testing.T) {
 	l := emptyLife(t)
 	essay := l.do(t, "/", "create-page", map[string]string{"title": "Essay"})
-	body := wholePageAt(t, l, href(essay, "self"), http.StatusOK)
+	body := pageAt(t, l.web, href(essay, "self"))
 	for _, want := range []string{
 		`<button type="button" class="button menu-button" popovertarget="menu" aria-label="More actions">`,
 		`<div class="menu-group" role="group" aria-label="Edit"><span class="menu-label">Edit</span>`,
@@ -94,7 +93,7 @@ func TestTheMenuHoldsTheActionsNoTemplatePlaces(t *testing.T) {
 func TestAnEmptyMenuDrawsNoButton(t *testing.T) {
 	l := emptyLife(t)
 	for _, path := range []string{"/browse", "/metrics", "/days"} {
-		if body := mainPartOf(wholePageAt(t, l, path, http.StatusOK)); strings.Contains(body, `menu-button`) || strings.Contains(body, `class="menu"`) {
+		if body := mainPartOf(pageAt(t, l.web, path)); strings.Contains(body, `menu-button`) || strings.Contains(body, `class="menu"`) {
 			t.Errorf("%s draws a menu with no item", path)
 		}
 	}
@@ -106,13 +105,13 @@ func TestAnAskedFormOfTheMenuIsAnOpenDialog(t *testing.T) {
 	l := emptyLife(t)
 	essay := l.do(t, "/", "create-page", map[string]string{"title": "Essay"})
 	self := href(essay, "self")
-	body := wholePageAt(t, l, self+"?new=rename&title="+url.QueryEscape("A better title"), http.StatusOK)
+	body := pageAt(t, l.web, self+"?new=rename&title="+url.QueryEscape("A better title"))
 	dialog := regexp.MustCompile(`(?s)<dialog class="menu-dialog" id="pencil"[^>]*>.*?</dialog>`).FindString(body)
 	if !strings.Contains(dialog, ` aria-label="Rename" open>`) || !strings.Contains(dialog, `name="title" value="A better title"`) ||
 		!strings.Contains(dialog, `command="close">Close</button>`) {
 		t.Errorf("the asked dialog is not open and filled:\n%s", dialog)
 	}
-	if other := wholePageAt(t, l, self, http.StatusOK); strings.Contains(other, `id="pencil" closedby="any" aria-label="Rename" open`) {
+	if other := pageAt(t, l.web, self); strings.Contains(other, `id="pencil" closedby="any" aria-label="Rename" open`) {
 		t.Error("the dialog of Rename is open without a link that asked for it")
 	}
 }
@@ -122,7 +121,7 @@ func TestAnAskedFormOfTheMenuIsAnOpenDialog(t *testing.T) {
 func TestATitleEditIsThePencilAndNotInTheMenu(t *testing.T) {
 	l := emptyLife(t)
 	essay := l.do(t, "/", "create-page", map[string]string{"title": "Essay"})
-	body := wholePageAt(t, l, href(essay, "self"), http.StatusOK)
+	body := pageAt(t, l.web, href(essay, "self"))
 	head := headOfPage(t, body)
 	if !regexp.MustCompile(`<h1>Essay</h1><div class="pop"><button type="button" class="button pencil" aria-label="Rename" title="Rename" popovertarget="pencil">`).MatchString(head) {
 		t.Errorf("the pencil is not beside the title:\n%s", head)
@@ -142,7 +141,7 @@ func TestATitleEditIsThePencilAndNotInTheMenu(t *testing.T) {
 // under it. The first button is the primary one; the others are plain.
 func TestACreateActionIsAButtonWithAPopover(t *testing.T) {
 	l := emptyLife(t)
-	people := headOfPage(t, wholePageAt(t, l, "/browse?kind=person", http.StatusOK))
+	people := headOfPage(t, pageAt(t, l.web, "/browse?kind=person"))
 	if !regexp.MustCompile(`<button type="button" class="button primary" popovertarget="new-create-person"><span class="icon icon-new" aria-hidden="true"></span>New person`).MatchString(people) ||
 		!strings.Contains(people, `<div class="head-pop" id="new-create-person" popover`) || !strings.Contains(people, `data-action="create-person"`) {
 		t.Errorf("New person is not a primary button with a popover and its form:\n%s", people)
@@ -150,7 +149,7 @@ func TestACreateActionIsAButtonWithAPopover(t *testing.T) {
 	if strings.Contains(people, `<details class="action"`) {
 		t.Error("the head draws a create action as a fold")
 	}
-	board := headOfPage(t, wholePageAt(t, l, "/metrics", http.StatusOK))
+	board := headOfPage(t, pageAt(t, l.web, "/metrics"))
 	first := strings.Index(board, `class="button primary" popovertarget="new-register-metric"`)
 	second := strings.Index(board, `class="button" popovertarget="new-record"`)
 	if first < 0 || second < first || strings.Count(board, `button primary`) != 1 {
@@ -172,7 +171,7 @@ func TestTheMetaLineIsUnderTheTitleAndTheFactsSectionIsGone(t *testing.T) {
 		{"a person", href(sam, "self"), []string{`<p class="meta-line">Samuel Ortiz · born Sun 3 Feb 1980 · died Thu 2 Jan 2020 · created <time `}},
 		{"a file", href(scan, "self"), []string{`<p class="meta-line">application/pdf · <span title="SHA-256 of the original: ` + strings.Repeat("ab", 32) + `">` + strings.Repeat("ab", 6) + `…</span> · created <time `}},
 	} {
-		body := wholePageAt(t, l, row.path, http.StatusOK)
+		body := pageAt(t, l.web, row.path)
 		head := headOfPage(t, body)
 		for _, want := range row.want {
 			if !strings.Contains(head, want) {

@@ -37,17 +37,11 @@ func TestPageViewIsAFunctionOfItsEntityAndFacts(t *testing.T) {
 		t.Fatal(err)
 	}
 	sv := &Shell{Today: "2026-10-16"}
-	v, err := pageView(e, Facts{URL: u, Shell: sv})
-	if err != nil {
-		t.Fatal(err)
-	}
+	v := pageView(e, Facts{URL: u, Shell: sv})
 	if v.Path != "/pages/4" || v.Here != "/pages/4?new=rename&title=Food" || v.Shell != sv {
 		t.Errorf("path %q, here %q, shell %v: want the facts given", v.Path, v.Here, v.Shell)
 	}
-	v, err = pageView(e, Facts{URL: u})
-	if err != nil {
-		t.Fatal(err)
-	}
+	v = pageView(e, Facts{URL: u})
 	if v.Shell != nil {
 		t.Errorf("with no shell: shell %v", v.Shell)
 	}
@@ -87,7 +81,7 @@ func TestDayPartsSplitTheViewByPart(t *testing.T) {
 	row := func(what, detail string) any { return map[string]any{"what": what, "detail": detail} }
 	for _, c := range []struct {
 		name  string
-		props any
+		props map[string]any
 		want  dayParts
 	}{
 		{"no properties", nil, dayParts{}},
@@ -114,7 +108,7 @@ func TestCategoriesAreThePartOfLinks(t *testing.T) {
 	lisbon := map[string]any{"kind": "follows", "title": "Lisbon"}
 	for _, c := range []struct {
 		name  string
-		props any
+		props map[string]any
 		want  []any
 	}{
 		{"no properties", nil, nil},
@@ -135,7 +129,7 @@ func TestBacklinksLeaveOutPartOf(t *testing.T) {
 	a, b, c, d := link("wikilink", "A"), link("part-of", "B"), link("follows", "C"), link("wikilink", "D")
 	for _, tc := range []struct {
 		name  string
-		props any
+		props map[string]any
 		want  []bucket
 	}{
 		{"no properties", nil, nil},

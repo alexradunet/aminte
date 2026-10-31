@@ -1,9 +1,8 @@
 package web_test
 
 // The period pages as the browser draws them (D30): the week with its seven days and its page, the month as a calendar,
-// the year as twelve months, the page of a period with its kind and its view, and the zoom between the levels. The
-// claims are those of the HTML part of the period tests of the core (plan 161, stage 3), held here against the real core.
-// Today is Wednesday 2031-05-14, in ISO week 2031-W20.
+// the year as twelve months, the page of a period with its kind and its view, and the zoom between the levels. They run
+// against the real core. Today is Wednesday 2031-05-14, in ISO week 2031-W20.
 
 import (
 	"fmt"
@@ -24,7 +23,7 @@ func TestAWeekListsItsSevenDaysAndItsPage(t *testing.T) {
 	l := emptyLife(t)
 	l.do(t, "/", "create-page", map[string]string{"title": "2031-W20", "body": "Finish the report"})
 
-	page := htmlPageAt(t, l.web, "/weeks/2031-W20", http.StatusOK)
+	page := pageAt(t, l.web, "/weeks/2031-W20")
 	if strings.Contains(page, "no value") {
 		t.Errorf("the week draws a missing value:\n%s", mainElementOf(page))
 	}
@@ -47,30 +46,30 @@ func TestAWeekListsItsSevenDaysAndItsPage(t *testing.T) {
 		t.Errorf("/weeks/today: %d to %q", today.Code, today.Header().Get("Location"))
 	}
 	for _, bad := range []string{"/weeks/2031-W53", "/weeks/2031-W00", "/weeks/2031-W5", "/weeks/x"} {
-		htmlPageAt(t, l.web, bad, http.StatusUnprocessableEntity)
+		pageWithStatus(t, l.web, bad, http.StatusUnprocessableEntity)
 	}
 }
 
 func TestAMonthAndAYearShowTheirPages(t *testing.T) {
 	l := emptyLife(t)
-	if page := htmlPageAt(t, l.web, "/months/2031-05", http.StatusOK); strings.Contains(page, "<h2>The month page</h2>") || !strings.Contains(page, "This month has no page yet") {
+	if page := pageAt(t, l.web, "/months/2031-05"); strings.Contains(page, "<h2>The month page</h2>") || !strings.Contains(page, "This month has no page yet") {
 		t.Errorf("a month with no page:\n%s", mainElementOf(page))
 	}
 	l.do(t, "/", "create-page", map[string]string{"title": "2031-05", "body": "Plan the month"})
 	l.do(t, "/", "create-page", map[string]string{"title": "2031", "body": "Run a marathon"})
-	month := htmlPageAt(t, l.web, "/months/2031-05", http.StatusOK)
+	month := pageAt(t, l.web, "/months/2031-05")
 	wantInPage(t, "the month", month, `aria-label="The page of the period"`, "Plan the month")
 	if strings.Index(month, "Plan the month") > strings.Index(month, `<table class="calendar">`) {
 		t.Error("the page of the month is below its calendar")
 	}
-	wantInPage(t, "the year", htmlPageAt(t, l.web, "/years/2031", http.StatusOK), "Run a marathon", `aria-label="Quarters"`, `href="/actions?new=create-page&amp;title=2031-Q4"`)
+	wantInPage(t, "the year", pageAt(t, l.web, "/years/2031"), "Run a marathon", `aria-label="Quarters"`, `href="/actions?new=create-page&amp;title=2031-Q4"`)
 	// The link of a quarter with no page opens the form of create-page, with the quarter as the title.
-	opened := htmlPageAt(t, l.web, "/actions?new=create-page&title=2031-Q4", http.StatusOK)
+	opened := pageAt(t, l.web, "/actions?new=create-page&title=2031-Q4")
 	if !strings.Contains(opened, `<details class="action" open>`) || !strings.Contains(opened, `name="title" value="2031-Q4"`) {
 		t.Errorf("?new=create-page&title=2031-Q4 does not open the form for the quarter:\n%s", mainElementOf(opened))
 	}
 	l.do(t, "/", "create-page", map[string]string{"title": "2031-Q4", "body": "Ship it"})
-	if after := htmlPageAt(t, l.web, "/years/2031", http.StatusOK); !strings.Contains(after, `<a href="/pages/`) || strings.Contains(after, `title=2031-Q4"`) {
+	if after := pageAt(t, l.web, "/years/2031"); !strings.Contains(after, `<a href="/pages/`) || strings.Contains(after, `title=2031-Q4"`) {
 		t.Errorf("a quarter with a page still links its opener:\n%s", mainElementOf(after))
 	}
 }
@@ -84,7 +83,7 @@ func TestAPeriodPageNamesItsKindAndItsView(t *testing.T) {
 		"2031-Q4":  {`<span class="kind">quarter page</span>`, `<a href="/months/2031-10">October</a>`, `<a href="/months/2031-12">December</a>`},
 	} {
 		e := l.do(t, "/", "create-page", map[string]string{"title": key, "body": "Aim " + key})
-		wantInPage(t, "the page "+key, htmlPageAt(t, l.web, href(e, "self"), http.StatusOK), append(want, "Aim "+key)...)
+		wantInPage(t, "the page "+key, pageAt(t, l.web, href(e, "self")), append(want, "Aim "+key)...)
 	}
 }
 
@@ -94,7 +93,7 @@ func TestAPeriodPageNamesItsKindAndItsView(t *testing.T) {
 func TestCreatePageMakesAPeriodPageAndRefusesAPeriodThatDoesNotExist(t *testing.T) {
 	l := emptyLife(t)
 	l.do(t, "/", "create-page", map[string]string{"title": "2031-W43"})
-	if page := htmlPageAt(t, l.web, "/weeks/2031-W43", http.StatusOK); !strings.Contains(page, `<h2>The week page</h2>`) || strings.Contains(page, "has no page yet") {
+	if page := pageAt(t, l.web, "/weeks/2031-W43"); !strings.Contains(page, `<h2>The week page</h2>`) || strings.Contains(page, "has no page yet") {
 		t.Errorf("the week view does not show the page that create-page made:\n%s", mainElementOf(page))
 	}
 	rec := postForm(l.web, "/pages", url.Values{"title": {"2027-W53"}})
@@ -108,9 +107,9 @@ func TestCreatePageMakesAPeriodPageAndRefusesAPeriodThatDoesNotExist(t *testing.
 func TestAPeriodViewWithoutAPageOffersCreatePage(t *testing.T) {
 	l := emptyLife(t)
 	for path, key := range map[string]string{"/weeks/2031-W20": "2031-W20", "/months/2031-05": "2031-05", "/years/2031": "2031"} {
-		wantInPage(t, path, htmlPageAt(t, l.web, path, http.StatusOK), "has no page yet", `<input type="hidden" name="title" value="`+key+`">`)
+		wantInPage(t, path, pageAt(t, l.web, path), "has no page yet", `<input type="hidden" name="title" value="`+key+`">`)
 		l.do(t, "/", "create-page", map[string]string{"title": key})
-		wantNotInPage(t, path+" with a page", htmlPageAt(t, l.web, path, http.StatusOK), "has no page yet", `<input type="hidden" name="title" value="`+key+`">`)
+		wantNotInPage(t, path+" with a page", pageAt(t, l.web, path), "has no page yet", `<input type="hidden" name="title" value="`+key+`">`)
 	}
 }
 
@@ -126,16 +125,16 @@ func TestTheYearHoldsTwelveMonths(t *testing.T) {
 		l.do(t, "/", "record", map[string]string{"metric": "weight", "day": day, "value": value})
 	}
 
-	body := htmlPageAt(t, l.web, "/years/2026", http.StatusOK)
+	body := pageAt(t, l.web, "/years/2026")
 	if n := strings.Count(body, `<div class="month-box">`); n != 12 { // the sidebar draws none
 		t.Errorf("%d month boxes on the year's page, want 12", n)
 	}
 	wantInPage(t, "the year's page", body, `<a href="/months/2026-01">January</a>`, `<a href="/months/2026-12">December</a>`, `<span class="meta">3 written</span>`,
 		`<a href="/days/2026-10-12" aria-current="date"`, `<a href="/days/2026-10-05" class="written"`, "3 days written", "3 readings", `rel="prev"`, `rel="next"`)
-	if !strings.Contains(htmlPageAt(t, l.web, "/years/2027", http.StatusOK), "0 days written") {
+	if !strings.Contains(pageAt(t, l.web, "/years/2027"), "0 days written") {
 		t.Error("a year with no page does not say that no day is written")
 	}
-	if !strings.Contains(htmlPageAt(t, l.web, "/months/2026-10", http.StatusOK), `<a href="/years/2026">Year</a>`) {
+	if !strings.Contains(pageAt(t, l.web, "/months/2026-10"), `<a href="/years/2026">Year</a>`) {
 		t.Error("a month does not link to its year")
 	}
 }
@@ -150,7 +149,7 @@ func TestTheMonthIsACalendar(t *testing.T) {
 	gone := l.do(t, "/days/2031-05-20", "capture", map[string]string{"text": "Scratch"})
 	l.do(t, href(gone, "page"), "tombstone-pages", nil)
 
-	body := htmlPageAt(t, l.web, "/months/2031-05", http.StatusOK)
+	body := pageAt(t, l.web, "/months/2031-05")
 	wantInPage(t, "the calendar", body, `<table class="calendar">`,
 		`<td class="written" aria-current="date"><a href="/days/2031-05-14"><span class="n">14</span><span class="meta">mood 3 · okay</span></a></td>`,
 		`<td class="written"><a href="/days/2031-05-01"><span class="n">1</span><span class="first">(00:00) May day: a walk by the lake.</span><span class="meta">mood 4 · good</span></a></td>`,
@@ -167,7 +166,7 @@ func TestTheMonthIsACalendar(t *testing.T) {
 // links in all: its Month and the Calendar of the sidebar.
 func TestTheZoomMarksItsOwnLevel(t *testing.T) {
 	l := emptyLife(t) // 2031-05-14
-	body := htmlPageAt(t, l.web, "/months/2031-04", http.StatusOK)
+	body := pageAt(t, l.web, "/months/2031-04")
 	if n := strings.Count(body, `aria-current="page">`); !strings.Contains(body, `<a href="/months/2031-04" aria-current="page">Month</a>`) || !strings.Contains(body, `<a href="/weeks/2031-W14">Week</a>`) || n != 2 {
 		t.Errorf("the month's zoom marks %d links (want its Month and the sidebar's Calendar): %.300s", n, body[strings.Index(body, `aria-label="Zoom"`):])
 	}

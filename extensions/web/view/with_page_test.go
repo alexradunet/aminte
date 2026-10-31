@@ -11,7 +11,7 @@ import (
 // TestAPageUnderWithIsDrawnByGeneric: a connected app names its own classes. A class that is also a class of this
 // server (day) must not choose the template of the server.
 func TestAPageUnderWithIsDrawnByGeneric(t *testing.T) {
-	e := &siren.Entity{Class: []string{"day"}, Title: "Their day", Properties: map[string]any{"count": 3}}
+	e := &siren.Entity{Class: []string{"day"}, Title: "Their day", Properties: map[string]any{"count": 3.0}}
 	for path, wantGeneric := range map[string]bool{"/with/app/": true, "/with/app/x/1": true, "/days/2026-09-01": false} {
 		b, err := Draw(e, Facts{URL: &url.URL{Path: path}})
 		generic := err == nil && strings.Contains(string(b), `<p class="meta-line">count: 3</p>`) // the scalar properties of the generic view

@@ -1,8 +1,7 @@
 package web_test
 
 // The search page as the browser draws it: the groups of hits, the order links, the empty search, the offer to make a
-// page, the fold of the paging fields and the links to the next and the previous page. The claims are those of the HTML
-// part of the search and paging tests of the core (plan 161, stage 3), held here against the real core.
+// page, the fold of the paging fields and the links to the next and the previous page. They run against the real core.
 
 import (
 	"fmt"
@@ -24,7 +23,7 @@ func TestSearchListsTitlesFirst(t *testing.T) {
 	draft := l.do(t, "/", "create-page", map[string]string{"title": "Gardening draft"})
 	l.do(t, href(draft, "self"), "rename", map[string]string{"title": "Allotment"})
 
-	body := htmlPageAt(t, l.web, "/search?q=garden", http.StatusOK)
+	body := pageAt(t, l.web, "/search?q=garden")
 	// The hits are in groups by kind (docs/plans/130-the-explore-pass.md, part 6): these are all pages.
 	titles, words := strings.Index(body, `aria-label="Pages by title"`), strings.Index(body, `<section class="result-group" aria-label="Pages">`)
 	if titles < 0 || words < 0 || titles > words {
@@ -52,7 +51,7 @@ func TestASearchOfOnlyBlanksIsTheEmptySearch(t *testing.T) {
 	l.do(t, "/", "create-page", map[string]string{"title": "Garden", "body": "The roses."})
 	for _, q := range []string{"", " ", "  \t ", " ", " ", "　  "} {
 		path := "/search?q=" + url.QueryEscape(q)
-		page := htmlPageAt(t, l.web, path, http.StatusOK)
+		page := pageAt(t, l.web, path)
 		wantInPage(t, path, page, `<form method="GET" action="/search" class="inline" data-action="search">`, `<summary>How to search</summary>`)
 		wantNotInPage(t, path, page, "No page matches.", `class="result-group"`)
 	}
@@ -67,10 +66,10 @@ func TestSearchOrderNewestFirst(t *testing.T) {
 	}
 	l.do(t, "/", "create-page", map[string]string{"title": "Shed", "body": "A lantern."})
 
-	if body := htmlPageAt(t, l.web, "/search?q=lantern", http.StatusOK); !strings.Contains(body, `href="/search?order=newest&amp;q=lantern"`) || !strings.Contains(body, ">Newest first</a>") {
+	if body := pageAt(t, l.web, "/search?q=lantern"); !strings.Contains(body, `href="/search?order=newest&amp;q=lantern"`) || !strings.Contains(body, ">Newest first</a>") {
 		t.Errorf("the best-match page lacks the link Newest first:\n%.2500s", body)
 	}
-	body := htmlPageAt(t, l.web, "/search?q=lantern&order=newest", http.StatusOK)
+	body := pageAt(t, l.web, "/search?q=lantern&order=newest")
 	if !strings.Contains(body, `href="/search?q=lantern"`) || !strings.Contains(body, ">Best match</a>") || strings.Contains(body, ">Newest first</a>") {
 		t.Errorf("the newest page lacks the link Best match:\n%.2500s", body)
 	}
@@ -79,7 +78,7 @@ func TestSearchOrderNewestFirst(t *testing.T) {
 	}
 	for _, bad := range []string{"oldest", "NEWEST", "newest,best"} {
 		path := "/search?q=lantern&order=" + url.QueryEscape(bad)
-		wantInPage(t, path, htmlPageAt(t, l.web, path, http.StatusUnprocessableEntity), "order must be one of best, newest")
+		wantInPage(t, path, pageWithStatus(t, l.web, path, http.StatusUnprocessableEntity), "order must be one of best, newest")
 	}
 }
 
@@ -87,21 +86,21 @@ func TestSearchOrderNewestFirst(t *testing.T) {
 // syntax (a * or a quote), which no title can keep.
 func TestASearchWithNoHitOffersTheNewPage(t *testing.T) {
 	l := emptyLife(t)
-	body := htmlPageAt(t, l.web, "/search?q="+url.QueryEscape("Zebra crossing"), http.StatusOK)
+	body := pageAt(t, l.web, "/search?q="+url.QueryEscape("Zebra crossing"))
 	wantInPage(t, "the search", body, `<a href="/browse?kind=page&amp;new=create-page&amp;title=Zebra&#43;crossing">Make a page titled ‘Zebra crossing’</a>`)
 	for _, q := range []string{"zebra*", `"zebra crossing"`} {
-		body := htmlPageAt(t, l.web, "/search?q="+url.QueryEscape(q), http.StatusOK)
+		body := pageAt(t, l.web, "/search?q="+url.QueryEscape(q))
 		if !strings.Contains(body, "No page matches.") || strings.Contains(body, "Make a page titled") {
 			t.Errorf("q=%s: the link is drawn for search syntax, or the empty words are not", q)
 		}
 	}
-	wantInPage(t, "the New page form", htmlPageAt(t, l.web, "/browse?kind=page&new=create-page&title=Zebra+crossing", http.StatusOK), `name="title" value="Zebra crossing"`)
+	wantInPage(t, "the New page form", pageAt(t, l.web, "/browse?kind=page&new=create-page&title=Zebra+crossing"), `name="title" value="Zebra crossing"`)
 }
 
 // TestTheSearchPageFoldsItsPagingFields: "Rows on a page" and "Rows skipped" are under More fields, not beside the words.
 func TestTheSearchPageFoldsItsPagingFields(t *testing.T) {
 	l := emptyLife(t)
-	page := htmlPageAt(t, l.web, "/search?q=ab", http.StatusOK)
+	page := pageAt(t, l.web, "/search?q=ab")
 	fold := regexp.MustCompile(`(?s)<details class="more-fields"><summary>[0-9]+ more fields</summary>(.*?)</details>`).FindStringSubmatch(page)
 	if fold == nil || !strings.Contains(fold[1], `name="limit"`) || !strings.Contains(fold[1], `name="offset"`) {
 		t.Fatalf("limit and offset are not under More fields:\n%s", page[strings.Index(page, "<main"):])
@@ -117,11 +116,11 @@ func TestTheListsOfABrowserLinkThePagesBeforeAndAfter(t *testing.T) {
 		l.do(t, "/", "create-person", map[string]string{"title": fmt.Sprintf("Person %d", i)})
 		l.do(t, fmt.Sprintf("/days/2031-03-%02d", i), "capture", map[string]string{"text": fmt.Sprintf("needleword [[Ghost %d]]", i)})
 	}
-	body := htmlPageAt(t, l.web, "/browse?kind=person&limit=3&offset=3", http.StatusOK)
+	body := pageAt(t, l.web, "/browse?kind=person&limit=3&offset=3")
 	if !strings.Contains(body, `href="/browse?kind=person&amp;limit=3&amp;offset=0" rel="prev"`) || !strings.Contains(body, `href="/browse?kind=person&amp;limit=3&amp;offset=6" rel="next"`) {
 		t.Errorf("people page 2: %.600s", body)
 	}
-	if body := htmlPageAt(t, l.web, "/search?q=needleword&limit=3", http.StatusOK); !strings.Contains(body, `rel="next"`) || strings.Contains(body, `rel="prev"`) {
+	if body := pageAt(t, l.web, "/search?q=needleword&limit=3"); !strings.Contains(body, `rel="next"`) || strings.Contains(body, `rel="prev"`) {
 		t.Errorf("search page 1 pager: %.600s", body)
 	}
 }

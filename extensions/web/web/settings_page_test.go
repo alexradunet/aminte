@@ -1,9 +1,8 @@
 package web_test
 
-// The page of the settings of the core: the form of the model, the key and the number of the phone. It is the HTML claim of
-// the test of the core TestTheSettingsPageDrawsTheThreeFieldsInOneForm (the number of the phone is the fourth field now).
-// The form of the settings of the browser itself, "This browser", is held with the catalog of web (catalog_test.go). This
-// test has no connected app, so the page is the page of the core's form alone.
+// The page of the settings of the core: the form of the model, the key and the number of the phone. The form of the
+// settings of the browser itself, "This browser", is held with the catalog of web (catalog_test.go). This test has no
+// connected app, so the page is the page of the core's form alone.
 
 import (
 	"net/http"
@@ -19,7 +18,7 @@ var settingsChatColumn = regexp.MustCompile(`(?s)<div class="chat compact" id="c
 // TestTheSettingsPageDrawsTheFieldsInOneForm: the model URL, the model id, the number of the phone and the key are fields of one
 // form whose one loud button is Save. The key is a password input that holds its value, and the browser is told not to fill
 // it. A save is a redirect back to /settings with the toast. The generic list of properties, the key among them, is not
-// drawn. Core: TestTheSettingsPageDrawsTheThreeFieldsInOneForm.
+// drawn.
 func TestTheSettingsPageDrawsTheFieldsInOneForm(t *testing.T) {
 	l := emptyLife(t)
 	page := ask(l.web, http.MethodGet, "/settings").Body.String()

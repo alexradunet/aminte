@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"regexp"
 	"slices"
 	"strings"
 	"sync"
@@ -126,15 +125,6 @@ func TestThePollOfTheChatReadsTheConversationWithoutItsCards(t *testing.T) {
 	}
 }
 
-// cardKinds are the kinds of the cards of a page, in the order they are drawn, with the address of each: "day /days/2031-05-01".
-func cardKinds(page string) []string {
-	var out []string
-	for _, m := range regexp.MustCompile(`<a class="card card-([a-z]+)" href="([^"]*)">`).FindAllStringSubmatch(page, -1) {
-		out = append(out, m[1]+" "+m[2])
-	}
-	return out
-}
-
 // TestTheColumnDrawsSixCardsAndTheScreenDrawsEveryOne: two turns name six days each. The conversation view draws a
 // card for each of the twelve. The column of any other page draws a card for the six of the newest turn, and the plain
 // link for the six of the older turn.
@@ -164,19 +154,6 @@ func TestTheColumnDrawsSixCardsAndTheScreenDrawsEveryOne(t *testing.T) {
 	}
 	if got := cardKinds(ask(l.web, http.MethodGet, "/browse").Body.String()); !slices.Equal(got, column) {
 		t.Errorf("the column:\n%v\nwant\n%v", got, column)
-	}
-}
-
-// TestTheTurnDrawsTheThingsTheAgentTouched: the tool lines of a turn name a day, a page, a person, a metric, a search,
-// an address that answers 404 and, as the seventh address of the turn, today by its word. The first five are cards,
-// the 404 is the plain link, and so is the seventh address: the server names six addresses of a turn.
-func TestTheTurnDrawsTheThingsTheAgentTouched(t *testing.T) {
-	l := richLife(t)
-	want := []string{"day /days/2031-05-14", "page /pages/3", "person /pages/2", "series /metrics/Weight", "search /search?q=heron", "link /pages/999999", "link /days/today"}
-	for _, uri := range []string{"/days/today/conversation", "/browse"} {
-		if got := cardKinds(ask(l.web, http.MethodGet, uri).Body.String()); !slices.Equal(got, want) {
-			t.Errorf("GET %s draws %v, want %v", uri, got, want)
-		}
 	}
 }
 

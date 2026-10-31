@@ -49,7 +49,7 @@ func TestAnAppPageIsDrawnWithTheRail(t *testing.T) {
 	if !strings.Contains(body, `href="/with/testapp" aria-current="page"`) {
 		t.Error("the rail has no current link to /with/testapp")
 	}
-	if other := shellPageOf(t, l, "/browse"); !strings.Contains(other, `href="/with/testapp"`) || strings.Contains(other, `href="/with/testapp" aria-current`) {
+	if other := pageAt(t, l.web, "/browse"); !strings.Contains(other, `href="/with/testapp"`) || strings.Contains(other, `href="/with/testapp" aria-current`) {
 		t.Error("another page: the link is missing or marked")
 	}
 }
@@ -62,7 +62,7 @@ func TestTheBrowserDrawsTheRowsOfAnApp(t *testing.T) {
 	l := emptyLife(t)
 	l.core.Connect(t, "testapp", itemsAppHandler(&done))
 
-	page := shellPageOf(t, l, "/with/testapp/")
+	page := pageAt(t, l.web, "/with/testapp/")
 	for _, want := range []string{
 		`<form method="POST" action="/with/testapp/items/1/done" class="round">`, `aria-label="Done"`,
 		`<span class="chip">n: 1</span>`, `<nav class="side" aria-label="Links">`, `aria-current="page"`, `class="quick-add"`,
@@ -136,7 +136,7 @@ func TestTheTaskServiceIsDrawnAsTasksAndNotAsAnApp(t *testing.T) {
 	l := emptyLife(t)
 	l.core.ConnectTasks(t, "taskservice", taskServiceHandler())
 
-	page := shellPageOf(t, l, "/tasks")
+	page := pageAt(t, l.web, "/tasks")
 	for _, row := range []string{"Fix tap", "Call mom"} { // the page is drawn from the service, so the next checks are not about an empty page
 		if !strings.Contains(page, row) {
 			t.Errorf("the page of Tasks lacks the task %q", row)
@@ -148,7 +148,7 @@ func TestTheTaskServiceIsDrawnAsTasksAndNotAsAnApp(t *testing.T) {
 	if strings.Contains(page, "/with/") || strings.Contains(strings.ToLower(page), "taskservice") {
 		t.Error("the page of Tasks names the service or an address of an app")
 	}
-	rail := railAsideRE.FindString(shellPageOf(t, l, "/browse"))
+	rail := railAsideRE.FindString(pageAt(t, l.web, "/browse"))
 	if !strings.Contains(rail, `href="/tasks"`) {
 		t.Error("the rail of /browse has no Tasks")
 	}

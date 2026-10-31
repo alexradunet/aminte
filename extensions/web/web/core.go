@@ -190,7 +190,8 @@ func isRedirect(status int) bool {
 }
 
 // isPath reports a Location that is a path of one server: it starts with one slash and has no backslash, so a browser
-// does not read it as the address of another host ("//host" and "/\host").
+// does not read it as the address of another host ("//host" and "/\host"). A control character is refused too: a
+// browser drops a tab or a line break from a URL, which could turn "/<tab>/host" into "//host".
 func isPath(to string) bool {
 	return strings.HasPrefix(to, "/") && !strings.HasPrefix(to, "//") && !strings.Contains(to, `\`) &&
 		strings.IndexFunc(to, func(c rune) bool { return c < 0x20 || c == 0x7f }) < 0

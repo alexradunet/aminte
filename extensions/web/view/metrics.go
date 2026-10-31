@@ -40,9 +40,8 @@ type metricReadings struct {
 
 // MetricReadings are the series' readings by year, newest first.
 func (v *view) MetricReadings() metricReadings {
-	props, _ := v.Props.(map[string]any)
-	list, _ := props["readings"].([]any)
-	unit, _ := props["unit"].(string)
+	list, _ := v.Props["readings"].([]any)
+	unit, _ := v.Props["unit"].(string)
 	r := metricReadings{}
 	for i := len(list) - 1; i >= 0; i-- {
 		m, _ := list[i].(map[string]any)
@@ -152,10 +151,9 @@ func newest(cards []metricCard) string {
 // MetricSections are the groups of /metrics as sections of cards, in the order of the groups. The words of a day
 // and whether a card is stale are said against the today of the view's clock.
 func (v *view) MetricSections() []metricSection {
-	props, _ := v.Props.(map[string]any)
-	groups, _ := props["groups"].([]any)
+	groups, _ := v.Props["groups"].([]any)
 	rows := map[string]map[string]any{}
-	if ms, _ := props["metrics"].([]any); ms != nil {
+	if ms, _ := v.Props["metrics"].([]any); ms != nil {
 		for _, x := range ms {
 			if m, _ := x.(map[string]any); m != nil {
 				rows[Num(m["id"])] = m
@@ -255,10 +253,9 @@ type readingTile struct {
 // ReadingTiles are the tiles of the day: first the daily metrics (property daily), in the order given, then the other
 // metrics read that day, in the order of their first reading. A metric has one tile.
 func (v *view) ReadingTiles() []readingTile {
-	props, _ := v.Props.(map[string]any)
-	daily, _ := props["daily"].([]any)
-	readings, _ := props["readings"].([]any)
-	units, _ := props["units"].(map[string]any)
+	daily, _ := v.Props["daily"].([]any)
+	readings, _ := v.Props["readings"].([]any)
+	units, _ := v.Props["units"].(map[string]any)
 	var out []readingTile
 	at := map[string]int{}
 	add := func(metric string) int {

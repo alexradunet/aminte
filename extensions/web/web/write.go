@@ -50,19 +50,15 @@ const newField = "new"
 const formType = "application/x-www-form-urlencoded"
 
 // backOf is the page a browser form asks to return to after its write (docs/plans/091-the-browser-for-daily-use.md): b
-// when it is a path on this server, "" otherwise. Only a path that starts with one slash is kept: "//host" and "/\host"
-// name another host to a browser, and a scheme, a host or a control character makes the value something other than a
-// path here. The path may end with one id fragment (backFragment). Any other "#" makes the value not a path. A value
-// that is not kept is ignored, not refused: the write is done, and the browser goes to the resource it changed.
+// when it is a path on this server (isPath), "" otherwise. The path must be a URL, and it is at most maxBack bytes. It may
+// end with one id fragment (backFragment). Any other "#" makes the value not a path. A value that is not kept is ignored,
+// not refused: the write is done, and the browser goes to the resource it changed.
 func backOf(b string) string {
 	path, fragment, hasFragment := strings.Cut(b, "#")
-	if b == "" || len(b) > maxBack || !strings.HasPrefix(b, "/") || strings.HasPrefix(b, "//") ||
-		strings.Contains(b, "\\") || hasFragment && !backFragment.MatchString(fragment) ||
-		strings.IndexFunc(b, func(c rune) bool { return c < 0x20 || c == 0x7f }) >= 0 {
+	if !isPath(b) || len(b) > maxBack || hasFragment && !backFragment.MatchString(fragment) {
 		return ""
 	}
-	u, err := url.Parse(path)
-	if err != nil || u.Scheme != "" || u.Host != "" || u.User != nil || u.Opaque != "" || !strings.HasPrefix(u.Path, "/") {
+	if _, err := url.Parse(path); err != nil {
 		return ""
 	}
 	return b

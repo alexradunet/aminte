@@ -12,17 +12,6 @@ import (
 	"testing"
 )
 
-// wholePageAt asks web for uri and fails the test unless the answer has the status and is a whole page.
-func wholePageAt(t *testing.T, l *life, uri string, status int) string {
-	t.Helper()
-	rec := ask(l.web, http.MethodGet, uri)
-	body := rec.Body.String()
-	if rec.Code != status || !strings.HasSuffix(strings.TrimSpace(body), "</html>") {
-		t.Errorf("GET %s: %d, want %d and a whole page: %.300s", uri, rec.Code, status, body)
-	}
-	return body
-}
-
 // TestEveryViewRenders draws every view of a small life as a browser gets it: one table of paths, each a whole page with
 // its status. Every page carries what semantic HTML needs: both sheets under their markers, one main with a way to skip to
 // it, the sections of the rail, at most one link of the whole rail marked, a footer, the search dialog, no script but
@@ -101,7 +90,7 @@ func TestEveryViewRenders(t *testing.T) {
 		{opens("Essay"), http.StatusOK, nil},
 		{"/pages/999999", http.StatusNotFound, nil},
 	} {
-		body := wholePageAt(t, l, row.path, row.status)
+		body := pageWithStatus(t, l.web, row.path, row.status)
 		bodies[row.path] = body
 		for _, want := range append([]string{
 			`<style data-sheet="base">`, `<style data-sheet="app">`, // the two sheets, the base one first
@@ -172,7 +161,7 @@ func TestNoPageShowsARawInstant(t *testing.T) {
 	attributes := regexp.MustCompile(`(datetime|title|value)="[^"]*"`)
 	instant := regexp.MustCompile(`\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z`)
 	for _, path := range []string{href(garden, "self"), href(reading, "self")} {
-		body := wholePageAt(t, l, path, http.StatusOK)
+		body := pageAt(t, l.web, path)
 		if !instant.MatchString(body) {
 			t.Errorf("%s holds no instant at all: the test proves nothing", path)
 		}

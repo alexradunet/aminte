@@ -6,7 +6,6 @@ package web_test
 import (
 	"encoding/json"
 	"fmt"
-	"html"
 	"net/http"
 	"regexp"
 	"strings"
@@ -101,7 +100,7 @@ func TestEveryActionOfAnEntityIsDrawnOnce(t *testing.T) {
 	} {
 		t.Run(row.name, func(t *testing.T) {
 			e := must(t)(l.api.Get(t.Context(), row.path))
-			checkActionsDrawnOnce(t, row.path, e, mainPartOf(wholePageAt(t, l, row.path, http.StatusOK)))
+			checkActionsDrawnOnce(t, row.path, e, mainPartOf(pageAt(t, l.web, row.path)))
 		})
 	}
 }
@@ -170,7 +169,7 @@ func TestEveryActionOfAnAppAndOfTheTaskServiceIsDrawnOnce(t *testing.T) {
 			if len(e.Actions) == 0 {
 				t.Fatalf("%s offers no action: the test proves nothing", path)
 			}
-			checkActionsDrawnOnce(t, path, e, mainPartOf(wholePageAt(t, l, path, http.StatusOK)))
+			checkActionsDrawnOnce(t, path, e, mainPartOf(pageAt(t, l.web, path)))
 		})
 	}
 }
@@ -183,7 +182,7 @@ func TestADayDrawsNoMenu(t *testing.T) {
 	l.do(t, "/", "register-metric", map[string]string{"name": "weight", "unit": "kg"})
 	for _, path := range []string{"/days/2026-09-30", "/days/2026-09-01"} {
 		e := must(t)(l.api.Get(t.Context(), path))
-		body := mainPartOf(wholePageAt(t, l, path, http.StatusOK))
+		body := mainPartOf(pageAt(t, l.web, path))
 		if strings.Contains(body, `aria-label="More actions"`) {
 			t.Errorf("%s draws a menu button: a day has no action without a place", path)
 		}
@@ -204,7 +203,7 @@ func TestAnAskedFormIsNotInTheBackOfAForm(t *testing.T) {
 	self := href(lisbon, "self")
 	backs := regexp.MustCompile(`name="back" value="([^"]*)"`)
 	for _, path := range []string{self + "?new=rename", self + "?new=tombstone-pages", self + "?new=file-pages", "/browse?in=Cities&new=file-pages"} {
-		page := wholePageAt(t, l, path, http.StatusOK)
+		page := pageAt(t, l.web, path)
 		found := backs.FindAllStringSubmatch(page, -1)
 		if len(found) == 0 {
 			t.Errorf("%s draws no form with a back: the test proves nothing", path)
@@ -219,12 +218,12 @@ func TestAnAskedFormIsNotInTheBackOfAForm(t *testing.T) {
 
 // TestEveryActionFormSendsToItsAction: a form drawn from an action sends to the href of the action with the method of the
 // action (a box, a row with one button, the capture), and every POST form of the page of today sends to an action of that page.
-// Every action that the root offers has its form on /actions, the page of every action.
+// That every action of the catalog has its form on /actions is held by TestEveryActionOfTheCatalogHasItsFormInWeb.
 func TestEveryActionFormSendsToItsAction(t *testing.T) {
 	l := lifeStartingOn(t, today)
 	l.do(t, "/", "register-metric", map[string]string{"name": "walk"})
 	dayEntity := must(t)(l.api.Get(t.Context(), "/days/"+today))
-	body := wholePageAt(t, l, "/days/"+today, http.StatusOK)
+	body := pageAt(t, l.web, "/days/"+today)
 	posts := map[string]bool{}
 	for _, a := range dayEntity.Actions {
 		if a.Method == http.MethodPost {
@@ -250,18 +249,6 @@ func TestEveryActionFormSendsToItsAction(t *testing.T) {
 	for _, m := range forms {
 		if !posts[m[1]] {
 			t.Errorf("a form of the page of today posts to %s, which is no action of that page", m[1])
-		}
-	}
-
-	root := must(t)(l.api.Get(t.Context(), "/"))
-	every, catalog := wholePageAt(t, l, "/actions", http.StatusOK), must(t)(l.api.Get(t.Context(), "/actions"))
-	for _, offered := range root.Actions {
-		a := act(t, catalog, offered.Name)
-		if strings.Contains(a.Href, "{") { // the action of a day (capture): its form is the page of the day, checked above
-			continue
-		}
-		if !strings.Contains(every, `<form method="`+a.Method+`" action="`+html.EscapeString(a.Href)+`"`) {
-			t.Errorf("/actions has no form of %s, which the root offers: %+v", offered.Name, a)
 		}
 	}
 }

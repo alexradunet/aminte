@@ -272,15 +272,11 @@ func (v *view) LongDate(x any) string {
 	return t.Format("Monday 2 January 2006")
 }
 
-// Value draws any value of the entity by its type; a value that JSON cannot carry is an error.
-func (v *view) Value(x any) (template.HTML, error) {
-	shape, err := jsonShape(x)
-	if err != nil {
-		return "", err
-	}
+// Value draws any value of the entity by its type.
+func (v *view) Value(x any) template.HTML {
 	var sb strings.Builder
-	v.clock().writeValue(&sb, shape)
-	return template.HTML(sb.String()), nil
+	v.clock().writeValue(&sb, x)
+	return template.HTML(sb.String())
 }
 
 // The layouts of a day in words.

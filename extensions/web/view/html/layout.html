@@ -179,8 +179,7 @@
      select, a textarea, or an input of the field's type. A field of page titles with options is an input with a datalist of them (List), so the reader picks a title or
      types a new one. A select of an optional field starts empty, so the form sends no value that the reader did not
      pick; a select of a required field with a placeholder starts with that prompt (an empty option), and the
-     browser refuses it until the reader picks. A required radio, textarea or input is marked required, so the browser does not send it empty, and an
-     input with a pattern (formOf) only when its value matches. The word "required" marks a field among others: a form
+     browser refuses it until the reader picks. A required radio, textarea or input is marked required, so the browser does not send it empty. The word "required" marks a field among others: a form
      of one field does not say it (Sole), and the browser still refuses an empty box. A form with a text area offers Preview
      (formView.Preview, drawn by form), which sends the form to /render in a new tab, so the words stay in the form. */}}
 {{define "field"}}{{if checkbox .Field}}<label><input type="checkbox" name="{{.Name}}" value="1"{{if eq (num .Value) "1"}} checked{{end}}{{if .Focus}} autofocus{{end}}><span>{{or .Title .Name}}</span></label>
@@ -188,13 +187,12 @@
 {{else}}<label><span>{{or .Title .Name}}{{if and .Required (not .Sole)}} <small>required</small>{{end}}</span>
 {{if and .Options (not .List)}}<select name="{{.Name}}"{{if and .Required .Placeholder}} required{{end}}{{if .Focus}} autofocus{{end}}>{{$v := num .Value}}{{if and .Required .Placeholder}}<option value="">{{.Placeholder}}</option>{{else if and (not .Required) (ne (index .Options 0) "")}}<option></option>{{end}}{{range .Options}}<option{{if eq . $v}} selected{{end}}>{{.}}</option>{{end}}</select>
 {{else if eq .Type "textarea"}}<textarea name="{{.Name}}"{{with .Rows}} rows="{{.}}"{{end}}{{if .Required}} required{{end}}{{with .Placeholder}} placeholder="{{.}}"{{end}}{{with .Key}} accesskey="{{.}}"{{end}}{{if .Focus}} autofocus{{end}}{{if .Send}} enterkeyhint="send"{{end}}>{{num .Value}}</textarea>
-{{else}}<input type="{{.Type}}" name="{{.Name}}" value="{{num .Value}}"{{if eq .Type "password"}} autocomplete="new-password"{{end}}{{if .Required}} required{{end}}{{with .Pattern}} pattern="{{.}}"{{end}}{{if eq .Type "number"}} step="any" inputmode="decimal"{{end}}{{with .Accept}} accept="{{.}}"{{end}}{{with .List}} list="{{.}}"{{end}}{{with .Placeholder}} placeholder="{{.}}"{{end}}{{if .Focus}} autofocus{{end}}>{{with .List}}<datalist id="{{.}}">{{$labels := $.Labels}}{{range $.Options}}{{$o := .}}{{with index $labels $o}}<option value="{{$o}}">{{.}}{{else}}<option value="{{$o}}">{{end}}{{end}}</datalist>{{end}}{{end}}</label>
+{{else}}<input type="{{.Type}}" name="{{.Name}}" value="{{num .Value}}"{{if eq .Type "password"}} autocomplete="new-password"{{end}}{{if .Required}} required{{end}}{{if eq .Type "number"}} step="any" inputmode="decimal"{{end}}{{with .Accept}} accept="{{.}}"{{end}}{{with .List}} list="{{.}}"{{end}}{{with .Placeholder}} placeholder="{{.}}"{{end}}{{if .Focus}} autofocus{{end}}>{{with .List}}<datalist id="{{.}}">{{$labels := $.Labels}}{{range $.Options}}{{$o := .}}{{with index $labels $o}}<option value="{{$o}}">{{.}}{{else}}<option value="{{$o}}">{{end}}{{end}}</datalist>{{end}}{{end}}</label>
 {{end}}{{end}}
 
 {{/* boxed is an action as a button that opens its form (the ActionForm of the design system): with no script, a
-     closed <details>. An owner-only action carries the owner mark. A form with a group (the option "group") shares
-     its name with the others of the group, so the browser keeps one of them open. */}}
-{{define "boxed"}}{{with .}}<details class="action"{{with .Group}} name="{{.}}"{{end}}{{if .Asked}} open{{end}}><summary class="button">{{.Button}}{{if .Owner}} <span class="owner">owner</span>{{end}}</summary><div class="action-form">{{with or .Hint .Description}}<p class="desc">{{.}}</p>{{end}}{{template "form" .}}</div></details>{{end}}{{end}}
+     closed <details>. An owner-only action carries the owner mark. */}}
+{{define "boxed"}}{{with .}}<details class="action"{{if .Asked}} open{{end}}><summary class="button">{{.Button}}{{if .Owner}} <span class="owner">owner</span>{{end}}</summary><div class="action-form">{{with or .Hint .Description}}<p class="desc">{{.}}</p>{{end}}{{template "form" .}}</div></details>{{end}}{{end}}
 
 {{/* period-page is the page of a period (a week, a month, a year) in its view: the prose above, and the fold that edits
      it. A period with no page shows the form that makes it (create-page, with the key as the title). It takes v (the

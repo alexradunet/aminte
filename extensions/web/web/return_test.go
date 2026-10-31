@@ -2,14 +2,8 @@ package web_test
 
 // Where a write of the browser returns, and the toast that tells its result. A form names the page to return to (back).
 // Web keeps the value only when it is a path of this server. The result of the write comes back once, as the toast at the
-// top of the page where the browser lands. These are the tests of the browser of the core
-// (internal/api/view_forms_test.go, days_test.go, feedback_test.go, feedback_internal_test.go, states_test.go,
-// measurements_test.go and files_test.go), ported to web with their strings, against the real core. The rules for the
-// value of back are in limits_test.go (backOf).
-//
-// Not ported: the part of TestABrowserFormReturnsToThePageThatSentIt about a JSON client, which never follows back. Web
-// has no JSON client. The core now refuses the field back as an unknown field (plan 161, decision 4). A test of the
-// core holds that.
+// top of the page where the browser lands. The tests run against the real core. The rules for the value of back are in
+// limits_test.go (backOf). A client of the API never follows back: the core refuses the field as an unknown field.
 
 import (
 	"bytes"
@@ -52,9 +46,9 @@ func locationWithoutReceipt(t *testing.T, location string) string {
 	return u.String()
 }
 
-// Core test: TestABrowserFormReturnsToThePageThatSentIt. A form that names a path on this server returns there with the
-// feedback. Web ignores any other value, and the browser goes to what it changed. The table of
-// TestBackOfKeepsAPathOnThisServerAndDropsEveryOtherValue says which values are a path on this server.
+// A form that names a path on this server returns there with the feedback. Web ignores any other value, and the browser
+// goes to what it changed. The table of TestBackOfKeepsAPathOnThisServerAndDropsEveryOtherValue says which values are a
+// path on this server.
 func TestAFormReturnsToThePageThatSentIt(t *testing.T) {
 	l := emptyLife(t)
 	const day = "2031-05-12"
@@ -74,7 +68,7 @@ func TestAFormReturnsToThePageThatSentIt(t *testing.T) {
 	// The feedback of a write that has some goes to the page returned to, with its receipt.
 	rec := postForm(l.web, "/pages", url.Values{"title": {"Notes"}, "body": {"[[bad/name]]"}, "back": {"/browse?kind=person"}})
 	loc := rec.Header().Get("Location")
-	if got := locationWithoutReceipt(t, loc); got != "/browse?kind=person" || !strings.Contains(browserPageAt(t, l.web, loc), "bad/name") {
+	if got := locationWithoutReceipt(t, loc); got != "/browse?kind=person" || !strings.Contains(pageAt(t, l.web, loc), "bad/name") {
 		t.Errorf("feedback did not follow the return path: %q", loc)
 	}
 	if view, _ := must(t)(l.api.Get(t.Context(), "/days/"+day)).Properties.(map[string]any)["view"].([]any); len(view) == 0 {
@@ -82,7 +76,7 @@ func TestAFormReturnsToThePageThatSentIt(t *testing.T) {
 	}
 }
 
-// Core test: TestBrowserMutationFeedback. A form with no back returns to what it wrote. The Location is the page of the
+// A form with no back returns to what it wrote. The Location is the page of the
 // new thing, with one receipt and nothing else in its query. The page tells the result in words, once.
 func TestAFormWithNoBackReturnsToTheNewPageWithOneReceiptAndTellsItsResultOnce(t *testing.T) {
 	l := emptyLife(t)
@@ -93,13 +87,13 @@ func TestAFormWithNoBackReturnsToTheNewPageWithOneReceiptAndTellsItsResultOnce(t
 		t.Fatalf("POST: %d %s", rec.Code, rec.Body.String())
 	}
 	location := rec.Header().Get("Location")
-	body := browserPageAt(t, l.web, location)
+	body := pageAt(t, l.web, location)
 	for _, want := range []string{"Result", `Revived <a href="/pages?title=Revived+target">Revived target</a>.`, "Not linked, not a valid title: <code>[[bad/name]]</code>."} {
 		if !strings.Contains(body, want) {
 			t.Errorf("missing %q in the redirected feedback", want)
 		}
 	}
-	if strings.Contains(browserPageAt(t, l.web, location), "<h2>Result</h2>") { // a reload is a whole page with the status 200
+	if strings.Contains(pageAt(t, l.web, location), "<h2>Result</h2>") { // a reload is a whole page with the status 200
 		t.Error("receipt replayed")
 	}
 	page := must(t)(l.api.Get(t.Context(), "/pages?title=Feedback%20page"))
@@ -108,7 +102,7 @@ func TestAFormWithNoBackReturnsToTheNewPageWithOneReceiptAndTellsItsResultOnce(t
 	}
 }
 
-// Core test: TestAFormThatReturnsHomeLandsOnToday. The write that returns to "/" goes home, which is the page of today.
+// The write that returns to "/" goes home, which is the page of today.
 // Its one-use receipt is read there, once.
 func TestAFormThatReturnsHomeLandsOnTodayWithItsToastOnce(t *testing.T) {
 	l := emptyLife(t)
@@ -117,15 +111,15 @@ func TestAFormThatReturnsHomeLandsOnTodayWithItsToastOnce(t *testing.T) {
 		t.Fatalf("capture: %d %q", rec.Code, rec.Header().Get("Location"))
 	}
 	to := rec.Header().Get("Location")
-	if body := browserPageAt(t, l.web, to); !strings.Contains(body, `class="toast"`) || !strings.Contains(body, "Dana Example") || !strings.Contains(body, `<h1>Wednesday</h1>`) {
+	if body := pageAt(t, l.web, to); !strings.Contains(body, `class="toast"`) || !strings.Contains(body, "Dana Example") || !strings.Contains(body, `<h1>Wednesday</h1>`) {
 		t.Errorf("the page of today does not carry the receipt of the capture:\n%.600s", fromTheMain(body))
 	}
-	if strings.Contains(browserPageAt(t, l.web, to), `class="toast"`) { // a reload is a whole page with the status 200
+	if strings.Contains(pageAt(t, l.web, to), `class="toast"`) { // a reload is a whole page with the status 200
 		t.Error("the receipt came back on a reload")
 	}
 }
 
-// Core test: TestAWriteEndsInAToast. The result of a form comes back once, as the toast at the top of the page. The toast
+// The result of a form comes back once, as the toast at the top of the page. The toast
 // is an open dialog in the flow. Escape (closedby) and its own Close button close it with no script.
 func TestAWriteEndsInAToastWithItsCloseButton(t *testing.T) {
 	l := emptyLife(t)
@@ -133,17 +127,17 @@ func TestAWriteEndsInAToastWithItsCloseButton(t *testing.T) {
 	if rec.Code != http.StatusSeeOther || !strings.HasPrefix(rec.Header().Get("Location"), "/days/"+today+"?feedback=") {
 		t.Fatalf("capture: %d %q", rec.Code, rec.Header().Get("Location"))
 	}
-	body := browserPageAt(t, l.web, rec.Header().Get("Location"))
+	body := pageAt(t, l.web, rec.Header().Get("Location"))
 	if !strings.Contains(body, `<main id="main">`+"\n"+`<dialog open closedby="closerequest" class="toast" aria-label="Result"><h2>Result</h2>`) || !strings.Contains(body, "Dana Example") ||
 		!strings.Contains(body, `<form method="dialog" class="tiny"><button class="close">Close</button></form></dialog>`) {
 		t.Errorf("the capture's result is not the toast at the top of the page, with its Close")
 	}
-	if strings.Contains(browserPageAt(t, l.web, rec.Header().Get("Location")), `class="toast"`) { // a reload is a whole page with the status 200
+	if strings.Contains(pageAt(t, l.web, rec.Header().Get("Location")), `class="toast"`) { // a reload is a whole page with the status 200
 		t.Error("the toast came back on a reload")
 	}
 }
 
-// Core test: TestPhotoDaySyncJSONAndBrowserReceipt (the browser case). A file with a day, sent as a form of files, is
+// A file with a day, sent as a form of files, is
 // redirected like any other write. The toast tells in words what happened in the page of its day: a link that came back
 // to life, and the link of the body.
 func TestAFileWithADayTellsWhatHappenedInItsDayPageInTheToast(t *testing.T) {
@@ -189,7 +183,7 @@ func TestAFileWithADayTellsWhatHappenedInItsDayPageInTheToast(t *testing.T) {
 	}
 }
 
-// Core test: TestBrowserMutationFeedbackEscaping. The result of a write is text of the core. It can hold a word that an
+// The result of a write is text of the core. It can hold a word that an
 // agent wrote. The toast draws it escaped: the page at the Location has Result and the words, and no live script. A
 // receipt is the only way to a toast. So a query with a message in it draws nothing, and a second visit has no toast. The
 // test looks for "<script>alert" and not for "<script>", because a page of the shell has the script chat.js.
@@ -224,7 +218,7 @@ func TestAToastIsEscapedAndOnlyAReceiptDrawsOne(t *testing.T) {
 	}
 }
 
-// Core test: TestDeleteFromTheViewReturnsToThePage (the first block). A form of a metric sent with no back (a form opened
+// A form of a metric sent with no back (a form opened
 // from /actions) returns to the page of the metric. The page leads to its view, the series. The toast comes along.
 func TestAWriteWithNoBackLandsOnThePageThenOnTheSeriesWithItsToast(t *testing.T) {
 	l := emptyLife(t)

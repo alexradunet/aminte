@@ -253,6 +253,25 @@ func ask(h http.Handler, method, uri string) *httptest.ResponseRecorder {
 	return rec
 }
 
+// pageAt is the body of GET uri through h, as a browser asks for it. The test stops unless the answer is a whole page
+// with the status 200, so that a test of the markup never reads the page of an error.
+func pageAt(t *testing.T, h http.Handler, uri string) string {
+	t.Helper()
+	return pageWithStatus(t, h, uri, http.StatusOK)
+}
+
+// pageWithStatus is pageAt for a page that is not a 200: the page of a refusal. The test stops unless the answer has
+// the status and is a whole page.
+func pageWithStatus(t *testing.T, h http.Handler, uri string, status int) string {
+	t.Helper()
+	rec := ask(h, http.MethodGet, uri)
+	body := rec.Body.String()
+	if rec.Code != status || !strings.HasSuffix(strings.TrimSpace(body), "</html>") {
+		t.Fatalf("GET %s: %d, want %d and a whole page: %.500s", uri, rec.Code, status, body)
+	}
+	return body
+}
+
 // versionOf is the version of the page at href, as a form carries it.
 func (l *life) versionOf(t *testing.T, href string) string {
 	t.Helper()

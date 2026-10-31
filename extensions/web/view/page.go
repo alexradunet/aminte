@@ -9,7 +9,6 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"embed"
-	"encoding/json"
 	"fmt"
 	"html/template"
 	"net/url"
@@ -197,13 +196,14 @@ func placingOf(e *siren.Entity) placing {
 	return placing{template: "generic"}
 }
 
-// view is what a template gets: the entity, its properties as the JSON client reads them, the path the browser
+// view is what a template gets: the entity, its properties as the JSON client reads them (the entity was decoded from
+// JSON, so they are maps, lists, strings and float64s), the path the browser
 // asked for (which navigation link is current), the address of this page (where a form on it asks to return,
 // docs/plans/091-the-browser-for-daily-use.md) and, for an error answering a form, the text that form sent (so a
 // refused save loses nothing) and the page it came from.
 type view struct {
 	*siren.Entity
-	Props     any
+	Props     map[string]any
 	Path      string
 	Here      string
 	Submitted string
@@ -268,27 +268,16 @@ type Facts struct {
 }
 
 // pageView is the view of a page: the entity and the facts of the page. It reads nothing, so the same arguments give
-// the same view. Properties that JSON cannot carry (a
-// NaN, an infinity) are an error, so a page is never drawn with its properties left out.
-func pageView(e *siren.Entity, f Facts) (*view, error) {
-	shape, err := jsonShape(e.Properties)
-	if err != nil {
-		return nil, err
-	}
-	v := &view{Entity: e, Props: shape, Path: f.URL.Path, Here: hereOf(f.URL), Submitted: f.Submitted, Back: f.Back,
+// the same view. Properties that are not an object give a view with none.
+func pageView(e *siren.Entity, f Facts) *view {
+	props, _ := e.Properties.(map[string]any)
+	return &view{Entity: e, Props: props, Path: f.URL.Path, Here: hereOf(f.URL), Submitted: f.Submitted, Back: f.Back,
 		Shell: f.Shell, query: f.URL.Query(), cards: f.Cards, chatDays: f.ChatDays}
-	return v, nil
 }
 
 // Draw is the page of e as HTML: the view of e (pageView), drawn by the template of its class (htmlOf). It is the one
 // call that draws a page: f are the facts of the page.
-func Draw(e *siren.Entity, f Facts) ([]byte, error) {
-	v, err := pageView(e, f)
-	if err != nil {
-		return nil, err
-	}
-	return htmlOf(v)
-}
+func Draw(e *siren.Entity, f Facts) ([]byte, error) { return htmlOf(pageView(e, f)) }
 
 // TemplateOf names the template that draws an entity: the first of its classes that has one, else "generic".
 func TemplateOf(e *siren.Entity) string { return placingOf(e).template }
@@ -363,9 +352,8 @@ func (v *view) Filed() *filedHere {
 
 // Categories are the categories of a page or a metric: the part-of links of its links, in their order.
 func (v *view) Categories() []any {
-	props, _ := v.Props.(map[string]any)
 	var out []any
-	for _, l := range anyList(props["links"]) {
+	for _, l := range anyList(v.Props["links"]) {
 		if m, _ := l.(map[string]any); m["kind"] == "part-of" {
 			out = append(out, l)
 		}
@@ -376,9 +364,8 @@ func (v *view) Categories() []any {
 // Backlinks are the backlinks of a page by kind, in the order of their first appearance, without part-of: Filed
 // here lists those.
 func (v *view) Backlinks() []bucket {
-	props, _ := v.Props.(map[string]any)
 	var out []bucket
-	for _, b := range group(props["backlinks"], "kind") {
+	for _, b := range group(v.Props["backlinks"], "kind") {
 		if b.Key != "part-of" {
 			out = append(out, b)
 		}
@@ -403,8 +390,7 @@ type writtenPage struct {
 
 // DayParts are the rows of the day's view by part, from one pass over the view.
 func (v *view) DayParts() dayParts {
-	props, _ := v.Props.(map[string]any)
-	rows, _ := props["view"].([]any)
+	rows, _ := v.Props["view"].([]any)
 	var p dayParts
 	for _, r := range rows {
 		m, _ := r.(map[string]any)
@@ -417,23 +403,6 @@ func (v *view) DayParts() dayParts {
 		}
 	}
 	return p
-}
-
-// jsonShape is v as a JSON client reads it: maps by JSON name, lists, strings, float64s. A value that JSON cannot
-// carry (a NaN, an infinity) is an error, so a page is never drawn with its properties left out.
-func jsonShape(v any) (any, error) {
-	if v == nil {
-		return nil, nil
-	}
-	b, err := json.Marshal(v)
-	if err != nil {
-		return nil, err
-	}
-	var x any
-	if err := json.Unmarshal(b, &x); err != nil {
-		return nil, err
-	}
-	return x, nil
 }
 
 // rejected are the [[…]] names in a body that make no link, because they are not valid titles.

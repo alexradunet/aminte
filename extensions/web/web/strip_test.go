@@ -95,7 +95,7 @@ func TestTheTodayStripReadsTheLife(t *testing.T) {
 		l.do(t, "/days/"+r.day, "record", map[string]string{"metric": r.metric, "value": r.value})
 	}
 
-	body := shellPageOf(t, l, "/days/"+today)
+	body := pageAt(t, l.web, "/days/"+today)
 	strip := stripBoxRE.FindString(body)
 	for _, want := range []string{
 		"3 of 5 done", "3 days in a row",
@@ -114,7 +114,7 @@ func TestTheTodayStripReadsTheLife(t *testing.T) {
 		t.Errorf("the head of today does not show the streak:\n%.1500s", body)
 	}
 	// A day that is not today has the strip in its rail, and no streak tag in its head.
-	if past := shellPageOf(t, l, "/days/2031-05-13"); !strings.Contains(past, "3 days in a row</div>") || strings.Contains(past, `<span class="tag">3 days in a row</span>`) {
+	if past := pageAt(t, l.web, "/days/2031-05-13"); !strings.Contains(past, "3 days in a row</div>") || strings.Contains(past, `<span class="tag">3 days in a row</span>`) {
 		t.Errorf("the page of a past day: the rail must show the streak and the head must not")
 	}
 }
@@ -124,11 +124,11 @@ func TestTheTodayStripReadsTheLife(t *testing.T) {
 // autofocus.
 func TestTheStripIsAtTheHeadOfTodayOnAPhone(t *testing.T) {
 	l := emptyLife(t)
-	todayPage := shellPageOf(t, l, "/days/"+today)
+	todayPage := pageAt(t, l.web, "/days/"+today)
 	if n := strings.Count(todayPage, `<section class="rail-today"`); n != 2 || !strings.Contains(todayPage, `<div class="today-inline"><section class="rail-today"`) {
 		t.Errorf("the strip is drawn %d times, or not in the page of today", n)
 	}
-	if other := shellPageOf(t, l, "/days/2031-05-10"); strings.Count(other, `<section class="rail-today"`) != 1 || strings.Contains(other, `<div class="today-inline">`) {
+	if other := pageAt(t, l.web, "/days/2031-05-10"); strings.Count(other, `<section class="rail-today"`) != 1 || strings.Contains(other, `<div class="today-inline">`) {
 		t.Error("another day draws the strip in its page")
 	}
 	if strings.Contains(todayPage, `accesskey="c" autofocus`) {
@@ -142,7 +142,7 @@ func TestTheLinkOfAHabitChipFillsTheRecordForm(t *testing.T) {
 	l := emptyLife(t)
 	l.do(t, "/", "register-metric", map[string]string{"name": "Walk"})
 	l.do(t, "/days/2031-05-13", "record", map[string]string{"metric": "Walk", "value": "1"})
-	form := stripRecordFormRE.FindString(shellPageOf(t, l, "/?new=record&metric=Walk&value=1"))
+	form := stripRecordFormRE.FindString(pageAt(t, l.web, "/?new=record&metric=Walk&value=1"))
 	if !strings.Contains(form, `<option selected>Walk</option>`) || !regexp.MustCompile(`name="value" value="1"`).MatchString(form) || !strings.Contains(form, "<details class=\"action\" open>") {
 		t.Errorf("the form is not open and filled with Walk and 1:\n%s", form)
 	}
@@ -157,7 +157,7 @@ func TestAHabitChipOnAPageThatAChipOpenedReturnsWithoutTheForm(t *testing.T) {
 		l.do(t, "/", "register-metric", map[string]string{"name": name, "daily": "1"})
 		l.do(t, "/days/2031-05-13", "record", map[string]string{"metric": name, "value": "1"})
 	}
-	strip := stripBoxRE.FindString(shellPageOf(t, l, "/?back=%2F&metric=Walk&new=record&value=1"))
+	strip := stripBoxRE.FindString(pageAt(t, l.web, "/?back=%2F&metric=Walk&new=record&value=1"))
 	if want := `<a class="chip" href="/?back=%2F&amp;metric=Run&amp;new=record&amp;value=1#record">Run</a>`; !strings.Contains(strip, want) {
 		t.Errorf("the chip of Run does not go back to Home without the form, want %s:\n%s", want, strip)
 	}
@@ -171,7 +171,7 @@ func TestTheChipOfAHabitReturnsToThePageItWasOn(t *testing.T) {
 	l.do(t, "/", "register-metric", map[string]string{"name": "Stretch", "daily": "1"})
 	l.do(t, "/days/2031-05-11", "record", map[string]string{"metric": "Stretch", "value": "1"})
 	page := "/days/2031-05-13"
-	chip := regexp.MustCompile(`<a class="chip" href="([^"]+)">Stretch</a>`).FindStringSubmatch(shellPageOf(t, l, page))
+	chip := regexp.MustCompile(`<a class="chip" href="([^"]+)">Stretch</a>`).FindStringSubmatch(pageAt(t, l.web, page))
 	if chip == nil {
 		t.Fatal("no chip for Stretch")
 	}
@@ -179,7 +179,7 @@ func TestTheChipOfAHabitReturnsToThePageItWasOn(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	form := stripRecordFormRE.FindString(shellPageOf(t, l, link.RequestURI()))
+	form := stripRecordFormRE.FindString(pageAt(t, l.web, link.RequestURI()))
 	if form == "" {
 		t.Fatal("the page of the chip has no form of a reading")
 	}
@@ -194,7 +194,7 @@ func TestTheChipOfAHabitReturnsToThePageItWasOn(t *testing.T) {
 	if got := returnedPathOf(t, rec.Header().Get("Location")); got != page {
 		t.Errorf("returned to %q, want %q", got, page)
 	}
-	if after := stripBoxRE.FindString(shellPageOf(t, l, page)); !strings.Contains(after, `<span class="chip done">✓ Stretch</span>`) {
+	if after := stripBoxRE.FindString(pageAt(t, l.web, page)); !strings.Contains(after, `<span class="chip done">✓ Stretch</span>`) {
 		t.Errorf("the strip does not count Stretch as done after the write:\n%s", after)
 	}
 }
@@ -205,13 +205,13 @@ func TestTheChipOfAHabitReturnsToThePageItWasOn(t *testing.T) {
 func TestOnThisDayListsTheSameDayOfEarlierYears(t *testing.T) {
 	l := emptyLife(t)
 	l.do(t, "/days/"+today, "capture", map[string]string{"text": "Today, with no earlier year."})
-	if g := onThisDayRE.FindString(shellPageOf(t, l, "/days/"+today)); g != "" { // the page of the day itself is no earlier year
+	if g := onThisDayRE.FindString(pageAt(t, l.web, "/days/"+today)); g != "" { // the page of the day itself is no earlier year
 		t.Errorf("a day with no earlier year has a group:\n%s", g)
 	}
 	l.do(t, "/days/2030-05-14", "capture", map[string]string{"text": "A year ago.", "mood": "5"})
 	l.do(t, "/days/2029-05-14", "capture", map[string]string{"text": "Two years ago."})
 	l.do(t, "/days/2027-05-14", "capture", map[string]string{"text": "Four years ago, after a gap."})
-	g := onThisDayRE.FindString(shellPageOf(t, l, "/days/"+today))
+	g := onThisDayRE.FindString(pageAt(t, l.web, "/days/"+today))
 	if g == "" {
 		t.Fatal("no group on today")
 	}
@@ -227,7 +227,7 @@ func TestOnThisDayListsTheSameDayOfEarlierYears(t *testing.T) {
 		t.Errorf("the group of today lists today:\n%s", g)
 	}
 	// A past day has its own earlier years, and its own day is left out.
-	if g := onThisDayRE.FindString(shellPageOf(t, l, "/days/2030-05-14")); !strings.Contains(g, `href="/days/2029-05-14"`) || strings.Contains(g, "2030-05-14") {
+	if g := onThisDayRE.FindString(pageAt(t, l.web, "/days/2030-05-14")); !strings.Contains(g, `href="/days/2029-05-14"`) || strings.Contains(g, "2030-05-14") {
 		t.Errorf("the group of 2030-05-14:\n%s", g)
 	}
 }
@@ -238,7 +238,7 @@ func TestOnThisDayStopsAtFiveYears(t *testing.T) {
 	for year := 2025; year <= 2030; year++ {
 		l.do(t, fmt.Sprintf("/days/%d-05-14", year), "capture", map[string]string{"text": "Synthetic words."})
 	}
-	g := onThisDayRE.FindString(shellPageOf(t, l, "/days/"+today))
+	g := onThisDayRE.FindString(pageAt(t, l.web, "/days/"+today))
 	if n := strings.Count(g, `class="entry`); n != 5 || strings.Contains(g, "2025-05-14") {
 		t.Errorf("%d entries, want the five nearest years (2026 to 2030):\n%s", n, g)
 	}

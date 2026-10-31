@@ -80,13 +80,13 @@ func TestThePagesOfTasksDrawTheRowsTheQuickAddAndTheSideColumn(t *testing.T) {
 	l := emptyLife(t)
 	l.core.ConnectTasks(t, "taskservice", newWatchedTaskService())
 
-	today := htmlPageAt(t, l.web, "/tasks", http.StatusOK)
+	today := pageAt(t, l.web, "/tasks")
 	wantInPage(t, "/tasks", today,
 		`<form method="POST" action="/tasks" class="quick-add" data-action="add-task">`,
 		`<nav class="side" aria-label="Links">`, `href="/tasks/lists/home"`, `href="/tasks/lists/work"`, `href="/tasks/week"`)
 	wantTaskRows(t, "/tasks", today, "/tasks")
 
-	list := htmlPageAt(t, l.web, "/tasks/lists/home", http.StatusOK)
+	list := pageAt(t, l.web, "/tasks/lists/home")
 	wantInPage(t, "/tasks/lists/home", list,
 		`<form method="POST" action="/tasks" class="quick-add" data-action="add-task">`, `<option selected>Home</option>`,
 		`<nav class="side" aria-label="Links">`, `href="/tasks/lists/work"`, `href="/tasks/lists/home/done"`)
@@ -101,7 +101,7 @@ func TestTheRoundFormOfATaskRowPostsThroughWebAndReturnsToThePage(t *testing.T) 
 	l := emptyLife(t)
 	l.core.ConnectTasks(t, "taskservice", service)
 
-	page := htmlPageAt(t, l.web, "/tasks/lists/home", http.StatusOK)
+	page := pageAt(t, l.web, "/tasks/lists/home")
 	form := regexp.MustCompile(`(?s)<form method="POST" action="/tasks/items/t2/complete" class="round">.*?</form>`).FindString(page)
 	if form == "" {
 		t.Fatalf("/tasks/lists/home has no round Complete form of the task t2:\n%.1500s", page)
@@ -117,7 +117,7 @@ func TestTheRoundFormOfATaskRowPostsThroughWebAndReturnsToThePage(t *testing.T) 
 	if got := service.completed(); len(got) != 1 || got[0] != "/tasks/t2/complete" {
 		t.Errorf("the service got the complete requests %q, want one: /tasks/t2/complete", got)
 	}
-	browserPageAt(t, l.web, rec.Header().Get("Location")) // the page that the browser lands on is a whole page
+	pageAt(t, l.web, rec.Header().Get("Location")) // the page that the browser lands on is a whole page
 }
 
 // TestAFailedReadOfTheTaskServiceIsAnErrorPageThatNamesNoService: when the service answers what is not an entity, the
@@ -130,7 +130,7 @@ func TestAFailedReadOfTheTaskServiceIsAnErrorPageThatNamesNoService(t *testing.T
 	service.failing.Store(true)
 
 	for _, path := range []string{"/tasks", "/tasks/lists/home"} {
-		page := htmlPageAt(t, l.web, path, http.StatusBadGateway)
+		page := pageWithStatus(t, l.web, path, http.StatusBadGateway)
 		wantInPage(t, path, page, `<span class="kind">error</span>`, "code: upstream", "status: 502")
 		wantNotInPage(t, path, page, "Fix tap", "Call mom", "/with/", "127.0.0.1")
 		if strings.Contains(strings.ToLower(page), "taskservice") {

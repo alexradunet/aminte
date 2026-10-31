@@ -45,7 +45,7 @@ func TestTheEdgesOfTheCalendarLinkOnlyToPages(t *testing.T) {
 	checked := map[string]bool{} // the links already fetched: the rail repeats the days of this month
 	for _, page := range []string{"/days/0000-01-01", "/days/0000-01-02", "/days/9999-12-31", "/months/0000-01", "/months/9999-12", "/years/0001", "/years/9999"} {
 		e := must(t)(l.api.Get(t.Context(), page))
-		body := wholePageAt(t, l, page, http.StatusOK)
+		body := pageAt(t, l.web, page)
 		for _, m := range calendarHref.FindAllStringSubmatch(body, -1) {
 			if checked[m[1]] {
 				continue
@@ -80,7 +80,7 @@ func TestTheFirstMonthOfTheDaysIsACalendar(t *testing.T) {
 	l.do(t, "/days/0000-01-01", "capture", map[string]string{"text": "The first day."})
 	l.do(t, "/", "register-metric", map[string]string{"name": "weight", "unit": "kg"})
 	l.do(t, "/", "record", map[string]string{"metric": "weight", "day": "0000-01-03", "value": "70"})
-	body := wholePageAt(t, l, "/months/0000-01", http.StatusOK)
+	body := pageAt(t, l.web, "/months/0000-01")
 	if !strings.Contains(body, "January 0000") {
 		t.Errorf("the page of /months/0000-01 does not name its month: %.300s", mainPartOf(body))
 	}

@@ -2,7 +2,6 @@ package web_test
 
 // The Metrics board. Web draws it from the answers of the real core.
 // It has the cards, the folds of the groups, the groups by category, the form that makes a metric and the form that files metrics.
-// Each test holds the markup that a test of the core held while the core drew the browser.
 // A test reads a form as a browser reads it (internal/formdoc), and sends it through web.
 
 import (
@@ -92,7 +91,6 @@ func landsOnWithReceipt(location, back string) bool {
 	return err == nil
 }
 
-// Core test: TestTheLatestTileWritesAScaleInWords.
 // The Latest tile of a metric writes the unit of a scale as every tile does: "of 5" for 1-5.
 // It writes any other unit as it is.
 func TestTheLatestTileWritesAScaleInWords(t *testing.T) {
@@ -100,13 +98,12 @@ func TestTheLatestTileWritesAScaleInWords(t *testing.T) {
 	l.do(t, "/", "record", map[string]string{"metric": "Mood", "day": "2026-10-12", "value": "4"})
 	for path, value := range map[string]string{"/metrics/Mood": `4 <span class="unit">of 5</span>`, "/metrics/Weight": `77.1 <span class="unit">kg</span>`} {
 		latest := regexp.MustCompile(`<span class="name">Latest, Mon 12 Oct</span>\n<a class="reading" href="/measurements/\d+">` + regexp.QuoteMeta(value) + `</a>`)
-		if body := browserPageAt(t, l.web, path); !latest.MatchString(body) {
+		if body := pageAt(t, l.web, path); !latest.MatchString(body) {
 			t.Errorf("the Latest tile of %s does not write %s", path, value)
 		}
 	}
 }
 
-// Core test: TestTheMetricsPageDrawsCards.
 // /metrics draws a card for each metric in the fold of its category.
 // A card has the name, the last reading with its unit, the day of that reading and the trend.
 // The card of a metric with no reading says so.
@@ -119,7 +116,7 @@ func TestTheMetricsPageDrawsCards(t *testing.T) {
 	iron := must(t)(l.api.Get(t.Context(), "/pages?title=Iron"))
 	l.do(t, href(iron, "self"), "file-pages", map[string]string{"category": "Body"})
 
-	page := browserPageAt(t, l.web, "/metrics")
+	page := pageAt(t, l.web, "/metrics")
 	for _, want := range []string{
 		`<nav class="kinds jump" aria-label="Groups"><a href="#c-`, `>Body <small>3</small></a>`, `<a href="#not-filed">Not filed <small>2</small></a>`,
 		`id="not-filed"`, `<details class="metric-sub" open><summary><h3>Iron <small>1</small></h3><span class="meta">newest `, `<a href="` + href(iron, "self") + `">Open Iron</a>`,
@@ -148,7 +145,7 @@ func TestTheMetricsPageDrawsCards(t *testing.T) {
 	if rec.Code != http.StatusSeeOther || !landsOnWithReceipt(rec.Header().Get("Location"), "/metrics") {
 		t.Fatalf("the form: %d %q %.300s", rec.Code, rec.Header().Get("Location"), rec.Body.String())
 	}
-	if after := browserPageAt(t, l.web, rec.Header().Get("Location")); !strings.Contains(after, "Put Mood and Steps in Daily (a new category).") || !strings.Contains(after, `<a href="#c-`) || strings.Contains(after, `id="not-filed"`) {
+	if after := pageAt(t, l.web, rec.Header().Get("Location")); !strings.Contains(after, "Put Mood and Steps in Daily (a new category).") || !strings.Contains(after, `<a href="#c-`) || strings.Contains(after, `id="not-filed"`) {
 		t.Errorf("/metrics after the filing: %.600s", after)
 	}
 	// A refused form answers with the error page, which leads back to the board.
@@ -159,7 +156,6 @@ func TestTheMetricsPageDrawsCards(t *testing.T) {
 	}
 }
 
-// Core test: TestTheMetricsBoardFolds.
 // A category on the board is a fold. It holds its metrics and its categories, and it says the newest day of its readings.
 // The tools of a group are its foot. The board has no list view.
 func TestTheMetricsBoardFolds(t *testing.T) {
@@ -168,7 +164,7 @@ func TestTheMetricsBoardFolds(t *testing.T) {
 	fileMetrics(t, l, "Body", ids["Weight"], ids["Walk"])
 	l.do(t, "/pages?title=Iron", "file-pages", map[string]string{"category": "Body"})
 
-	cards := browserPageAt(t, l.web, "/metrics")
+	cards := pageAt(t, l.web, "/metrics")
 	for _, want := range []string{
 		// Body holds Weight and Walk, and Ferritin under Iron: its newest reading is Weight's, yesterday.
 		`<details class="group metric-group" id="c-`, ` open><summary><h2>Body <small>3</small></h2><span class="meta">newest yesterday · Tue 13 May</span></summary>`,
@@ -190,7 +186,6 @@ func TestTheMetricsBoardFolds(t *testing.T) {
 	}
 }
 
-// Core test: TestMetricsAreGroupedByCategory.
 // The board draws each category in tree order, with its metrics under it. The metrics with no category come last.
 // The datalist of the categories follows the tree.
 // The view of a metric holds its note and its categories. Each category is a badge with an x.
@@ -212,7 +207,7 @@ func TestMetricsAreGroupedByCategory(t *testing.T) {
 	file("/pages?title=Weight", "Body")
 	file("/pages?title=Walk", "Body")
 
-	page := browserPageAt(t, l.web, "/metrics")
+	page := pageAt(t, l.web, "/metrics")
 	for _, s := range []string{"<h3>Thyroid <small>1</small></h3>", `<datalist id="pick-category"><option value="Biomarkers"><option value="Thyroid"><option value="Body"></datalist>`,
 		"<h2>Not filed", `title="thyroid-stimulating hormone"`} {
 		if !strings.Contains(page, s) {
@@ -220,7 +215,7 @@ func TestMetricsAreGroupedByCategory(t *testing.T) {
 		}
 	}
 	// The metric's view holds its note and its categories, each a badge with its x.
-	s := browserPageAt(t, l.web, "/metrics/TSH")
+	s := pageAt(t, l.web, "/metrics/TSH")
 	if !regexp.MustCompile(`<span class="badge category"><a href="/pages/\d+">Thyroid</a><form method="POST" action="/pages/file" class="tiny">\s*<input type="hidden" name="ids" value="\d+"><input type="hidden" name="from" value="Thyroid">`).MatchString(s) {
 		t.Error("a metric's page does not show its category as a badge with its x")
 	}
@@ -229,24 +224,23 @@ func TestMetricsAreGroupedByCategory(t *testing.T) {
 	}
 }
 
-// Core test: TestTheMetricsPageMakesAMetric.
 // New metric is one boxed form of register-metric. ?new=register-metric opens it with the focus in its name.
 // A card has no + Add, and the page has no New category.
 // The form of the day and the page of the metric record a reading. Select files the metrics.
 // The post of the form makes the metric.
 func TestTheMetricsPageMakesAMetric(t *testing.T) {
 	l := emptyLife(t)
-	page := browserPageAt(t, l.web, "/metrics")
+	page := pageAt(t, l.web, "/metrics")
 	if !strings.Contains(page, `<form method="POST" action="/metrics"`) || strings.Contains(page, "new-kind") || strings.Contains(page, "New category") {
 		t.Errorf("/metrics does not draw one New metric form, or draws the kinds or New category")
 	}
 	if !regexp.MustCompile(`class="button primary" popovertarget="new-register-metric">[^/]*</span>New metric <span class="owner">owner</span></button>`).MatchString(page) || !strings.Contains(page, `id="new-register-metric" popover`) {
 		t.Error("/metrics does not draw New metric as the primary button with its popover")
 	}
-	if home := browserPageAt(t, l.web, "/days/"+today); strings.Contains(home, `method="POST" action="/metrics"`) {
+	if home := pageAt(t, l.web, "/days/"+today); strings.Contains(home, `method="POST" action="/metrics"`) {
 		t.Error("Home, the page of today, draws the New metric form")
 	}
-	if p := browserPageAt(t, l.web, "/metrics?new=register-metric"); !strings.Contains(p, `<dialog class="menu-dialog" id="new-register-metric"`) ||
+	if p := pageAt(t, l.web, "/metrics?new=register-metric"); !strings.Contains(p, `<dialog class="menu-dialog" id="new-register-metric"`) ||
 		!regexp.MustCompile(`<input type="text" name="name" value="" required placeholder="[^"]*" autofocus>`).MatchString(p) {
 		t.Error("?new=register-metric does not open New metric with the focus in its name")
 	}
@@ -265,7 +259,7 @@ func TestTheMetricsPageMakesAMetric(t *testing.T) {
 	if want := `unit "kg", note Before breakfast`; made["Weight"] != want {
 		t.Errorf("the form made Weight with %s, want %s", made["Weight"], want)
 	}
-	if page = browserPageAt(t, l.web, "/metrics"); strings.Contains(page, `aria-label="Add a reading of`) || strings.Contains(page, "+ New metric here") {
+	if page = pageAt(t, l.web, "/metrics"); strings.Contains(page, `aria-label="Add a reading of`) || strings.Contains(page, "+ New metric here") {
 		t.Error("/metrics draws + Add on a card or + New metric here")
 	}
 }

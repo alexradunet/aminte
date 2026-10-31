@@ -2,7 +2,6 @@ package web_test
 
 // The series of a metric (/metrics/NAME), the page of a reading, and the pages that lead to them.
 // Web draws them from the answers of the real core.
-// Each test holds the markup that a test of the core held while the core drew the browser.
 // A test reads a form as a browser reads it (internal/formdoc), and sends it through web.
 
 import (
@@ -22,14 +21,13 @@ func pageOfSeries(t *testing.T, l *life, name string) *siren.Entity {
 	return must(t)(l.api.Get(t.Context(), pageOf(t, l, name)))
 }
 
-// Core test: TestAMetricIsOnePage.
 // A metric is one page in a browser.
 // The form that records a reading is fixed to the metric. It comes before the readings.
 // The page has every reading, newest first, in a fold for each year. A window leads back to every reading.
 // A record from the page returns to the page. The new reading is the first row.
 func TestAMetricIsOnePage(t *testing.T) {
 	l, readings := lifeWithWeightSeries(t)
-	body := browserPageAt(t, l.web, "/metrics/Weight")
+	body := pageAt(t, l.web, "/metrics/Weight")
 
 	record := formTextPostingTo(t, body, "/measurements")
 	if !strings.Contains(record, `<input type="hidden" name="metric" value="Weight">`) || strings.Contains(record, `<select name="metric"`) {
@@ -51,7 +49,7 @@ func TestAMetricIsOnePage(t *testing.T) {
 			t.Errorf("no open fold of %s: a short series opens every year", year)
 		}
 	}
-	if b := browserPageAt(t, l.web, "/metrics/Weight?from=2026-01-01"); !strings.Contains(b, ">All readings<") {
+	if b := pageAt(t, l.web, "/metrics/Weight?from=2026-01-01"); !strings.Contains(b, ">All readings<") {
 		t.Error("a window does not lead back to every reading")
 	}
 
@@ -62,14 +60,13 @@ func TestAMetricIsOnePage(t *testing.T) {
 	if rec.Code != http.StatusSeeOther || rec.Header().Get("Location") != "/metrics/Weight" {
 		t.Fatalf("record from the page: %d to %q, want 303 back to it", rec.Code, rec.Header().Get("Location"))
 	}
-	after := browserPageAt(t, l.web, "/metrics/Weight")
+	after := pageAt(t, l.web, "/metrics/Weight")
 	fold := after[strings.Index(after, `class="readings-year"`):]
 	if first := strings.Index(fold, "<tbody>"); first < 0 || !strings.HasPrefix(fold[first:], `<tbody><tr><td><a href="/days/2026-10-13">`) || !strings.Contains(fold[first:first+200], ">76.9</a>") {
 		t.Error("the reading recorded from the page is not its first row")
 	}
 }
 
-// Core test: TestTheBrowserSendsAMetricsPageToItsSeries.
 // A metric has one view in a browser.
 // The page of a live metric is a redirect to its series, and the redirect keeps the query.
 // The page of a deleted metric stays, with Restore.
@@ -87,13 +84,12 @@ func TestTheBrowserSendsAMetricsPageToItsSeries(t *testing.T) {
 	}
 
 	l.do(t, self, "tombstone-pages", nil)
-	body := browserPageAt(t, l.web, self)
+	body := pageAt(t, l.web, self)
 	if !strings.Contains(body, "Deleted") || !strings.Contains(body, `action="`+self+`/revive"`) {
 		t.Error("a deleted metric's page is not the page view with Restore")
 	}
 }
 
-// Core test: TestAMetricsViewHoldsItsPage.
 // /metrics/NAME draws the whole page of its metric.
 // The view has the note, the editor, the categories, the pages that mention the metric, and the form of each action of the page once.
 // The one open form of the mark is there.
@@ -102,7 +98,7 @@ func TestAMetricsViewHoldsItsPage(t *testing.T) {
 	l, _ := lifeWithWeightSeries(t)
 	page := pageOfSeries(t, l, "Weight")
 	day := must(t)(l.api.Get(t.Context(), "/pages?title=2026-10-13"))
-	body := browserPageAt(t, l.web, "/metrics/Weight")
+	body := pageAt(t, l.web, "/metrics/Weight")
 	for _, want := range []string{"Before breakfast.", `href="` + href(day, "self") + `"`, `aria-label="Backlinks"`, `aria-label="Categories"`, `<summary>Edit</summary>`} {
 		if !strings.Contains(body, want) {
 			t.Errorf("the view of a metric lacks %s", want)
@@ -139,21 +135,20 @@ func TestAMetricsViewHoldsItsPage(t *testing.T) {
 	if rec.Code != http.StatusSeeOther || !strings.HasPrefix(rec.Header().Get("Location"), "/metrics/Weight") {
 		t.Fatalf("the save of the body from the view: %d to %q, want 303 back to the series", rec.Code, rec.Header().Get("Location"))
 	}
-	if body := browserPageAt(t, l.web, rec.Header().Get("Location")); !strings.Contains(body, "<h2>Result</h2>") || !strings.Contains(body, `Created <a href="/pages?title=Scales">Scales</a>.`) {
+	if body := pageAt(t, l.web, rec.Header().Get("Location")); !strings.Contains(body, "<h2>Result</h2>") || !strings.Contains(body, `Created <a href="/pages?title=Scales">Scales</a>.`) {
 		t.Error("the toast of the save is lost")
 	}
-	body = browserPageAt(t, l.web, "/metrics/Weight") // the save changed the version
+	body = pageAt(t, l.web, "/metrics/Weight") // the save changed the version
 	action, daily := formSentWith(t, body, `action="`+mark.Href+`"`, url.Values{"daily": {"1"}})
 	rec = postForm(l.web, action, daily, "Referer", "http://example.com/metrics/Weight")
 	if rec.Code != http.StatusSeeOther || !strings.HasPrefix(rec.Header().Get("Location"), "/metrics/Weight") {
 		t.Fatalf("the mark from the view: %d to %q, want 303 back to the series", rec.Code, rec.Header().Get("Location"))
 	}
-	if after := browserPageAt(t, l.web, "/metrics/Weight"); !regexp.MustCompile(`name="daily" value="1" checked`).MatchString(after) {
+	if after := pageAt(t, l.web, "/metrics/Weight"); !regexp.MustCompile(`name="daily" value="1" checked`).MatchString(after) {
 		t.Error("the mark is not set after the save")
 	}
 }
 
-// Core test: TestAYearShowsItsNewestReadingsFirst.
 // The fold of a year shows its newest ten readings.
 // The other readings of the year are in a closed fold under them. That fold says how many readings it holds.
 // So the other groups of the page stay near. Every reading is still on the page, newest first.
@@ -163,7 +158,7 @@ func TestAYearShowsItsNewestReadingsFirst(t *testing.T) {
 	for d := 1; d <= 15; d++ {
 		l.do(t, "/", "record", map[string]string{"metric": "Weight", "day": fmt.Sprintf("2026-09-%02d", d), "value": fmt.Sprint(70 + d)})
 	}
-	body := browserPageAt(t, l.web, "/metrics/Weight")
+	body := pageAt(t, l.web, "/metrics/Weight")
 	fold := body[strings.Index(body, `<details class="readings-year" open>`):]
 	end := strings.Index(fold, `</details></details>`)
 	if end < 0 {
@@ -188,7 +183,6 @@ func TestAYearShowsItsNewestReadingsFirst(t *testing.T) {
 	}
 }
 
-// Core test: TestTheFoldOfOneOlderReadingSaysReading.
 // A year of eleven readings folds one reading under its newest ten.
 // The fold says "1 more reading", not "1 more readings".
 func TestTheFoldOfOneOlderReadingSaysReading(t *testing.T) {
@@ -197,13 +191,12 @@ func TestTheFoldOfOneOlderReadingSaysReading(t *testing.T) {
 	for d := 1; d <= 11; d++ {
 		l.do(t, "/", "record", map[string]string{"metric": "Weight", "day": fmt.Sprintf("2026-09-%02d", d), "value": fmt.Sprint(70 + d)})
 	}
-	body := browserPageAt(t, l.web, "/metrics/Weight")
+	body := pageAt(t, l.web, "/metrics/Weight")
 	if want := `<details class="readings-more"><summary>1 more reading of 2026</summary>`; !strings.Contains(body, want) {
 		t.Errorf("the fold of one older reading is not %s", want)
 	}
 }
 
-// Core test: TestBrowserAllReadingsCoordinates.
 // The page of a window links All readings.
 // The page that the link leads to draws a chart. The chart has a circle for each reading, and each circle has its own place.
 // The chart of a window of 90 days ends at 626.
@@ -214,12 +207,12 @@ func TestAllReadingsOfAWindowDrawTheChartAtItsPlaces(t *testing.T) {
 	for _, day := range []string{"2026-01-01", "2026-09-01"} {
 		l.do(t, "/", "record", map[string]string{"metric": "synthetic", "day": day, "value": "1"})
 	}
-	body := browserPageAt(t, l.web, "/metrics/synthetic?from=2026-06-03&to=2026-09-01")
+	body := pageAt(t, l.web, "/metrics/synthetic?from=2026-06-03&to=2026-09-01")
 	link := regexp.MustCompile(`href="([^"]+)"\>All readings`).FindStringSubmatch(body)
 	if len(link) != 2 {
 		t.Fatal("missing all readings link")
 	}
-	all := browserPageAt(t, l.web, strings.ReplaceAll(link[1], "&amp;", "&"))
+	all := pageAt(t, l.web, strings.ReplaceAll(link[1], "&amp;", "&"))
 	chartSVG := regexp.MustCompile(`(?s)<svg class="chart".*?</svg>`).FindString(all) // the icons of the sidebar have circles too
 	xs := regexp.MustCompile(`<circle cx="([^"]+)"`).FindAllStringSubmatch(chartSVG, -1)
 	if len(xs) != 2 || xs[0][1] == xs[1][1] {
@@ -228,15 +221,14 @@ func TestAllReadingsOfAWindowDrawTheChartAtItsPlaces(t *testing.T) {
 	if !strings.Contains(body, `cx="626.0"`) {
 		t.Error("90 day endpoint")
 	}
-	if strings.Contains(browserPageAt(t, l.web, "/metrics/synthetic?from=2026-09-01&to=2026-09-01"), `<svg class="chart"`) {
+	if strings.Contains(pageAt(t, l.web, "/metrics/synthetic?from=2026-09-01&to=2026-09-01"), `<svg class="chart"`) {
 		t.Error("same day exclusive range should be empty")
 	}
-	if strings.Contains(browserPageAt(t, l.web, "/metrics/synthetic?from=2025-01-01&to=2025-02-01"), `<svg class="chart"`) {
+	if strings.Contains(pageAt(t, l.web, "/metrics/synthetic?from=2025-01-01&to=2025-02-01"), `<svg class="chart"`) {
 		t.Error("empty chart")
 	}
 }
 
-// Core test: TestAllReadingsIncludesEntireAdmittedCalendar.
 // The page that the link All readings leads to says All history.
 // This holds also when the readings are on the first days of the calendar,
 // and when the owner asks with the old name of a metric that has a new name.
@@ -253,29 +245,27 @@ func TestTheLinkToAllReadingsLeadsToAllHistory(t *testing.T) {
 	if link == "" {
 		t.Fatal("the series of a window has no link to all readings")
 	}
-	if body := browserPageAt(t, l.web, link); !strings.Contains(body, "All history") {
+	if body := pageAt(t, l.web, link); !strings.Contains(body, "All history") {
 		t.Fatal("missing explicit history label")
 	}
 }
 
-// Core test: TestAReadingsFactsAreOnACard.
 // The page of a reading puts its facts on a card.
 func TestAReadingsFactsAreOnACard(t *testing.T) {
 	l := emptyLife(t)
 	l.do(t, "/", "register-metric", map[string]string{"name": "weight", "unit": "kg"})
 	r := l.do(t, "/", "record", map[string]string{"metric": "weight", "day": today, "value": "71.4"})
-	if body := browserPageAt(t, l.web, href(r, "self")); !strings.Contains(body, `<div class="sheet list"><dl class="facts">`) {
+	if body := pageAt(t, l.web, href(r, "self")); !strings.Contains(body, `<div class="sheet list"><dl class="facts">`) {
 		t.Error("the facts of a reading are not on a card")
 	}
 }
 
-// Core test: TestHabitsAndUnitsAreSaid (the view of a metric).
 // A metric with no unit says what a reading is, and its value box shows what to type.
 // A metric with a unit says neither.
 // The mark of a daily metric is one open form on its view. The box of the form is ticked or not.
 func TestHabitsAndUnitsAreSaidOnTheViewOfAMetric(t *testing.T) {
 	l := lifeWithHabitsAndUnits(t)
-	habit := browserPageAt(t, l.web, "/metrics/Stretch")
+	habit := pageAt(t, l.web, "/metrics/Stretch")
 	for _, want := range []string{"With no unit, a reading is a count, or 1 for done and 0 for not done.", `placeholder="a count, or 1 done and 0 not done"`} {
 		if !strings.Contains(habit, want) {
 			t.Errorf("the page of a habit lacks %q", want)
@@ -289,15 +279,14 @@ func TestHabitsAndUnitsAreSaidOnTheViewOfAMetric(t *testing.T) {
 	if form := mark.FindString(habit); !strings.Contains(form, `name="daily"`) || strings.Contains(form, "checked") || strings.Contains(form, "<details") {
 		t.Errorf("the view of a metric that is not daily lacks the open form with an unticked box:\n%s", form)
 	}
-	if form := mark.FindString(browserPageAt(t, l.web, "/metrics/Meditate")); !strings.Contains(form, `name="daily" value="1" checked`) || strings.Contains(form, "<details") {
+	if form := mark.FindString(pageAt(t, l.web, "/metrics/Meditate")); !strings.Contains(form, `name="daily" value="1" checked`) || strings.Contains(form, "<details") {
 		t.Errorf("the view of a daily metric lacks the open form with a ticked box:\n%s", form)
 	}
-	if weight := browserPageAt(t, l.web, "/metrics/Weight"); strings.Contains(weight, "1 done and 0 not done") || !mark.MatchString(weight) {
+	if weight := pageAt(t, l.web, "/metrics/Weight"); strings.Contains(weight, "1 done and 0 not done") || !mark.MatchString(weight) {
 		t.Error("the view of a metric with a unit speaks of habits, or lacks the form of the mark")
 	}
 }
 
-// Core test: TestTheViewOfAMetricDrawsTheDailyForm.
 // The view of a metric offers edit-metric with the current mark. It offers the action once, and not under More.
 // The form of the browser sets the mark. An unticked box sends nothing, and that means 0.
 // The page of a person has no such form.
@@ -307,40 +296,39 @@ func TestTheViewOfAMetricDrawsTheDailyForm(t *testing.T) {
 	l.do(t, "/", "create-person", map[string]string{"title": "Sam (barber)", "name": "Samuel Ortiz"})
 	view := "/metrics/Meditate"
 	referer := "http://example.com" + view
-	page := regexp.MustCompile(`action="(/pages/\d+)/metric"`).FindStringSubmatch(browserPageAt(t, l.web, view))[1]
+	page := regexp.MustCompile(`action="(/pages/\d+)/metric"`).FindStringSubmatch(pageAt(t, l.web, view))[1]
 
-	body := browserPageAt(t, l.web, view)
+	body := pageAt(t, l.web, view)
 	if n := strings.Count(body, `action="`+page+`/metric"`); n != 1 || strings.Contains(body, `name="daily" value="1" checked`) {
 		t.Errorf("the view of a metric that is not daily has %d forms of the mark, or a ticked box", n)
 	}
 	if rec := postForm(l.web, page+"/metric", url.Values{"daily": {"1"}, "back": {view}}, "Referer", referer); rec.Code != http.StatusSeeOther || placeWithoutReceipt(t, rec.Header().Get("Location")) != view {
 		t.Fatalf("the form answered %d to %q, want 303 to the view", rec.Code, rec.Header().Get("Location"))
 	}
-	if !strings.Contains(browserPageAt(t, l.web, view), `name="daily" value="1" checked`) {
+	if !strings.Contains(pageAt(t, l.web, view), `name="daily" value="1" checked`) {
 		t.Error("after the form, the box is not ticked")
 	}
 	if rec := postForm(l.web, page+"/metric", url.Values{"back": {view}}, "Referer", referer); rec.Code != http.StatusSeeOther {
 		t.Fatalf("the form with an empty box answered %d", rec.Code)
 	}
-	if strings.Contains(browserPageAt(t, l.web, view), `name="daily" value="1" checked`) {
+	if strings.Contains(pageAt(t, l.web, view), `name="daily" value="1" checked`) {
 		t.Error("after an empty box, the mark is still set")
 	}
-	person := regexp.MustCompile(`href="(/pages/\d+)"`).FindStringSubmatch(browserPageAt(t, l.web, "/browse?kind=person"))[1]
-	if strings.Contains(browserPageAt(t, l.web, person), "Ask for it every day") {
+	person := regexp.MustCompile(`href="(/pages/\d+)"`).FindStringSubmatch(pageAt(t, l.web, "/browse?kind=person"))[1]
+	if strings.Contains(pageAt(t, l.web, person), "Ask for it every day") {
 		t.Error("the page of a person draws the daily form")
 	}
 }
 
-// Core test: TestACorrectionStartsFromTheValueAndARetractionHasNone.
 // Correct holds the current value. A retraction offers no Correct.
 // The page says how to fix a wrong day or a wrong metric, with a link to the record form that is already filled.
 func TestACorrectionStartsFromTheValueAndARetractionHasNone(t *testing.T) {
 	l := emptyLife(t)
 	l.do(t, "/", "register-metric", map[string]string{"name": "Weight", "unit": "kg"})
 	l.do(t, "/days/"+today, "record", map[string]string{"metric": "Weight", "value": "71.5"})
-	reading := regexp.MustCompile(`href="(/measurements/\d+)"`).FindStringSubmatch(browserPageAt(t, l.web, "/metrics/Weight"))[1]
+	reading := regexp.MustCompile(`href="(/measurements/\d+)"`).FindStringSubmatch(pageAt(t, l.web, "/metrics/Weight"))[1]
 
-	body := browserPageAt(t, l.web, reading)
+	body := pageAt(t, l.web, reading)
 	if !regexp.MustCompile(`(?s)aria-label="Correct".*name="value" value="71.5"`).MatchString(body) {
 		t.Errorf("Correct is not filled with 71.5:\n%s", body)
 	}
@@ -355,7 +343,7 @@ func TestACorrectionStartsFromTheValueAndARetractionHasNone(t *testing.T) {
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("retract: %d %.300s", rec.Code, rec.Body.String())
 	}
-	retracted := browserPageAt(t, l.web, placeWithoutReceipt(t, rec.Header().Get("Location")))
+	retracted := pageAt(t, l.web, placeWithoutReceipt(t, rec.Header().Get("Location")))
 	if strings.Contains(retracted, `aria-label="Correct"`) || strings.Contains(retracted, "Wrong day") || strings.Contains(retracted, "Retract</summary>") {
 		t.Errorf("a retraction offers an action:\n%s", retracted)
 	}
@@ -364,7 +352,6 @@ func TestACorrectionStartsFromTheValueAndARetractionHasNone(t *testing.T) {
 	}
 }
 
-// Core test: TestDeleteFromTheViewReturnsToThePage.
 // Delete on the view of a metric lands on the page of the metric, with Restore. A deleted metric keeps its page.
 // The view of a name that is not a live metric draws no part of a page.
 // A toast follows the redirect of a page to its view. So a form that is sent with no back shows its result on the view.
@@ -372,7 +359,7 @@ func TestDeleteFromTheViewReturnsToThePage(t *testing.T) {
 	l, _ := lifeWithWeightSeries(t)
 	series := must(t)(l.api.Get(t.Context(), "/metrics/Weight"))
 	self := pageOf(t, l, "Weight")
-	body := browserPageAt(t, l.web, "/metrics/Weight")
+	body := pageAt(t, l.web, "/metrics/Weight")
 
 	// A form of the metric that is sent with no back, for example a form opened from /actions.
 	// The POST returns to the page. The page redirects to the view. The toast comes along.
@@ -389,7 +376,7 @@ func TestDeleteFromTheViewReturnsToThePage(t *testing.T) {
 	if hop.Code != http.StatusSeeOther || !strings.HasPrefix(loc2, "/metrics/Weight?feedback=") {
 		t.Fatalf("the page in a browser: %d to %q, want 303 to the view with the receipt", hop.Code, loc2)
 	}
-	if view := browserPageAt(t, l.web, loc2); !strings.Contains(view, `class="toast"`) || !strings.Contains(view, "Asked for on every day.") {
+	if view := pageAt(t, l.web, loc2); !strings.Contains(view, `class="toast"`) || !strings.Contains(view, "Asked for on every day.") {
 		t.Error("the toast is lost across the redirect to the view")
 	}
 
@@ -401,13 +388,13 @@ func TestDeleteFromTheViewReturnsToThePage(t *testing.T) {
 	if rec.Code != http.StatusSeeOther || !strings.HasPrefix(loc, self+"?feedback=") {
 		t.Fatalf("Delete from the view: %d to %q, want 303 to %s?feedback=…", rec.Code, loc, self)
 	}
-	if page := browserPageAt(t, l.web, loc); !strings.Contains(page, `action="`+self+`/revive"`) || !strings.Contains(page, `class="toast"`) {
+	if page := pageAt(t, l.web, loc); !strings.Contains(page, `action="`+self+`/revive"`) || !strings.Contains(page, `class="toast"`) {
 		t.Error("after Delete from the view the browser is not on the page with Restore and the result")
 	}
 
 	// A name that is not a live metric: the readings alone, no part of a page.
 	for _, path := range []string{"/metrics/Weight", "/metrics/Nope"} {
-		view := browserPageAt(t, l.web, path)
+		view := pageAt(t, l.web, path)
 		for _, bad := range []string{"Nothing written here yet.", `aria-label="Facts"`, `<summary>Edit</summary>`, `aria-label="Every day"`} {
 			if strings.Contains(view, bad) {
 				t.Errorf("%s carries no page but draws %q", path, bad)
@@ -416,7 +403,6 @@ func TestDeleteFromTheViewReturnsToThePage(t *testing.T) {
 	}
 }
 
-// Core test: TestAPlainPageLeadsToTheNewMetricForm.
 // The owner can make a page where a metric was wanted. That page has the link "Make it a metric".
 // The link opens the one New metric form, with the name filled.
 // The registration turns the page into the metric. The metric keeps the text.
@@ -426,12 +412,12 @@ func TestAPlainPageLeadsToTheNewMetricForm(t *testing.T) {
 	pg := l.do(t, "/", "create-page", map[string]string{"title": "Steps", "body": "Counted by the watch."})
 	pgHref := href(pg, "self")
 	const want = "/metrics?name=Steps&new=register-metric"
-	page := browserPageAt(t, l.web, pgHref)
+	page := pageAt(t, l.web, pgHref)
 	if !strings.Contains(page, `<a class="button" href="`+strings.ReplaceAll(want, "&", "&amp;")+`">Make it a metric</a>`) {
 		t.Errorf("the page of a plain page has no Make it a metric link")
 	}
 
-	form := browserPageAt(t, l.web, want)
+	form := pageAt(t, l.web, want)
 	if !regexp.MustCompile(`<input type="text" name="name" value="Steps" required`).MatchString(form) {
 		t.Errorf("the link does not open New metric with the name Steps")
 	}
@@ -447,19 +433,18 @@ func TestAPlainPageLeadsToTheNewMetricForm(t *testing.T) {
 	if body := after.Properties.(map[string]any)["body"]; body != "Counted by the watch." {
 		t.Errorf("the metric keeps the text? body %q", body)
 	}
-	if got := browserPageAt(t, l.web, "/metrics/Steps"); strings.Contains(got, "Make it a metric") {
+	if got := pageAt(t, l.web, "/metrics/Steps"); strings.Contains(got, "Make it a metric") {
 		t.Error("the view of a metric leads to the form that makes it one")
 	}
 
-	if p := browserPageAt(t, l.web, "/browse?kind=metric"); !strings.Contains(p, `<a class="button" href="/metrics?new=register-metric">New metric</a>`) {
+	if p := pageAt(t, l.web, "/browse?kind=metric"); !strings.Contains(p, `<a class="button" href="/metrics?new=register-metric">New metric</a>`) {
 		t.Error("Browse of the metrics has no New metric link")
 	}
-	if p := browserPageAt(t, l.web, "/browse?kind=page"); strings.Contains(p, ">New metric</a>") && strings.Contains(p, `class="button" href="/metrics`) {
+	if p := pageAt(t, l.web, "/browse?kind=page"); strings.Contains(p, ">New metric</a>") && strings.Contains(p, `class="button" href="/metrics`) {
 		t.Error("Browse of the pages links to New metric")
 	}
 }
 
-// Core test: TestAConversationPageHasOneViewInABrowser.
 // A GET of a live conversation page by a browser is a 303 to the conversation of its day. The redirect keeps the query.
 // A page that is not a conversation is not redirected.
 // A deleted conversation page stays a page.
@@ -467,9 +452,9 @@ func TestAPlainPageLeadsToTheNewMetricForm(t *testing.T) {
 func TestAConversationPageHasOneViewInABrowser(t *testing.T) {
 	l := emptyLife(t)
 	conversation := "/days/" + today + "/conversation"
-	browserPageAt(t, l.web, "/days/today/conversation")
+	pageAt(t, l.web, "/days/today/conversation")
 	l.do(t, conversation, "say", map[string]string{"text": "Hello"})
-	browserPageAt(t, l.web, "/days/today/conversation")
+	pageAt(t, l.web, "/days/today/conversation")
 	self := href(must(t)(l.api.Get(t.Context(), conversation)), "page")
 	if self == "" {
 		t.Fatal("the conversation links no page")

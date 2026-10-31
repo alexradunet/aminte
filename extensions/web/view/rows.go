@@ -79,11 +79,7 @@ func roundAction(a siren.Action) bool {
 
 // rowChips are the scalar properties of an embedded link as "name: value" (scalarItems).
 func rowChips(l siren.Link) []string {
-	shape, err := jsonShape(l.Properties)
-	props, _ := shape.(map[string]any)
-	if err != nil {
-		return nil
-	}
+	props, _ := l.Properties.(map[string]any)
 	return scalarItems(props)
 }
 

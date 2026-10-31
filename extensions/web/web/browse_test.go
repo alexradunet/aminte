@@ -1,8 +1,7 @@
 package web_test
 
 // The page of Browse as the browser draws it: the crumbs, the tree of categories, the chips, the rows of each kind, the
-// pick bar and the empty words. The claims are those of the HTML tests of the browser of the core (plan 161, stage 3),
-// held here against the real core: web draws the page from the answer of the API.
+// pick bar and the empty words. They run against the real core: web draws the page from the answer of the API.
 
 import (
 	"fmt"
@@ -28,7 +27,7 @@ func pageIDOf(t *testing.T, address string) string {
 	return rest
 }
 
-// browseLife is a file with the layout of the Browse tests of the core, made through the API (plan 161, stage 3).
+// browseLife is a file with the layout below, made through the API.
 //
 //	Family:  Beta, Cousins, Ana, photo.jpg, scan.pdf
 //	Cousins: Gamma, Weight
@@ -72,18 +71,6 @@ func browseLife(t *testing.T) (*life, map[string]string) {
 	return l, ids
 }
 
-// htmlPageAt asks h for the page at uri as a browser does. It fails the test unless the status is want and the body is a
-// whole page.
-func htmlPageAt(t *testing.T, h http.Handler, uri string, want int) string {
-	t.Helper()
-	rec := ask(h, http.MethodGet, uri)
-	body := rec.Body.String()
-	if rec.Code != want || !strings.HasSuffix(strings.TrimSpace(body), "</html>") {
-		t.Errorf("GET %s: %d, want %d and a whole page: %.300s", uri, rec.Code, want, body)
-	}
-	return body
-}
-
 // wantInPage fails the test for each of the texts that the page does not hold. what names the page in the failure.
 func wantInPage(t *testing.T, what, page string, texts ...string) {
 	t.Helper()
@@ -106,7 +93,7 @@ func wantNotInPage(t *testing.T, what, page string, texts ...string) {
 
 func TestTheBrowsePageDrawsTheTreeTheChipsAndTheRows(t *testing.T) {
 	l, ids := browseLife(t)
-	family := htmlPageAt(t, l.web, "/browse?in=Family", http.StatusOK)
+	family := pageAt(t, l.web, "/browse?in=Family")
 	wantInPage(t, "/browse?in=Family", family,
 		`<nav class="crumbs" aria-label="Where"><a href="/browse">Browse</a><span aria-current="page">Family</span></nav>`, `<h1>Family</h1>`, `<p class="sub"><a href="/pages/`+ids["Family"]+`">Open its page</a>`,
 		`<details class="browse-tree panel"><summary>Categories <span class="meta">Family</span></summary><nav aria-label="Categories">`,
@@ -126,14 +113,14 @@ func TestTheBrowsePageDrawsTheTreeTheChipsAndTheRows(t *testing.T) {
 		!strings.Contains(family, `<button form="pick" name="from" value="Family" formnovalidate>Remove from Family</button>`) || strings.Contains(family, `>Delete<`) {
 		t.Error("All in a category does not draw the pick bar with Move to and Remove from Family, and no Delete")
 	}
-	if cousins := htmlPageAt(t, l.web, "/browse?in=Cousins&kind=page", http.StatusOK); !strings.Contains(cousins, `<nav class="crumbs" aria-label="Where"><a href="/browse?kind=page">Browse</a><a href="/browse?in=Family&amp;kind=page">Family</a><span aria-current="page">Cousins</span></nav>`) || !strings.Contains(cousins, `<h1>Cousins</h1>`) ||
+	if cousins := pageAt(t, l.web, "/browse?in=Cousins&kind=page"); !strings.Contains(cousins, `<nav class="crumbs" aria-label="Where"><a href="/browse?kind=page">Browse</a><a href="/browse?in=Family&amp;kind=page">Family</a><span aria-current="page">Cousins</span></nav>`) || !strings.Contains(cousins, `<h1>Cousins</h1>`) ||
 		!strings.Contains(cousins, `<a href="/browse?in=Cousins&amp;kind=page" aria-current="page">Pages <small>1</small></a>`) {
 		t.Errorf("/browse?in=Cousins&kind=page lacks its path or its chip")
 	} else if !strings.Contains(cousins, `<details open><summary><span class="sr">Categories in Family</span>`) {
 		t.Error("the fold of Family is not open on the path to Cousins")
 	}
 
-	people := htmlPageAt(t, l.web, "/browse?kind=person", http.StatusOK)
+	people := pageAt(t, l.web, "/browse?kind=person")
 	wantInPage(t, "/browse?kind=person", people,
 		fmt.Sprintf(`<a class="entry named face" href="/pages/%s"><span class="face-picture" aria-hidden="true">`, ids["Ana"]),
 		`<span class="first">Ana</span><span class="meta">mentioned on 1 page, last `, `<span class="meta">not mentioned yet</span>`,
@@ -143,19 +130,19 @@ func TestTheBrowsePageDrawsTheTreeTheChipsAndTheRows(t *testing.T) {
 		`<a class="entry" href="/browse?kind=person" aria-current="page"><span class="first">Everything</span>`)
 	wantNotInPage(t, "/browse?kind=person", people, `formaction="/pages/tombstone"`, "delete them")
 
-	media := htmlPageAt(t, l.web, "/browse?kind=media", http.StatusOK)
+	media := pageAt(t, l.web, "/browse?kind=media")
 	wantInPage(t, "/browse?kind=media", media, `<ul class="plain tiles">`, `<li class="tile pick">`, `<span class="first">memo.m4a</span><span class="meta">recording · `,
 		`<nav class="kinds" aria-label="Media kind"><a href="/browse?kind=media" aria-current="page">All media</a><a href="/browse?kind=media&amp;media=image">Pictures</a>`,
 		`formaction="/pages/tombstone"`)
 	wantNotInPage(t, "/browse?kind=media", media, `accept="`) // the media list limits no kind of file
-	if docs := htmlPageAt(t, l.web, "/browse?kind=document", http.StatusOK); !strings.Contains(docs, `<span class="first">scan.pdf</span><span class="meta">application/pdf · `) {
+	if docs := pageAt(t, l.web, "/browse?kind=document"); !strings.Contains(docs, `<span class="first">scan.pdf</span><span class="meta">application/pdf · `) {
 		t.Error("the documents lack their row")
 	}
-	if metrics := htmlPageAt(t, l.web, "/browse?kind=metric", http.StatusOK); !strings.Contains(metrics, `<span class="first">Weight</span><span class="meta">kg<span class="badge category">Cousins</span></span>`) ||
+	if metrics := pageAt(t, l.web, "/browse?kind=metric"); !strings.Contains(metrics, `<span class="first">Weight</span><span class="meta">kg<span class="badge category">Cousins</span></span>`) ||
 		!strings.Contains(metrics, `<span class="first">Mood</span><span class="meta">of 5</span>`) || !strings.Contains(metrics, `<a href="/metrics">The values are on the Metrics board</a>`) {
 		t.Errorf("the metrics lack their rows or the way to the board: %s", metrics[strings.Index(metrics, "<main"):])
 	}
-	pages := htmlPageAt(t, l.web, "/browse", http.StatusOK)
+	pages := pageAt(t, l.web, "/browse")
 	// On Pages in Everything a category is a row with its box and its badge; the fold of Family is closed.
 	wantInPage(t, "/browse", pages, `<a href="/browse?ghosts=1&amp;kind=page">Ghost pages 0</a>`,
 		fmt.Sprintf(`<li class="pick"><label class="pick-box"><input type="checkbox" name="ids" value="%s" form="pick" aria-label="Select Family"></label>`, ids["Family"]),
@@ -164,13 +151,13 @@ func TestTheBrowsePageDrawsTheTreeTheChipsAndTheRows(t *testing.T) {
 		`formaction="/pages/tombstone"`, "type a category or delete them")
 	// The form of the catalog's browse, on /actions: an optional select starts empty, so the form sends only what the
 	// reader picks, and the empty values it sends are the defaults.
-	wantInPage(t, "/actions", htmlPageAt(t, l.web, "/actions", http.StatusOK), `<form method="GET" action="/browse" data-action="browse">`, `<select name="kind"><option></option><option>page</option>`,
+	wantInPage(t, "/actions", pageAt(t, l.web, "/actions"), `<form method="GET" action="/browse" data-action="browse">`, `<select name="kind"><option></option><option>page</option>`,
 		`<select name="media"><option></option><option>image</option>`)
-	if blank := htmlPageAt(t, l.web, "/browse?kind=&in=&media=&limit=&offset=", http.StatusOK); !strings.Contains(blank, `<a href="/browse?kind=page" aria-current="page">Pages <small>5</small></a>`) {
+	if blank := pageAt(t, l.web, "/browse?kind=&in=&media=&limit=&offset="); !strings.Contains(blank, `<a href="/browse?kind=page" aria-current="page">Pages <small>5</small></a>`) {
 		t.Error("the blank form of browse does not give the pages")
 	}
 	// The ghost list looks at everything: the tree marks Everything.
-	if ghosts := htmlPageAt(t, l.web, "/browse?ghosts=1&kind=page", http.StatusOK); !strings.Contains(ghosts, `<a class="entry" href="/browse?kind=page" aria-current="page"><span class="first">Everything</span>`) {
+	if ghosts := pageAt(t, l.web, "/browse?ghosts=1&kind=page"); !strings.Contains(ghosts, `<a class="entry" href="/browse?kind=page" aria-current="page"><span class="first">Everything</span>`) {
 		t.Error("the ghost list marks no branch of the tree")
 	}
 	for path, want := range map[string]string{
@@ -179,7 +166,7 @@ func TestTheBrowsePageDrawsTheTreeTheChipsAndTheRows(t *testing.T) {
 		"/browse?in=Cousins&kind=person":  "Nothing of this kind is filed in Cousins.",
 		"/browse?kind=media&in=Alpha":     "Nothing of this kind is filed in Alpha.",
 	} {
-		if body := htmlPageAt(t, l.web, path, http.StatusOK); !strings.Contains(body, `<p class="empty">`+want+`</p>`) {
+		if body := pageAt(t, l.web, path); !strings.Contains(body, `<p class="empty">`+want+`</p>`) {
 			t.Errorf("%s lacks its empty state %q", path, want)
 		}
 	}
@@ -206,7 +193,7 @@ func TestBrowseDrawsTheTreeAndTheUnfiledPages(t *testing.T) {
 	file(travel, "Life")
 	l.do(t, "/pages/"+ids["Gone"], "tombstone-pages", nil)
 
-	body := htmlPageAt(t, l.web, "/browse?unfiled=1", http.StatusOK)
+	body := pageAt(t, l.web, "/browse?unfiled=1")
 	rows := regexp.MustCompile(`<li(?: class="branch")?><a class="entry" href="/browse\?in=(\w+)"><span class="first">([^<]*)</span><span class="meta">(\d+)</span></a>`).FindAllStringSubmatch(body, -1)
 	var got []string
 	for _, r := range rows {
@@ -231,7 +218,7 @@ func TestBrowseDrawsTheTreeAndTheUnfiledPages(t *testing.T) {
 
 func TestBrowseWithNoCategory(t *testing.T) {
 	l := emptyLife(t)
-	body := htmlPageAt(t, l.web, "/browse?unfiled=1", http.StatusOK)
+	body := pageAt(t, l.web, "/browse?unfiled=1")
 	tree := regexp.MustCompile(`(?s)<nav aria-label="Categories">(.*?)</nav>`).FindStringSubmatch(body)
 	if tree == nil || strings.Count(tree[1], "<li") != 4 || !strings.Contains(tree[1], "Everything") || !strings.Contains(tree[1], "Not filed") || !strings.Contains(tree[1], `<span class="first">Deleted, every kind</span><span class="meta">0</span>`) {
 		t.Errorf("an empty tree is not Everything and Not filed: %v", tree)
@@ -245,7 +232,7 @@ func TestBrowseWithNoCategory(t *testing.T) {
 // list says why it is empty, not how to make a page.
 func TestTheGhostPagesSayWhatTheyAre(t *testing.T) {
 	l := emptyLife(t)
-	wantInPage(t, "/browse?ghosts=1", htmlPageAt(t, l.web, "/browse?ghosts=1", http.StatusOK),
+	wantInPage(t, "/browse?ghosts=1", pageAt(t, l.web, "/browse?ghosts=1"),
 		`<nav class="crumbs" aria-label="Where"><a href="/browse">Browse</a><span aria-current="page">Ghost pages</span></nav>`, `<h1>Ghost pages</h1>`, `<p class="sub"><span>Empty pages, older than 30 days, that nothing links to or from.</span></p>`,
 		`<p class="empty">No ghost page: every page has text or a link.</p>`)
 }
@@ -257,11 +244,11 @@ func TestBrowseListsTheDeletedSoTheyCanBeRestored(t *testing.T) {
 	gone := l.do(t, "/", "create-page", map[string]string{"title": "Gone"})
 	kept := l.do(t, "/", "create-page", map[string]string{"title": "Kept"})
 	l.do(t, "/pages/"+pageIDOf(t, href(gone, "self")), "tombstone-pages", nil)
-	body := htmlPageAt(t, l.web, "/browse?deleted=1", http.StatusOK)
+	body := pageAt(t, l.web, "/browse?deleted=1")
 	wantInPage(t, "/browse?deleted=1", body, `href="`+href(gone, "self")+`"`)
 	wantNotInPage(t, "/browse?deleted=1", body, `href="`+href(kept, "self")+`"`)
 	// The page of a deleted page offers Restore.
-	wantInPage(t, href(gone, "self"), htmlPageAt(t, l.web, href(gone, "self"), http.StatusOK), `data-action="revive"`)
+	wantInPage(t, href(gone, "self"), pageAt(t, l.web, href(gone, "self")), `data-action="revive"`)
 }
 
 // TestBrowseMovesAndFilesFromTheList: a row offers Move and its other categories; inside a category the bar moves and
@@ -269,7 +256,7 @@ func TestBrowseListsTheDeletedSoTheyCanBeRestored(t *testing.T) {
 func TestBrowseMovesAndFilesFromTheList(t *testing.T) {
 	l, ids := browseLife(t)
 	ana := ids["Ana"]
-	people := htmlPageAt(t, l.web, "/browse?kind=person", http.StatusOK)
+	people := pageAt(t, l.web, "/browse?kind=person")
 	wantInPage(t, "/browse?kind=person", people,
 		`<a class="row-move" href="/browse?ids=`+ana+`&amp;kind=person&amp;new=file-pages">Move</a>`,
 		`<span class="first">Ana</span><span class="meta">mentioned on 1 page, last `,
@@ -278,14 +265,14 @@ func TestBrowseMovesAndFilesFromTheList(t *testing.T) {
 	if strings.Contains(people, `name="from"`) || strings.Contains(people, `class="pick-on" checked`) {
 		t.Error("Everything offers Remove from, or opens Select without being asked")
 	}
-	in := htmlPageAt(t, l.web, "/browse?in=Family&kind=page", http.StatusOK)
+	in := pageAt(t, l.web, "/browse?in=Family&kind=page")
 	wantInPage(t, "/browse?in=Family&kind=page", in, `name="move" value="1" checked`, `<button class="primary">Move to</button>`,
 		`<button form="pick" name="from" value="Family" formnovalidate>Remove from Family</button>`)
 	wantNotInPage(t, "/browse?in=Family&kind=page", in, `<span class="badge category">Family</span>`) // a row in Family is not badged with Family
-	asked := htmlPageAt(t, l.web, "/browse?ids="+ana+"&kind=person&new=file-pages", http.StatusOK)
+	asked := pageAt(t, l.web, "/browse?ids="+ana+"&kind=person&new=file-pages")
 	wantInPage(t, "the page of the Move link", asked, `class="pick-on" checked`, `name="ids" value="`+ana+`" form="pick" checked aria-label="Select Ana"`,
 		`<input type="hidden" name="back" value="/browse?kind=person">`)
-	wantInPage(t, "/browse?unfiled=1", htmlPageAt(t, l.web, "/browse?unfiled=1", http.StatusOK),
+	wantInPage(t, "/browse?unfiled=1", pageAt(t, l.web, "/browse?unfiled=1"),
 		`<nav class="crumbs" aria-label="Where"><a href="/browse">Browse</a><span aria-current="page">Not filed</span></nav>`, `<h1>Not filed</h1>`,
 		`<li class="tree-foot"><a href="/browse?kind=page&amp;new=file-pages">New category</a></li>`)
 }
@@ -298,9 +285,9 @@ func TestBrowseCountsTheDeletedOnEveryKind(t *testing.T) {
 	l.do(t, "/pages/"+pageIDOf(t, href(old, "self")), "tombstone-pages", nil)
 	want := `<li><a class="entry" href="/browse?deleted=1"><span class="first">Deleted, every kind</span><span class="meta">1</span></a></li>`
 	for _, path := range []string{"/browse", "/browse?kind=person", "/browse?kind=media", "/browse?kind=metric", "/browse?unfiled=1"} {
-		wantInPage(t, path, htmlPageAt(t, l.web, path, http.StatusOK), want)
+		wantInPage(t, path, pageAt(t, l.web, path), want)
 	}
-	wantInPage(t, "the deleted list", htmlPageAt(t, l.web, "/browse?deleted=1", http.StatusOK), `<a class="entry" href="/browse?deleted=1" aria-current="page">`)
+	wantInPage(t, "the deleted list", pageAt(t, l.web, "/browse?deleted=1"), `<a class="entry" href="/browse?deleted=1" aria-current="page">`)
 }
 
 // TestNewCategoryOpensTheSelectBar: a page becomes a category when something is filed in it, so the link of the tree
@@ -308,10 +295,10 @@ func TestBrowseCountsTheDeletedOnEveryKind(t *testing.T) {
 func TestNewCategoryOpensTheSelectBar(t *testing.T) {
 	l := emptyLife(t)
 	l.do(t, "/", "create-page", map[string]string{"title": "Loose note"})
-	wantInPage(t, "the list", htmlPageAt(t, l.web, "/browse?kind=page&new=file-pages", http.StatusOK), `<a href="/browse?kind=page&amp;new=file-pages">New category</a>`,
+	wantInPage(t, "the list", pageAt(t, l.web, "/browse?kind=page&new=file-pages"), `<a href="/browse?kind=page&amp;new=file-pages">New category</a>`,
 		`<input type="checkbox" class="pick-on" checked>`,
 		`<span class="desc">Check what goes in it, then type its name. A new name makes a new category.</span>`)
-	wantNotInPage(t, "the plain list", htmlPageAt(t, l.web, "/browse?kind=page", http.StatusOK), "then type its name", `class="pick-on" checked`) // the Select bar is not open unasked
+	wantNotInPage(t, "the plain list", pageAt(t, l.web, "/browse?kind=page"), "then type its name", `class="pick-on" checked`) // the Select bar is not open unasked
 }
 
 // TestTheHeadingOfBrowseNamesTheKind: with no category chosen, the heading is the kind's name, not Everything.
@@ -319,7 +306,7 @@ func TestTheHeadingOfBrowseNamesTheKind(t *testing.T) {
 	l := emptyLife(t)
 	h1 := regexp.MustCompile(`<h1>([^<]*)</h1>`)
 	for kind, want := range map[string]string{"page": "Pages", "person": "People", "media": "Media", "document": "Documents", "metric": "Metrics"} {
-		m := h1.FindStringSubmatch(htmlPageAt(t, l.web, "/browse?kind="+kind, http.StatusOK))
+		m := h1.FindStringSubmatch(pageAt(t, l.web, "/browse?kind="+kind))
 		if m == nil || m[1] != want {
 			t.Errorf("kind %s: the heading is %v, want %s", kind, m, want)
 		}
@@ -383,12 +370,12 @@ func TestTheListsDeleteWhatIsChecked(t *testing.T) {
 		files = append(files, pageIDOf(t, href(e, "self")))
 	}
 
-	list := htmlPageAt(t, l.web, "/browse?kind=media", http.StatusOK)
+	list := pageAt(t, l.web, "/browse?kind=media")
 	wantInPage(t, "the media list", list, `<form id="pick" method="POST" action="/pages/file" class="inline" data-action="file-pages">`,
 		`<input type="hidden" name="back" value="/browse?kind=media">`, `<span class="desc">Check the rows, then type a category or delete them. A new name makes a new category.</span>`,
 		`<button class="danger" formaction="/pages/tombstone" formnovalidate data-action="tombstone-pages">Delete</button></form></div></div>`,
 		`<input type="checkbox" name="ids" value="`+files[0]+`" form="pick" aria-label="Select Scan 1.jpg">`, `name="ids" value="`+files[1]+`"`)
-	wantNotInPage(t, "the people list", htmlPageAt(t, l.web, "/browse?kind=person", http.StatusOK), `formaction="/pages/tombstone"`)
+	wantNotInPage(t, "the people list", pageAt(t, l.web, "/browse?kind=person"), `formaction="/pages/tombstone"`)
 	// The bar comes after the rows, so a CSS counter can count the checked boxes on its button (plan 108).
 	if bar, last := strings.Index(list, `class="pick-bar"`), strings.LastIndex(list, `name="ids"`); bar < last || !strings.Contains(list[bar:], "</form>") {
 		t.Error("the bar is not after the rows")
@@ -407,7 +394,7 @@ func TestTheListsDeleteWhatIsChecked(t *testing.T) {
 	if !isReceiptLocation(loc, "/browse?kind=media") {
 		t.Fatalf("the form returned to %q", loc)
 	}
-	after := htmlPageAt(t, l.web, loc, http.StatusOK)
+	after := pageAt(t, l.web, loc)
 	wantInPage(t, "the list after the delete", after, "Deleted 2 pages.", `<a href="/browse?deleted=1">See the deleted pages</a>`)
 	wantNotInPage(t, "the list after the delete", after, ">Undo<", `href="/pages/`+files[0]+`"`, `href="/pages/`+files[1]+`"`)
 }
@@ -421,7 +408,7 @@ func TestDeletingOnePageOffersItsUndo(t *testing.T) {
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("the delete: %d %.300s", rec.Code, rec.Body.String())
 	}
-	toast := htmlPageAt(t, l.web, rec.Header().Get("Location"), http.StatusOK)
+	toast := pageAt(t, l.web, rec.Header().Get("Location"))
 	if !strings.Contains(toast, "Deleted 1 page.") || !strings.Contains(toast, `<form class="undo" method="post" action="/pages/`+id+`/revive">`) ||
 		!strings.Contains(toast, ">Undo<") || strings.Contains(toast, "See the deleted pages") {
 		t.Fatalf("the toast: %.900s", toast)
@@ -440,7 +427,7 @@ func TestThePickBarSendsOnlyWhatTheAPIAllows(t *testing.T) {
 	l := emptyLife(t)
 	l.do(t, "/", "add-file", map[string]string{"title": "Scan 1.jpg", "sha256": strings.Repeat("07", 32), "mime": "image/jpeg"})
 	catalog := must(t)(l.api.Get(t.Context(), "/actions"))
-	list := htmlPageAt(t, l.web, "/browse?kind=media", http.StatusOK)
+	list := pageAt(t, l.web, "/browse?kind=media")
 	bar := regexp.MustCompile(`(?s)<form id="pick"[^>]*>(.*?)</form>`).FindStringSubmatch(list)
 	if bar == nil {
 		t.Fatal("the media list has no pick bar")
@@ -480,7 +467,7 @@ func TestEveryListSelectsTheSameWay(t *testing.T) {
 		{"/browse?kind=media", "/pages/file", "/pages/tombstone"}, {"/browse?kind=document", "/pages/file", "/pages/tombstone"},
 		{"/browse?kind=metric", "/pages/file", ""}, {"/metrics", "/pages/file", ""},
 	} {
-		body := htmlPageAt(t, l.web, list.path, http.StatusOK)
+		body := pageAt(t, l.web, list.path)
 		if strings.Count(body, `id="pick"`) != 1 || !strings.Contains(body, `<label class="pick-toggle button small"><input type="checkbox" class="pick-on">Select</label>`) {
 			t.Errorf("%s has no one pick bar with Select", list.path)
 			continue

@@ -1,6 +1,6 @@
 package web_test
 
-// The parity of the browser (plan 161, stage 2). Web holds its own parity, as the table "Every action on every surface"
+// The parity of the browser. Web holds its own parity, as the table "Every action on every surface"
 // of the README says for the surfaces other than the API and the CLI: each action of GET /actions, the actions of the core
 // and the actions of a connected app, has its form in the pages that web draws. The test reads the catalog of the core,
 // asks web for the page of every action (/actions), and reads the forms of the HTML as a browser reads them.
@@ -8,6 +8,7 @@ package web_test
 import (
 	"net/http"
 	"net/url"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -20,10 +21,14 @@ import (
 // new kind of path field is a decision of the author and not a guess of the test.
 var pathValues = map[string]string{"id": "7", "day": "2031-05-03"}
 
+// openActionForm finds the first open form of a page: group 1 is the address that its form posts to.
+var openActionForm = regexp.MustCompile(`<details class="action" open>.*?<form[^>]* action="([^"]*)"`)
+
 // TestEveryActionOfTheCatalogHasItsFormInWeb: for each action of the catalog of the core with the app web connected,
 // /actions draws a form with the method and the address of the action. An action with a path field is drawn open, with its
-// address filled in, on /actions?new=NAME&FIELD=VALUE, the way the pages link to it. No action is exempt: a browser reaches
-// every one. An action that a page cannot draw as a form must be named here, with its reason, in the change that adds it.
+// address filled in, on /actions?new=NAME&FIELD=VALUE, the way the pages link to it: the open form posts to that address.
+// No action is exempt: a browser reaches every one. An action that a page cannot draw as a form must be named here, with
+// its reason, in the change that adds it.
 func TestEveryActionOfTheCatalogHasItsFormInWeb(t *testing.T) {
 	l := emptyLife(t)
 	l.core.Connect(t, "web", l.browser.Catalog()) // the app, as `serve --with web` registers it: its action joins the catalog
@@ -40,7 +45,8 @@ func TestEveryActionOfTheCatalogHasItsFormInWeb(t *testing.T) {
 	for _, a := range catalog {
 		t.Run(a.Name, func(t *testing.T) {
 			uri, want := "/actions", a.Href
-			if strings.Contains(a.Href, "{") {
+			opens := strings.Contains(a.Href, "{") // an action with a path field
+			if opens {
 				q := url.Values{"new": {a.Name}}
 				for _, f := range a.Fields {
 					if f.In != "path" {
@@ -65,6 +71,11 @@ func TestEveryActionOfTheCatalogHasItsFormInWeb(t *testing.T) {
 				return f.Method == a.Method && action == want
 			}) {
 				t.Errorf("GET %s draws no form %s %s (%d forms)", uri, a.Method, want, len(forms))
+			}
+			if opens {
+				if open := openActionForm.FindStringSubmatch(rec.Body.String()); open == nil || open[1] != want {
+					t.Errorf("GET %s: the open form posts to %v, want %s", uri, open, want)
+				}
 			}
 		})
 	}

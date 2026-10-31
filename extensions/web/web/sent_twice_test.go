@@ -2,11 +2,8 @@ package web_test
 
 // A form that a browser sends twice (a double click, a reload that posts again) is one write. The form carries a key
 // (import_key, D28) that web draws, the core stores the first write under it, and the second send is an answer "Already
-// added" that lands on the day. These are the HTML claims of these tests of the core:
-// TestTheCaptureFormCarriesAFreshKeyEachTimeItIsDrawn, TestACaptureFormSentAgainIsAddedOnce,
-// TestAReadingSentAgainLinksTheDayOfTheStoredReading and TestARecordGoesBackToTheDayItWasMadeOn. The core keeps their JSON
-// halves (the answer "Already added" with the link of the day). The core is the real one. Its clock stands still, so a
-// reading that is sent again "on the next day" is not here.
+// added" that lands on the day. The core is the real one. Its clock stands still, so a reading that is sent again "on the
+// next day" is not here.
 
 import (
 	"fmt"
@@ -60,7 +57,7 @@ func readingHrefsOfDay(t *testing.T, l *life, path string) []string {
 
 // TestTheCaptureFormCarriesAFreshKeyEachTimeItIsDrawn (issue 0085, D28): the browser sends the key that the form was drawn
 // with, so a form sent twice is one capture. The form of the next draw has another key, so the next entry is a new
-// capture. Core: TestTheCaptureFormCarriesAFreshKeyEachTimeItIsDrawn.
+// capture.
 func TestTheCaptureFormCarriesAFreshKeyEachTimeItIsDrawn(t *testing.T) {
 	l := emptyLife(t)
 	action := "/days/" + today + "/capture"
@@ -72,7 +69,7 @@ func TestTheCaptureFormCarriesAFreshKeyEachTimeItIsDrawn(t *testing.T) {
 }
 
 // TestACaptureFormSentAgainIsAddedOnce: the same form sent twice answers 303 to the day both times, the second time with
-// "Already added" and no second paragraph. Core: TestACaptureFormSentAgainIsAddedOnce.
+// "Already added" and no second paragraph.
 func TestACaptureFormSentAgainIsAddedOnce(t *testing.T) {
 	l := emptyLife(t)
 	form := url.Values{"text": {"Walked the dog"}, "mood": {"4"}, "import_key": {"form-key-1"}}
@@ -81,14 +78,14 @@ func TestACaptureFormSentAgainIsAddedOnce(t *testing.T) {
 	if first.Code != http.StatusSeeOther || locationWithoutFeedback(t, first.Header().Get("Location")) != toDay {
 		t.Fatalf("first send: %d %q", first.Code, first.Header().Get("Location"))
 	}
-	if body := browserPageAt(t, l.web, first.Header().Get("Location")); strings.Contains(body, "Already added") {
+	if body := pageAt(t, l.web, first.Header().Get("Location")); strings.Contains(body, "Already added") {
 		t.Errorf("the first send says Already added:\n%.400s", body)
 	}
 	again := postForm(l.web, toDay+"/capture", form)
 	if again.Code != http.StatusSeeOther || locationWithoutFeedback(t, again.Header().Get("Location")) != toDay {
 		t.Fatalf("send again: %d %q, want 303 to the day", again.Code, again.Header().Get("Location"))
 	}
-	if body := browserPageAt(t, l.web, again.Header().Get("Location")); !strings.Contains(body, "Already added") {
+	if body := pageAt(t, l.web, again.Header().Get("Location")); !strings.Contains(body, "Already added") {
 		t.Errorf("the second send does not say Already added:\n%.400s", body)
 	}
 	day := must(t)(l.api.Get(t.Context(), toDay))
@@ -104,7 +101,6 @@ func TestACaptureFormSentAgainIsAddedOnce(t *testing.T) {
 
 // TestAReadingSentAgainLandsOnTheDayOfTheStoredReading: a form of a reading sent again gets the redirect to the day of the
 // reading that stands, with the toast "Already added. Nothing changed.", as a capture does, and the day keeps one reading.
-// Core: TestAReadingSentAgainLinksTheDayOfTheStoredReading.
 func TestAReadingSentAgainLandsOnTheDayOfTheStoredReading(t *testing.T) {
 	l := emptyLife(t)
 	l.do(t, "/", "register-metric", map[string]string{"name": "Weight", "unit": "kg"})
@@ -125,7 +121,7 @@ func TestAReadingSentAgainLandsOnTheDayOfTheStoredReading(t *testing.T) {
 }
 
 // TestARecordGoesBackToTheDayItWasMadeOn: the form of Home and of a day, filled by a link, returns to that page with the
-// answer, and its key is filled, so a form sent twice is one reading. Core: TestARecordGoesBackToTheDayItWasMadeOn.
+// answer, and its key is filled, so a form sent twice is one reading.
 func TestARecordGoesBackToTheDayItWasMadeOn(t *testing.T) {
 	l := emptyLife(t)
 	l.do(t, "/", "register-metric", map[string]string{"name": "Walk"})

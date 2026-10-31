@@ -1,8 +1,6 @@
 package web_test
 
 // The pages of a page, of a day and of the stream of days. Web draws them from the answers of the real core.
-// Each test holds the markup that a test of the core held while the core drew the browser.
-// The strings are the strings of that test, because web draws the same bytes.
 // Each test makes its data through the API of the core, as the owner and an agent would make it.
 
 import (
@@ -18,18 +16,6 @@ import (
 
 	"lifelog-web/internal/formdoc"
 )
-
-// browserPageAt returns the body of GET path through h, as a browser asks for it.
-// The test fails unless the answer is a whole page with the status 200.
-func browserPageAt(t *testing.T, h http.Handler, path string) string {
-	t.Helper()
-	rec := ask(h, http.MethodGet, path)
-	body := rec.Body.String()
-	if rec.Code != http.StatusOK || !strings.HasSuffix(strings.TrimSpace(body), "</html>") {
-		t.Errorf("GET %s: %d, want 200 and a whole page: %.300s", path, rec.Code, body)
-	}
-	return body
-}
 
 // formTextPostingTo returns the HTML of the form of page that posts to action.
 // The test fails when the page has no such form.
@@ -103,13 +89,12 @@ func lifeWithAJournal(t *testing.T) *life {
 	return l
 }
 
-// Core test: TestAnEmptyPageSaysSoWithItsEditorClosed.
 // A page with no text says so in words, as every empty view does.
 // Its editor is closed under that sentence, so the page does not open as a large empty box with the focus in it.
 func TestAnEmptyPageSaysSoWithItsEditorClosed(t *testing.T) {
 	l := emptyLife(t)
 	sam := l.do(t, "/", "create-person", map[string]string{"title": "Sam"})
-	body := browserPageAt(t, l.web, href(sam, "self"))
+	body := pageAt(t, l.web, href(sam, "self"))
 	if !strings.Contains(body, `<p class="empty">Nothing written here yet.</p>`) {
 		t.Error("an empty page does not say that nothing is written")
 	}
@@ -123,40 +108,37 @@ func TestAnEmptyPageSaysSoWithItsEditorClosed(t *testing.T) {
 	}
 }
 
-// Core test: TestTheEditorIsTallAsItsBodyAndFirst.
 // The page draws its editor before its body.
 func TestAPageDrawsItsEditorBeforeItsBody(t *testing.T) {
 	l := emptyLife(t)
 	p := l.do(t, "/", "create-page", map[string]string{"title": "Long", "body": "words"})
-	body := browserPageAt(t, l.web, href(p, "self"))
+	body := pageAt(t, l.web, href(p, "self"))
 	if e, b := strings.Index(body, "<summary>Edit</summary>"), strings.Index(body, `<div class="prose">`); e < 0 || b < 0 || e > b {
 		t.Errorf("the editor is not before the body: %d, %d", e, b)
 	}
 }
 
-// Core test: TestTheBrowserMarksTheBodyOfASaveRequired.
 // The catalog marks the field body of save-body as required, because the core refuses an empty body.
 // So the browser marks the text area required, and it does not send an empty body.
 func TestTheBrowserMarksTheBodyOfASaveRequired(t *testing.T) {
 	l := emptyLife(t)
 	p := l.do(t, "/", "create-page", map[string]string{"title": "Notes", "body": "words"})
-	area := regexp.MustCompile(`<textarea name="body"[^>]*>`).FindString(browserPageAt(t, l.web, href(p, "self")))
+	area := regexp.MustCompile(`<textarea name="body"[^>]*>`).FindString(pageAt(t, l.web, href(p, "self")))
 	if area != `<textarea name="body" rows="12" required>` {
 		t.Errorf("the text area of save-body: %q, want it required", area)
 	}
 }
 
-// Core test: TestADestructiveActionDrawsADangerButton.
 // The warning comes from the catalog, not from a template that knows the name of an action.
 // A tombstone is drawn as a danger. The revive that undoes it is not.
 func TestADestructiveActionDrawsADangerButton(t *testing.T) {
 	l := emptyLife(t)
 	p := l.do(t, "/", "create-page", map[string]string{"title": "Draft"})
-	if body := browserPageAt(t, l.web, href(p, "self")); !strings.Contains(body, `<button class="danger">Delete</button>`) {
+	if body := pageAt(t, l.web, href(p, "self")); !strings.Contains(body, `<button class="danger">Delete</button>`) {
 		t.Errorf("a page that offers a tombstone draws no danger button: %.400s", body)
 	}
 	l.do(t, href(p, "self"), "tombstone-pages", nil)
-	body := browserPageAt(t, l.web, href(p, "self"))
+	body := pageAt(t, l.web, href(p, "self"))
 	if !strings.Contains(body, "<button>Restore</button>") {
 		t.Errorf("a deleted page offers no plain Restore: %.400s", body)
 	}
@@ -165,12 +147,11 @@ func TestADestructiveActionDrawsADangerButton(t *testing.T) {
 	}
 }
 
-// Core test: TestTheDayCarriesItsMood.
 // The day shows its moods in one span and offers the edit of its page.
 // The table of its readings has no column for the scope.
 func TestTheDayShowsItsMoodsAndTheEditOfItsPage(t *testing.T) {
 	l := lifeWithAJournal(t)
-	body := browserPageAt(t, l.web, "/days/"+today)
+	body := pageAt(t, l.web, "/days/"+today)
 	for _, want := range []string{`<span class="mood" title="Mood">mood 4, 3</span>`, "<summary>Edit the day page</summary>"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("the day view lacks %q", want)
@@ -181,7 +162,6 @@ func TestTheDayShowsItsMoodsAndTheEditOfItsPage(t *testing.T) {
 	}
 }
 
-// Core test: TestTheRootIsTodayAtAGlance.
 // Home is the page of today: GET / answers with the day of today.
 // A browser asks with either of its two usual Accept headers. Its capture form posts to the day.
 func TestHomeIsThePageOfToday(t *testing.T) {
@@ -201,23 +181,21 @@ func TestHomeIsThePageOfToday(t *testing.T) {
 	}
 }
 
-// Core test: TestTheDayOfTodayCarriesTheLastEntries.
 // The list of the last entries is in the margin of today, and of no other day.
 func TestTheDayOfTodayCarriesTheLastEntries(t *testing.T) {
 	l := lifeWithAJournal(t)
-	body := browserPageAt(t, l.web, "/days/"+today)
+	body := pageAt(t, l.web, "/days/"+today)
 	for _, want := range []string{`aria-label="Last entries"`, "<h2>Last entries</h2>", `<a href="/days">Every day</a>`,
 		`<a class="entry" href="/days/` + dayFromToday(-2) + `">`, "Morning"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("the page of today lacks %q", want)
 		}
 	}
-	if strings.Contains(browserPageAt(t, l.web, "/days/"+dayFromToday(-1)), "Last entries") {
+	if strings.Contains(pageAt(t, l.web, "/days/"+dayFromToday(-1)), "Last entries") {
 		t.Error("a day that is not today draws Last entries")
 	}
 }
 
-// Core test: TestTheMoodIsAChoiceOfFive.
 // The browser draws the mood of the capture form as a row of radio buttons. It works with no script.
 // The mood is not a list and is not required. A day with one mood says its word.
 // A capture that a browser sends with a mood reaches the day.
@@ -227,7 +205,7 @@ func TestTheMoodIsARowOfFaces(t *testing.T) {
 	l.do(t, "/days/"+today, "capture", map[string]string{"mood": "4"})
 	l.do(t, "/days/"+dayFromToday(-1), "capture", map[string]string{"mood": "2"})
 
-	body := browserPageAt(t, l.web, "/days/"+today)
+	body := pageAt(t, l.web, "/days/"+today)
 	form := formTextPostingTo(t, body, "/days/"+today+"/capture")
 	for _, want := range []string{`<fieldset class="segmented faces"><legend>Mood</legend>`,
 		`<label title="awful"><input type="radio" name="mood" value="1"><span>1 <small>awful</small></span></label>`,
@@ -240,7 +218,7 @@ func TestTheMoodIsARowOfFaces(t *testing.T) {
 	if strings.Contains(form, `<select name="mood"`) || strings.Contains(form, " required") {
 		t.Errorf("the mood is a list, or is required:\n%s", form)
 	}
-	if one := browserPageAt(t, l.web, "/days/"+dayFromToday(-1)); !strings.Contains(one, `<span class="mood" title="Mood">mood 2 · bad</span>`) {
+	if one := pageAt(t, l.web, "/days/"+dayFromToday(-1)); !strings.Contains(one, `<span class="mood" title="Mood">mood 2 · bad</span>`) {
 		t.Errorf("a day with one mood does not say its word:\n%s", one)
 	}
 	rec := postForm(l.web, "/days/"+today+"/capture", url.Values{"text": {"From the browser."}, "mood": {"3"}, "back": {"/days/" + today}})
@@ -253,7 +231,6 @@ func TestTheMoodIsARowOfFaces(t *testing.T) {
 	}
 }
 
-// Core test: TestCaptureReturnsToThePageThatSentIt.
 // The capture form of a day returns to that day. This holds for today too.
 // Home is the page of today, so no form returns to "/".
 // The test reads the forms as a browser reads them.
@@ -261,7 +238,7 @@ func TestTheCaptureOfADayReturnsToTheDay(t *testing.T) {
 	l := emptyLife(t)
 	for _, day := range []string{today, dayFromToday(-3)} {
 		page := "/days/" + day
-		capture, ok := formdoc.Find(formdoc.Forms(browserPageAt(t, l.web, page)), func(f formdoc.Form) bool { return f.Action == page+"/capture" })
+		capture, ok := formdoc.Find(formdoc.Forms(pageAt(t, l.web, page)), func(f formdoc.Form) bool { return f.Action == page+"/capture" })
 		if !ok {
 			t.Errorf("%s has no form that captures on the day", page)
 			continue
@@ -272,7 +249,6 @@ func TestTheCaptureOfADayReturnsToTheDay(t *testing.T) {
 	}
 }
 
-// Core test: TestTheDayIsALeafAndItsMargin.
 // The head of a day is a calendar leaf that opens its month. The weekday, the week and "today" are beside it.
 // The links to the previous and the next day keep their whole name for a reader.
 // In the source, the sheet (the journal, then Capture) comes before the margin. So a narrow screen shows the writing first.
@@ -280,7 +256,7 @@ func TestTheCaptureOfADayReturnsToTheDay(t *testing.T) {
 // 14 May 2031 is a Wednesday in ISO week 20.
 func TestTheDayIsALeafAndItsMargin(t *testing.T) {
 	l := emptyLife(t)
-	body := browserPageAt(t, l.web, "/days/"+today)
+	body := pageAt(t, l.web, "/days/"+today)
 	for _, want := range []string{
 		`<a class="leaf" href="/months/2031-05" aria-label="May 2031, the calendar of the month"><span class="leaf-month">May 2031</span><span class="leaf-day">14</span></a>`,
 		`<h1>Wednesday</h1>`,
@@ -314,7 +290,7 @@ func TestTheDayIsALeafAndItsMargin(t *testing.T) {
 		t.Errorf("a day with no reading does not say so:\n%s", readings)
 	}
 
-	past := browserPageAt(t, l.web, "/days/"+dayFromToday(-3))
+	past := pageAt(t, l.web, "/days/"+dayFromToday(-3))
 	for _, want := range []string{`<span class="leaf-day">11</span>`, `<h1>Sunday</h1>`, `<a href="/days/today">Go to today</a>`,
 		`<p class="empty">Nothing written on this day. <a href="#capture">Add to it</a> below.</p>`, `<h2>Add to Sun 11 May</h2>`} {
 		if !strings.Contains(past, want) {
@@ -326,7 +302,6 @@ func TestTheDayIsALeafAndItsMargin(t *testing.T) {
 	}
 }
 
-// Core test: TestTheStreamPagesByDay.
 // /days lists the days that have something, the newest first. Each day is a card with the words of the day.
 // A day after today is not in the list.
 func TestTheStreamDrawsOneCardForEachDayWithSomething(t *testing.T) {
@@ -334,7 +309,7 @@ func TestTheStreamDrawsOneCardForEachDayWithSomething(t *testing.T) {
 	for day, text := range map[string]string{today: "Today.", dayFromToday(-1): "Yesterday.", dayFromToday(-2): "Two days ago.", "2030-05-14": "A year ago.", "2031-05-20": "Not yet."} {
 		l.do(t, "/days/"+day, "capture", map[string]string{"text": text})
 	}
-	body := browserPageAt(t, l.web, "/days")
+	body := pageAt(t, l.web, "/days")
 	for _, want := range []string{fmt.Sprintf(`<article class="day-card" aria-label="%s">`, today), `<p class="card-words">(00:00) Today.</p>`} {
 		if !strings.Contains(body, want) {
 			t.Errorf("/days lacks %s", want)

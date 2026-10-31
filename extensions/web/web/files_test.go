@@ -110,21 +110,20 @@ func TestAPictureWithAVersionIsTheSamePicture(t *testing.T) {
 	}
 }
 
-// TestChatJSIsServedAsJavaScript: the script of the page is a short file with a short cache. It polls the conversation of
-// the day of its element, as Siren.
-func TestChatJSIsServedAsJavaScript(t *testing.T) {
+// TestTheScriptsNameWhatTheyDo: chat.js polls the conversation of the day of its element, as Siren. lock.js sends /awake,
+// asks for /lock, keeps the time in localStorage and waits while a page prerenders. The type, the cache and the size of
+// a script are held by TestTheOwnFilesHaveTheirTypeTheirCacheAndTheirBytes and TestTheScriptsAreSmallAndAlone.
+func TestTheScriptsNameWhatTheyDo(t *testing.T) {
 	l := emptyLife(t)
-	got := ask(l.web, http.MethodGet, "/assets/chat.js")
-	if got.Code != http.StatusOK || got.Header().Get("Content-Type") != "text/javascript; charset=utf-8" || got.Header().Get("Cache-Control") != cacheScript ||
-		got.Header().Get("X-Content-Type-Options") != "nosniff" {
-		t.Errorf("GET /assets/chat.js: %d %v", got.Code, got.Header())
-	}
-	if lines := strings.Count(got.Body.String(), "\n"); lines >= 80 {
-		t.Errorf("chat.js has %d lines, want under 80", lines)
-	}
-	for _, want := range []string{"application/vnd.siren+json", "/conversation", "dataset.day"} {
-		if !strings.Contains(got.Body.String(), want) {
-			t.Errorf("chat.js does not poll the conversation of the day of its element: it lacks %s", want)
+	for path, words := range map[string][]string{
+		"/assets/chat.js": {"application/vnd.siren+json", "/conversation", "dataset.day"},
+		"/assets/lock.js": {"/awake", "/lock", "localStorage", "prerendering"},
+	} {
+		body := ask(l.web, http.MethodGet, path).Body.String()
+		for _, want := range words {
+			if !strings.Contains(body, want) {
+				t.Errorf("%s lacks %s", path, want)
+			}
 		}
 	}
 }
