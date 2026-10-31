@@ -19,7 +19,7 @@ import (
 const embedField = "embed"
 
 // feedbackField is the one-use receipt of the toast after a write (feedback.go). Web alone reads it, so web does not send
-// it to the core.
+// it to the core (webFields).
 const feedbackField = "feedback"
 
 // refRel is the rel of the sub-entities of a conversation that name what its agent touched.
@@ -136,7 +136,6 @@ const (
 // web-settings of the catalog of the core, with the values that this program keeps. Without `serve --with web` the core
 // has no such action, and the page is the page of the core.
 func (b *Browser) offerBrowserSettings(r *http.Request, e *siren.Entity) {
-	dropBrowserFields(e)
 	actions, err := b.core.catalog(r.Context())
 	if err != nil {
 		logFault(r, "the catalog of the core cannot be read", err)
@@ -144,23 +143,6 @@ func (b *Browser) offerBrowserSettings(r *http.Request, e *siren.Entity) {
 	}
 	if i := slices.IndexFunc(actions, func(a siren.Action) bool { return a.Name == browserSettingsAction }); i >= 0 {
 		e.Actions = append(e.Actions, withValues(actions[i], b.settings()))
-	}
-}
-
-// coreBrowserFields are the fields of the core's action settings that hold the settings of a browser. Web keeps them
-// itself, so a value sent in the core's form would never reach web: the owner would set a lock that does not lock. The
-// core keeps a setting that a request leaves out (API.md, settings), so the form without them changes nothing else.
-// Stage 3 of plan 161 takes them out of the core, and this list with them.
-var coreBrowserFields = []string{"ground", "lock_after", "lock_pin"}
-
-// dropBrowserFields takes coreBrowserFields out of the core's action settings of e.
-func dropBrowserFields(e *siren.Entity) {
-	for i := range e.Actions {
-		if e.Actions[i].Name == "settings" {
-			e.Actions[i].Fields = slices.DeleteFunc(slices.Clone(e.Actions[i].Fields), func(f siren.Field) bool {
-				return slices.Contains(coreBrowserFields, f.Name)
-			})
-		}
 	}
 }
 
@@ -251,15 +233,18 @@ func write(w http.ResponseWriter, r *http.Request, status int, body []byte, retr
 	}
 }
 
-// coreURI is the path and the query of u as a read of the core takes them: the query without the receipt of the toast.
+// coreURI is the path and the query of u as a read of the core takes them: the query without the names that only web
+// reads.
 func coreURI(u *url.URL) string { return withQuery(u.EscapedPath(), coreQuery(u)) }
 
-// coreQuery is the raw query of u without the receipt of the toast. The other pairs stay as the browser sent them.
+// coreQuery is the raw query of u without webFields: the receipt of the toast (feedback) and the page to return to (back).
+// The core refuses a name that no action lists, and these two are names of web alone. new stays: the core takes it on a
+// GET, to open a form. The other pairs stay as the browser sent them.
 func coreQuery(u *url.URL) string {
 	var kept []string
 	for pair := range strings.SplitSeq(u.RawQuery, "&") {
 		name, _, _ := strings.Cut(pair, "=")
-		if name, err := url.QueryUnescape(name); pair != "" && (err != nil || name != feedbackField) {
+		if name, err := url.QueryUnescape(name); pair != "" && (err != nil || !slices.Contains(webFields, name)) {
 			kept = append(kept, pair)
 		}
 	}
@@ -281,15 +266,19 @@ func withQuery(path, rawQuery string) string {
 func withEmbed(uri, rels string) string { return withQuery(uri, embedField+"="+rels) }
 
 // logFault writes a fault of this program to the standard log: the route, what failed and the cause. The browser never
-// gets the cause. The route is the pattern that the request matched, and not its path, because a path can name a
-// person or a metric. A request that the browser cancelled is no fault.
+// gets the cause. A request that the browser cancelled is no fault.
 func logFault(r *http.Request, what string, err error) {
 	if errors.Is(err, context.Canceled) {
 		return
 	}
-	route := r.Pattern
-	if route == "" {
-		route = r.Method
+	log.Printf("%s: %s: %v", routeName(r), what, err)
+}
+
+// routeName names the route of r in the log: the pattern that the request matched, and not its path, because a path can name
+// a person or a metric. A request that no route matched (the login, a refusal of the door) has its method.
+func routeName(r *http.Request) string {
+	if r.Pattern == "" {
+		return r.Method
 	}
-	log.Printf("%s: %s: %v", route, what, err)
+	return r.Pattern
 }

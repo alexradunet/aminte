@@ -244,3 +244,14 @@ func ask(h http.Handler, method, uri string) *httptest.ResponseRecorder {
 	h.ServeHTTP(rec, req)
 	return rec
 }
+
+// versionOf is the version of the page at href, as a form carries it.
+func (l *life) versionOf(t *testing.T, href string) string {
+	t.Helper()
+	page := must(t)(l.api.Get(t.Context(), href))
+	v, _ := page.Properties.(map[string]any)["version"].(string)
+	if v == "" {
+		t.Fatalf("the page %s has no version", href)
+	}
+	return v
+}

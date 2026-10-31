@@ -81,7 +81,8 @@ func New(o Options) (*Browser, error) {
 	return b, nil
 }
 
-// tokenMinLength is the shortest token that web accepts. It is the rule of the public listener of the core.
+// tokenMinLength is the shortest token that web accepts. The core demands the same length of its own token, so one token
+// is the login of the browser and the bearer token of the core.
 const tokenMinLength = 32
 
 // checkToken reports whether t may be the owner's token: one line of at least tokenMinLength characters.

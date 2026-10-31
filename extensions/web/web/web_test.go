@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/fs"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -362,7 +361,8 @@ func TestAPageTakesNoEmbedAndAMethodThatIsNoneOfTheThreeIsRefused(t *testing.T) 
 	}
 }
 
-// TestADeletedMetricStaysAPage: the page of a live metric is the series, and the page of a deleted metric is a page.
+// TestADeletedMetricStaysAPage: the page of a live metric is the series, and the page of a deleted metric is a page. The
+// page of a deleted metric says what it is, when it was deleted and how to restore it, and it leads to the readings.
 func TestADeletedMetricStaysAPage(t *testing.T) {
 	l := richLife(t)
 	page := l.hrefs["walkPage"]
@@ -373,97 +373,50 @@ func TestADeletedMetricStaysAPage(t *testing.T) {
 	if e := must(t)(l.api.Get(t.Context(), page)); !slices.Contains(e.Class, "deleted") {
 		t.Fatalf("the page is not deleted: %v", e.Class)
 	}
-	want, got := ask(l.core.Handler, http.MethodGet, page), ask(l.web, http.MethodGet, page)
-	if got.Code != http.StatusOK || got.Code != want.Code {
-		t.Errorf("the page of a deleted metric: %d, the core %d, want 200", got.Code, want.Code)
+	got := ask(l.web, http.MethodGet, page)
+	if got.Code != http.StatusOK || got.Header().Get("Location") != "" {
+		t.Fatalf("the page of a deleted metric: %d to %q, want 200 and no redirect", got.Code, got.Header().Get("Location"))
 	}
-	if withoutKeys(got.Body.String()) != withoutKeys(want.Body.String()) {
-		t.Errorf("the page of a deleted metric differs from the page of the core:\n%s", firstDifference(withoutKeys(got.Body.String()), withoutKeys(want.Body.String())))
-	}
-}
-
-// TestTheOwnFilesAreTheFilesOfTheCore: web serves the files of the browser itself. Each has the type, the cache and the
-// bytes that the core's own route gives, and a font that does not exist is a 404.
-func TestTheOwnFilesAreTheFilesOfTheCore(t *testing.T) {
-	l := emptyLife(t)
-	paths := []string{"/manifest.webmanifest", "/assets/speculation.json", "/assets/chat.js", "/assets/lock.js", "/assets/icon.svg",
-		"/assets/icon-192.png", "/assets/icon-512.png", "/assets/wood.png", "/assets/ground.png", "/assets/embers.png", "/assets/sprites.png", "/assets/icons.png"}
-	fonts, err := fs.ReadDir(view.Files, "html/fonts")
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, f := range fonts {
-		if name := f.Name(); strings.HasSuffix(name, ".woff2") || strings.HasSuffix(name, ".txt") {
-			paths = append(paths, "/assets/fonts/"+name)
-		}
-	}
-	if len(paths) < 14 {
-		t.Fatalf("%d files: the fonts are not found", len(paths))
-	}
-	for _, p := range paths {
-		want, got := ask(l.core.Handler, http.MethodGet, p), ask(l.web, http.MethodGet, p)
-		if got.Code != http.StatusOK || got.Body.Len() == 0 || got.Body.String() != want.Body.String() {
-			t.Errorf("GET %s: %d, %d bytes; the core gave %d, %d bytes", p, got.Code, got.Body.Len(), want.Code, want.Body.Len())
-		}
-		for _, name := range []string{"Content-Type", "Cache-Control", "X-Content-Type-Options"} {
-			if got.Header().Get(name) != want.Header().Get(name) || got.Header().Get(name) == "" {
-				t.Errorf("GET %s: %s is %q, the core's is %q", p, name, got.Header().Get(name), want.Header().Get(name))
-			}
-		}
-	}
-	for _, p := range []string{"/assets/fonts/nothing.woff2", "/assets/fonts/x.exe", "/assets/fonts/..%2Fapp.css"} {
-		if got := ask(l.web, http.MethodGet, p); got.Code != http.StatusNotFound {
-			t.Errorf("GET %s: %d, want 404", p, got.Code)
+	for _, want := range []string{
+		`<span class="kind">metric, deleted</span>`,
+		"<h1>Walk</h1>",
+		`<div class="alert" role="alert"><p><strong>Deleted `,
+		"Nothing is ever removed: restore it to bring it back.",
+		`<form method="POST" action="` + page + `/revive" class="tiny" data-action="revive">`,
+		`<a href="/metrics/Walk">Its readings</a>`,
+	} {
+		if !strings.Contains(got.Body.String(), want) {
+			t.Errorf("the page of a deleted metric lacks %s\n%.1500s", want, got.Body.String())
 		}
 	}
 }
 
-// TestRenderDrawsTheBodyAndWritesNothing: POST /render draws the field body (or text) as a page would show it saved. The
-// page is the page of the core, it has no shell, nothing is cached, and nothing is asked of the core or written to it.
-func TestRenderDrawsTheBodyAndWritesNothing(t *testing.T) {
+// TestAReadNeverSendsBackOrFeedbackToTheCore: back and feedback are names that only web reads. The core takes no client's
+// back or feedback, so a read that carries them goes through web as a page, and the core gets neither. new stays: the
+// core takes it on a GET, to open a form.
+func TestAReadNeverSendsBackOrFeedbackToTheCore(t *testing.T) {
 	l := richLife(t)
 	rec := &recorder{next: l.core.Handler}
 	b := webOver(t, rec)
-	post := func(h http.Handler, contentType, body string, header ...string) *httptest.ResponseRecorder {
-		req := httptest.NewRequest(http.MethodPost, "/render", strings.NewReader(body))
-		req.Header.Set("Content-Type", contentType)
-		for i := 0; i+1 < len(header); i += 2 {
-			req.Header.Set(header[i], header[i+1])
-		}
-		out := httptest.NewRecorder()
-		h.ServeHTTP(out, req)
-		return out
-	}
-	form := "application/x-www-form-urlencoded"
-	for _, field := range []string{"body", "text"} {
-		values := url.Values{field: {"# Heading\n\nA **bold** word and a [[River walk]] link. #birds"}}.Encode()
-		want, got := post(l.core.Handler, form, values), post(b, form, values)
-		if got.Code != http.StatusOK || got.Header().Get("Cache-Control") != "no-store" || !strings.Contains(got.Body.String(), "<h1>Heading</h1>") ||
-			!strings.Contains(got.Body.String(), "<strong>bold</strong>") {
-			t.Errorf("render of %s: %d, %q\n%.300s", field, got.Code, got.Header().Get("Cache-Control"), got.Body.String())
-		}
-		if got.Body.String() != want.Body.String() || got.Header().Get("Content-Type") != want.Header().Get("Content-Type") {
-			t.Errorf("render of %s differs from the page of the core:\n%s", field, firstDifference(got.Body.String(), want.Body.String()))
-		}
-		if strings.Contains(got.Body.String(), `<section class="rail-today"`) || strings.Contains(got.Body.String(), `id="chat"`) {
-			t.Errorf("render of %s has a shell", field)
-		}
-	}
-	if n := len(rec.requests()); n != 0 {
-		t.Errorf("render asked the core %d times, want none", n)
-	}
-	for name, c := range map[string]struct {
-		contentType, body string
-		header            []string
-		want              int
-	}{
-		"json":         {"application/json", `{"body":"x"}`, nil, http.StatusUnsupportedMediaType},
-		"multipart":    {"multipart/form-data; boundary=x", "--x--", nil, http.StatusUnsupportedMediaType},
-		"cross-origin": {form, "body=x", []string{"Sec-Fetch-Site", "cross-site", "Origin", "https://elsewhere.example"}, http.StatusForbidden},
-		"too large":    {form, "body=" + strings.Repeat("a", 20<<20), nil, http.StatusRequestEntityTooLarge},
+	for _, c := range []struct{ uri, want string }{
+		{"/browse?kind=media&back=/x", "kind=media"},
+		{"/browse?back=%2Fx&kind=media&feedback=once", "kind=media"},
+		{"/browse?kind=media&new=add-file&back=/x&feedback=once", "kind=media&new=add-file"},
+		{"/browse?kind=person&%62ack=/x", "kind=person"}, // the name b-a-c-k, written with an escape
 	} {
-		if got := post(b, c.contentType, c.body, c.header...); got.Code != c.want || !strings.Contains(got.Body.String(), "</html>") {
-			t.Errorf("render, %s: %d, want %d with a page", name, got.Code, c.want)
+		before := len(rec.requests())
+		if got := ask(b, http.MethodGet, c.uri); got.Code != http.StatusOK {
+			t.Errorf("GET %s: %d, want 200\n%.300s", c.uri, got.Code, got.Body.String())
+			continue
+		}
+		first := rec.requests()[before].URL
+		if first.Path != "/browse" || first.RawQuery != c.want {
+			t.Errorf("GET %s was read as %s, want /browse?%s", c.uri, first, c.want)
+		}
+		for _, req := range rec.requests()[before:] {
+			if req.URL.Query().Has("back") || req.URL.Query().Has("feedback") {
+				t.Errorf("GET %s: the core was asked for %s", c.uri, req.URL)
+			}
 		}
 	}
 }

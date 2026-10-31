@@ -29,24 +29,39 @@ const (
 // fontTypes are the files the font route serves, by their extension: the faces and their licences.
 var fontTypes = map[string]string{"woff2": "font/woff2", "txt": "text/plain; charset=utf-8"}
 
-// ownRoutes registers the routes of web's own files and /render on m.
+// ownRoutes registers the routes of web's own files and /render on m. A file takes GET and its HEAD, and /render takes
+// POST. Web answers any other method itself, with 405 and the Allow header (onlyAllow), and does not ask the core.
 func (b *Browser) ownRoutes(m *http.ServeMux) {
-	m.HandleFunc("GET /assets/fonts/{file}", fonts)
-	m.HandleFunc("GET /manifest.webmanifest", file("manifest.webmanifest", "application/manifest+json", hour))
+	readOnly := func(path string, h http.HandlerFunc) {
+		m.HandleFunc("GET "+path, h) // the server answers a HEAD with the headers of the GET
+		m.HandleFunc(path, b.onlyAllow("GET, HEAD"))
+	}
+	readOnly("/assets/fonts/{file}", fonts)
+	readOnly("/manifest.webmanifest", file("manifest.webmanifest", "application/manifest+json", hour))
 	// The rules of speculation. JSON has no comments, so the reasons are here. No address with a query string: a
 	// ?feedback= receipt is read once, and ?new= opens a form. The pattern is "/*\?*=*", with the "=" every query of
 	// this app has: a URLPattern "/*\?*" alone has the search "*", which an empty search matches too, so it would
 	// exclude every address. The others are the routes that redirect (today, go, random, find), the pictures, the
 	// downloads of a snapshot, the install file and the integrity check, which a hover must not run. A browser
 	// without speculation rules ignores the header.
-	m.HandleFunc("GET /assets/speculation.json", file("speculation.json", "application/speculationrules+json", hour))
-	m.HandleFunc("GET /assets/chat.js", file("chat.js", "text/javascript; charset=utf-8", script))
-	m.HandleFunc("GET /assets/lock.js", file("lock.js", "text/javascript; charset=utf-8", script))
-	m.HandleFunc("GET /assets/icon.svg", file("icon.svg", "image/svg+xml", immutable))
+	readOnly("/assets/speculation.json", file("speculation.json", "application/speculationrules+json", hour))
+	readOnly("/assets/chat.js", file("chat.js", "text/javascript; charset=utf-8", script))
+	readOnly("/assets/lock.js", file("lock.js", "text/javascript; charset=utf-8", script))
+	readOnly("/assets/icon.svg", file("icon.svg", "image/svg+xml", immutable))
 	for _, name := range []string{"icon-192.png", "icon-512.png", "wood.png", "ground.png", "embers.png", "sprites.png", "icons.png"} {
-		m.HandleFunc("GET /assets/"+name, file(name, "image/png", immutable))
+		readOnly("/assets/"+name, file(name, "image/png", immutable))
 	}
 	m.HandleFunc("POST /render", b.render)
+	m.HandleFunc("/render", b.onlyAllow("POST"))
+}
+
+// onlyAllow answers a method that a route of web's own does not take: 405 with the Allow header. The route is web's, so
+// its answer is web's to decide, and the core is not asked.
+func (b *Browser) onlyAllow(allow string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Allow", allow)
+		b.fail(w, r, http.StatusMethodNotAllowed, siren.CodeBadRequest, "this address takes "+allow)
+	}
 }
 
 // fonts is GET /assets/fonts/{file}: an embedded face or licence, by its exact name (view/html/fonts/README.md). A file

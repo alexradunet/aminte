@@ -2,6 +2,7 @@ package main_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -35,7 +36,7 @@ import (
 )
 
 // The end-to-end test builds the real lifelog and lifelog-web into one folder and runs the line of the live unit on a new
-// life.db: `lifelog serve --public --token-file F --with web`, with LIFELOG_WEB_LISTEN, LIFELOG_WEB_ORIGINS and
+// life.db: `lifelog serve --token-file F --with web`, with LIFELOG_WEB_LISTEN, LIFELOG_WEB_ORIGINS and
 // LIFELOG_WEB_STATE in the environment. Then it is a browser: a cookie jar, Accept: text/html, the fetch headers of a
 // navigation, and no other door than the door of web. It holds what the tests of ./web cannot: the program, its
 // environment, the handshake of the catalog "This browser" (served on LIFELOG_LISTEN, merged by the core as /with/web),
@@ -121,9 +122,10 @@ func loopbackAddr(t *testing.T) string {
 	return l.Addr().String()
 }
 
-// stack is a running `lifelog serve --public --with web`.
+// stack is a running `lifelog serve --token-file F --with web`.
 type stack struct {
 	t       *testing.T
+	bin     string // the lifelog program, for the command line
 	cmd     *exec.Cmd
 	stderr  *lockedBuffer
 	exited  chan error
@@ -146,10 +148,10 @@ func startStack(t *testing.T, b bins) *stack {
 	if err := os.WriteFile(tokenFile, []byte(ownerToken+"\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	s := &stack{t: t, stderr: new(lockedBuffer), exited: make(chan error, 1), state: filepath.Join(work, "state")}
+	s := &stack{t: t, bin: b.lifelog, stderr: new(lockedBuffer), exited: make(chan error, 1), state: filepath.Join(work, "state")}
 	listen := loopbackAddr(t)
 	s.door = "http://" + listen
-	s.cmd = exec.Command(b.lifelog, "--db", db, "serve", "--public", "--addr", "127.0.0.1:0", "--token-file", tokenFile, "--with", "web")
+	s.cmd = exec.Command(b.lifelog, "--db", db, "serve", "--addr", "127.0.0.1:0", "--token-file", tokenFile, "--with", "web")
 	// The environment of the unit, and nothing of the owner's: any LIFELOG_ variable of the shell could point the child
 	// at another file or server.
 	s.cmd.Env = append(slices.DeleteFunc(os.Environ(), func(kv string) bool {
@@ -175,6 +177,33 @@ func startStack(t *testing.T, b bins) *stack {
 	s.waitFor("lifelog: with web: a catalog of 1 actions on 127.0.0.1:")
 	s.waitForDoor()
 	return s
+}
+
+// lifelogCLI runs `lifelog --url CORE args...` as the owner does at a shell: with the token in $LIFELOG_TOKEN and no other
+// LIFELOG_ variable. It returns what the program wrote and how it ended.
+func (s *stack) lifelogCLI(args ...string) (stdout, stderr string, err error) {
+	ctx, cancel := context.WithTimeout(s.t.Context(), wait)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, s.bin, append([]string{"--url", s.core}, args...)...)
+	cmd.Env = append(slices.DeleteFunc(os.Environ(), func(kv string) bool { return strings.HasPrefix(kv, "LIFELOG_") }), "LIFELOG_TOKEN="+ownerToken)
+	var out, errOut bytes.Buffer
+	cmd.Stdout, cmd.Stderr = &out, &errOut
+	err = cmd.Run()
+	return out.String(), errOut.String(), err
+}
+
+// savedSettings are the settings of web as its state folder holds them.
+func (s *stack) savedSettings() map[string]string {
+	s.t.Helper()
+	raw, err := os.ReadFile(filepath.Join(s.state, "settings.json"))
+	if err != nil {
+		s.t.Fatal(err)
+	}
+	var saved map[string]string
+	if err := json.Unmarshal(raw, &saved); err != nil {
+		s.t.Fatalf("the settings file is not JSON: %v\n%s", err, raw)
+	}
+	return saved
 }
 
 // waitFor waits until the stderr holds the text and returns the line that holds it. It reads the log, never the clock.
@@ -711,6 +740,27 @@ func TestWebOnTheRealLifelog(t *testing.T) {
 		raw, err := os.ReadFile(filepath.Join(s.state, "settings.json"))
 		if err != nil || !strings.Contains(string(raw), `"ground": "oak"`) {
 			t.Errorf("the settings after the refusal: %s %v, want the ground oak", raw, err)
+		}
+	})
+
+	t.Run("the ground is set on the command line, and a floor outside the four is refused", func(t *testing.T) {
+		out, errOut, err := s.lifelogCLI("do", "web-settings", "ground=embers")
+		if err != nil {
+			t.Fatalf("lifelog do web-settings ground=embers: %v\n%s%s", err, out, errOut)
+		}
+		if saved := s.savedSettings(); saved["ground"] != "embers" || saved["lock_after"] != "5" {
+			t.Errorf("the settings file after the command: %v, want the ground embers and the lock as it was", saved)
+		}
+		if landed := person.get("/settings"); landed.Status != http.StatusOK || !strings.Contains(landed.Body, `data-ground="embers"`) {
+			t.Errorf("the page of the settings after the command: %d, no data-ground=embers", landed.Status)
+		}
+		out, errOut, err = s.lifelogCLI("do", "web-settings", "ground=flagstones")
+		var exit *exec.ExitError
+		if !errors.As(err, &exit) || !strings.Contains(out+errOut, "ground") {
+			t.Errorf("ground=flagstones: %v, want a refusal that names the field\n%s%s", err, out, errOut)
+		}
+		if saved := s.savedSettings(); saved["ground"] != "embers" {
+			t.Errorf("the settings file after the refusal: %v, want the ground embers", saved)
 		}
 	})
 

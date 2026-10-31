@@ -1,8 +1,8 @@
 package web_test
 
-// What web sends to the core for a write, what it does with each answer, and what it refuses. The forms side by side
-// (forms_sidebyside_test.go) hold that a browser sees what the browser of the core shows. These tests hold the requests that
-// reach the core, with a recorder between web and the real core, and the answers that a real core does not give, with a fake.
+// What web sends to the core for a write, what it does with each answer, and what it refuses. These tests hold the
+// requests that reach the core, with a recorder between web and the real core, and the answers that a real core does not
+// give, with a fake.
 
 import (
 	"bytes"
@@ -10,6 +10,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"net/textproto"
 	"net/url"
 	"strings"
 	"sync"
@@ -58,6 +59,66 @@ func postForm(h http.Handler, path string, form url.Values, headers ...string) *
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 	return rec
+}
+
+// formSent is a form of a browser: the address it posts to, its text (urlencoded) or its file (multipart), and the page it
+// is on, which a browser names in the Referer.
+type formSent struct {
+	path    string
+	text    url.Values  // a form of text
+	file    *fileSent   // a form of a file, when it is not nil
+	from    string      // the page the form is on
+	headers [][2]string // more headers: the origin of a cross-site form
+}
+
+// fileSent is a form of a file: its text fields, its back and its original.
+type fileSent struct {
+	fields   [][2]string
+	back     string
+	original []byte
+}
+
+// deliver posts the form to h as a browser does. A form of a file carries back in the query of its address, as the view
+// draws it: web streams the body of a file and reads none of it.
+func deliver(h http.Handler, f formSent) *httptest.ResponseRecorder {
+	path, body, contentType := f.path, f.text.Encode(), "application/x-www-form-urlencoded"
+	if f.file != nil {
+		var buf bytes.Buffer
+		mw := multipart.NewWriter(&buf)
+		if f.file.back != "" {
+			path = withQueryPair(path, "back="+url.QueryEscape(f.file.back))
+		}
+		for _, field := range f.file.fields {
+			mw.WriteField(field[0], field[1])
+		}
+		part, _ := mw.CreatePart(textproto.MIMEHeader{
+			"Content-Disposition": {`form-data; name="original"; filename="Heron.jpg"`}, "Content-Type": {"image/jpeg"}})
+		part.Write(f.file.original)
+		mw.Close()
+		body, contentType = buf.String(), mw.FormDataContentType()
+	}
+	req := httptest.NewRequest(http.MethodPost, path, strings.NewReader(body))
+	req.Header.Set("Content-Type", contentType)
+	req.Header.Set("Accept", "text/html,application/xhtml+xml")
+	req.Header.Set("Sec-Fetch-Site", "same-origin")
+	req.Header.Set("Sec-Fetch-Mode", "navigate")
+	if f.from != "" {
+		req.Header.Set("Referer", "http://example.com"+f.from)
+	}
+	for _, h := range f.headers {
+		req.Header.Set(h[0], h[1])
+	}
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	return rec
+}
+
+// withQueryPair is path with the pair added to its query.
+func withQueryPair(path, pair string) string {
+	if strings.Contains(path, "?") {
+		return path + "&" + pair
+	}
+	return path + "?" + pair
 }
 
 // TestAWriteReachesTheCoreAsTheWriterUIWithTheFieldsOfTheAction: web reads the catalog, then sends one POST to the same
@@ -220,21 +281,56 @@ func TestAFormOfAFileStreamsToTheCore(t *testing.T) {
 }
 
 // TestARefusedFileFormKeepsNoText: a form of a file is refused by the core, and the page of the error has the reason. It does
-// not show "What you sent", because the text is in the body of the stream, which web does not read. The browser of the core
-// shows it. This is the second allowed difference of the forms (forms_sidebyside_test.go).
+// not show "What you sent", because the text is in the body of the stream, which web does not read. The refusal of a form of
+// text shows it, so a reader can send the words again.
 func TestARefusedFileFormKeepsNoText(t *testing.T) {
 	l := richLife(t)
-	form := formSent{path: "/files", from: "/browse", file: &fileSent{
-		fields: [][2]string{{"title", "X.jpg"}, {"body", "Words that the page of the error could show again."}, {"bogus", "1"}}, back: "/browse", original: syntheticJPEG(t)}}
-	old, got := deliver(l.core.Handler, form, false), deliver(l.web, form, true)
-	if old.Code != http.StatusUnprocessableEntity || got.Code != old.Code {
-		t.Fatalf("the core %d, web %d, want 422 from both", old.Code, got.Code)
+	words := "Words that the page of the error could show again."
+	got := deliver(l.web, formSent{path: "/files", from: "/browse", file: &fileSent{
+		fields: [][2]string{{"title", "X.jpg"}, {"body", words}, {"bogus", "1"}}, back: "/browse", original: syntheticJPEG(t)}})
+	page := got.Body.String()
+	if got.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("a file form with a field of no action: %d, want 422\n%.400s", got.Code, page)
 	}
-	if !strings.Contains(old.Body.String(), "What you sent") {
-		t.Error("the browser of the core does not show the text any more: this test is out of date")
+	if strings.Contains(page, "What you sent") || strings.Contains(page, words) || !strings.Contains(page, "unknown field bogus") {
+		t.Errorf("the page of the refusal:\n%.600s", page)
 	}
-	if strings.Contains(got.Body.String(), "What you sent") || !strings.Contains(got.Body.String(), "unknown field bogus") {
-		t.Errorf("the page of web: %.400s", got.Body.String())
+	again := postForm(l.web, "/pages", url.Values{"title": {"X"}, "body": {words}, "bogus": {"1"}})
+	if again.Code != http.StatusUnprocessableEntity || !strings.Contains(again.Body.String(), "What you sent") || !strings.Contains(again.Body.String(), words) {
+		t.Errorf("a refused form of text: %d, want 422 with the text it sent\n%.600s", again.Code, again.Body.String())
+	}
+}
+
+// TestAWriteNeverSendsNewToTheCore: new opens a form on a GET. The core takes it on a GET alone, so a write that carries it,
+// in the query of its address or in its body, a form of text or a form of a file, reaches the core without it. The
+// names that only web reads (back, feedback) do not go either, and every other name goes.
+func TestAWriteNeverSendsNewToTheCore(t *testing.T) {
+	l := richLife(t)
+	rec := &bodies{next: l.core.Handler}
+	h := webOver(t, rec)
+
+	got := postForm(h, "/days/"+today+"/capture?new=capture&mood=3", url.Values{"text": {"Words."}, "new": {"capture"}, "back": {"/days/" + today}})
+	if got.Code != http.StatusSeeOther {
+		t.Fatalf("a form of text with new: %d %.300s", got.Code, got.Body.String())
+	}
+	write := rec.requests()[len(rec.requests())-1]
+	if write.method != http.MethodPost || write.uri != "/days/"+today+"/capture?mood=3" {
+		t.Errorf("the write is %s %s, want POST /days/%s/capture?mood=3 (the query without new)", write.method, write.uri, today)
+	}
+	if sent, _ := url.ParseQuery(write.body); sent.Has("new") || sent.Encode() != "text=Words." {
+		t.Errorf("the core got the fields %q, want text alone", write.body)
+	}
+
+	mark := len(rec.requests())
+	got = deliver(h, formSent{path: "/files?new=add-file&feedback=x", from: "/browse?new=add-file", file: &fileSent{
+		fields: [][2]string{{"title", "Heron.jpg"}, {"day", today}}, back: "/browse?kind=media", original: syntheticJPEG(t)}})
+	if got.Code != http.StatusSeeOther {
+		t.Fatalf("a form of a file with new: %d %.300s", got.Code, got.Body.String())
+	}
+	for _, r := range rec.requests()[mark:] {
+		if r.method == http.MethodPost && r.uri != "/files" {
+			t.Errorf("the file was sent to %s, want /files with no query", r.uri)
+		}
 	}
 }
 

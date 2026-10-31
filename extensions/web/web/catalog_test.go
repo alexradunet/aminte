@@ -1,7 +1,7 @@
 package web_test
 
-// The settings of the browser and the catalog that serves them. The rules of plan 160 for the settings (the core's
-// TestLockSettings) are held here: the PIN is 4 to 8 digits, the hash is in the file and the PIN is nowhere, an empty PIN
+// The settings of the browser and the catalog that serves them. The rules of plan 160 for the settings are held here: the
+// PIN is 4 to 8 digits, the hash is in the file and the PIN is nowhere, an empty PIN
 // keeps the stored one, lock_after needs a PIN, a refused save writes nothing, and the PIN is in no answer.
 
 import (
@@ -166,7 +166,7 @@ func TestTheCatalogRefusesWhatItDoesNotTake(t *testing.T) {
 	}
 }
 
-// TestEmptyFieldsClearAndAnEmptyPINKeepsTheStoredOne: core TestLockSettings. A field that is left out stays; an empty one
+// TestEmptyFieldsClearAndAnEmptyPINKeepsTheStoredOne: a field that is left out stays; an empty one
 // clears that setting; an empty PIN keeps the stored PIN; lock_after off keeps the hash; a new PIN replaces it.
 func TestEmptyFieldsClearAndAnEmptyPINKeepsTheStoredOne(t *testing.T) {
 	l := emptyLife(t)
@@ -272,9 +272,8 @@ func TestManyReadersAndWritersSeeWholeSettings(t *testing.T) {
 // TestTheSettingsPageHasTheFormOfThisBrowser: with the app web connected to the core (`serve --with web`), the page of
 // the settings has the form of the core and, under it, the form "This browser", which is the action web-settings of the
 // catalog of the core, with the values that web keeps. A save through web goes to the core, which forwards it to the
-// catalog with its owner rule, and the browser returns to the page with the toast. The page lacks the form without the app
-// (the pages side by side). The core's form has no field of the browser: each setting of the browser is one field, in
-// the form "This browser" (a lock set in the core's form would never lock web).
+// catalog with its owner rule, and the browser returns to the page with the toast. The core's form has no field of the
+// browser: each setting of the browser is one field, in the form "This browser".
 func TestTheSettingsPageHasTheFormOfThisBrowser(t *testing.T) {
 	l := emptyLife(t)
 	l.core.Connect(t, "web", l.browser.Catalog())

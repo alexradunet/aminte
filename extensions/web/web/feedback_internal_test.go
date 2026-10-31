@@ -9,8 +9,7 @@ import (
 	"time"
 )
 
-// The tests of the receipts of the toast, ported from internal/api/feedback_internal_test.go and feedback_test.go. The
-// store is the store of the core (feedback.go), moved here with the browser.
+// The tests of the receipts of the toast (feedback.go).
 
 func receiptToken(location string) string {
 	u, _ := url.Parse(location)

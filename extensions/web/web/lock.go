@@ -10,10 +10,9 @@ import (
 	"lifelog/siren"
 )
 
-// The lock (docs/plans/160-the-lock.md, moved from the core by plan 161). A session that is idle for longer than
-// lock_after, or that the owner locked, gets the lock page and nothing of the life log, until the PIN opens it. The
-// rules, with their reasons, are the rules of plan 160 and of its counter-review: a try is counted before the PIN is
-// compared; a lock keeps the count of wrong PINs; an ended session compares no PIN and gets no state again; every answer
+// The lock (docs/plans/160-the-lock.md). A session that is idle for longer than lock_after, or that the owner locked,
+// gets the lock page and nothing of the life log, until the PIN opens it. The rules, with their reasons, are the rules of
+// plan 160 and of its counter-review: a try is counted before the PIN is compared; a lock keeps the count of wrong PINs; an ended session compares no PIN and gets no state again; every answer
 // of a session but /assets/ is no-store; the lock page keeps the path of the page and never its query.
 //
 // The settings are in memory (settings.go), so there is no read that can fail while the program runs. A file that

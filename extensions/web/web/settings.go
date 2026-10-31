@@ -18,9 +18,8 @@ import (
 )
 
 // The settings of the browser are the choices of the owner that only this program needs. They live in a file of its own
-// state folder, never in life.db and never in the settings file of the core. The core does not read them. The keys are
-// the keys of the settings file of the core (ground, lock_after, lock_pin_hash), so that the owner copies them with one
-// jq line (README.md).
+// state folder, never in life.db and never in the settings file of the core, which does not read them. The keys are
+// ground, lock_after and lock_pin_hash.
 
 // grounds are the floors of the pages, the options of the field ground, in the order of the select. The first is the
 // floor of a page with no choice (docs/plans/153-the-ground-in-settings.md).
@@ -155,8 +154,8 @@ func writeAtomically(path string, v browserSettings) (err error) {
 const pinIterations = 200_000
 
 // hashPIN is the stored form of pin: "pbkdf2-sha256$ITERATIONS$SALT$KEY", with the salt and the key in base64. The salt
-// and the count are in the text, so a later version can change the count and still read an old hash. It is the form
-// that the core stored, so a hash copied from its settings file works here.
+// and the count are in the text, so a later version can change the count and still read an old hash. A hash of this form
+// is valid, whatever program made it.
 func hashPIN(pin string) (string, error) {
 	salt := make([]byte, 16)
 	if _, err := rand.Read(salt); err != nil {

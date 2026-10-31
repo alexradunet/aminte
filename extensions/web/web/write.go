@@ -20,8 +20,8 @@ import (
 )
 
 // The write side of the browser. A form posts to web. Web sends the same write to the core, with the same path, as the
-// writer ui, and then does what the browser of the core did (plan 161): post, then redirect, so a reload never posts
-// again.
+// writer ui. The core answers with the entity, and web sends the browser on to a page (post, then redirect), so a reload
+// never posts again.
 //
 //	the form --> web --> the core --> an answer:
 //	  2xx with a Location --> 303 to the page the form came from (back), or to the written thing, with the toast
@@ -38,6 +38,13 @@ var backFragment = regexp.MustCompile(`^[A-Za-z0-9_-]{1,64}$`)
 
 // backField is the name of the page that a browser form asks to return to after its write. Only web reads it.
 const backField = "back"
+
+// webFields are the names that only web reads: the page that a form returns to and the receipt of the toast (feedback.go).
+// The core takes them from no client, so no request to the core carries them.
+var webFields = []string{backField, feedbackField}
+
+// newField opens a form on a GET (?new=rename). The core takes it on a GET alone, so a write never sends it.
+const newField = "new"
 
 // formType is the media type of the form of a browser.
 const formType = "application/x-www-form-urlencoded"
@@ -115,7 +122,7 @@ func (b *stallBody) Read(p []byte) (int, error) {
 
 // outgoing is a write as web sends it to the core.
 type outgoing struct {
-	uri         string    // the path and the query, without the fields that only web reads
+	uri         string    // the path and the query, without the names that only web reads (webFields) and new
 	body        io.Reader // the fields of a form, or the stream of a file
 	size        int64     // the length of body, -1 when it is not known
 	contentType string
@@ -125,9 +132,9 @@ type outgoing struct {
 }
 
 // write sends a POST of the browser to the core. A form of text (urlencoded) is read and bounded, because web takes out
-// the fields that only it reads and the fields of the other button of a pick bar. A form of a file (multipart) streams
-// to the core unchanged and is never held, so web reads nothing of it: the page to return to is in the query of its
-// address (the view puts it there).
+// the names that only it reads (webFields), new and the fields of the other button of a pick bar. A form of a file
+// (multipart) streams to the core unchanged and is never held, so web reads nothing of it: the page to return to is in
+// the query of its address (the view puts it there).
 func (b *Browser) write(w http.ResponseWriter, r *http.Request) {
 	out, ok := b.outgoing(w, r)
 	if !ok {
@@ -161,8 +168,10 @@ func (b *Browser) outgoing(w http.ResponseWriter, r *http.Request) (out outgoing
 		return out, false
 	}
 	back := query.Get(backField)
-	query.Del(backField)
-	query.Del(feedbackField) // the receipt of a toast: web alone reads it
+	for _, name := range webFields {
+		query.Del(name)
+	}
+	query.Del(newField)
 	out.uri = withQuery(r.URL.EscapedPath(), query.Encode())
 
 	ct, _, _ := mime.ParseMediaType(r.Header.Get("Content-Type"))
@@ -190,8 +199,10 @@ func (b *Browser) outgoing(w http.ResponseWriter, r *http.Request) (out outgoing
 	}
 	form := r.PostForm
 	out.back = backOf(cmp.Or(form.Get(backField), back))
-	form.Del(backField)
-	form.Del(feedbackField)
+	for _, name := range webFields {
+		form.Del(name)
+	}
+	form.Del(newField)
 	if len(form) > 0 { // the catalog says which fields the action takes, and which fields are long text
 		actions, err := b.core.catalog(r.Context())
 		switch {
@@ -310,8 +321,8 @@ func actionAt(actions []siren.Action, path string) (siren.Action, bool) {
 
 // dropSharedFields takes out of form the fields of the shared form that act does not list. The pick bar of a list posts
 // the form of file-pages to tombstone-pages by a second button, because HTML cannot join one checkbox to two forms
-// (view.SharedForms). The core takes the fields of one action only, so web sends the action the fields that it lists.
-// A field that neither form lists stays, and the core refuses it.
+// (view.SharedForms). The core takes the fields of one action from every client, so web sends the action the fields that
+// it lists. A field that neither form lists stays, and the core refuses it.
 func dropSharedFields(form url.Values, act siren.Action, actions []siren.Action) {
 	shared, ok := view.SharedForms[act.Name]
 	if !ok {

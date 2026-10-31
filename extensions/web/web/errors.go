@@ -3,9 +3,11 @@ package web
 import (
 	"context"
 	"errors"
+	"log"
 	"net"
 	"net/http"
 	"net/url"
+	"runtime/debug"
 	"strings"
 
 	"lifelog-web/view"
@@ -83,4 +85,22 @@ func (b *Browser) unreachable(w http.ResponseWriter, r *http.Request, err error)
 	}
 	logFault(r, "the core cannot be reached", err)
 	b.fail(w, r, http.StatusServiceUnavailable, siren.CodeUnavailable, "lifelog is not running")
+}
+
+// recovered ends the request of a handler that panicked. Defer it at the top of the handler: recover sees a panic only
+// when a deferred function calls it. Without it the server would close the connection, and the browser would see a
+// broken connection and no page. Here the browser gets the page of an internal error, the same words for every fault, and
+// the log gets one record: the route, the value of the panic and the stack. The route is the pattern, never the path,
+// because a path can name a person or a metric. If the handler had sent the status already, the page cannot replace it:
+// the server logs that, and the answer ends where it was.
+func (b *Browser) recovered(w http.ResponseWriter, r *http.Request) {
+	v := recover()
+	if v == nil {
+		return
+	}
+	if err, ok := v.(error); ok && errors.Is(err, http.ErrAbortHandler) {
+		panic(v) // the handler cut the answer on purpose: the server ends the connection and logs nothing
+	}
+	log.Printf("%s: panic: %v\n%s", routeName(r), v, debug.Stack())
+	b.fail(w, r, http.StatusInternalServerError, siren.CodeInternal, "internal error")
 }

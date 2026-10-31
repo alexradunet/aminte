@@ -11,13 +11,12 @@ import (
 	"time"
 )
 
-// The sessions of the browser (docs/plans/160-the-lock.md, moved from the core by plan 161). A browser logs in with the
-// token and gets a session cookie: a random id and its HMAC. This program keeps the state of each session in memory.
-// A session that is idle for longer than lock_after, or that the owner locked, gets the lock page and nothing of the
-// life log, until the PIN opens it.
+// The sessions of the browser (docs/plans/160-the-lock.md). A browser logs in with the token and gets a session cookie: a
+// random id and its HMAC. This program keeps the state of each session in memory. A session that is idle for longer than
+// lock_after, or that the owner locked, gets the lock page and nothing of the life log, until the PIN opens it.
 
-// sessionCookie is the credential of the browser, set by POST /login. It is the cookie of the older browser of the
-// core, with the same HMAC, so the owner logs in only once.
+// sessionCookie is the credential of the browser, set by POST /login. Its format and its key are fixed (newSessions), so a
+// cookie made earlier with the same token is still valid, and the owner logs in only once.
 const sessionCookie = "lifelog_session"
 
 // legacyCookie held the token itself in the oldest login. It is no credential: any request that carries it clears it.
@@ -62,7 +61,7 @@ type sessions struct {
 
 func newSessions(token []byte) *sessions {
 	m := hmac.New(sha256.New, token)
-	m.Write([]byte("lifelog session")) // the same derivation as the core's older browser: its cookie is valid here
+	m.Write([]byte("lifelog session")) // the key is HMAC-SHA256(token, "lifelog session"): a cookie of the same format stays valid
 	return &sessions{key: m.Sum(nil), state: map[string]*sessionState{}, ended: map[string]time.Time{}}
 }
 
@@ -97,7 +96,7 @@ func (ss *sessions) idOf(r *http.Request) (string, bool) {
 }
 
 // setCookie sets the session cookie. It is not Secure: this program serves plain HTTP on the loopback, and the proxy of
-// the owner ends TLS. The core marks the cookie Secure when it serves TLS itself, and web does not.
+// the owner ends TLS.
 func setCookie(w http.ResponseWriter, value string, maxAge int) {
 	http.SetCookie(w, &http.Cookie{Name: sessionCookie, Value: value, Path: "/", HttpOnly: true, SameSite: http.SameSiteStrictMode, MaxAge: maxAge})
 }

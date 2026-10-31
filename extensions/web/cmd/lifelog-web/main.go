@@ -1,5 +1,6 @@
-// Command lifelog-web is the browser of lifelog: the front door of the HTML interface. Run it as `lifelog serve --with
-// web`, which gives it the address of the server, or as `lifelog web` on a life.db that exists. See README.md.
+// Command lifelog-web is the browser of lifelog: the front door of the HTML interface. Run it as `lifelog serve
+// --token-file F --with web`, which gives it the address and the token of the server, or as `lifelog web` on a life.db
+// that exists. See README.md.
 package main
 
 import (
@@ -76,8 +77,8 @@ func run(ctx context.Context, getenv func(string) string, started func(addr stri
 	}
 	token := getenv("LIFELOG_TOKEN")
 	if token == "" {
-		// The token is the login of the browser. The core hands it to a child of `serve --public`.
-		return &configError{"no LIFELOG_TOKEN: it is the login of the browser. `lifelog serve --public --with web` gives it; for `lifelog web`, set it in the environment"}
+		// The token is the login of the browser. A server that has a token (`serve --token-file`) hands it to its children.
+		return &configError{"no LIFELOG_TOKEN: it is the login of the browser. `lifelog serve --token-file F --with web` gives it; for `lifelog web`, set it in the environment"}
 	}
 	state, err := stateDir(getenv)
 	if err != nil {

@@ -1,13 +1,8 @@
 package web_test
 
-// The door and the lock of the browser. They are the tests of the public listener of the core (internal/api/public_test.go,
-// login_log_test.go and lock_test.go) ported to web, with their cases and their assertions; the setup changes (a web
-// in front of a real core, a clock of the test, a settings file in the state folder of web). Each test says which test
-// of the core it is, and what is different, with its reason.
-//
-// Not ported: the CORS answers of TestPublicAllowedOrigins and the remote client of TestPublicRemoteClientParity. Web
-// is the door of a browser. It is no API for another origin, and a program that sends the bearer header goes to the core.
-// (A bearer header opens nothing here: TestABearerHeaderOpensNothing.)
+// The door and the lock of the browser (plan 160, the lock). A web in front of a real core, a clock of the test, and a
+// settings file in the state folder of web. Web is the door of a browser. It is no API for another origin, and a program
+// that sends the bearer header goes to the core (a bearer header opens nothing here: TestABearerHeaderOpensNothing).
 
 import (
 	"bytes"
@@ -165,8 +160,8 @@ func captureLog(t *testing.T) *bytes.Buffer {
 	return logs
 }
 
-// Core test: TestPublicRequiresTheToken. Web takes no bearer header (nothing opens with it), the 401 has no
-// WWW-Authenticate because no HTTP scheme opens the door, and the write with the token is a write with a session.
+// TestTheDoorRequiresASession: web takes no bearer header (nothing opens with it), the 401 has no WWW-Authenticate because
+// no HTTP scheme opens the door, and a write needs a session.
 func TestTheDoorRequiresASession(t *testing.T) {
 	l := emptyLife(t)
 	h := l.browser
@@ -227,8 +222,8 @@ func TestTheDoorRequiresASession(t *testing.T) {
 	}
 }
 
-// Core test: TestABearerRequestNeverLocks. Web has no door for a program: the bearer header opens nothing, with or
-// without the cookie beside it, so it cannot be a way round the lock.
+// TestABearerHeaderOpensNothing: web has no door for a program. The bearer header opens nothing, with or without the cookie
+// beside it, so it cannot be a way round the lock.
 func TestABearerHeaderOpensNothing(t *testing.T) {
 	f := newLockFixture(t, "5")
 	f.l.clock.add(10 * time.Hour)
@@ -243,8 +238,8 @@ func TestABearerHeaderOpensNothing(t *testing.T) {
 	}
 }
 
-// Core test: TestPublicLoginCookie. The cookie is never Secure, because web serves plain HTTP (the core marks it Secure
-// when it serves TLS itself).
+// TestTheLoginSetsASessionCookie: the cookie is never Secure, because web serves plain HTTP and the proxy of the owner ends
+// TLS.
 func TestTheLoginSetsASessionCookie(t *testing.T) {
 	l := emptyLife(t)
 	h := l.browser
@@ -291,7 +286,7 @@ func TestTheLoginSetsASessionCookie(t *testing.T) {
 	}
 }
 
-// Core test: TestSessionCookie (the part about the old cookie).
+// TestTheLoginClearsTheOldCookie: a login clears the cookie of an older login, which held the token itself.
 func TestTheLoginClearsTheOldCookie(t *testing.T) {
 	l := emptyLife(t)
 	// The browser still has the cookie of an older login, which held the token itself.
@@ -313,7 +308,8 @@ func TestTheLoginClearsTheOldCookie(t *testing.T) {
 	}
 }
 
-// Core test: TestSessionCookieChecks.
+// TestSessionCookieChecks: a cookie that is changed, cut, empty, the token itself or made with another token opens nothing,
+// and the cookie of a session that logged out is dead although its HMAC is right.
 func TestSessionCookieChecks(t *testing.T) {
 	f := newLockFixture(t, "")
 	value := strings.TrimPrefix(f.cookie, "lifelog_session=")
@@ -358,8 +354,8 @@ func TestSessionCookieChecks(t *testing.T) {
 	}
 }
 
-// Core test: TestSessionPagesAreNotCachedAndAssetsKeepTheirHeaders. The core's own handler keeps a preview for a year;
-// the session of web makes it no-store.
+// TestSessionPagesAreNotCachedAndAssetsKeepTheirHeaders: the core keeps a preview for a year; the session of web makes it
+// no-store. The assets keep their own headers.
 func TestSessionPagesAreNotCachedAndAssetsKeepTheirHeaders(t *testing.T) {
 	f := newLockFixture(t, "")
 	if got := f.browse("/days/"+secretDay, nil).Header().Get("Cache-Control"); got != "no-store" {
@@ -386,8 +382,8 @@ func TestSessionPagesAreNotCachedAndAssetsKeepTheirHeaders(t *testing.T) {
 	}
 }
 
-// Core test: TestTheLockPageKeepsThePathOnly. The lock page and its address hold the path of the page, never its query:
-// a search's words are the owner's.
+// TestTheLockPageKeepsThePathOnly: the lock page and its address hold the path of the page, never its query: a search's
+// words are the owner's.
 func TestTheLockPageKeepsThePathOnly(t *testing.T) {
 	f := newLockFixture(t, "15")
 	f.post("/lock", "", nil)
@@ -397,8 +393,8 @@ func TestTheLockPageKeepsThePathOnly(t *testing.T) {
 	}
 }
 
-// Core test: TestTheOldCookieIsClearedOnAnyRequest. The old cookie held the token in clear: any request that still
-// carries it gets it cleared.
+// TestTheOldCookieIsClearedOnAnyRequest: the old cookie held the token in clear. Any request that still carries it gets it
+// cleared.
 func TestTheOldCookieIsClearedOnAnyRequest(t *testing.T) {
 	f := newLockFixture(t, "")
 	rec := request(f.h, "GET", "/", "", map[string]string{"Accept": "text/html", "Cookie": "lifelog_token=" + testToken + "; " + f.cookie})
@@ -411,8 +407,8 @@ func TestTheOldCookieIsClearedOnAnyRequest(t *testing.T) {
 	}
 }
 
-// Core test: TestAWrongLoginLeavesOneLogLine. A wrong token on /login is sent back to the form, and the owner can see it
-// in the log: one line with the route. The line never has the token that was sent, and a right token leaves no line.
+// TestAWrongLoginLeavesOneLogLine: a wrong token on /login is sent back to the form, and the owner can see it in the log:
+// one line with the route. The line never has the token that was sent, and a right token leaves no line.
 func TestAWrongLoginLeavesOneLogLine(t *testing.T) {
 	l := emptyLife(t)
 	logged := captureLog(t) // no test of this package runs in parallel
@@ -437,8 +433,8 @@ func TestAWrongLoginLeavesOneLogLine(t *testing.T) {
 	}
 }
 
-// Core test: TestPublicAllowedOrigins, the guard part. An origin that the owner lists writes; any other is refused, also
-// with a session. No CORS headers are sent (see the head of this file).
+// TestAnOriginThatIsListedMayWrite: the guard of the writes. An origin that the owner lists writes; any other is refused,
+// also with a session. No CORS headers are sent.
 func TestAnOriginThatIsListedMayWrite(t *testing.T) {
 	const proxy = "https://lifelog.example"
 	l := emptyLife(t)
@@ -463,7 +459,8 @@ func TestAnOriginThatIsListedMayWrite(t *testing.T) {
 	}
 }
 
-// Core test: TestPublicOptionsValidation (the token and the origins).
+// TestNewRefusesABadTokenOrOrigin: a token that is short or has two lines is refused, and so is an origin that is not
+// scheme://host[:port] in lower case. The words of the refusal name the lower case.
 func TestNewRefusesABadTokenOrOrigin(t *testing.T) {
 	options := func(token string, origins ...string) web.Options {
 		return web.Options{CoreURL: "http://127.0.0.1:7777", Token: token, Origins: origins, StateDir: t.TempDir()}
@@ -490,9 +487,8 @@ func TestNewRefusesABadTokenOrOrigin(t *testing.T) {
 	}
 }
 
-// Core test: TestHeldUnlocksGetNoMoreThanFiveTries. Requests that the program holds while their bodies come (or that come
-// at once) get no more tries than the limit: a try is counted before the PIN is compared, and an ended session compares
-// no PIN.
+// TestHeldUnlocksGetNoMoreThanFiveTries: requests that the program holds while their bodies come (or that come at once)
+// get no more tries than the limit: a try is counted before the PIN is compared, and an ended session compares no PIN.
 func TestHeldUnlocksGetNoMoreThanFiveTries(t *testing.T) {
 	logs := captureLog(t)
 	f := newLockFixture(t, "15")
@@ -533,7 +529,8 @@ func TestHeldUnlocksGetNoMoreThanFiveTries(t *testing.T) {
 	}
 }
 
-// Core test: TestLockAfterTheIdleMinutes.
+// TestLockAfterTheIdleMinutes: a session locks after lock_after minutes and the slack of one minute, and a locked session
+// stays locked: a navigation does not open it.
 func TestLockAfterTheIdleMinutes(t *testing.T) {
 	f := newLockFixture(t, "5")
 	f.l.clock.add(6 * time.Minute) // lock_after plus one minute, to the second: still open
@@ -555,8 +552,8 @@ func TestLockAfterTheIdleMinutes(t *testing.T) {
 	}
 }
 
-// Core test: TestOnlyTheOwnersActivityKeepsTheSessionOpen. Each case: one request at four minutes, then a probe at seven
-// minutes. The session is open at seven minutes only if the request counted as activity (the limit is six).
+// TestOnlyTheOwnersActivityKeepsTheSessionOpen: each case is one request at four minutes, then a probe at seven minutes.
+// The session is open at seven minutes only if the request counted as activity (the limit is six).
 func TestOnlyTheOwnersActivityKeepsTheSessionOpen(t *testing.T) {
 	for _, tc := range []struct {
 		name  string
@@ -596,7 +593,8 @@ func TestOnlyTheOwnersActivityKeepsTheSessionOpen(t *testing.T) {
 	}
 }
 
-// Core test: TestLockNowAndTheLockPage.
+// TestLockNowAndTheLockPage: the Lock button shuts the session. A page, a script and a form then meet the lock, and the
+// lock page shows nothing of the life log and keeps a next that is a path of this server only.
 func TestLockNowAndTheLockPage(t *testing.T) {
 	f := newLockFixture(t, "15")
 	rec := f.post("/lock", "", nil)
@@ -634,7 +632,8 @@ func TestLockNowAndTheLockPage(t *testing.T) {
 	}
 }
 
-// Core test: TestUnlock.
+// TestUnlock: a wrong PIN goes back to the lock page, the right one opens and goes to next, and the fifth wrong PIN in a
+// row ends the session. The log holds a line for each wrong PIN and never a PIN.
 func TestUnlock(t *testing.T) {
 	logs := captureLog(t)
 	f := newLockFixture(t, "15")
@@ -696,8 +695,8 @@ func TestUnlock(t *testing.T) {
 	}
 }
 
-// Core test: TestALockKeepsTheCountOfWrongPINs. The Lock button does not give the tries back: four wrong PINs, a lock,
-// and the next wrong PIN ends the session.
+// TestALockKeepsTheCountOfWrongPINs: the Lock button does not give the tries back. Four wrong PINs, a lock, and the next
+// wrong PIN ends the session.
 func TestALockKeepsTheCountOfWrongPINs(t *testing.T) {
 	f := newLockFixture(t, "15")
 	f.post("/lock", "", nil)
@@ -712,7 +711,7 @@ func TestALockKeepsTheCountOfWrongPINs(t *testing.T) {
 	}
 }
 
-// Core test: TestARestartLocksEverySession. A new web over the same state folder does not know the sessions.
+// TestARestartLocksEverySession: a new web over the same state folder does not know the sessions.
 func TestARestartLocksEverySession(t *testing.T) {
 	f := newLockFixture(t, "15")
 	if f.isLocked() {
@@ -734,8 +733,8 @@ func TestARestartLocksEverySession(t *testing.T) {
 	}
 }
 
-// Core test: TestWithTheLockOffNothingLocks. A change of the settings is live at once, because the settings are in
-// memory and the catalog is the only writer.
+// TestWithTheLockOffNothingLocks: a change of the settings is live at once, because the settings are in memory and the
+// catalog is the only writer.
 func TestWithTheLockOffNothingLocks(t *testing.T) {
 	f := newLockFixture(t, "")
 	f.l.clock.add(10 * time.Hour)
@@ -761,8 +760,8 @@ func TestWithTheLockOffNothingLocks(t *testing.T) {
 	}
 }
 
-// Core test: TestAnUnreadableLockSettingLocksTheBrowser. With the settings in memory, a file that cannot be read can only
-// be met at the start. Then the program does not start: the lock would have to guess what the file says.
+// TestSettingsThatCannotBeReadStopTheStart: with the settings in memory, a file that cannot be read can only be met at the
+// start. Then the program does not start: the lock would have to guess what the file says.
 func TestSettingsThatCannotBeReadStopTheStart(t *testing.T) {
 	core := lifelogtest.New(t, today)
 	dir := t.TempDir()
@@ -786,7 +785,8 @@ func TestSettingsThatCannotBeReadStopTheStart(t *testing.T) {
 	}
 }
 
-// Core test: TestTheOriginGuardHoldsForTheLockRoutes.
+// TestTheOriginGuardHoldsForTheLockRoutes: a cross-site POST to /lock, /unlock, /awake, /logout or /login is 403, and it
+// neither locks nor ends the session.
 func TestTheOriginGuardHoldsForTheLockRoutes(t *testing.T) {
 	f := newLockFixture(t, "15")
 	cross := map[string]string{"Sec-Fetch-Site": "cross-site", "Origin": "https://evil.example"}
@@ -803,8 +803,8 @@ func TestTheOriginGuardHoldsForTheLockRoutes(t *testing.T) {
 	}
 }
 
-// Core test: TestThePageDrawsTheLockOnlyWhenTheLockIsOn. The Lock button, its access key, the script with the minutes and
-// the key in the two lists are all there with the lock on, and none of them with it off.
+// TestThePageDrawsTheLockOnlyWhenTheLockIsOn: the Lock button, its access key, the script with the minutes and the key in
+// the two lists are all there with the lock on, and none of them with it off.
 func TestThePageDrawsTheLockOnlyWhenTheLockIsOn(t *testing.T) {
 	marks := []string{
 		`<form class="rail-lock" method="POST" action="/lock">`, `accesskey="l"`,
@@ -831,7 +831,8 @@ func TestThePageDrawsTheLockOnlyWhenTheLockIsOn(t *testing.T) {
 	}
 }
 
-// Core test: TestLockJSIsServedLikeChatJS.
+// TestLockJSIsServedLikeChatJS: lock.js has the type, the cache and the nosniff header of chat.js, and it mentions what it
+// does: it sends /awake, it asks for /lock, it keeps the time in localStorage and it waits while a page prerenders.
 func TestLockJSIsServedLikeChatJS(t *testing.T) {
 	f := newLockFixture(t, "5")
 	rec := request(f.h, "GET", "/assets/lock.js", "", map[string]string{"Cookie": f.cookie})
@@ -846,9 +847,9 @@ func TestLockJSIsServedLikeChatJS(t *testing.T) {
 	}
 }
 
-// Core test: TestOnlyTheLoginFieldOffersTheSavedLogin. A browser fills an empty password field with the saved login, and
-// the settings form then sends the token as the PIN. Every password field of the settings page says new-password; the
-// login form keeps current-password. The page has the key of the model (the core's form) and the PIN (this browser's).
+// TestOnlyTheLoginFieldOffersTheSavedLogin: a browser fills an empty password field with the saved login, and the settings
+// form then sends the token as the PIN. Every password field of the settings page says new-password; the login form keeps
+// current-password. The page has the key of the model (the form of the core) and the PIN (the form of this browser).
 func TestOnlyTheLoginFieldOffersTheSavedLogin(t *testing.T) {
 	f := newLockFixture(t, "5")
 	f.l.core.Connect(t, "web", f.l.browser.Catalog())

@@ -31,6 +31,7 @@ jobs:
             extensions/googlephotos/go.sum
             extensions/mcp/go.sum
             extensions/whatsapp/go.sum
+            extensions/web/go.sum
       - name: Report environment
         run: go version; go env GOOS GOARCH
       - name: gofmt
@@ -43,7 +44,7 @@ jobs:
         run: go test -count=1 -timeout=30m ./...
       - name: Extensions
         run: |
-          for dir in extensions/mcp extensions/whatsapp extensions/agentic extensions/googlephotos; do
+          for dir in extensions/mcp extensions/whatsapp extensions/agentic extensions/googlephotos extensions/web; do
             echo "== $dir"
             (cd "$dir" && go vet ./... && go test -count=1 -timeout=20m ./...)
           done

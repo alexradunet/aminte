@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-// TestPINHash: the core's TestPINHash. A hash is salted, so two hashes of one PIN differ; it matches its PIN and no other;
+// TestPINHash: a hash is salted, so two hashes of one PIN differ; it matches its PIN and no other;
 // a text that is not a hash matches nothing.
 func TestPINHash(t *testing.T) {
 	a, err := hashPIN("0042")
@@ -27,8 +27,8 @@ func TestPINHash(t *testing.T) {
 	}
 }
 
-// TestAHashOfAnotherProgramMatches: the form is the form of the settings file of the core, so a hash copied from it works
-// here. This one was made with another implementation of PBKDF2-HMAC-SHA256 (Python hashlib), 200000 rounds, the salt
+// TestAHashOfAnotherProgramMatches: the form of a hash is fixed (hashPIN), so a hash that another program made in that
+// form works here. This one was made with another implementation of PBKDF2-HMAC-SHA256 (Python hashlib), 200000 rounds, the salt
 // 0x00..0x0f and the PIN 4242.
 func TestAHashOfAnotherProgramMatches(t *testing.T) {
 	const stored = "pbkdf2-sha256$200000$AAECAwQFBgcICQoLDA0ODw$lk3Qq3nONx8pHPLSBKyIUqKR3W/kfvuw7I33oi/LFNc"
@@ -70,8 +70,8 @@ func TestTheLockIsOnOnlyWithAPINAndAPositiveNumber(t *testing.T) {
 	}
 }
 
-// TestTheFileThatTheOwnerCopiesIsRead: the one-off step of the README copies three keys of the settings file of the core.
-// A key that the core file lacks is null after jq, and a null is an empty value.
+// TestTheFileThatTheOwnerCopiesIsRead: a settings file that the owner copied by hand has the three keys. A key with the
+// value null is an empty value.
 func TestTheFileThatTheOwnerCopiesIsRead(t *testing.T) {
 	dir := t.TempDir()
 	const stored = "pbkdf2-sha256$200000$AAECAwQFBgcICQoLDA0ODw$lk3Qq3nONx8pHPLSBKyIUqKR3W/kfvuw7I33oi/LFNc"
