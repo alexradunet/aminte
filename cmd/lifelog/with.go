@@ -96,7 +96,8 @@ func withEnv(e env, exe, file, url string) []string {
 }
 
 // superviseWith runs the extension at path until it ends for good or ctx ends, by the rule of extensions/README.md:
-// exit 0 is an end by its own choice; 2 and 3 want the owner first; any other end starts it again after restartDelay.
+// exit 0 is an end by its own choice; 78 (exitOwnerActs) and 3 want the owner first; any other end, 2 of a panic too,
+// starts it again after restartDelay.
 func superviseWith(ctx context.Context, e env, name, path, url string, apps *api.Apps) {
 	say := func(format string, a ...any) {
 		fmt.Fprintf(e.stderr, "lifelog: with %s: %s\n", name, fmt.Sprintf(format, a...))
