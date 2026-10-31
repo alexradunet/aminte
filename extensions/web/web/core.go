@@ -30,10 +30,6 @@ const (
 	// entityWait is the longest wait for the body of a Siren answer once its headers came. An entity is small, so a
 	// body that stalls is a core that hung; a stream of a file has no such bound.
 	entityWait = 30 * time.Second
-	// embedWriter is the writer of the reads that web makes for the cards of the chat. It is an agent's, so the core
-	// refuses an owner-only read to it, as it does for the reads that it embeds itself (API.md, "Embedding"): an
-	// address in a tool line is text that an agent wrote.
-	embedWriter = siren.AgentPrefix + "embed"
 	// pageWriter is the writer of the reads for a page of the browser.
 	pageWriter = "ui"
 )
@@ -61,8 +57,8 @@ func newCore(rawURL, token string) (*core, error) {
 		TLSHandshakeTimeout:   dialTimeout,
 		ResponseHeaderTimeout: headerWait,
 		ExpectContinueTimeout: time.Second,
-		MaxIdleConnsPerHost:   cardsPerColumn + 2, // the shell reads the root and a card for each address, all at once
-		DisableCompression:    true,               // the bytes of a picture or a file reach the browser as the core sent them
+		MaxIdleConnsPerHost:   8,    // a page of pictures asks for several at once
+		DisableCompression:    true, // the bytes of a picture or a file reach the browser as the core sent them
 	}
 	hc := &http.Client{Transport: transport, CheckRedirect: func(*http.Request, []*http.Request) error {
 		return http.ErrUseLastResponse // a redirect is an answer: the browser follows it
@@ -168,38 +164,19 @@ func entityOf(res *http.Response, body []byte) (*siren.Entity, error) {
 
 // read asks the core for uri, which web built, and returns the Siren entity that a 2xx answer holds. It returns nil for
 // any other answer: a failure, another status, an answer that is not an entity, or an entity with no class and no
-// title. For a redirect it returns the Location too.
-func (c *core) read(ctx context.Context, uri, writer string) (e *siren.Entity, location string) {
+// title.
+func (c *core) read(ctx context.Context, uri, writer string) *siren.Entity {
 	res, err := c.get(ctx, uri, writer, nil)
 	if err != nil {
-		return nil, ""
-	}
-	defer res.Body.Close()
-	if isRedirect(res.StatusCode) {
-		return nil, res.Header.Get("Location")
-	}
-	if res.StatusCode/100 != 2 || !isSiren(res) {
-		return nil, ""
-	}
-	e, err = c.readEntity(res)
-	if err != nil || e.Title == "" && len(e.Class) == 0 {
-		return nil, ""
-	}
-	return e, ""
-}
-
-// entity is the Siren entity at ref, nil when there is none. A ref can come from text that an agent wrote (a tool line),
-// so it is checked: it must be a path of the core, and it must not ask for an embedding of its own. The fragment of ref
-// stays with the reader. A redirect to a path of the core (/days/today to the day) is followed hops times at most.
-func (c *core) entity(ctx context.Context, ref, writer string, hops int) *siren.Entity {
-	path, _, _ := strings.Cut(ref, "#")
-	u, err := url.ParseRequestURI(path)
-	if err != nil || !isPath(path) || u.Query().Has(embedField) {
 		return nil
 	}
-	e, to := c.read(ctx, u.RequestURI(), writer)
-	if e == nil && hops > 0 && isPath(to) {
-		return c.entity(ctx, to, writer, hops-1)
+	defer res.Body.Close()
+	if res.StatusCode/100 != 2 || !isSiren(res) {
+		return nil
+	}
+	e, err := c.readEntity(res)
+	if err != nil || e.Title == "" && len(e.Class) == 0 {
+		return nil
 	}
 	return e
 }

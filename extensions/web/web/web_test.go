@@ -50,10 +50,10 @@ func webOver(t *testing.T, h http.Handler) http.Handler {
 	return signedIn{b, login(t, b)}
 }
 
-// TestWebAsksTheCoreForSirenAsTheUI: a page is one read of the core for the page and one for the shell, and one for each
-// card of the column. Each is a GET that asks for Siren JSON with the bearer token, as the writer ui; the reads of the
-// cards are the writer agent:embed. The query that the browser sent goes to the core, without the receipt of the toast
-// (feedback), which web alone reads.
+// TestWebAsksTheCoreForSirenAsTheUI: each read of the core is a GET that asks for Siren JSON with the bearer token, as
+// the writer ui. The core makes the reads of the cards as agent:embed, so web sends no other writer. The query that the
+// browser sent goes to the core, without the receipt of the toast (feedback), which web alone reads. How many reads a
+// page makes is held by TestAPageIsFewReadsOfTheCore.
 func TestWebAsksTheCoreForSirenAsTheUI(t *testing.T) {
 	l := richLife(t)
 	rec := &recorder{next: l.core.Handler}
@@ -61,7 +61,6 @@ func TestWebAsksTheCoreForSirenAsTheUI(t *testing.T) {
 	if page := ask(b, http.MethodGet, "/browse?kind=person&feedback=once&unfiled=1"); page.Code != http.StatusOK {
 		t.Fatalf("GET /browse: %d", page.Code)
 	}
-	var cards, ui int
 	for _, req := range rec.requests() {
 		if req.Method != http.MethodGet {
 			t.Errorf("%s %s: web reads with GET only", req.Method, req.URL)
@@ -72,20 +71,58 @@ func TestWebAsksTheCoreForSirenAsTheUI(t *testing.T) {
 		if got := req.Header.Get("Authorization"); got != "Bearer synthetic-token-synthetic-token-1234" {
 			t.Errorf("%s sends the credential %q", req.URL, got)
 		}
-		switch got := req.Header.Get(siren.SourceHeader); got {
-		case "ui":
-			ui++
-		case "agent:embed":
-			cards++
-		default:
-			t.Errorf("%s is read as %q, want ui or agent:embed", req.URL, got)
+		if got := req.Header.Get(siren.SourceHeader); got != "ui" {
+			t.Errorf("%s is read as %q, want ui", req.URL, got)
 		}
-	}
-	if ui != 2 || cards != 6 {
-		t.Errorf("%d reads as ui and %d as agent:embed, want 2 (the page and the shell) and 6 (the cards of the column)", ui, cards)
 	}
 	if first := rec.requests()[0].URL; first.Path != "/browse" || first.RawQuery != "kind=person&unfiled=1" {
 		t.Errorf("the page was read as %s, want /browse?kind=person&unfiled=1", first)
+	}
+}
+
+// TestAPageIsFewReadsOfTheCore: the core embeds what a page needs (API.md, "Embedding"), and web reads each embedding
+// once. The day page, the page of the settings and the conversation of today make these reads, in this order. The
+// cards of the chat column come with the conversation that is read with ?embed=ref, not with a read for each card. The
+// conversation view takes its own cards from its own read.
+func TestAPageIsFewReadsOfTheCore(t *testing.T) {
+	const conversation = "/days/" + today + "/conversation"
+	for _, c := range []struct {
+		name, uri string
+		want      []string
+	}{
+		{"the day page", "/days/2031-05-13", []string{"/days/2031-05-13", "/?embed=today,conversation", conversation + "?embed=ref"}},
+		{"the settings page", "/settings", []string{"/settings", "/actions", "/?embed=today,conversation", conversation + "?embed=ref"}},
+		{"the conversation of today", "/days/today/conversation", []string{"/days/today/conversation?embed=ref", "/?embed=today,conversation"}},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			rec := &recorder{next: richLife(t).core.Handler}
+			if page := ask(webOver(t, rec), http.MethodGet, c.uri); page.Code != http.StatusOK {
+				t.Fatalf("GET %s: %d", c.uri, page.Code)
+			}
+			var got []string
+			for _, req := range rec.requests() {
+				got = append(got, req.URL.RequestURI())
+			}
+			if !slices.Equal(got, c.want) {
+				t.Errorf("GET %s makes %d reads of the core:\n%v\nwant %d:\n%v", c.uri, len(got), got, len(c.want), c.want)
+			}
+		})
+	}
+}
+
+// TestThePollOfTheChatReadsTheConversationWithoutItsCards: a script that asks for the Siren entity of a conversation
+// gets the answer of the core as it is. It reads the version only, so no card is embedded for it.
+func TestThePollOfTheChatReadsTheConversationWithoutItsCards(t *testing.T) {
+	rec := &recorder{next: richLife(t).core.Handler}
+	req := httptest.NewRequest(http.MethodGet, "/days/today/conversation", nil)
+	req.Header.Set("Accept", "application/vnd.siren+json")
+	got := httptest.NewRecorder()
+	webOver(t, rec).ServeHTTP(got, req)
+	if got.Code != http.StatusOK {
+		t.Fatalf("GET /days/today/conversation as Siren: %d", got.Code)
+	}
+	if reads := rec.requests(); len(reads) != 1 || reads[0].URL.RequestURI() != "/days/today/conversation" {
+		t.Errorf("the poll made these reads of the core: %v, want the conversation alone", reads)
 	}
 }
 
@@ -144,7 +181,7 @@ func TestTheTurnDrawsTheThingsTheAgentTouched(t *testing.T) {
 }
 
 // TestACardAsksForWhatThePageMayRead: a tool line that names an owner-only read draws the plain link, as the core's
-// own page does. The card is read as agent:embed, which the core refuses the read of the settings and of the integrity check.
+// own page does. The core reads the card as agent:embed, which the core refuses the read of the settings and of the integrity check.
 func TestACardAsksForWhatThePageMayRead(t *testing.T) {
 	l := emptyLife(t)
 	l.do(t, "/days/"+today+"/conversation", "say", map[string]string{"text": "Settings?"})

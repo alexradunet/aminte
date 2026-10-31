@@ -176,9 +176,11 @@ Three decisions come from the data of the API and from no rule that web copies:
   the query kept (the receipt of a toast too, which moves with the redirect), because the view carries the page. The
   page of a deleted metric stays as it is.
 - **The shell.** The strip of today, the days, the apps and the chat column come from `GET /?embed=today,conversation`.
-  The cards of the column are one read for each of the newest six addresses of today's conversation, all at once, as the
-  writer `agent:embed`, which the core refuses an owner-only read. A read that fails keeps the plain link. The
-  conversation view takes its cards from `?embed=ref`, which the core makes.
+  The cards of the column come from one more read, `GET <conversation of today>?embed=ref`: the core embeds the thing
+  at each address as the writer `agent:embed`, which the core refuses an owner-only read, and the column draws the
+  newest six. An address that the core did not embed keeps the plain link. The conversation view takes its cards from
+  its own read with `?embed=ref`. A day page makes 3 reads of the core: the page, the root and the conversation. A
+  script that asks for the Siren entity of a conversation (the poll of `chat.js`) gets it without `embed`.
 
 A core that is down is a 503 page with `Retry-After`. A core that is slow is a 504 page. A browser that goes away ends
 the request to the core. The page names no address and no cause: the log has them.
