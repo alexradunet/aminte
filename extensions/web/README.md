@@ -45,12 +45,12 @@ lifelog serve --token-file F --with web
 
 or, for a trial on a `life.db` that exists, as `lifelog web`. `lifelog` then opens a temporary server for the life of the
 program. That server checks no token. The program still needs `LIFELOG_TOKEN` in the environment for its login: any token
-of 32 characters or more.
+of 32 characters or more, in one line, that does not start or end with a space or a tab.
 
 | environment | meaning |
 |---|---|
 | `LIFELOG_URL` | The address of the core, `http://127.0.0.1:PORT`. Required: the program refuses to start without it, with exit status 78, so `serve` does not start it again. |
-| `LIFELOG_TOKEN` | The token of the server. Required, 32 characters or more, one line; without it the program exits with status 78. It is the login of the browser and the bearer token of every request to the core. `serve --with` sets it from the token of the server. A new token ends every session of every browser. |
+| `LIFELOG_TOKEN` | The token of the server. Required, 32 characters or more, one line, and no space or tab at its start or end; without it the program exits with status 78. It is the login of the browser and the bearer token of every request to the core. `serve --with` sets it from the token of the server. A new token ends every session of every browser. |
 | `LIFELOG_WEB_LISTEN` | The address of the door of the browser. A loopback address only (`127.0.0.1:7780` by default). Another address is refused with exit status 78. The proxy of the owner points to it and ends TLS. |
 | `LIFELOG_WEB_ORIGINS` | The browser origins that the guard of the writes trusts besides its own, separated by commas or spaces: `https://lifelog.example`. Each is a scheme, a host, an optional port and nothing else, in lower case. The origin that the proxy shows to the browser is the one to list: behind a proxy the `Origin` of a form is not the `Host` that web sees. |
 | `LIFELOG_WEB_STATE` | The state folder. The default is `os.UserConfigDir()/lifelog-web`. The tests set it. |
@@ -58,8 +58,9 @@ of 32 characters or more.
 
 A bad value of any of these is a refusal with exit status 78: the owner acts first, and `serve` does not start the program
 again. So is a settings file that is not JSON, and a state folder that cannot be made. A settings file that cannot be read
-now (a fault of the file system) ends the program with status 1, and `serve` starts it again after 10 seconds. The unit of
-the service lists `~/.config/lifelog-web` in `ReadWritePaths`, else the program cannot write its settings.
+now (a fault of the file system) ends the program with status 1, and `serve` starts it again after 10 seconds. When the
+unit of the service has `ProtectHome=read-only`, it must list `~/.config/lifelog-web` in `ReadWritePaths`, else the
+program cannot write its settings.
 
 ## Install
 
@@ -83,7 +84,7 @@ flowchart TD
    go build -C extensions/web -o <install folder>/lifelog-web ./cmd/lifelog-web
    ```
 
-2. Make the token file: one line of 32 characters or more ([the quick start](../../README.md) shows a line that makes it).
+2. Make the token file: one line of 32 characters or more, with no space or tab at its start or end ([the quick start](../../README.md) shows a line that makes it).
 3. Change the unit. `ExecStart` runs `serve --token-file F --snapshots D --with web`. The core listens on the loopback
    only, and the token turns on its check. A unit that still has `--public`, `--allow-origin`, `--tls-cert` or
    `--tls-key` fails, because `serve` refuses a flag that it does not know. Add
@@ -101,7 +102,21 @@ flowchart TD
    server and the connected apps.
 
 To go back, keep the programs of the last good build beside the new ones (for example `lifelog.prev` and
-`lifelog-web.prev`), copy them over the new ones and restart the service.
+`lifelog-web.prev`). A step back between two builds that are both after this move is the copy of the programs over the
+new ones and a restart of the service.
+
+A step back to a build before this move needs more, because the old `lifelog` refuses `--token-file` without
+`--public`: the old programs with the new unit leave the service down. The old `lifelog` also served the browser on
+`127.0.0.1:7777`, so the proxy goes back there. Do these steps in this order:
+
+```mermaid
+flowchart TD
+  S["stop the service"] --> P["copy the old programs (.prev) over the new ones"]
+  P --> U["put the old unit back: remove the drop-in of the move, or put the old ExecStart back"]
+  U --> D["systemctl daemon-reload"]
+  D --> T["start the service"]
+  T --> X["point the proxy back to 127.0.0.1:7777"]
+```
 
 ## What web does with a request
 
@@ -127,9 +142,10 @@ flowchart TD
 | `GET /assets/...` (the other files), `/assets/fonts/...` | A file of the program: a sheet, a script, a font, a picture ([the sheets, the faces and the pictures](#the-sheets-the-faces-and-the-pictures)). A session is needed. The files under `/assets/` are the one place with a cache; a font is cached for a year. |
 | `POST /lock`, `/unlock`, `/awake`, `GET /locked` | The lock. With the lock off, `POST /lock` is 409. |
 | `POST /render` | The Preview of a body: a page drawn from the field `body` (or `text`). It writes nothing and asks the core for nothing. It is not a catalog action, and it answers `text/html` only. The body is 20 MiB at most. |
-| any other `GET` or `HEAD` | One read of the core for the same path and query, without the receipt `feedback`. See below. |
+| any other `GET` or `HEAD` | One read of the core for the same path and query, without `back` and `feedback`, the two names that only web reads. `new` stays: the core takes it on a read. See below. |
 | any other `POST` | A write: see [the write side](#the-write-side). |
-| any other method | 405 `bad_request` with `Allow: GET, HEAD, POST`. |
+| any other method, on a path of the core | 405 `bad_request` with `Allow: GET, HEAD, POST`. |
+| a method that a route of web itself does not take | 405 `bad_request`. A file that web serves (the manifest and the files of web under `/assets/`) takes `GET` and `HEAD`, so its header is `Allow: GET, HEAD`. `/render` takes `POST`, so its header is `Allow: POST`. Web answers and does not ask the core. |
 
 None of these routes is a catalog action: `/login`, `/logout`, `/lock`, `/unlock`, `/locked`, `/awake`, `/render`, the
 manifest and the files under `/assets/`. They are about one browser and not about the data, so the CLI and the MCP
@@ -176,7 +192,7 @@ means it.
 ```mermaid
 flowchart TD
   F["a POST of a browser"] --> T{"the body"}
-  T -->|"urlencoded"| R["read, 20 MiB at most; back and feedback taken out; read GET /actions for the action at the path; the fields of the other button of a pick bar taken out"]
+  T -->|"urlencoded"| R["read, 20 MiB at most; back, feedback and new taken out; read GET /actions for the action at the path; the fields of the other button of a pick bar taken out"]
   T -->|"multipart: a file"| M["streamed to the core as it comes; back is read from the query of the address"]
   T -->|"any other type"| U["415"]
   R --> C["POST to the core: the same path, Accept: Siren, bearer token, Lifelog-Source: ui"]

@@ -1,8 +1,9 @@
 # lifelog-ticktick: TickTick, the task service
 
 `lifelog-ticktick` links TickTick to your life log in two ways. What you finish in TickTick comes back as an entry of
-its day: `Done: Pay rent · Home`. And it is the **task service** of `lifelog`: `lifelog` draws your TickTick tasks as
-the section Tasks, and it adds, edits, completes, reopens and deletes them through this program.
+its day: `Done: Pay rent · Home`. And it is the **task service** of `lifelog`: `lifelog` builds the entities of Tasks under `/tasks` from your TickTick
+tasks, and `lifelog-web` draws them as the section Tasks. `lifelog` adds, edits, completes, reopens and deletes the
+tasks through this program.
 
 It is an extension that `lifelog serve --with ticktick` runs. It serves the task protocol of
 [a task service](../README.md#a-task-service) and no page: `lifelog` builds the pages. It is a separate Go module,

@@ -105,7 +105,7 @@ flowchart TD
 - **The stop.** On an interrupt or SIGTERM, `serve` interrupts the child first and waits for it, 10 seconds at most,
   then kills it. Then it drains its own requests and closes the file, so the child may still write while it ends.
 - **A catalog of its own.** A child may serve a Siren catalog on `LIFELOG_LISTEN`: see [a catalog of its own](#a-catalog-of-its-own).
-- **A task service.** One child may be the task service, which `lifelog` draws under `/tasks`: see [a task service](#a-task-service).
+- **A task service.** One child may be the task service. `lifelog` builds the entities of Tasks under `/tasks`, and `lifelog-web` draws them: see [a task service](#a-task-service).
 
 ## A catalog of its own
 
@@ -259,9 +259,9 @@ own; the server calls the `href`, not the name): `/tasks`, `/tasks/{id}`, `/task
 `/tasks/{id}/reopen`, `/tasks/{id}/delete` and `/sync`. A catalog that lacks one is refused. The lists are read once,
 when the service registers: a new list needs a restart of the service.
 An app whose prefixed action name is one of the six names of [API.md](../API.md#tasks) is refused too.
-The service sends no `class` on its actions. The server draws `/tasks` from its own catalog of the protocol, and that
-catalog holds the class of each write (`create`, `edit`, `toggle`). A connected app under `/with/NAME` still sends its
-own classes.
+The service sends no `class` on its actions. The server builds the entities of `/tasks` from its own catalog of the
+protocol, and that catalog holds the class of each write (`create`, `edit`, `toggle`). A connected app under
+`/with/NAME` still sends its own classes.
 
 ### The protocol
 

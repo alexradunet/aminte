@@ -19,8 +19,10 @@ and this page disagree, so a property here is a property on the wire.
   or `import:…` is refused the owner-only actions (`owner: true` in the catalog)
   and the owner-only reads `GET /settings` and `GET /snapshots/{name}` (403 `forbidden`).
 - **Representation:** every answer is Siren JSON (the entity below), or the bytes of a picture, a file or a snapshot. A
-  client sends an action as `application/x-www-form-urlencoded`, `application/json` (one object; a non-string value is
-  sent as its JSON text) or, for `add-file` and `set-cover`, `multipart/form-data`.
+  redirect (303, with a short body from `net/http`), a route that does not exist (404) and a method that a route does not
+  take (405) are the plain answers of `net/http`, not Siren. A client sends an action as
+  `application/x-www-form-urlencoded`, `application/json` (one object; a non-string value is sent as its JSON text) or,
+  for `add-file` and `set-cover`, `multipart/form-data`.
 - **Writes answer with the resource they changed** (200, with `Location`), and `result` says what the write did.
 
 ## The entity
@@ -55,7 +57,7 @@ another kind is 422.
 **Types** in the tables: `string`, `integer`, `number`, `boolean`, `day` (a local day, `YYYY-MM-DD`), `instant`
 (UTC, `2026-06-09T21:14:03.482Z`), `list`, `object`. A property marked *absent when empty* is left out of the JSON
 when it has no value. A `number` field is written in decimal digits; `mood`, `value` and `line` also take a sign, a point and an exponent (`-0.5`, `1e3`). `NaN`, `Inf`, a hexadecimal number and an underscore are refused.
-A request names only the fields of the action; any other name is 422 `invalid`. A read also takes `embed` ([embedding](#embedding)) and `new`. `new=NAME` asks for the action NAME with its `href` filled in, and it allows the fields of that action as query values ([the actions](#actions)); a `POST` that names `new` is 422 `invalid`. A value outside a field's `options`, as `GET /actions` lists them, is 422 `invalid`. A multipart part with an unknown name is refused before its bytes are read.
+A request of an action names only the fields of the action; any other name is 422 `invalid`. A read of an action also takes `embed` ([embedding](#embedding)) and `new`. `new=NAME` allows the fields of the action NAME that are not path fields as query values, and a `new` that names no action is 422 `invalid`. `GET /actions?new=NAME`, with a value for each path field of NAME, fills the `href` of the action NAME ([the actions](#actions)); `GET /actions` takes any name, and a `new` that names no action fills nothing. On any other read, such as `GET /days/D`, `new` is for the client (`lifelog-web` opens a form with it): the core takes it and does nothing with it. A `POST` that names `new` is 422 `invalid`. A value outside a field's `options`, as `GET /actions` lists them, is 422 `invalid`. A multipart part with an unknown name is refused before its bytes are read.
 
 ## Embedding
 
@@ -165,9 +167,10 @@ when the catalog of the app is read; a multipart body is not forwarded.
 
 ## Tasks
 
-While a **task service** runs ([the contract of an extension](extensions/README.md#a-task-service)), `lifelog` draws
-its tasks under `/tasks` and offers six actions. The service is not an app: it has no `/with/NAME` and no action with a
-prefix. The file keeps no task ([D23](docs/decisions/D23-no-tasks.md)); the pages are made at each request.
+While a **task service** runs ([the contract of an extension](extensions/README.md#a-task-service)), `lifelog` builds
+the entities of Tasks under `/tasks`, and `lifelog-web` draws them. `lifelog` offers six actions. The service is not
+an app: it has no `/with/NAME` and no action with a prefix. The file keeps no task
+([D23](docs/decisions/D23-no-tasks.md)); the pages are made at each request.
 
 | route | the page |
 |---|---|

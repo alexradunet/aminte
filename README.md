@@ -46,9 +46,10 @@ lifelog file IMG_0001.HEIC --preview IMG_0001.jpg   # a photo lifelog cannot rea
 lifelog cover 12 lake.jpg                  # a new photo as page 12's cover; `lifelog cover 12 --title Lake.jpg` takes a kept one
 ```
 
-A token turns on the bearer check of `serve`. It is one line of 32 characters or more. `lifelog-web` asks the owner
-for the same token at its login page. The address `http://127.0.0.1:7777` answers Siren JSON and no page. On Windows,
-in PowerShell 7.2 or later, these two lines make the token file:
+A token turns on the bearer check of `serve`. It is one line of 32 characters or more, and it must not start or end with
+a space or a tab. `lifelog-web` asks the owner for the same token at its login page. The address `http://127.0.0.1:7777`
+answers Siren JSON and no page ([API.md](API.md#reaching-a-server) names the plain answers of `net/http` that are not
+Siren). On Windows, in PowerShell 7.2 or later, these two lines make the token file:
 
 ```
 New-Item -ItemType Directory -Force $HOME\life | Out-Null
@@ -309,9 +310,9 @@ These are this application's own engineering decisions ([D14](docs/decisions/D14
   file opens.
 - **A token turns on the bearer check** ([plan 078](docs/plans/078-network-server.md)). `--token-file PATH` (one line
   of at least 32 characters; the command line never carries the secret) or `LIFELOG_TOKEN` gives `serve` a token. A
-  token that is shorter, or has more than one line, refuses the command before the listener opens. With a token, every
-  request must carry `Authorization: Bearer <token>`; one without is answered 401 `token_required`, with nothing of
-  the database. The compare takes the same time for every value, and there is no exemption: no install file and no
+  token that is shorter, has more than one line, or starts or ends with a space or a tab, refuses the command before the
+  listener opens. An empty value of `--token-file` is refused too. With a token, every request must carry
+  `Authorization: Bearer <token>`; one without is answered 401 `token_required`, with nothing of the database. The compare takes the same time for every value, and there is no exemption: no install file and no
   login page. The check of the `Host` comes first, so a wrong `Host` is 403 before a missing token is 401. With no
   token there is no check, as on the temporary server of `lifelog NAME`. A token holder is the owner: owner-only
   actions are still refused by `Lifelog-Source: agent:*` or `import:*`, not by the token. The CLI and the MCP server
@@ -405,7 +406,7 @@ which the CLI's `get` and the MCP tool `get` read.
 | `extensions/web` | its own module, `lifelog-web`: the browser; it draws the answers of the API as HTML and owns the login, the lock, the forms and its settings; it imports `lifelog/siren`, `lifelog/client`, `lifelog/app` and `lifelog/text` of the root module (a `replace` directive), and nothing of `lifelog/internal` | the tests of its packages (`go test ./...` in the folder); `e2e_test.go` builds the real `lifelog` and `lifelog-web` and runs `lifelog serve --with web`; `web/parity_test.go` holds a form for each action |
 | `extensions/mcp` | its own module, `lifelog-mcp`: the catalog as MCP tools, over HTTP; it imports `lifelog/siren`, `lifelog/client` and `lifelog/client/tools` of the root module (a `replace` directive), and nothing of `lifelog/internal` | `mcp.New` on a fake catalog (`go test ./...` in the folder); `TestTheMCPServerOnTheRealLifelog` builds the real `lifelog` and `lifelog-mcp` and runs `lifelog mcp --agent test` |
 | `extensions/whatsapp` | its own module, `lifelog-whatsapp`: an always-on agent; the owner writes on WhatsApp, a model answers through the action catalog; it imports `lifelog/siren`, `lifelog/client` and `lifelog/client/tools` of the root module (a `replace` directive), and nothing of `lifelog/internal` | the tests of its packages (`go test ./...` in the folder); `e2e_test.go` builds the real `lifelog` |
-| `extensions/ticktick` | its own module, `lifelog-ticktick`: TickTick, the task service ([a task service](extensions/README.md#a-task-service)); it polls the done tasks into the day pages as `import:ticktick` and serves the task protocol, which `lifelog` draws under `/tasks`; it imports `lifelog/siren`, `lifelog/client` and `lifelog/app` of the root module (a `replace` directive), and nothing of `lifelog/internal` | the tests of its packages against a fake TickTick (`go test ./...` in the folder); `e2e_test.go` builds the real `lifelog` and runs `lifelog serve --with ticktick` |
+| `extensions/ticktick` | its own module, `lifelog-ticktick`: TickTick, the task service ([a task service](extensions/README.md#a-task-service)); it polls the done tasks into the day pages as `import:ticktick` and serves the task protocol (`lifelog` builds the entities of Tasks under `/tasks`, and `lifelog-web` draws them); it imports `lifelog/siren`, `lifelog/client` and `lifelog/app` of the root module (a `replace` directive), and nothing of `lifelog/internal` | the tests of its packages against a fake TickTick (`go test ./...` in the folder); `e2e_test.go` builds the real `lifelog` and runs `lifelog serve --with ticktick` |
 | `extensions/agentic` | its own module, `lifelog-agentic`: `lifelog agentic-init`, the texts and MCP configs for a coding agent opened in the folder of the program; it reads `LIFELOG_EXE` and `LIFELOG_DB`, and imports nothing of `lifelog/internal` | `agentic.Files` and `agentic.Init` on the `Paths` of a temporary folder (`go test ./...` in the folder); `e2e_test.go` builds the real `lifelog`, `lifelog-mcp` and `lifelog-agentic-init` |
 | `internal/scaletest` | the synthetic personas and the lifetime workload of `tools/lifescale`: generators, an oracle and the timed checks | `scaletest.Run` with the profile `small`, in the baseline |
 | `tools/lifescale` | the lifetime and stress runner over `internal/scaletest` ([tests/README.md](tests/README.md)) | `internal/scaletest`: the runner has no test of its own |
@@ -440,9 +441,9 @@ The command line `lifelog NAME [ARGS...]` runs the program `lifelog-NAME`, found
 the program `LIFELOG_URL` (the API of the file), `LIFELOG_EXE` and `LIFELOG_DB`. The contract, for an author, is
 [`extensions/README.md`](extensions/README.md).
 
-- [`extensions/web`](extensions/web/README.md): the browser, `lifelog serve --with web` or `lifelog web`. It draws the
-  answers of the API as pages of HTML and owns the login, the lock and the forms. Its door is `LIFELOG_WEB_LISTEN`
-  (`127.0.0.1:7780`).
+- [`extensions/web`](extensions/web/README.md): the browser, `lifelog serve --token-file F --with web` (or `lifelog web`
+  with `LIFELOG_TOKEN` set). It draws the answers of the API as pages of HTML and owns the login, the lock and the
+  forms. Its door is `LIFELOG_WEB_LISTEN` (`127.0.0.1:7780`).
 - [`extensions/googlephotos`](extensions/googlephotos/README.md): a local page where the owner picks, for each day
   that has no cover, one photo of that day from Google Photos.
 - [`extensions/mcp`](extensions/mcp/README.md): the MCP server, `lifelog mcp [--agent NAME]`. Every action of the
@@ -454,7 +455,8 @@ the program `LIFELOG_URL` (the API of the file), `LIFELOG_EXE` and `LIFELOG_DB`.
   `agent:whatsapp`.
 - [`extensions/ticktick`](extensions/ticktick/README.md): TickTick, the task service. What you finish in
   TickTick comes back as a `Done:` entry of its day, once. It is the task service:
-  `lifelog` draws its tasks under `/tasks`, with `add-task` and the other actions of [Tasks](API.md#tasks). Run it with `lifelog serve --with ticktick`.
+  `lifelog` builds the entities of Tasks under `/tasks`, and `lifelog-web` draws them. `add-task` and the other actions
+  of [Tasks](API.md#tasks) are in the catalog. Run it with `lifelog serve --with ticktick`.
 
 ## Engineering references
 
