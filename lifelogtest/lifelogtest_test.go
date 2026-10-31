@@ -1,6 +1,7 @@
 package lifelogtest_test
 
 import (
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -108,5 +109,40 @@ func TestAConnectedAppIsInTheCatalogAndAnswersItsRoutes(t *testing.T) {
 	got = ""
 	if _, err := client.Remote(s.URL, "agent:test", "").Do(t.Context(), *found, map[string]string{"word": "no"}); err == nil || got != "" {
 		t.Errorf("an agent ran the owner action: err=%v, the app got %q", err, got)
+	}
+}
+
+// TestConnectTasksMakesTheServiceTasks registers a small task service and reads Tasks through the server: the list of
+// the service is a list of the page.
+func TestConnectTasksMakesTheServiceTasks(t *testing.T) {
+	var writes []siren.Action
+	for _, href := range []string{"/tasks", "/tasks/{id}", "/tasks/{id}/complete", "/tasks/{id}/reopen", "/tasks/{id}/delete", "/sync"} {
+		writes = append(writes, siren.Action{Name: "w" + href, Method: "POST", Href: href})
+	}
+	service := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		e := &siren.Entity{Class: []string{"tasks"}, Properties: map[string]any{"tasks": []any{}}}
+		switch r.URL.Path {
+		case "/actions":
+			e = &siren.Entity{Class: []string{"actions", "tasks"}, Title: "Actions", Actions: writes}
+		case "/lists":
+			e.Properties = map[string]any{"lists": []map[string]string{{"id": "home", "name": "Home"}}}
+		}
+		w.Header().Set("Content-Type", "application/vnd.siren+json")
+		if err := json.NewEncoder(w).Encode(e); err != nil {
+			t.Error(err)
+		}
+	})
+	s := lifelogtest.New(t, "2031-05-14")
+	s.ConnectTasks(t, "svc", service)
+	tasks, err := client.Remote(s.URL, "cli", "").Get(t.Context(), "/tasks")
+	if err != nil {
+		t.Fatalf("GET /tasks: %v", err)
+	}
+	b, err := json.Marshal(tasks)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(b), `"Home"`) {
+		t.Errorf("GET /tasks does not name the list Home: %s", b)
 	}
 }

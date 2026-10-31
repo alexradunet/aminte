@@ -7,6 +7,7 @@ package lifelogtest
 import (
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"testing"
 	"time"
 
@@ -64,5 +65,34 @@ func (s *Server) Connect(t testing.TB, name string, h http.Handler) {
 	}
 	if err := s.apps.Set(name, app.URL, title, catalog.Actions); err != nil {
 		t.Fatalf("lifelogtest.Connect %s: %v", name, err)
+	}
+}
+
+// ConnectTasks registers h as the task service name, as `lifelog serve --with name` does when the catalog of the program
+// has the class tasks (extensions/README.md, "A task service"): the server reads GET /lists of h and draws Tasks under
+// /tasks from it. h runs in the process, on a loopback socket that the cleanup of t closes before the server. It fails
+// t when the catalog has no class tasks, when the lists cannot be read, or when the server refuses the service.
+func (s *Server) ConnectTasks(t testing.TB, name string, h http.Handler) {
+	t.Helper()
+	service := httptest.NewServer(h)
+	t.Cleanup(service.Close)
+	c := client.Remote(service.URL, "", "")
+	catalog, err := c.Get(t.Context(), "/actions")
+	if err != nil {
+		t.Fatalf("lifelogtest.ConnectTasks %s: GET /actions: %v", name, err)
+	}
+	if !slices.Contains(catalog.Class, "tasks") {
+		t.Fatalf("lifelogtest.ConnectTasks %s: the catalog has the class %v, not tasks", name, catalog.Class)
+	}
+	listed, err := c.Get(t.Context(), "/lists")
+	if err != nil {
+		t.Fatalf("lifelogtest.ConnectTasks %s: GET /lists: %v", name, err)
+	}
+	lists, err := api.TaskListsOf(listed)
+	if err != nil {
+		t.Fatalf("lifelogtest.ConnectTasks %s: %v", name, err)
+	}
+	if err := s.apps.SetTasks(name, service.URL, catalog.Actions, lists); err != nil {
+		t.Fatalf("lifelogtest.ConnectTasks %s: %v", name, err)
 	}
 }
