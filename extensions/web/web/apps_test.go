@@ -5,6 +5,7 @@ package web_test
 // answers. The view tests hold the pieces drawn from a hand-made entity; these hold the whole path.
 
 import (
+	"cmp"
 	"net/http"
 	"regexp"
 	"strings"
@@ -92,7 +93,8 @@ func TestTheBrowserDrawsTheRowsOfAnApp(t *testing.T) {
 }
 
 // taskServiceHandler is a small task service (extensions/README.md, "A task service"): two lists, two open tasks and the
-// six writes. The days are relative to 2031-05-14, the day of the clock of the tests.
+// six writes. A write answers with a task that has the id of the path (t3 for add-task). The days are relative to
+// 2031-05-14, the day of the clock of the tests.
 func taskServiceHandler() http.Handler {
 	var actions []siren.Action
 	run := map[string]func(*http.Request) (*siren.Entity, error){}
@@ -105,8 +107,8 @@ func taskServiceHandler() http.Handler {
 			a.Fields = []siren.Field{{Name: "id", Type: "text", Required: true, In: "path"}}
 		}
 		actions = append(actions, a)
-		run[w.name] = func(*http.Request) (*siren.Entity, error) {
-			return &siren.Entity{Class: []string{"task"}, Title: "A task"}, nil
+		run[w.name] = func(r *http.Request) (*siren.Entity, error) { // the core takes a write as done when the answer is a task with an id
+			return &siren.Entity{Class: []string{"task"}, Title: "A task", Properties: map[string]any{"id": cmp.Or(r.PathValue("id"), "t3"), "title": "A task"}}, nil
 		}
 	}
 	read := func(properties map[string]any) http.HandlerFunc {

@@ -126,8 +126,8 @@ func run(ctx context.Context, getenv func(string) string, started func(addr stri
 // isSeparator splits LIFELOG_WEB_ORIGINS: a comma or a space.
 func isSeparator(r rune) bool { return r == ',' || unicode.IsSpace(r) }
 
-// stateDir is the state folder: LIFELOG_WEB_STATE, else os.UserConfigDir()/lifelog-web. The unit of the service lists the
-// default in ReadWritePaths (extensions/README.md, "Run by serve").
+// stateDir is the state folder: LIFELOG_WEB_STATE, else os.UserConfigDir()/lifelog-web. A unit with ProtectHome=read-only
+// must list the default in ReadWritePaths, else the program cannot write its state (extensions/README.md, "Run by serve").
 func stateDir(getenv func(string) string) (string, error) {
 	if dir := getenv("LIFELOG_WEB_STATE"); dir != "" {
 		return dir, os.MkdirAll(dir, 0o700)

@@ -74,7 +74,7 @@ func TestAFormReturnsToThePageThatSentIt(t *testing.T) {
 	// The feedback of a write that has some goes to the page returned to, with its receipt.
 	rec := postForm(l.web, "/pages", url.Values{"title": {"Notes"}, "body": {"[[bad/name]]"}, "back": {"/browse?kind=person"}})
 	loc := rec.Header().Get("Location")
-	if got := locationWithoutReceipt(t, loc); got != "/browse?kind=person" || !strings.Contains(ask(l.web, http.MethodGet, loc).Body.String(), "bad/name") {
+	if got := locationWithoutReceipt(t, loc); got != "/browse?kind=person" || !strings.Contains(browserPageAt(t, l.web, loc), "bad/name") {
 		t.Errorf("feedback did not follow the return path: %q", loc)
 	}
 	if view, _ := must(t)(l.api.Get(t.Context(), "/days/"+day)).Properties.(map[string]any)["view"].([]any); len(view) == 0 {
@@ -93,13 +93,13 @@ func TestAFormWithNoBackReturnsToTheNewPageWithOneReceiptAndTellsItsResultOnce(t
 		t.Fatalf("POST: %d %s", rec.Code, rec.Body.String())
 	}
 	location := rec.Header().Get("Location")
-	body := ask(l.web, http.MethodGet, location).Body.String()
+	body := browserPageAt(t, l.web, location)
 	for _, want := range []string{"Result", `Revived <a href="/pages?title=Revived+target">Revived target</a>.`, "Not linked, not a valid title: <code>[[bad/name]]</code>."} {
 		if !strings.Contains(body, want) {
 			t.Errorf("missing %q in the redirected feedback", want)
 		}
 	}
-	if strings.Contains(ask(l.web, http.MethodGet, location).Body.String(), "<h2>Result</h2>") {
+	if strings.Contains(browserPageAt(t, l.web, location), "<h2>Result</h2>") { // a reload is a whole page with the status 200
 		t.Error("receipt replayed")
 	}
 	page := must(t)(l.api.Get(t.Context(), "/pages?title=Feedback%20page"))
@@ -117,10 +117,10 @@ func TestAFormThatReturnsHomeLandsOnTodayWithItsToastOnce(t *testing.T) {
 		t.Fatalf("capture: %d %q", rec.Code, rec.Header().Get("Location"))
 	}
 	to := rec.Header().Get("Location")
-	if body := ask(l.web, http.MethodGet, to).Body.String(); !strings.Contains(body, `class="toast"`) || !strings.Contains(body, "Dana Example") || !strings.Contains(body, `<h1>Wednesday</h1>`) {
+	if body := browserPageAt(t, l.web, to); !strings.Contains(body, `class="toast"`) || !strings.Contains(body, "Dana Example") || !strings.Contains(body, `<h1>Wednesday</h1>`) {
 		t.Errorf("the page of today does not carry the receipt of the capture:\n%.600s", fromTheMain(body))
 	}
-	if strings.Contains(ask(l.web, http.MethodGet, to).Body.String(), `class="toast"`) {
+	if strings.Contains(browserPageAt(t, l.web, to), `class="toast"`) { // a reload is a whole page with the status 200
 		t.Error("the receipt came back on a reload")
 	}
 }
@@ -133,12 +133,12 @@ func TestAWriteEndsInAToastWithItsCloseButton(t *testing.T) {
 	if rec.Code != http.StatusSeeOther || !strings.HasPrefix(rec.Header().Get("Location"), "/days/"+today+"?feedback=") {
 		t.Fatalf("capture: %d %q", rec.Code, rec.Header().Get("Location"))
 	}
-	body := ask(l.web, http.MethodGet, rec.Header().Get("Location")).Body.String()
+	body := browserPageAt(t, l.web, rec.Header().Get("Location"))
 	if !strings.Contains(body, `<main id="main">`+"\n"+`<dialog open closedby="closerequest" class="toast" aria-label="Result"><h2>Result</h2>`) || !strings.Contains(body, "Dana Example") ||
 		!strings.Contains(body, `<form method="dialog" class="tiny"><button class="close">Close</button></form></dialog>`) {
 		t.Errorf("the capture's result is not the toast at the top of the page, with its Close")
 	}
-	if strings.Contains(ask(l.web, http.MethodGet, rec.Header().Get("Location")).Body.String(), `class="toast"`) {
+	if strings.Contains(browserPageAt(t, l.web, rec.Header().Get("Location")), `class="toast"`) { // a reload is a whole page with the status 200
 		t.Error("the toast came back on a reload")
 	}
 }

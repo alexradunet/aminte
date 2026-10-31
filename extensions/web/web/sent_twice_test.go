@@ -81,14 +81,14 @@ func TestACaptureFormSentAgainIsAddedOnce(t *testing.T) {
 	if first.Code != http.StatusSeeOther || locationWithoutFeedback(t, first.Header().Get("Location")) != toDay {
 		t.Fatalf("first send: %d %q", first.Code, first.Header().Get("Location"))
 	}
-	if body := ask(l.web, http.MethodGet, first.Header().Get("Location")).Body.String(); strings.Contains(body, "Already added") {
+	if body := browserPageAt(t, l.web, first.Header().Get("Location")); strings.Contains(body, "Already added") {
 		t.Errorf("the first send says Already added:\n%.400s", body)
 	}
 	again := postForm(l.web, toDay+"/capture", form)
 	if again.Code != http.StatusSeeOther || locationWithoutFeedback(t, again.Header().Get("Location")) != toDay {
 		t.Fatalf("send again: %d %q, want 303 to the day", again.Code, again.Header().Get("Location"))
 	}
-	if body := ask(l.web, http.MethodGet, again.Header().Get("Location")).Body.String(); !strings.Contains(body, "Already added") {
+	if body := browserPageAt(t, l.web, again.Header().Get("Location")); !strings.Contains(body, "Already added") {
 		t.Errorf("the second send does not say Already added:\n%.400s", body)
 	}
 	day := must(t)(l.api.Get(t.Context(), toDay))

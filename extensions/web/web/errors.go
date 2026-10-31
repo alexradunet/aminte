@@ -89,11 +89,15 @@ func (b *Browser) unreachable(w http.ResponseWriter, r *http.Request, err error)
 
 // recovered ends the request of a handler that panicked. Defer it at the top of the handler: recover sees a panic only
 // when a deferred function calls it. Without it the server would close the connection, and the browser would see a
-// broken connection and no page. Here the browser gets the page of an internal error, the same words for every fault, and
-// the log gets one record: the route, the value of the panic and the stack. The route is the pattern, never the path,
-// because a path can name a person or a metric. If the handler had sent the status already, the page cannot replace it:
-// the server logs that, and the answer ends where it was.
-func (b *Browser) recovered(w http.ResponseWriter, r *http.Request) {
+// broken connection and no page. The log gets one record in both cases: the route, the value of the panic and the stack.
+// The route is the pattern, never the path, because a path can name a person or a metric.
+//
+//   - The answer has not started: the browser gets the page of an internal error, the same words for every fault. The
+//     page is never cached, whatever header the handler had set.
+//   - The answer has started: the status is sent, and a page after the first part of a body would look like a whole
+//     answer. So recovered panics with http.ErrAbortHandler. The server then closes the connection, logs nothing more,
+//     and the browser sees an answer that ends too early.
+func (b *Browser) recovered(w *startWriter, r *http.Request) {
 	v := recover()
 	if v == nil {
 		return
@@ -102,5 +106,36 @@ func (b *Browser) recovered(w http.ResponseWriter, r *http.Request) {
 		panic(v) // the handler cut the answer on purpose: the server ends the connection and logs nothing
 	}
 	log.Printf("%s: panic: %v\n%s", routeName(r), v, debug.Stack())
+	if w.started {
+		panic(http.ErrAbortHandler)
+	}
+	w.Header().Set("Cache-Control", "no-store") // the handler may have set a cache for the answer that it did not make
 	b.fail(w, r, http.StatusInternalServerError, siren.CodeInternal, "internal error")
 }
+
+// startWriter records that the answer has started: the handler sent its status, wrote a byte or flushed. From then on
+// the status cannot change (recovered). It sits at the top of ServeHTTP. Unwrap lets http.ResponseController and
+// serverWriter reach the writer of the server.
+type startWriter struct {
+	http.ResponseWriter
+	started bool
+}
+
+func (s *startWriter) WriteHeader(code int) {
+	s.started = true
+	s.ResponseWriter.WriteHeader(code)
+}
+
+func (s *startWriter) Write(b []byte) (int, error) {
+	s.started = true
+	return s.ResponseWriter.Write(b)
+}
+
+// FlushError is the flush that http.ResponseController calls first. A flush sends the status 200 when the handler has sent
+// none, so it starts the answer too.
+func (s *startWriter) FlushError() error {
+	s.started = true
+	return http.NewResponseController(s.ResponseWriter).Flush()
+}
+
+func (s *startWriter) Unwrap() http.ResponseWriter { return s.ResponseWriter }

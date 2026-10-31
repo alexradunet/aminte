@@ -56,7 +56,8 @@ func absoluteForm(r *http.Request) bool {
 
 // ServeHTTP makes Browser an http.Handler. It is the door: the checks that every request passes, in this order.
 //
-//  0. A panic of any step below ends in the page of an internal error (recovered).
+//  0. A panic of any step below ends in the page of an internal error, or in a cut answer when the answer had started
+//     (recovered).
 //  1. An absolute-form target is refused.
 //  2. The guard refuses a write from an origin that it does not trust, before anything else is done for the request.
 //  3. The old cookie lifelog_token, which held the token in clear, is cleared.
@@ -64,7 +65,9 @@ func absoluteForm(r *http.Request) bool {
 //  5. Any other request needs a valid session cookie: a browser gets /login, any other client gets 401.
 //  6. A session goes on to serveSession, which holds the lock.
 func (b *Browser) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	defer b.recovered(w, r)
+	started := &startWriter{ResponseWriter: w}
+	w = started
+	defer b.recovered(started, r)
 	if absoluteForm(r) {
 		b.fail(w, r, http.StatusForbidden, siren.CodeForbidden, "HTTP authority refused")
 		return
