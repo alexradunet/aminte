@@ -1,0 +1,71 @@
+{{/* The conversation of a day is the chat screen (docs/plans/148-the-chat-screen.md), not a page: a thin day bar (the
+     title, the day, the chips of the last days that have a conversation page, and a menu ⋯ with the things of the page
+     itself, a popover that Close, Escape or a tap outside closes: the top layer, so nothing clips it), the thread that fills the height and starts at its newest turn, and the composer pinned at the bottom.
+     It has no page head, no margin and no categories row. The Edit fold is the page's body editor; the thread is the
+     body, so the body is not drawn a second time. #conversation is the screen that chat.js swaps in place; the
+     column is not drawn on this view, since the screen is the column at full size. */}}
+{{define "conversation"}}{{template "head" .}}
+{{$p := .Props}}{{$turns := .Turns}}
+<div class="chat-screen" id="conversation" data-day="{{$p.day}}" data-version="{{$p.version}}">
+<header class="daybar">
+<h1>Chat</h1><span class="day">{{$.Date $p.day}}{{if eq $p.day .Today}} · today{{end}}</span>
+<nav class="days" aria-label="Days">{{range .ChatDays}}<a href="{{.Href}}"{{if .Current}} aria-current="page"{{end}}>{{.Text}}</a>{{end}}</nav>
+<button type="button" class="more" popovertarget="chat-menu" aria-label="More: the day view, the page of this conversation">⋯</button>
+<div class="more-body" id="chat-menu" popover>
+<div class="more-head"><span class="label">More</span><button type="button" class="button small" popovertarget="chat-menu" popovertargetaction="hide">Close</button></div>
+<p class="sub"><a href="{{.Link "day"}}">{{weekday $p.day}}: the day view</a></p>
+{{if $p.id}}{{template "categories" (dict "v" $ "back" $.ReturnHere)}}
+{{template "body-editor" (dict "action" (.Action "save-body") "back" (.Link "self") "summary" "Edit")}}
+{{template "links" .}}
+{{template "backlinks" .}}
+{{end}}
+{{$menu := .Menu}}{{if not $menu.Empty}}{{template "menu-list" $menu}}{{end}}
+</div>
+{{template "menu-dialogs" $menu}}
+</header>
+<section class="thread" aria-label="Conversation of {{$.Date $p.day}}">
+{{if $turns}}{{template "thread" (dict "v" $ "turns" $turns "day" $p.day)}}{{else if .Action "say"}}<div class="turns"><p class="empty">Nothing is said on this day yet. Write to the agent below. It answers here when it runs: start it with <code>lifelog whatsapp</code>.</p></div>{{else}}<div class="turns"><p class="empty">Nothing was said on this day.</p></div>{{end}}
+</section>
+{{with .Action "say"}}<footer class="composer">{{template "form" (form . "button" "Say" "class" "chat-form" "plain" "1" "send" "1" "back" $.ReturnHere)}}
+<p class="hint"><kbd>Enter</kbd> sends · <kbd>Shift</kbd>+<kbd>Enter</kbd> a new line</p></footer>{{end}}
+</div>
+{{template "foot" .}}{{end}}
+
+{{/* thread is the turns of a conversation, in order: the screen and the column draw it alike (the column with the
+     class compact, app.css). It takes v (the view), turns and, for the screen, day (a date above the first turn).
+     Every turn is one card of the same material, and a small avatar beside its meta (who, the relay, the time) tells
+     the owner's from the agent's: the person glyph and the chat glyph of the icon sheet. The card holds the tool
+     lines as a row of badges, each the name of the tool with the thing its address names (a card, below) or the
+     words after the name, and last the words in markdown (a [[link]] in them is a chip, by CSS). A turn of who text
+     (a paragraph the owner edited in) is shown as it is. Three dots wait in a card of the agent's under the thread
+     when the last turn is the owner's. */}}
+{{define "thread"}}{{$v := .v}}<ol class="turns">
+{{with .day}}<li class="datesep">{{$v.LongDate .}}</li>{{end}}
+{{range .turns}}{{if eq .Who "text"}}<li class="turn text"><p class="free">{{.Text}}</p></li>
+{{else}}<li class="turn {{if eq .Who "owner"}}owner{{else}}agent{{end}}">{{template "avatar" .Who}}<div class="meta"><span class="from">{{if eq .Who "owner"}}You{{else}}lifelog{{end}}</span>{{with .Via}}<span class="via">· via {{.}}</span>{{end}}{{if .At}}<time datetime="{{.At}}">{{.At}}</time>{{end}}</div>
+<div class="turn-card">{{with .Tools}}<ul class="tools">{{range .}}{{with toolChip .}}<li><b>{{.Name}}</b>{{if .Href}}{{template "card" ($v.CardOf .Href)}}{{else}}{{with .Words}} {{.}}{{end}}{{end}}</li>{{end}}{{end}}</ul>{{end}}
+<div class="words prose">{{markdown .Text}}</div></div></li>
+{{end}}{{end}}
+{{if waiting .turns}}<li class="turn agent">{{template "avatar" "agent"}}<div class="meta"><span class="from">lifelog</span></div><div class="thinking" role="status" aria-label="lifelog is answering"><i></i><i></i><i></i></div></li>{{end}}</ol>{{end}}
+
+{{/* avatar is the small picture beside a turn, by who said it: hidden from a reader, since the meta line says who. */}}
+{{define "avatar"}}<span class="avatar" aria-hidden="true">{{if eq . "owner"}}{{icon "people"}}{{else}}{{icon "chat"}}{{end}}</span>{{end}}
+
+{{/* card is a thing of the database that a tool line named (docs/plans/148-the-chat-screen.md), drawn on the
+     badge of the line by the class of its entity (view.Card): one link to the thing, with the kind's icon (or a
+     small picture), the title and one value. An address that answered an error is the plain link. */}}
+{{define "card"}}{{if eq .Kind "link"}}<a class="card card-link" href="{{.Href}}">{{.Title}}</a>{{else}}<a class="card card-{{.Kind}}" href="{{.Href}}"><span class="card-icon">{{with .Picture}}<img src="{{.}}" alt="" loading="lazy">{{else}}{{icon .Icon}}{{end}}</span><b class="card-title">{{.Title}}</b>{{with .Value}}<span class="card-value">{{.}}</span>{{end}}</a>{{end}}{{end}}
+
+{{/* chat is the chat column (docs/plans/146-settings-and-the-chat-column.md): today's turns and the composer, a form of
+     say whose back is this page, so the page comes back with the owner's paragraph. It is the thread of the screen in its
+     compact form (the class compact: a card is one line). It is a popover that the button Chat opens (the rail's on a
+     phone, the one at the corner on a wide screen), and that Close, Escape or a tap outside closes: no script. Under 900
+     px it is a sheet over the page (app.css). Its data-version is the version of the conversation page, empty when the
+     day has none. chat.js, when it runs, polls it while the last turn is the owner's and swaps the column in place, and
+     lets Enter send; the form posts without it. */}}
+{{define "chat"}}{{with .Chat}}<button type="button" class="button chat-open" popovertarget="chat">{{icon "chat"}}Chat</button>
+<div class="chat compact" id="chat" popover role="complementary" data-day="today" data-version="{{.Version}}" aria-label="Chat">
+<div class="chat-head"><span class="label">Chat</span><a href="/days/today/conversation">Open the day</a><button type="button" class="button small" popovertarget="chat" popovertargetaction="hide">Close</button></div>
+<div class="chat-scroll"><div class="chat-turns">{{if .Turns}}{{template "thread" (dict "v" $ "turns" .Turns)}}{{else if .Say.Name}}<p class="empty">Nothing is said today yet. Write to the agent below. It answers here when it runs.</p>{{else}}<p class="empty">Nothing was said on this day.</p>{{end}}</div></div>
+{{if .Say.Name}}{{template "form" (form .Say "button" "Say" "class" "chat-form" "plain" "1" "send" "1" "back" $.ReturnHere)}}<p class="hint"><kbd>Enter</kbd> sends · <kbd>Shift</kbd>+<kbd>Enter</kbd> a new line</p>{{end}}
+</div>{{end}}{{end}}

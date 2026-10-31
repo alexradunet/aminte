@@ -6,7 +6,7 @@ import (
 	"slices"
 	"strconv"
 
-	"lifelog/internal/text"
+	"lifelog/text"
 )
 
 // A page's cover is the first live file with a preview that its body embeds (docs/plans/127-a-cover-for-every-page.md).

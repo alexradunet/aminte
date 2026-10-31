@@ -1,0 +1,176 @@
+package web
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"net"
+	"net/http"
+	"net/url"
+	"strings"
+	"time"
+
+	"lifelog/siren"
+)
+
+// The connection to the core. Web asks the core for Siren JSON and for bytes, and it draws the HTML itself. The
+// package client is not used for a read: it holds the whole answer and decodes numbers as json.Number, and the view
+// reads a number as a float64 and streams a picture or a file without holding it.
+
+const (
+	// maxEntity is the largest Siren answer that web reads. An answer is one entity, and a list is paged, so the
+	// limit stops a wrong server from filling memory. It is the limit of package client.
+	maxEntity = 16 << 20
+	// headerWait is the longest wait for the headers of an answer from the core. The core ends a request at 2
+	// minutes, so a slow answer is the 504 of the core and not a timeout on this side.
+	headerWait  = 150 * time.Second
+	dialTimeout = 10 * time.Second
+	// entityWait is the longest wait for the body of a Siren answer once its headers came. An entity is small, so a
+	// body that stalls is a core that hung; a stream of a file has no such bound.
+	entityWait = 30 * time.Second
+	// embedWriter is the writer of the reads that web makes for the cards of the chat. It is an agent's, so the core
+	// refuses an owner-only read to it, as it does for the reads that it embeds itself (API.md, "Embedding"): an
+	// address in a tool line is text that an agent wrote.
+	embedWriter = siren.AgentPrefix + "embed"
+	// pageWriter is the writer of the reads for a page of the browser.
+	pageWriter = "ui"
+)
+
+// core is the connection to one lifelog server. It is safe for concurrent use.
+type core struct {
+	base       string // scheme://host[:port], without a path
+	token      string // sent as a bearer credential when it is not empty
+	hc         *http.Client
+	entityWait time.Duration // the longest wait for the body of a Siren answer (entityWait)
+}
+
+// newCore checks the address of the core and makes the connection. It dials nothing yet.
+func newCore(rawURL, token string) (*core, error) {
+	u, err := url.Parse(rawURL)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" || u.User != nil || (u.Path != "" && u.Path != "/") || u.RawQuery != "" || u.Fragment != "" {
+		return nil, fmt.Errorf("the address of the core %q: use http://host:port", rawURL)
+	}
+	if strings.ContainsAny(token, "\r\n") {
+		return nil, errors.New("the token must be one line")
+	}
+	transport := &http.Transport{
+		Proxy:                 http.ProxyFromEnvironment,
+		DialContext:           (&net.Dialer{Timeout: dialTimeout}).DialContext,
+		TLSHandshakeTimeout:   dialTimeout,
+		ResponseHeaderTimeout: headerWait,
+		ExpectContinueTimeout: time.Second,
+		MaxIdleConnsPerHost:   cardsPerColumn + 2, // the shell reads the root and a card for each address, all at once
+		DisableCompression:    true,               // the bytes of a picture or a file reach the browser as the core sent them
+	}
+	hc := &http.Client{Transport: transport, CheckRedirect: func(*http.Request, []*http.Request) error {
+		return http.ErrUseLastResponse // a redirect is an answer: the browser follows it
+	}}
+	return &core{base: u.Scheme + "://" + u.Host, token: token, hc: hc, entityWait: entityWait}, nil
+}
+
+// get asks the core for uri (a path and a query) as writer, and returns the answer with its body not yet read. The
+// caller closes the body. header holds the headers of the browser's request that make sense for a read of the core
+// (conditional and range requests): nil for none.
+func (c *core) get(ctx context.Context, uri, writer string, header http.Header) (*http.Response, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.base+uri, nil)
+	if err != nil {
+		return nil, err
+	}
+	for _, name := range forwarded {
+		if v := header.Get(name); v != "" {
+			req.Header.Set(name, v)
+		}
+	}
+	req.Header.Set("Accept", sirenType)
+	req.Header.Set(siren.SourceHeader, writer)
+	if c.token != "" {
+		req.Header.Set("Authorization", "Bearer "+c.token)
+	}
+	return c.hc.Do(req)
+}
+
+// sirenType is the media type of the JSON of an entity.
+const sirenType = "application/vnd.siren+json"
+
+// forwarded are the headers of the browser's request that web passes to the core, so that a file or a picture answers
+// a conditional or a range request as the core does.
+var forwarded = []string{"Range", "If-Range", "If-None-Match", "If-Modified-Since"}
+
+// isSiren reports an answer that holds a Siren entity.
+func isSiren(res *http.Response) bool {
+	return strings.HasPrefix(res.Header.Get("Content-Type"), sirenType)
+}
+
+// readEntity reads the Siren entity that res holds, with the limit maxEntity. Numbers are float64, as the view reads
+// them. An answer that is not one entity is an error, never a half entity.
+func (c *core) readEntity(res *http.Response) (*siren.Entity, error) {
+	stall := time.AfterFunc(c.entityWait, func() { res.Body.Close() }) // ends a Read that waits for the core
+	defer stall.Stop()
+	body, err := io.ReadAll(io.LimitReader(res.Body, maxEntity+1))
+	if err != nil {
+		return nil, err
+	}
+	if len(body) > maxEntity {
+		return nil, fmt.Errorf("the answer is larger than %d bytes", maxEntity)
+	}
+	e := &siren.Entity{}
+	if err := json.Unmarshal(body, e); err != nil {
+		return nil, fmt.Errorf("HTTP %d, not a Siren entity (%s)", res.StatusCode, res.Header.Get("Content-Type")) // never the body: it may be a picture or a page
+	}
+	return e, nil
+}
+
+// read asks the core for uri, which web built, and returns the Siren entity that a 2xx answer holds. It returns nil for
+// any other answer: a failure, another status, an answer that is not an entity, or an entity with no class and no
+// title. For a redirect it returns the Location too.
+func (c *core) read(ctx context.Context, uri, writer string) (e *siren.Entity, location string) {
+	res, err := c.get(ctx, uri, writer, nil)
+	if err != nil {
+		return nil, ""
+	}
+	defer res.Body.Close()
+	if isRedirect(res.StatusCode) {
+		return nil, res.Header.Get("Location")
+	}
+	if res.StatusCode/100 != 2 || !isSiren(res) {
+		return nil, ""
+	}
+	e, err = c.readEntity(res)
+	if err != nil || e.Title == "" && len(e.Class) == 0 {
+		return nil, ""
+	}
+	return e, ""
+}
+
+// entity is the Siren entity at ref, nil when there is none. A ref can come from text that an agent wrote (a tool line),
+// so it is checked: it must be a path of the core, and it must not ask for an embedding of its own. The fragment of ref
+// stays with the reader. A redirect to a path of the core (/days/today to the day) is followed hops times at most.
+func (c *core) entity(ctx context.Context, ref, writer string, hops int) *siren.Entity {
+	path, _, _ := strings.Cut(ref, "#")
+	u, err := url.ParseRequestURI(path)
+	if err != nil || !isPath(path) || u.Query().Has(embedField) {
+		return nil
+	}
+	e, to := c.read(ctx, u.RequestURI(), writer)
+	if e == nil && hops > 0 && isPath(to) {
+		return c.entity(ctx, to, writer, hops-1)
+	}
+	return e
+}
+
+func isRedirect(status int) bool {
+	switch status {
+	case http.StatusMovedPermanently, http.StatusFound, http.StatusSeeOther, http.StatusTemporaryRedirect, http.StatusPermanentRedirect:
+		return true
+	}
+	return false
+}
+
+// isPath reports a Location that is a path of one server: it starts with one slash and has no backslash, so a browser
+// does not read it as the address of another host ("//host" and "/\host").
+func isPath(to string) bool {
+	return strings.HasPrefix(to, "/") && !strings.HasPrefix(to, "//") && !strings.Contains(to, `\`) &&
+		strings.IndexFunc(to, func(c rune) bool { return c < 0x20 || c == 0x7f }) < 0
+}

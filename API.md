@@ -38,7 +38,7 @@ Every answer is one [Siren](https://github.com/kevinswiber/siren) entity:
 | `properties` | the resource's own data, per class below |
 | `entities` | embedded links: `{rel, href, title, class}` each, the things this resource lists or links to. An embedded link of a connected app may also carry `properties` and `actions` (an extension of Siren): a short form of an embedded representation that keeps its `href`. The browser draws it as a [row](extensions/README.md#how-the-browser-draws-a-page-of-an-app). `?embed=` replaces an embedded link by the full entity that its `href` answers ([embedding](#embedding)): then the sub-entity also carries `entities` and `links`. |
 | `links` | `{rel, href, title}`: `self`, `index` (home), `prev`/`next` (a neighbour or the next page), and the rels named per class |
-| `actions` | what may be done here: `{name, class, title, description, method, href, type, fields, owner, danger}`, each field `{name, type, title, value, required, options, in, rows, pages, accept, placeholder}` with its current value filled in; `class` is at most one word that says what the action does ([action classes](#action-classes)); `owner: true` marks the owner's alone and `danger: true` marks one that hides or retracts what is there, so a client can warn before it sends; `in: "path"` marks a field of a templated href (`GET /actions` only) and `rows` is how many lines a `textarea` is drawn; `pages: true` says the value is a page's title, so a client can offer the names of the pages; `accept` is what a `file` field takes (`audio/*`); `placeholder` is the words that a client may show in an empty field, an example of a value (`Weight, Mood, Walk`) or a short prompt (`What happened? Who was there?`), and a client may ignore it |
+| `actions` | what may be done here: `{name, class, title, description, hint, method, href, type, fields, owner, danger}`, each field `{name, type, title, value, required, options, in, rows, pages, accept, placeholder}` with its current value filled in; `class` is at most one word that says what the action does ([action classes](#action-classes)); `hint` is the short text of the action's form, one or two sentences in plain words (no status code, no code style); a client that draws a form shows it in place of `description`, and `GET /actions` has none; `owner: true` marks the owner's alone and `danger: true` marks one that hides or retracts what is there, so a client can warn before it sends; `in: "path"` marks a field of a templated href (`GET /actions` only) and `rows` is how many lines a `textarea` is drawn; `pages: true` says the value is a page's title, so a client can offer the names of the pages; `accept` is what a `file` field takes (`audio/*`); `placeholder` is the words that a client may show in an empty field, an example of a value (`Weight, Mood, Walk`) or a short prompt (`What happened? Who was there?`), and a client may ignore it |
 | `result` | after a write: what it did (the result shapes below) |
 
 `GET /actions` is the catalog: every action with a templated `href` (`/pages/{id}/body`). A client fills the path
@@ -557,7 +557,8 @@ link to each month. Actions: `save-body` once the page of the year exists, else 
 ### page, person, file
 
 `GET /pages/{id}`; `GET /pages?title=` redirects to it. A browser's `GET` of the page of a live metric is a 303 to its [series](#series), with the query kept: the series carries the page, so a metric has one view. JSON, and the page of a deleted metric, are answered as here. The class is the page's type; a day page adds `day-page`, a
-tombstoned page adds `deleted`. Links: `day` (a day page's day view), `series` (a metric's readings), `preview` (a
+tombstoned page adds `deleted`. Links: `day` (a day page's day view), `series` (a metric's readings), `conversation` (the [conversation](#conversation) of a
+conversation page's day: it carries the page, as a series carries a metric's page, so a client that draws the view and not the page follows it), `preview` (a
 file's picture), `cover` (the
 picture of the page's cover, when it has one), `choose-cover` (the [pictures it may take](#cover-choice): a live page that
 is not a file), `make-metric` (a live plain page that is not a day page: the address of the [New metric form](#metrics) with the name filled; registering the metric turns this page into it and keeps its text). Embedded: every outgoing link under its kind, every incoming one under `backlink` and its kind, with the class
@@ -959,7 +960,7 @@ own day: they are the day bar of a chat client. Embedded: one `ref` for each add
 only when `day` is the server's local today (the conversation of another day offers none);
 when the page exists, the actions of [the page](#page-person-file) after it (`save-body` with the `version`, and
 the others). When the page exists, the answer carries the page as a series carries a metric's page: its properties
-(the rows below that follow `turns`), its links but `self` and `index`, and its embedded links. A page that is
+(the rows below that follow `turns`), its links but `self`, `conversation` and `index`, and its embedded links. A page that is
 deleted is no conversation: the answer has no turns, and `say` makes it live again. A browser's `GET /pages/{id}` of a
 live conversation page is a 303 to this resource, with the query kept; the JSON of the page is the page's own.
 

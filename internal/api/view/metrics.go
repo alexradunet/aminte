@@ -5,8 +5,8 @@ import (
 	"regexp"
 	"strings"
 
-	"lifelog/internal/text"
 	"lifelog/siren"
+	"lifelog/text"
 )
 
 // The one page of a metric (docs/plans/100-one-page-a-metric.md): its readings newest first, in one fold a year.

@@ -1,0 +1,72 @@
+{{/* The day (docs/plans/095-the-leaf-and-its-margin.md): a calendar leaf heads it, with the weekday, the mood, and the
+     previous and next day; the stream goes to a day by its date. Then the sheet and its margin. The sheet is what the owner writes and
+     reads: the journal, Capture as its next part, the editor and the pages written this day. The margin is what the
+     day asks of the owner: the readings (with Add a reading). The day of today is Home
+     (docs/plans/129-the-ux-pass.md): its margin ends with the last entries. On a narrow screen
+     the margin comes after the sheet. */}}
+{{define "day"}}{{template "head" .}}
+{{$d := .Props}}{{$p := .DayParts}}{{$today := eq .Title .Today}}
+<header class="page-head day-head">
+<div class="day-title">{{template "leaf" .Title}}
+<div class="what"><h1>{{weekday .Title}}{{template "mood" $d.mood}}</h1>
+<p class="sub">{{if $today}}<span class="tag open">today</span>{{if ge .Streak 2}} <span class="tag">{{.Streak}} days in a row</span>{{end}}{{else}}<a href="/days/today">Go to today</a>{{end}}</p></div></div>
+<div class="tools">
+{{- $prev := shortDay (addDays .Title -1)}}{{$next := shortDay (addDays .Title 1)}}
+{{- with .Link "prev"}}
+{{template "step" (dict "href" . "rel" "prev" "label" (printf "Previous day, %s" $prev) "text" $prev)}}{{end}}
+{{- with .Link "next"}}
+{{template "step" (dict "href" . "rel" "next" "label" (printf "Next day, %s" $next) "text" $next)}}{{end}}
+</div>
+</header>
+{{if $today}}<div class="today-inline">{{template "today-strip" .}}</div>{{end}}
+<div class="sheet-margin">
+<div class="sheet">
+<section class="journal" aria-label="Journal">
+<div class="panel-head"><h2>Journal</h2>{{with .Link "page"}}<a href="{{.}}">The day page</a>{{end}}</div>
+{{$embed := ""}}{{with $d.cover}}{{$embed = .embed}}{{end}}
+{{range $p.Journal}}<div class="prose journal-text">{{markdownCover . $embed}}</div>{{end}}
+{{if not $p.Journal}}<p class="empty">{{if $today}}Nothing written today yet. <a href="#capture">Add to today</a> below.{{else}}Nothing written on this day. <a href="#capture">Add to it</a> below.{{end}}</p>{{end}}
+</section>
+
+{{with .Action "capture"}}<section class="capture" id="capture" aria-label="Capture">
+<h2>{{if $today}}Add to today{{else}}Add to {{shortDay $.Title}}{{end}}</h2>
+{{template "form" (form . "button" "Add" "back" $.ReturnHere "label" "text=Entry" "key" "text=c" "import_key" newKey)}}
+</section>{{end}}
+
+{{template "body-editor" (dict "action" (.Action "save-body") "back" (.Link "self") "summary" "Edit the day page")}}
+{{- with $p.Pages}}
+<section class="also" aria-label="Pages written this day"><h2>Pages written this day</h2>
+<ul class="plain">{{range .}}<li><a href="{{titleHref .Title}}">{{.Title}}</a>{{if .Edited}} <span class="badge">edited</span>{{end}}</li>{{end}}</ul></section>{{end}}
+</div>
+
+<div class="margin">
+{{template "cover" .}}
+{{- with $d.earlier}}
+<section class="group" aria-label="On this day">
+<div class="panel-head"><h2>On this day</h2></div>
+<ul class="plain">{{range .}}<li>{{template "dayentry" (dict "v" $ "e" .)}}</li>{{end}}</ul></section>{{end}}
+{{- $tiles := $.ReadingTiles}}
+{{- if or $tiles (.Action "record")}}
+<section class="group" aria-label="Readings">
+<div class="panel-head"><h2>Readings</h2><a href="/metrics">Metrics</a></div>
+{{with $tiles}}<div class="readings">{{range .}}{{$metric := .Metric}}{{$unit := .Unit}}<div class="reading-tile"><a class="name" href="/metrics/{{pathesc .Metric}}">{{.Metric}}</a>
+{{if .ID}}{{template "reading-link" (dict "id" .ID "value" .Value "unit" (unitWords .Unit))}}
+{{with .More}}<a class="meta" href="/metrics/{{pathesc $metric}}">and {{.}} more this day</a>{{end}}
+{{else}}{{with $.Action "record"}}{{if $unit}}{{template "form" ((form . "metric" $metric "day" $.Title "button" "Save" "hide" "taken_at,tz" "id" (printf "tile-%s" $metric) "import_key" newKey "back" $.Path).Prompt "value" $unit)}}{{else}}{{template "form" (form . "metric" $metric "day" $.Title "button" "Save" "hide" "taken_at,tz" "id" (printf "tile-%s" $metric) "import_key" newKey "back" $.Path "options" "value=1,0")}}{{end}}{{end}}{{end}}</div>{{end}}</div>{{end}}
+{{if not $tiles}}<p class="empty">No readings on this day. <a href="#record">Add one</a> below.</p>{{end}}
+<div id="record">{{template "boxed" (form (.Action "record") "more" "taken_at,tz" "import_key" newKey "back" (or ($.Asked "back") $.Path))}}</div>
+</section>{{end}}
+{{- with $d.recent}}
+<section class="group" aria-label="Last entries">
+<div class="panel-head"><h2>Last entries</h2><a href="/days">Every day</a></div>
+<ul class="plain">{{range .}}<li>{{template "dayentry" (dict "v" $ "e" .)}}</li>{{end}}</ul></section>{{end}}
+</div>
+</div>
+{{template "foot" .}}{{end}}
+
+{{/* leaf is the calendar leaf of a day: the month on its band, the day's number under it; it opens that month */}}
+{{define "leaf"}}<a class="leaf" href="/months/{{slice . 0 7}}" aria-label="{{monthBand .}}, the calendar of the month"><span class="leaf-month">{{monthBand .}}</span><span class="leaf-day">{{dayOfMonth .}}</span></a>{{end}}
+
+{{/* mood is a day's mood beside its heading */}}
+{{define "mood"}}{{with .}} <span class="mood" title="Mood">{{template "moodwords" .}}</span>{{end}}{{end}}
+

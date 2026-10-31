@@ -132,8 +132,9 @@ func (l Link) Entity() *Entity {
 
 // Action is a Siren action. Class (standard Siren) is at most one of ActionClasses: what the action does to the
 // resource. Description (what the action does, for an agent), Owner (the owner's alone) and Danger (it hides or
-// retracts what is there) are extensions. Hint is the browser's short text for the form: it
-// is not on the wire, so a client, the CLI and the MCP tools keep reading Description.
+// retracts what is there) are extensions. Hint is the short text of the action's form, in plain words for a person:
+// a client that draws a form shows it in place of Description, which is the API text. The CLI and the MCP tools keep
+// reading Description.
 type Action struct {
 	Name        string   `json:"name"`
 	Class       []string `json:"class,omitempty"`
@@ -141,7 +142,7 @@ type Action struct {
 	Danger      bool     `json:"danger,omitempty"`
 	Title       string   `json:"title,omitempty"`
 	Description string   `json:"description,omitempty"`
-	Hint        string   `json:"-"`
+	Hint        string   `json:"hint,omitempty"`
 	Method      string   `json:"method"`
 	Href        string   `json:"href"`
 	Type        string   `json:"type,omitempty"`

@@ -159,7 +159,7 @@ flowchart TB
     S["schema.sql: the tables, CHECKs, triggers and lifelog_meta. The domain model and every rule about the data."]
   end
   subgraph R1["ring 1: the writer, in Go"]
-    C["internal/core, db, text, photo, preview: transactions, and only what SQLite cannot say"]
+    C["internal/core, db, photo, preview, and text (a public package: the read-only grammar of titles and wikilinks): transactions, and only what SQLite cannot say"]
   end
   subgraph R2["ring 2: the catalog and its surfaces"]
     K["internal/api and cmd/lifelog: one catalog, one Siren handler, the forms, the CLI's do, all generated from the catalog. siren, client and app are public packages of this ring (app: the package a connected app serves its catalog with)."]
@@ -189,7 +189,7 @@ it draws the entity on the origin of the API, with the forms that post to it.
 
 - **Ordinary Go first.** Follow [Go Code Review Comments](https://go.dev/wiki/CodeReviewComments): clear names,
   early error returns, cohesive packages, explicit dependencies and small public surfaces. Keep supporting packages
-  under `internal/`, except `siren`, `client` and `app`, the packages the Go extensions import (`app`: the package a connected app serves its catalog with). Prefer the standard library; justify a dependency by the complexity or risk it removes.
+  under `internal/`, except `siren`, `client`, `app` and `text`, the packages the Go extensions import (`app`: the package a connected app serves its catalog with; `text`: the read-only grammar of titles and wikilinks that a UI needs, the Go reference of [titles and wikilinks](docs/contract/titles-and-wikilinks.md)), and `lifelogtest`, the kit for the tests of extensions only. Prefer the standard library; justify a dependency by the complexity or risk it removes.
 - **A rule about the data is a CHECK or a trigger, never Go.** When a write must be refused because of what the row
   says (a range, a shape, a state, a relation to another row), the refusal is written in `schema.sql`, with its
   decision, its mutant and its suite witness; the Go cites the constraint name and lets the file refuse. Go holds

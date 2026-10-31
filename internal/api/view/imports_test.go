@@ -43,7 +43,7 @@ func TestTheViewImportsNoStore(t *testing.T) {
 			walk(view)
 			// pixelart is a leaf package of drawings with no import of this module. The view reads the names of the icon
 			// sheet from it, so that the names have one home.
-			want := map[string]bool{view: true, "lifelog/siren": true, "lifelog/internal/text": true,
+			want := map[string]bool{view: true, "lifelog/siren": true, "lifelog/text": true,
 				"lifelog/internal/pixelart": true}
 			for path := range seen {
 				if !want[path] {

@@ -14,7 +14,7 @@ import (
 	"github.com/yuin/goldmark/util"
 	"golang.org/x/text/unicode/norm"
 
-	"lifelog/internal/text"
+	"lifelog/text"
 )
 
 // CommonMark owns links and images before eligible plain text is enhanced. The links panel,
@@ -122,7 +122,7 @@ var wikiAtStart = regexp.MustCompile(`^(!?)\[\[([^\[\]\n\r]*)\]\]`)
 
 // enhanceText joins adjacent text segments before decoding, but never crosses an inline
 // container or line break. Existing anchors, images, code and HTML are left to CommonMark.
-// It decodes the joined run, not each node as internal/text does: after a hard line break, goldmark can put the
+// It decodes the joined run, not each node as text does: after a hard line break, goldmark can put the
 // backslash of an escape and the next character in two nodes, and only the joined run decodes that escape.
 func enhanceText(parent ast.Node, source []byte) {
 	for c := parent.FirstChild(); c != nil; {

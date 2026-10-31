@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"lifelog/internal/core"
-	"lifelog/internal/text"
 	"lifelog/siren"
+	"lifelog/text"
 )
 
 var weekPattern = regexp.MustCompile(`^(\d{4})-W(\d{2})$`)

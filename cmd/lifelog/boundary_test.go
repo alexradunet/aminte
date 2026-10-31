@@ -13,7 +13,7 @@ import (
 
 // The two tests of this file keep the rings of plan 135 (AGENTS.md, "The four rings"): the core is the file, the
 // writer and the catalog, and everything that names a third party or talks to one is an extension. Both read the Go
-// source of internal/, cmd/, siren/, client/ and app/ that is not a test.
+// source of internal/, cmd/, siren/, client/, app/, text/ and lifelogtest/ that is not a test.
 
 // thirdParties are the products and companies the core never names. A thing that names one is an extension; the
 // change that moves it out adds its name here.
@@ -76,12 +76,12 @@ var remoteAllowed = map[string]bool{
 	"cmd/lifelog/with.go":             true, // the same children, when serve probes them before it registers them (plan 154)
 }
 
-// coreSources is the Go source of internal/, cmd/, siren/, client/ and app/ that is not a test, by its path relative to the repo root.
+// coreSources is the Go source of internal/, cmd/, siren/, client/, app/, text/ and lifelogtest/ that is not a test, by its path relative to the repo root.
 func coreSources(t *testing.T) map[string]string {
 	t.Helper()
 	root := filepath.Join("..", "..")
 	out := map[string]string{}
-	for _, dir := range []string{"internal", "cmd", "siren", "client", "app"} {
+	for _, dir := range []string{"internal", "cmd", "siren", "client", "app", "text", "lifelogtest"} {
 		err := filepath.WalkDir(filepath.Join(root, dir), func(path string, d os.DirEntry, err error) error {
 			if err != nil {
 				return err

@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"maps"
 
-	"lifelog/internal/text"
+	"lifelog/text"
 )
 
 // Resync is what ResyncLinks did: the live pages whose links it rewrote, by id, and what rewriting them made, revived

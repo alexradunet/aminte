@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"lifelog/internal/text"
+	"lifelog/text"
 )
 
 func TestMeasurementsAreAppendOnly(t *testing.T) {

@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"lifelog/internal/photo/phototest"
-	"lifelog/internal/text"
+	"lifelog/text"
 )
 
 func sha(c byte) string { return strings.Repeat(string(c), 64) }

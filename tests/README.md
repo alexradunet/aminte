@@ -70,7 +70,7 @@ the document (a broken block makes a later step impossible) reports that as one 
 **The vectors have one home per subject**: the table of [titles and wikilinks](../docs/contract/titles-and-wikilinks.md)
 and [exact time](../docs/contract/exact-time.md).
 The wikilink suites read them from the page (with the boundary cases the line under the table states) and run them through the
-writer's extraction (`internal/text`) and its save (`internal/core`); `internal/text` has its own tests against the
+writer's extraction (`text`) and its save (`internal/core`); `text` has its own tests against the
 same table. Every save path here runs against the DDL under test, so a mutant of `schema.sql` reaches it.
 Boundary probes roll back every case, including unexpected success under a mutant.
 
@@ -80,7 +80,7 @@ embeds the file as it is. They import four packages of the writer, each for one 
 
 | package | why |
 |---|---|
-| `internal/text` | the rules that the contract gives a writer to compute: the title predicate, `title_key`, the wikilinks and the `#tags`; and the writer's checks of a day and an instant |
+| `text` | the rules that the contract gives a writer to compute: the title predicate, `title_key`, the wikilinks and the `#tags`; and the writer's checks of a day and an instant |
 | `internal/core` | the writer's own save (a body, a capture, a kept file), run on the DDL under test |
 | `internal/db` | the type that `core.Store` writes through, around the suite's own connection |
 | `internal/photo/phototest` | the synthetic JPEG of a file's preview: the DDL checks that a preview starts with the bytes of a JPEG |

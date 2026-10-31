@@ -23,7 +23,7 @@ import (
 	"lifelog/internal/core"
 	"lifelog/internal/db"
 	"lifelog/internal/photo/phototest"
-	"lifelog/internal/text"
+	"lifelog/text"
 
 	_ "modernc.org/sqlite"
 )

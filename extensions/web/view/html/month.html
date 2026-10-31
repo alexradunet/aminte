@@ -1,0 +1,12 @@
+{{/* The calendar (docs/plans/092-the-app-shell.md): the weeks of a month, Monday first. A day with a page is tinted,
+     with its first line, its cover and its mood; today is framed; each day opens its day view, which holds the rest. */}}
+{{define "month"}}{{template "head" .}}
+{{$m := .Props}}
+{{template "page-head" (dict "v" . "title" .Title "sub" "zoom" "current" "month" "tools" "period-steps" "name" "month")}}
+{{template "period-page" (dict "v" . "name" "month")}}
+<div class="scroll"><table class="calendar">
+{{template "weekdays" false}}
+<tbody>{{range weeks $m.days}}<tr>{{range .}}{{if .}}<td{{if .page}} class="written{{if .picture}} pictured{{end}}"{{end}}{{if eq .day $.Today}} aria-current="date"{{end}}><a href="/days/{{.day}}">{{with .picture}}<img class="cell-cover" src="{{.}}" alt="" loading="lazy">{{end}}<span class="n">{{dayOfMonth .day}}</span>{{with .first_line}}<span class="first">{{.}}</span>{{end}}
+{{- with .mood}}<span class="meta">{{template "moodwords" .}}</span>{{end}}</a></td>{{else}}<td></td>{{end}}{{end}}</tr>
+{{end}}</tbody></table></div>
+{{template "foot" .}}{{end}}

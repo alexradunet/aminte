@@ -103,6 +103,9 @@ func (h *server) pageEntity(ctx context.Context, id int64) (*siren.Entity, error
 	if p.Type == "metric" { // the page of a metric links its readings, and its readings link the page
 		e.Links = append(e.Links, link("series", siren.MetricHref(p.Title), "Readings"))
 	}
+	if day := conversationDay(p.Title); day != "" { // the page of a conversation links the talk of its day, which carries the page
+		e.Links = append(e.Links, link("conversation", conversationHref(day), "Conversation"))
+	}
 	e.Links = append(e.Links, coverLinks(p)...)
 	// register-metric turns a plain page into the metric; not a period page or a category (core's promotable)
 	if p.Type == "page" && !p.IsDayPage && p.Period == "" && p.DeletedAt == "" && !slices.ContainsFunc(p.In, func(l core.Edge) bool { return l.Kind == "part-of" }) {

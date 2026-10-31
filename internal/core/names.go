@@ -7,7 +7,7 @@ import (
 	"regexp"
 	"strings"
 
-	"lifelog/internal/text"
+	"lifelog/text"
 )
 
 // insertPage is the universal insert convention (cookbook/capture.md): entities first, RETURNING id, then the

@@ -14,8 +14,8 @@ import (
 	"time"
 
 	"lifelog/internal/core"
-	"lifelog/internal/text"
 	"lifelog/siren"
+	"lifelog/text"
 )
 
 // conversationCategory is the category page that every conversation page is filed in.

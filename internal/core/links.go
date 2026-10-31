@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"errors"
 
-	"lifelog/internal/text"
+	"lifelog/text"
 )
 
 // Sync is what a body save did to the page's wikilinks (docs/contract/titles-and-wikilinks.md: the UI reports

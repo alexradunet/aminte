@@ -12,7 +12,7 @@ import (
 )
 
 // The vectors are read from the contract page itself, the language-neutral home of the rules.
-const contract = "../../docs/contract/titles-and-wikilinks.md"
+const contract = "../docs/contract/titles-and-wikilinks.md"
 
 // cells splits a markdown table row on the | that are not escaped as \|.
 func cells(row string) []string {

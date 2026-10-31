@@ -1,0 +1,52 @@
+{{/* The stream (docs/plans/130-the-explore-pass.md): the Calendar opens on the days of the record as cards, the
+     newest first, 30 a page, then Older days. A card holds up to four plain lines of the journal, the mood, the cover,
+     the people as chips, the birthdays, and the pages of the day; a day with no day page is a slim card
+     with no words. Days, Month and Year are the zoom of the Calendar. */}}
+{{define "stream"}}{{template "head" .}}{{$s := .Props}}
+{{template "page-head" (dict "v" . "title" "Days" "sub" "zoom" "current" "days" "tools" "stream-tools")}}
+<div class="stream">
+{{range $s.cards}}{{template "day-card" (dict "v" $ "c" .)}}
+{{else}}<p class="empty">Nothing yet. A day is here when it has a journal, a page, a file or a reading.</p>{{end}}
+{{$prev := .Link "prev"}}{{$next := .Link "next"}}{{if or $prev $next}}<nav class="pager" aria-label="Pages">{{with $prev}}<a href="{{.}}" rel="prev">← Newer days</a>{{else}}<span></span>{{end}}{{with $next}}<a href="{{.}}" rel="next">Older days →</a>{{end}}</nav>{{end}}
+</div>
+{{template "foot" .}}{{end}}
+
+{{/* day-card is one day of the stream. It takes v (the view) and c (the card). */}}
+{{define "day-card"}}{{$v := .v}}{{with .c}}<article class="day-card{{if not .page_id}} slim{{end}}" aria-label="{{.day}}">
+<div class="card-head"><a class="date" href="/days/{{.day}}">{{.day}}</a><span class="weekday">{{weekday .day}}</span>{{with .mood}}<span class="meta">{{template "moodwords" .}}</span>{{end}}</div>
+<div class="card-body">
+{{with .picture}}<a class="card-cover" href="/days/{{$.c.day}}"><img src="{{.}}" alt="" loading="lazy"></a>{{end}}
+<div class="card-text">
+{{with .words}}<p class="card-words">{{.}}</p>{{end}}
+{{if or .people .birthdays}}<ul class="card-chips" aria-label="People">{{range .people}}<li><a href="{{.href}}">{{icon "people"}}{{.title}}</a></li>{{end}}{{with .more_chips}}<li><a href="/days/{{$.c.day}}">+{{num .}}</a></li>{{end}}{{range .birthdays}}<li><a href="{{.href}}">Birthday: {{.title}}</a></li>{{end}}</ul>{{end}}
+{{with .pages}}<p class="card-pages">+ {{count (beyond . 0 $.c.more_pages) "page" "pages"}}: {{range $i, $p := .}}{{if $i}}, {{end}}<a href="{{.href}}">{{.title}}</a>{{end}}{{with $.c.more_pages}}, <a href="/days/{{$.c.day}}">and {{num .}} more</a>{{end}}</p>{{end}}
+{{with .readings}}<p class="meta">{{count . "reading" "readings"}}</p>{{end}}
+</div>
+</div>
+</article>{{end}}{{end}}
+
+{{/* zoom is the levels of the Calendar (docs/plans/130-the-explore-pass.md, part 3): Days, Month and Year, the one
+     the page is marked, then Today. It takes v (the view) and current (days, month or year). */}}
+{{/* stream-tools are the tools that the Days view adds to its head: a random day, and Go to a day. */}}
+{{define "stream-tools"}}{{template "random" (dict "a" (.v.Action "random-page") "label" "A random day")}}
+{{template "boxed" (form (.v.Action "open-day") "button" "Go to a day")}}{{end}}
+
+{{/* period-steps are the buttons to the previous and the next period (a week, a month, a year) among the tools of its
+     head. It takes v and name. */}}
+{{define "period-steps"}}{{$v := .v}}{{$name := .name}}
+{{- with $v.Link "prev"}}
+{{template "step" (dict "href" . "rel" "prev" "label" (printf "Previous %s, %s" $name ($v.LinkTitle "prev")) "text" ($v.LinkTitle "prev"))}}{{end}}
+{{- with $v.Link "next"}}
+{{template "step" (dict "href" . "rel" "next" "label" (printf "Next %s, %s" $name ($v.LinkTitle "next")) "text" ($v.LinkTitle "next"))}}{{end}}{{end}}
+
+{{define "zoom"}}{{$v := .v}}{{$c := .current}}<nav class="kinds chips zoom" aria-label="Zoom">
+{{- with $v.Link "days"}}<a href="{{.}}"{{if eq $c "days"}} aria-current="page"{{end}}>Days</a>{{end}}
+{{- with $v.Link "week"}}<a href="{{.}}"{{if eq $c "week"}} aria-current="page"{{end}}>Week</a>{{end}}
+{{- with $v.Link "month"}}<a href="{{.}}"{{if eq $c "month"}} aria-current="page"{{end}}>Month</a>{{end}}
+{{- with $v.Link "year"}}<a href="{{.}}"{{if eq $c "year"}} aria-current="page"{{end}}>Year</a>{{end}}
+<a href="/days/today">Today</a></nav>{{end}}
+
+{{/* random is a quiet button that opens a thing picked at random (docs/plans/130-the-explore-pass.md, part 5): a GET
+     form of the action random-page, with its prefilled kind hidden. It takes a (the action) and label. Nothing is
+     drawn without the action. The rail's New stays the one loud button. */}}
+{{define "random"}}{{$label := .label}}{{with .a}}<form class="tiny" method="GET" action="{{.Href}}" data-action="{{.Name}}">{{range .Fields}}{{$f := .}}{{with .Value}}<input type="hidden" name="{{$f.Name}}" value="{{num .}}">{{end}}{{end}}<button class="quiet">{{$label}}</button></form>{{end}}{{end}}

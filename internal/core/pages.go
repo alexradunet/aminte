@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"lifelog/internal/text"
+	"lifelog/text"
 )
 
 // saveBody is Store.SaveBody in t. A stale version is a conflict unless the body sent is the body the page holds:

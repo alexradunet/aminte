@@ -6,7 +6,7 @@ import (
 	"sort"
 	"strings"
 
-	"lifelog/internal/text"
+	"lifelog/text"
 )
 
 // dates: time (lifelog_meta.instants and .days, D10) — instants, local days and their round-trip CHECKs, why `IS`

@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"lifelog/internal/core"
-	"lifelog/internal/text"
 	"lifelog/siren"
+	"lifelog/text"
 )
 
 // recentDays is how many of the newest day pages the root shows.

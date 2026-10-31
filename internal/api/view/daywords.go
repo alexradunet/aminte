@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"time"
 
-	"lifelog/internal/text"
+	"lifelog/text"
 )
 
 // The calendar in words and numbers: days stepped, weekdays, and the cells of a month.

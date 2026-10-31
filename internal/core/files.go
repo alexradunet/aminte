@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"lifelog/internal/preview"
-	"lifelog/internal/text"
+	"lifelog/text"
 )
 
 // FileIn is a file to keep (docs/cookbook/keep-a-file.md, D9): the hash and type of the original, which is never

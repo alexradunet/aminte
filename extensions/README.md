@@ -11,7 +11,10 @@ third party: an extension does.
 
 - It lives in its own folder under `extensions/`, with its own module and its own `README.md` that gives its build line.
 - It never imports `lifelog/internal`: Go refuses it. In Go it requires `lifelog v0.0.0` with `replace lifelog => ../..`
-  and imports `lifelog/siren`, `lifelog/client` and, for the tools of a model, `lifelog/client/tools`.
+  and imports `lifelog/siren`, `lifelog/client`, `lifelog/app` (a catalog of its own) and, for the tools of a model,
+  `lifelog/client/tools`. An extension that draws pages also imports `lifelog/text`, the Go reference of the grammar of
+  titles and wikilinks ([titles and wikilinks](../docs/contract/titles-and-wikilinks.md)). A test file of an extension
+  may import `lifelog/lifelogtest`: a real core handler over a fresh synthetic file, in the process. No program imports it.
   `go mod verify` reports `lifelog v0.0.0: missing ziphash`: a directory replace has no zip, and this is not a fault; `go mod tidy -diff` is the check that the module files are in order.
 - It never opens `life.db`. There is one writer per file. The extension reads and writes through the HTTP API.
 - It keeps its own state (a token, a cursor) in its own folder under the user's configuration folder, for example
@@ -335,3 +338,4 @@ the rule that exists already ([API.md](../API.md)). `GET /actions` of the server
 | `extensions/mcp` | `lifelog-mcp` | `lifelog mcp [--agent NAME]` | `agent:NAME`, default `agent:mcp` | yes: `LIFELOG_URL`, else `--url`, else it refuses; `--source` is refused as today |
 | `extensions/ticktick` | `lifelog-ticktick` | `lifelog ticktick login`, `lifelog ticktick sync [--url U]`, and `lifelog serve --with ticktick` (the always-on way, as the task service) | `import:ticktick` | yes: `LIFELOG_URL`, else `--url`, else it refuses; `login` needs none |
 | `extensions/whatsapp` | `lifelog-whatsapp` | `lifelog serve --with whatsapp` (the always-on way), `lifelog whatsapp login` and `lifelog whatsapp [--terminal] [--url U] [--token-file F]` (the number is the setting `owner_number`) | `agent:whatsapp` | yes: `LIFELOG_URL`, else `--url`, else it refuses; `login` needs none |
+| `extensions/web` | `lifelog-web` | `lifelog serve --with web` (the always-on way) and `lifelog web` (a trial on a `life.db` that exists) | `ui` (the writer of the browser) | yes: `LIFELOG_URL`, else it refuses; `LIFELOG_WEB_LISTEN` is its door (`127.0.0.1:7780`, a loopback address only) |

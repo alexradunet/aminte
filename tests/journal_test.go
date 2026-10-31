@@ -6,7 +6,7 @@ import (
 	"slices"
 	"strings"
 
-	"lifelog/internal/text"
+	"lifelog/text"
 )
 
 // journal: the journal (D5, D15, D22, D23) — the day page and its CHECK, capture that appends to it

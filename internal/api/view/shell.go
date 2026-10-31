@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"lifelog/internal/pixelart"
-	"lifelog/internal/text"
 	"lifelog/siren"
+	"lifelog/text"
 )
 
 // The shell is the frame of every page a browser gets (docs/plans/092-the-app-shell.md): the sidebar, with today's

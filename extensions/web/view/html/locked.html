@@ -1,0 +1,11 @@
+{{define "locked"}}{{template "head" .}}
+{{$p := .Props}}
+<header class="page-head"><div class="what"><span class="kind">Lifelog</span><h1>Locked</h1></div></header>
+<p><small class="desc">This browser is locked, because it was idle or the owner locked it. Type the PIN to go on. The page shows nothing of the journal until then.</small></p>
+{{if $p.failed}}<div class="alert danger" role="alert"><p><strong>Refused.</strong> That PIN is not the owner's.</p></div>{{end}}
+<form method="POST" action="/unlock">
+<input type="hidden" name="next" value="{{$p.next}}">
+<label><span>PIN <small>required</small></span><input type="password" name="pin" required inputmode="numeric" autocomplete="off" pattern="[0-9]{4,8}" autofocus></label>
+<button class="primary">Unlock</button></form>
+<form method="POST" action="/logout" class="inline"><button class="quiet">Log out</button></form>
+{{template "foot" .}}{{end}}

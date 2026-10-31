@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"lifelog/internal/text"
+	"lifelog/text"
 )
 
 // The lines of the readings (docs/plans/093-words-phone-and-today.md): the line of a metric's recent readings on its

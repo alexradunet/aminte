@@ -1,0 +1,226 @@
+package web
+
+import (
+	"context"
+	"errors"
+	"io"
+	"log"
+	"net/http"
+	"net/url"
+	"slices"
+	"strings"
+
+	"lifelog-web/view"
+	"lifelog/siren"
+)
+
+// embedField is the query parameter that asks the core for an embedding (API.md, "Embedding"). A page of the browser
+// never takes it: the cards of a page are read by web itself.
+const embedField = "embed"
+
+// feedbackField is the one-use receipt of the toast after a write. Web alone reads it (the write side of web), so
+// web does not send it to the core.
+const feedbackField = "feedback"
+
+// refRel is the rel of the sub-entities of a conversation that name what its agent touched.
+const refRel = "ref"
+
+// page is the answer to a GET of any path that web does not serve itself. It asks the core for the same path and
+// query as Siren JSON and then does one of three things with the answer:
+//
+//   - A redirect of the core is the redirect of the browser. A path of the core is a path of web.
+//   - A Siren entity is drawn as a page, in the shell, with the status of the core.
+//   - Any other answer (a picture, a file) streams to the browser as the core sent it.
+func (b *Browser) page(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Query().Has(embedField) { // refused, not ignored: a page reads its sub-entities itself
+		b.fail(w, r, http.StatusUnprocessableEntity, siren.CodeInvalid, "embed is a parameter of the Siren answer, not of a page")
+		return
+	}
+	uri := coreURI(r.URL)
+	if r.URL.Path == "/" { // Home is the page of today, and one read gives the shell too (homeOf)
+		uri = withEmbed(uri, "today,conversation")
+	}
+	res, err := b.core.get(r.Context(), uri, pageWriter, r.Header)
+	if err != nil {
+		b.unreachable(w, r, err)
+		return
+	}
+	defer res.Body.Close()
+	switch {
+	case isRedirect(res.StatusCode):
+		b.redirect(w, r, res.Header.Get("Location"), res.StatusCode)
+	case isSiren(res):
+		e, err := b.core.readEntity(res)
+		if err != nil {
+			logFault(r, "the answer of the core cannot be read", err)
+			b.fail(w, r, http.StatusBadGateway, siren.CodeUpstream, "the core gave an answer that is not an entity")
+			return
+		}
+		b.draw(w, r, res.StatusCode, e, res.Header.Get("Retry-After"))
+	default:
+		stream(w, r, res)
+	}
+}
+
+// draw answers with the page of e, which the core answered with status. retryAfter is the header of that answer.
+func (b *Browser) draw(w http.ResponseWriter, r *http.Request, status int, e *siren.Entity, retryAfter string) {
+	var root *siren.Entity // the root of the API with the day of today and the chat embedded, when this page asked for it
+	if r.URL.Path == "/" && status < http.StatusBadRequest {
+		var ok bool
+		if root, e, ok = b.homeOf(r.Context(), e); !ok {
+			b.fail(w, r, http.StatusBadGateway, siren.CodeUpstream, "the core gave no day of today")
+			return
+		}
+	}
+	if status < http.StatusBadRequest {
+		if to := ownView(e); to != "" {
+			b.redirect(w, r, withQuery(to, coreQuery(r.URL)), http.StatusSeeOther)
+			return
+		}
+		if slices.Contains(e.Class, "conversation") {
+			// The conversation view is the chat at full size: the core embeds the entity at each address that its
+			// tool lines name. A read that fails keeps the page without its cards.
+			if full, _ := b.core.read(r.Context(), withEmbed(coreURI(r.URL), refRel), pageWriter); full != nil {
+				e = full
+			}
+		}
+	}
+	f := view.Facts{URL: r.URL}
+	b.shellFacts(r, status, root, e, &f)
+	body, err := view.Draw(e, f)
+	if err != nil {
+		logFault(r, "the view "+view.TemplateOf(e)+" cannot be drawn", err)
+		status, body = http.StatusInternalServerError, []byte(view.DrawFailed)
+	}
+	write(w, r, status, body, retryAfter, true)
+}
+
+// homeOf is the page of Home, from the root of the API read with ?embed=today,conversation: the day of today. The
+// root is the shell too. A day that the embedding did not give is read from its link. ok is false when the root has
+// no day of today.
+func (b *Browser) homeOf(ctx context.Context, root *siren.Entity) (_, home *siren.Entity, ok bool) {
+	i := slices.IndexFunc(root.Entities, func(l siren.Link) bool { return l.HasRel("today") })
+	if i < 0 {
+		return nil, nil, false
+	}
+	today := root.Entities[i]
+	if today.Embedded() {
+		return root, today.Entity(), true
+	}
+	if home = b.core.entity(ctx, today.Href, pageWriter, 1); home == nil {
+		return nil, nil, false
+	}
+	return root, home, true
+}
+
+// ownView is the address of the view that carries the page e, "" when e has none. A live metric and a live conversation
+// page each have one view in a browser: the series of the metric and the conversation of the day. The page links to
+// that view (API.md, "page, person, file"), and the view carries the page. The page of a deleted metric or conversation
+// stays a page.
+func ownView(e *siren.Entity) string {
+	if slices.Contains(e.Class, "deleted") {
+		return ""
+	}
+	for _, v := range []struct{ class, rel string }{{"metric", "series"}, {"page", "conversation"}} {
+		if l := e.LinkByRel(v.rel); l != nil && slices.Contains(e.Class, v.class) && isPath(l.Href) {
+			return l.Href
+		}
+	}
+	return ""
+}
+
+// redirect sends the browser to another address of web. A Location that is not a path would send the browser to
+// another host, so it is a fault of the core.
+func (b *Browser) redirect(w http.ResponseWriter, r *http.Request, to string, status int) {
+	if !isPath(to) {
+		b.fail(w, r, http.StatusBadGateway, siren.CodeUpstream, "the core sent a redirect that is not a path")
+		return
+	}
+	http.Redirect(w, r, to, status)
+}
+
+// stream sends the answer of the core to the browser as it is: the status, the headers that describe the content, and
+// the body, which is copied and never held whole. A HEAD gets the headers alone.
+func stream(w http.ResponseWriter, r *http.Request, res *http.Response) {
+	for _, name := range relayed {
+		if v := res.Header.Values(name); len(v) > 0 {
+			w.Header()[http.CanonicalHeaderKey(name)] = v
+		}
+	}
+	w.WriteHeader(res.StatusCode)
+	if r.Method == http.MethodHead {
+		return
+	}
+	if _, err := io.Copy(w, res.Body); err != nil && !errors.Is(err, context.Canceled) {
+		logFault(r, "the answer of the core was not sent", err)
+	}
+}
+
+// relayed are the headers of a streamed answer that web passes to the browser: the ones that describe the content, how
+// long a browser keeps it, what a conditional or a range request needs, and the nosniff of the plain text of a route
+// that does not exist.
+var relayed = []string{"Content-Type", "Content-Length", "Content-Disposition", "Cache-Control", "ETag", "Last-Modified",
+	"Accept-Ranges", "Content-Range", "Retry-After", "X-Content-Type-Options"}
+
+// write sends the page: its status, its body and its headers. A page of the shell asks the browser to prerender the
+// links of the rules in speculation.json. A 503 of the core keeps the Retry-After that the core sent.
+func write(w http.ResponseWriter, r *http.Request, status int, body []byte, retryAfter string, shell bool) {
+	h := w.Header()
+	h.Set("Content-Type", "text/html; charset=utf-8")
+	if shell {
+		h.Set("Speculation-Rules", `"/assets/speculation.json"`) // a quoted URL string
+	}
+	if status == http.StatusServiceUnavailable && retryAfter != "" {
+		h.Set("Retry-After", retryAfter)
+	}
+	w.WriteHeader(status)
+	if r.Method == http.MethodHead {
+		return
+	}
+	if _, err := w.Write(body); err != nil {
+		logFault(r, "the page was not sent", err)
+	}
+}
+
+// coreURI is the path and the query of u as a read of the core takes them: the query without the receipt of the toast.
+func coreURI(u *url.URL) string { return withQuery(u.EscapedPath(), coreQuery(u)) }
+
+// coreQuery is the raw query of u without the receipt of the toast. The other pairs stay as the browser sent them.
+func coreQuery(u *url.URL) string {
+	var kept []string
+	for pair := range strings.SplitSeq(u.RawQuery, "&") {
+		name, _, _ := strings.Cut(pair, "=")
+		if name, err := url.QueryUnescape(name); pair != "" && (err != nil || name != feedbackField) {
+			kept = append(kept, pair)
+		}
+	}
+	return strings.Join(kept, "&")
+}
+
+// withQuery is path with the raw query, when there is one.
+func withQuery(path, rawQuery string) string {
+	if rawQuery == "" {
+		return path
+	}
+	if strings.Contains(path, "?") {
+		return path + "&" + rawQuery
+	}
+	return path + "?" + rawQuery
+}
+
+// withEmbed is uri with the parameter embed.
+func withEmbed(uri, rels string) string { return withQuery(uri, embedField+"="+rels) }
+
+// logFault writes a fault of this program to the standard log: the route, what failed and the cause. The browser never
+// gets the cause. The route is the pattern that the request matched, and not its path, because a path can name a
+// person or a metric. A request that the browser cancelled is no fault.
+func logFault(r *http.Request, what string, err error) {
+	if errors.Is(err, context.Canceled) {
+		return
+	}
+	route := r.Pattern
+	if route == "" {
+		route = r.Method
+	}
+	log.Printf("lifelog-web: %s: %s: %v", route, what, err)
+}

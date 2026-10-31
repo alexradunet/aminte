@@ -1,0 +1,300 @@
+{{define "head"}}<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="manifest" href="/manifest.webmanifest"><link rel="icon" href="/assets/icon.svg" type="image/svg+xml">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#efe2bd"><meta name="theme-color" media="(prefers-color-scheme: dark)" content="#140c06">
+<title>{{.Title}} · Lifelog</title>
+<style data-sheet="base">{{basecss}}</style>
+<style data-sheet="app">{{appcss}}</style>
+</head><body{{if .Shell}} data-ground="{{.Shell.Ground}}"{{end}}>
+<a class="skip" href="#main">Skip to the content</a>
+<div class="shell{{if not .Shell}} bare{{end}}">
+{{if .Shell}}{{template "rail" .}}{{end}}
+<div class="column">
+<main id="main">
+{{template "feedback" .}}
+{{end}}
+
+{{/* rail is the sidebar (docs/plans/092-the-app-shell.md): the brand and today, the search, New, the sections of
+     every day (Today, Calendar, Metrics and Browse, docs/plans/117-one-browse-view.md) and the owner's links. This
+     month is on Calendar, not here: one view of it. A page with no shell (the login) has none. On a phone (docs/plans/093-words-phone-and-today.md) the head is a top bar, the sections of every
+     day a bottom bar with More, and the rest (#sections) a popover sheet over the page that More opens and Close,
+     Escape or a tap outside closes: no script (docs/plans/108-the-browser-made-current.md). Chat is the link to the
+     conversation of today; on a phone the bar shows the button of the chat column (#chat) in its place, except on the
+     conversation, where the link is the one marked. New opens a menu of the
+     kinds the same way, each made on its list (docs/plans/114-one-way-to-do-a-thing.md). The access keys (k the
+     search, n New, t Today, c the capture, [ and ] the previous and next page) are the browser's own, with its
+     modifier. When the lock is on (docs/plans/160-the-lock.md), the Lock button joins the foot of the More sheet and l, lock
+     joins the keys. On a wide screen the sheet is part of the rail, so the access key l works there. */}}
+{{define "rail"}}{{$nav := .Nav}}<aside class="rail">
+<div class="rail-head">{{range $nav}}{{if eq .Group "home"}}<a class="brand" href="{{.Href}}"{{if .Current}} aria-current="page"{{end}}>{{.Title}}</a>{{end}}{{end}}{{with .Today}}<span class="date">{{shortDay .}}</span>{{end}}
+<button type="button" class="rail-search-link button" commandfor="palette" command="show-modal" aria-label="Search">{{icon "search"}}</button></div>
+<button type="button" class="rail-search button" commandfor="palette" command="show-modal" accesskey="k">{{icon "search"}}Search<kbd title="The access key k, with the browser's modifier, is the search">k</kbd></button>
+<button type="button" class="button primary rail-new" popovertarget="new-menu" accesskey="n">{{icon "new"}}New</button>
+<div class="new-menu" id="new-menu" popover><div class="new-menu-head"><span class="label">New</span><button type="button" class="button small" popovertarget="new-menu" popovertargetaction="hide">Close</button></div>
+<nav aria-label="New"><ul>{{range .NewKinds}}<li><a href="{{.Href}}">{{icon .Icon}}{{.Title}}</a></li>{{end}}</ul></nav></div>
+<nav aria-label="Sections">
+<ul>{{range $nav}}{{if eq .Group "day"}}<li>{{template "navlink" .}}</li>{{end}}{{end}}
+{{range $nav}}{{if eq .Group "apps"}}<li class="nav-app">{{template "navlink" .}}</li>{{end}}{{end}}
+{{range $nav}}{{if eq .Group "chat"}}<li class="nav-chat">{{template "navlink" .}}</li>{{end}}{{end}}
+{{if .Chat}}<li class="rail-chat-link"><button type="button" popovertarget="chat">{{icon "chat"}}Chat</button></li>{{end}}
+<li class="rail-more-link"><button type="button" popovertarget="sections"{{if .InMore}} class="here"{{end}}>{{icon "more"}}More</button></li></ul>
+</nav>
+<div class="rail-more" id="sections" popover>
+<div class="rail-more-head"><span class="label">More</span><button type="button" class="button small" popovertarget="sections" popovertargetaction="hide">Close</button></div>
+{{template "today-strip" .}}
+{{with .Apps}}<nav class="rail-apps" aria-label="Apps"><ul>{{range .}}<li>{{template "navlink" .}}</li>{{end}}</ul></nav>{{end}}
+<p class="rail-foot">Owner{{range $nav}}{{if eq .Group "owner"}} · <a href="{{.Href}}"{{if .Current}} aria-current="page"{{end}}>{{.Title}}</a>{{end}}{{end}} · <a href="/actions?new=snapshot">Snapshot</a></p>
+{{if .Shell.LockMinutes}}<form class="rail-lock" method="POST" action="/lock"><button type="submit" class="button" accesskey="l">Lock<kbd title="The access key l, with the browser's modifier, locks this browser">l</kbd></button></form>{{end}}
+</div>
+</aside>{{end}}
+
+{{/* today-strip is the Today strip (entry, mood, habits): one view of the data, drawn twice. The More sheet of the rail
+     holds it, and on a narrow screen the head of Home and of today's day holds it too (today-inline in app.css, hidden
+     on a wide screen, where the rail shows it). It takes the view. */}}
+{{define "today-strip"}}{{with .Strip}}<section class="rail-today" aria-label="Today"><div class="line"><b>Today</b><span class="n">{{.DoneCount}} of {{.Total}} done</span></div>
+<div class="chips"><a class="chip{{if .Written}} done{{end}}" href="/days/today#capture">{{if .Written}}✓ {{end}}entry</a><a class="chip{{if .Mood}} done{{end}}" href="/days/today#capture">{{if .Mood}}✓ {{end}}mood</a>{{range .Habits}}{{if eq .State "open"}}<a class="chip" href="{{.Href $.ReturnHere}}">{{.Name}}</a>{{else if eq .State "done"}}<span class="chip done">✓ {{.Name}}</span>{{else}}<span class="chip">{{.Name}} · no</span>{{end}}{{end}}</div>
+{{if ge .Streak 2}}<div class="streak">{{.Streak}} days in a row</div>{{end}}</section>{{end}}{{end}}
+
+{{define "navlink"}}<a href="{{.Href}}"{{if .Current}} aria-current="page"{{end}}{{with .Key}} accesskey="{{.}}"{{end}}>{{icon .Icon}}{{.Title}}</a>{{end}}
+
+{{/* feedback is what a browser form's POST did, carried across the redirect by a one-use receipt: the toast of the
+     design system, at the top of the page, where it stays until the next page, for it may name what the write did
+     not do. It is an open dialog in the flow of the page: Escape closes it (closedby), and so does its Close, a
+     form of the dialog's own; no script. */}}
+{{define "feedback"}}{{if .Result}}<dialog open closedby="closerequest" class="toast" aria-label="Result"><h2>Result</h2>{{range .ResultLines}}<p>{{.HTML}}</p>{{with .Form}}<form class="undo" method="post" action="{{.Href}}">{{range .Hidden}}<input type="hidden" name="{{index . 0}}" value="{{index . 1}}">{{end}}<button class="small quiet">{{.Label}}</button></form>{{end}}{{end}}<form method="dialog" class="tiny"><button class="close">Close</button></form></dialog>{{end}}{{end}}
+
+{{/* foot closes the page: the footer with the access keys and the search dialog
+     (docs/plans/108-the-browser-made-current.md): a modal the rail's Search opens by its command, with the search
+     form inside, so a page by its title or the words of a body is one key away; Escape or a tap outside closes it. */}}
+{{define "foot"}}</main>
+<footer><p>Lifelog, the one writer of <code>life.db</code>.</p>{{if .Shell}}<p class="keys"><small>Access keys, with the browser's modifier: <kbd>k</kbd> search · <kbd>n</kbd> new · <kbd>c</kbd> capture · <kbd>t</kbd> today · <kbd>[</kbd> <kbd>]</kbd> previous, next{{if .Shell.LockMinutes}} · <kbd>l</kbd> lock{{end}}</small></p>{{end}}</footer>
+</div>
+{{if .Shell}}<dialog class="palette" id="palette" closedby="any" aria-label="Search">
+<search><form method="GET" action="/search"><input type="search" name="q" autocomplete="off" aria-label="Search" placeholder="A page's title, or words of a body"></form></search>
+<p class="meta">Enter searches · <kbd>Escape</kbd> closes · access keys, with the browser's modifier: <kbd>k</kbd> search · <kbd>n</kbd> new · <kbd>c</kbd> capture · <kbd>t</kbd> today · <kbd>[</kbd> <kbd>]</kbd> previous, next{{if .Shell.LockMinutes}} · <kbd>l</kbd> lock{{end}}</p>
+</dialog>
+{{template "chat" .}}{{end}}
+</div>
+{{if .Shell}}<script src="/assets/chat.js" defer></script>
+{{if .Shell.LockMinutes}}<script src="/assets/lock.js" data-minutes="{{.Shell.LockMinutes}}" defer></script>
+{{end}}{{end}}</body></html>{{end}}
+
+{{/* monthbox is a month as the year draws it: its name, how many of its days are written, and its
+     days in the rows of a calendar, Monday first; a day with a page is tinted, today is framed. It takes href, name,
+     written, days (the month resource's days: day, page) and today. */}}
+{{define "monthbox"}}<div class="month-box">
+<div class="month-head"><a href="{{.href}}">{{.name}}</a><span class="meta">{{num .written}} written</span></div>
+<table class="month">{{template "weekdays" true}}
+<tbody>{{$today := .today}}{{range weeks .days}}<tr>{{range .}}<td>{{if .}}<a href="/days/{{.day}}"{{if .page}} class="written"{{end}}{{if eq .day $today}} aria-current="date"{{end}} aria-label="{{shortDay .day}}{{if .page}}, written{{end}}">{{dayOfMonth .day}}</a>{{end}}</td>{{end}}</tr>
+{{end}}</tbody></table></div>{{end}}
+
+{{/* weekdays is the header row of a calendar, Monday first: one letter a day when short, else three */}}
+{{define "weekdays"}}<thead><tr>{{if .}}<th scope="col" abbr="Monday">M</th><th scope="col" abbr="Tuesday">T</th><th scope="col" abbr="Wednesday">W</th><th scope="col" abbr="Thursday">T</th><th scope="col" abbr="Friday">F</th><th scope="col" abbr="Saturday">S</th><th scope="col" abbr="Sunday">S</th>{{else}}<th scope="col" abbr="Monday">Mon</th><th scope="col" abbr="Tuesday">Tue</th><th scope="col" abbr="Wednesday">Wed</th><th scope="col" abbr="Thursday">Thu</th><th scope="col" abbr="Friday">Fri</th><th scope="col" abbr="Saturday">Sat</th><th scope="col" abbr="Sunday">Sun</th>{{end}}</tr></thead>{{end}}
+
+{{/* moodwords are a day's moods in words, "mood 3, 4": each current reading, in the order it was recorded. One mood
+     also says its word, "mood 4 · good". */}}
+{{define "moodwords"}}{{with .}}mood {{range $i, $m := .}}{{if $i}}, {{end}}{{num $m}}{{end}}{{if eq (len .) 1}}{{with moodWord (index . 0)}} · {{.}}{{end}}{{end}}{{end}}{{end}}
+
+{{/* dayentry is a day page in a list: its date (with the year when it is not this year's), its first line and its
+     mood. It takes v (the view) and e (the entry: day, first_line, mood, picture); with cover set, an entry that has a
+     picture draws it first, as a row of a list does. */}}
+{{define "dayentry"}}{{$v := .v}}{{$cover := .cover}}{{with .e}}<a class="entry{{if and $cover .picture}} covered{{end}}" href="/days/{{.day}}"><span class="date">{{$v.Date .day}}</span>{{if $cover}}{{template "cover-picture" .}}{{end}}<span class="first">{{.first_line}}</span><span class="meta">{{template "moodwords" .mood}}</span></a>{{end}}{{end}}
+
+
+{{/* step is the previous or next day, week, month or year: a button whose text a phone shortens to the arrow (the
+     label keeps the whole name). It takes href, rel (prev or next), label and text. */}}
+{{define "step"}}<a class="button step" accesskey="{{if eq .rel "prev"}}[{{else}}]{{end}}" href="{{.href}}" rel="{{.rel}}" aria-label="{{.label}}">{{if eq .rel "prev"}}<span aria-hidden="true">‹</span><span class="step-day">{{.text}}</span>{{else}}<span class="step-day">{{.text}}</span><span aria-hidden="true">›</span>{{end}}</a>{{end}}
+
+{{/* reading-link is a reading as a link to its own page: its value, and its unit when it has one. It takes id,
+     value and unit. */}}
+{{define "reading-link"}}<a class="reading" href="/measurements/{{num .id}}">{{num .value}}{{with .unit}} <span class="unit">{{.}}</span>{{end}}</a>{{end}}
+
+{{/* body-editor is the fold that edits the body of a page with save-body (the day, a page): it is closed, and a
+     refused save answers with the error page, which keeps the words sent. It takes action (save-body; nothing is drawn
+     without it), back (the page
+     the browser returns to) and summary (the words of the fold). */}}
+{{define "body-editor"}}{{with form .action "button" "Save" "back" .back}}<details class="body-editor"{{if .Asked}} open{{end}}><summary>{{$.summary}}</summary>
+<small class="desc">CommonMark. [[Title]] links a page and #tag a tag page; both are created if new. Nothing is saved until the version you read is still the current one.</small>
+{{template "form" .}}</details>{{end}}{{end}}
+
+{{/* rejected-names is the note under a body that lists the [[names]] in it that make no link, because a title cannot
+     hold them. It takes the body; nothing is drawn when each name makes a link. */}}
+{{define "rejected-names"}}{{with rejected .}}<div class="alert" role="note"><p>These names make no link — a title cannot hold <code>/ \ : * ? " &lt; &gt; |</code>, or start or end with a dot or space:</p>
+<p>{{range $i, $t := .}}{{if $i}}, {{end}}<code>[[{{$t}}]]</code>{{end}}</p></div>{{end}}{{end}}
+
+{{/* typed-links are the typed links of a page or a metric by kind: each kind, then its pages, each with the note of
+     its link. It takes v (the view) and links (the page's links). */}}
+{{define "typed-links"}}{{$v := .v}}<dl>{{range group .links "kind"}}<dt>{{.Key}}</dt>
+<dd>{{range .Items}}<a href="/pages/{{num .id}}">{{$v.Date .title}}</a>{{with .note}} <small>({{.}})</small>{{end}}{{end}}</dd>{{end}}</dl>{{end}}
+
+{{/* categories are the categories of a page or a metric as badges (docs/plans/114-one-way-to-do-a-thing.md): each
+     with x, which removes that part-of link (file-pages with from), and + Add, which puts the page in a category: the form of
+     file-pages, whose ids and move the page fills in (this page's id, 0), and whose category offers the titles of the
+     categories (a new name makes a new category). It takes v (the view) and back. */}}
+{{define "categories"}}{{$v := .v}}{{$back := .back}}{{$file := form ($v.Action "file-pages") "class" "inline" "button" "Add" "hide" "ids,move" "outside" "from" "required" "category" "back" $back}}
+{{$cats := $v.Categories}}
+{{if or $file $cats}}<div class="categories" role="group" aria-label="Categories"><span class="label">Categories</span>
+{{range $cats}}{{$t := .title}}<span class="badge category"><a href="/pages/{{num .id}}">{{$t}}</a>{{if $file}}{{template "form" (form ($v.Action "file-pages") "ids" ($file.Field "ids").Value "from" $t "outside" "category,move" "class" "tiny" "button" "×" "aria" (print "Remove from " $t) "back" $back)}}{{end}}</span>{{end}}
+{{if not $cats}}<span class="meta">none</span>{{end}}
+{{with $file}}<details class="add-category"{{if .Asked}} open{{end}}><summary class="button small">+ Add</summary>
+{{template "form" .}}</details>{{end}}</div>{{end}}{{end}}
+
+{{/* pick-bar is the one way to act on several things of a list (docs/plans/114-one-way-to-do-a-thing.md): Select
+     shows a box on each row, tile or card, and the bar's tools, with no script. The tools are the form of the first
+     action the list offers (id "pick"), and each box joins it by its form attribute, so a card may hold a form of its
+     own; the boxes send its ids. The other action is a second button of the form (Or), which sends the checked ids to
+     its own address and needs no category. The bar comes after the boxes, so a CSS counter counts them on the
+     buttons, and it is drawn first by order, at the top of the list. Select is on when the page asks for the form. It takes back, words (what to check), button (the words of the primary button), from (the category the
+     list is in, or ""; it adds a button that removes the checked rows from it), paths (the title of each
+     category with its path, for the choices of the category field), and the actions: file (file-pages) and del (a
+     delete of several). */}}
+{{define "pick-bar"}}{{$f := form (or .file .del) "id" "pick" "class" "inline" "outside" "ids,from" "required" "category" "button" .button "back" .back}}{{if .paths}}{{$f = $f.Labels "category" .paths}}{{end}}{{if .file}}{{$f = $f.Or (form .del)}}{{end}}
+<div class="pick-bar">
+<label class="pick-toggle button small"><input type="checkbox" class="pick-on"{{if $f.Asked}} checked{{end}}>Select</label>
+<div class="pick-tools"><span class="desc">{{.words}}</span><span class="picked" aria-live="polite"></span>
+{{template "form" $f}}{{with .from}}<button form="pick" name="from" value="{{.}}" formnovalidate>Remove from {{.}}</button>{{end}}</div></div>{{end}}
+
+{{/* pick-box is the box of a row, a tile or a card that joins the form of the pick bar (form="pick"). It takes v (the view,
+     which says what the page asks to have checked), id and title. */}}
+{{define "pick-box"}}<label class="pick-box"><input type="checkbox" name="ids" value="{{num .id}}" form="pick"{{if .v.Picked .id}} checked{{end}} aria-label="Select {{.title}}"></label>{{end}}
+
+{{/* pager draws a list's prev and next links, when it has them */}}
+{{define "pager"}}{{$prev := .Link "prev"}}{{$next := .Link "next"}}{{if or $prev $next}}<nav class="pager" aria-label="Pages">{{with $prev}}<a href="{{.}}" rel="prev">← Previous</a>{{else}}<span></span>{{end}}{{with $next}}<a href="{{.}}" rel="next">Next →</a>{{end}}</nav>{{end}}{{end}}
+
+{{/* form draws one action of the entity (see formOf); nothing when the action is not offered. Its data-action is the action's name, so a test counts the forms of an action on a page (the x of a badge has none: it repeats the Add form). A label wraps its
+     field, so a form needs no layout of its own; the catalog says how tall an area is and which action is a danger.
+     The optional fields a view folds are under "More fields": still in the form, so they are sent with no script
+     (docs/plans/095-the-leaf-and-its-margin.md). A second action of the form (formView.Or) is a button after its own, which
+     sends the form to that action's address. */}}
+{{define "form"}}{{with .}}<form{{with .ID}} id="{{.}}"{{end}} method="{{.Method}}" action="{{.Href}}"{{with .Class}} class="{{.}}"{{end}}{{with .Autocomplete}} autocomplete="{{.}}"{{end}}{{if .Multipart}} enctype="multipart/form-data"{{end}}{{if not .Aria}} data-action="{{.Name}}"{{end}}>
+{{range .Hidden}}<input type="hidden" name="{{.Name}}" value="{{num .Value}}">{{end}}{{with .Back}}<input type="hidden" name="back" value="{{.}}">{{end}}
+{{range .Fields false}}{{template "field" .}}{{end}}{{with .Fields true}}<details class="more-fields"{{if $.MoreOpen}} open{{end}}><summary>{{count (len .) "more field" "more fields"}}</summary>
+{{range .}}{{template "field" .}}{{end}}</details>
+{{end}}{{if .Preview}}<button type="submit" class="quiet" formaction="/render" formmethod="POST" formenctype="application/x-www-form-urlencoded" formtarget="_blank">Preview</button>{{end}}<button{{if .Aria}} class="remove" aria-label="{{.Aria}}"{{else if .Danger}} class="danger"{{else if .Primary}} class="primary"{{end}}>{{if .Opens}}Open{{else}}{{.Button}}{{end}}</button>{{with .Also}}<button{{if .Danger}} class="danger"{{end}} formaction="{{.Href}}" formnovalidate data-action="{{.Name}}">{{.Button}}</button>{{end}}</form>{{end}}{{end}}
+
+{{/* field draws one field of a form: a flag (the options 0 and 1) as one checkbox before its title, a few short
+     options as a row of radio buttons (the options of the field mood also carry their words; a flag that the action requires, as the value of a daily metric, is the words Done and Not done in place of 0 and 1: a small word in the slab, which the sheet shows on the chosen slab), other options as a
+     select, a textarea, or an input of the field's type. A field of page titles with options is an input with a datalist of them (List), so the reader picks a title or
+     types a new one. A select of an optional field starts empty, so the form sends no value that the reader did not
+     pick; a select of a required field with a placeholder starts with that prompt (an empty option), and the
+     browser refuses it until the reader picks. A required radio, textarea or input is marked required, so the browser does not send it empty, and an
+     input with a pattern (formOf) only when its value matches. The word "required" marks a field among others: a form
+     of one field does not say it (Sole), and the browser still refuses an empty box. A form with a text area offers Preview
+     (formView.Preview, drawn by form), which sends the form to /render in a new tab, so the words stay in the form. */}}
+{{define "field"}}{{if checkbox .Field}}<label><input type="checkbox" name="{{.Name}}" value="1"{{if eq (num .Value) "1"}} checked{{end}}{{if .Focus}} autofocus{{end}}><span>{{or .Title .Name}}</span></label>
+{{else if segmented .Field}}<fieldset class="segmented{{if eq .Name "mood"}} faces{{end}}"><legend>{{or .Title .Name}}{{if and .Required (not .Sole)}} <small>required</small>{{end}}</legend>{{$v := num .Value}}{{$n := .Name}}{{$req := .Required}}{{$f := .}}{{range .Options}}{{$o := .}}{{$w := $f.Word $o}}<label{{with $w}} title="{{.}}"{{end}}><input type="radio" name="{{$n}}" value="{{$o}}"{{if eq $o $v}} checked{{end}}{{if $req}} required{{end}}><span>{{if $f.Spoken}}{{$w}}{{else}}{{$o}}{{with $w}} <small>{{.}}</small>{{end}}{{end}}</span></label>{{end}}</fieldset>
+{{else}}<label><span>{{or .Title .Name}}{{if and .Required (not .Sole)}} <small>required</small>{{end}}</span>
+{{if and .Options (not .List)}}<select name="{{.Name}}"{{if and .Required .Placeholder}} required{{end}}{{if .Focus}} autofocus{{end}}>{{$v := num .Value}}{{if and .Required .Placeholder}}<option value="">{{.Placeholder}}</option>{{else if and (not .Required) (ne (index .Options 0) "")}}<option></option>{{end}}{{range .Options}}<option{{if eq . $v}} selected{{end}}>{{.}}</option>{{end}}</select>
+{{else if eq .Type "textarea"}}<textarea name="{{.Name}}"{{with .Rows}} rows="{{.}}"{{end}}{{if .Required}} required{{end}}{{with .Placeholder}} placeholder="{{.}}"{{end}}{{with .Key}} accesskey="{{.}}"{{end}}{{if .Focus}} autofocus{{end}}{{if .Send}} enterkeyhint="send"{{end}}>{{num .Value}}</textarea>
+{{else}}<input type="{{.Type}}" name="{{.Name}}" value="{{num .Value}}"{{if eq .Type "password"}} autocomplete="new-password"{{end}}{{if .Required}} required{{end}}{{with .Pattern}} pattern="{{.}}"{{end}}{{if eq .Type "number"}} step="any" inputmode="decimal"{{end}}{{with .Accept}} accept="{{.}}"{{end}}{{with .List}} list="{{.}}"{{end}}{{with .Placeholder}} placeholder="{{.}}"{{end}}{{if .Focus}} autofocus{{end}}>{{with .List}}<datalist id="{{.}}">{{$labels := $.Labels}}{{range $.Options}}{{$o := .}}{{with index $labels $o}}<option value="{{$o}}">{{.}}{{else}}<option value="{{$o}}">{{end}}{{end}}</datalist>{{end}}{{end}}</label>
+{{end}}{{end}}
+
+{{/* boxed is an action as a button that opens its form (the ActionForm of the design system): with no script, a
+     closed <details>. An owner-only action carries the owner mark. A form with a group (the option "group") shares
+     its name with the others of the group, so the browser keeps one of them open. */}}
+{{define "boxed"}}{{with .}}<details class="action"{{with .Group}} name="{{.}}"{{end}}{{if .Asked}} open{{end}}><summary class="button">{{.Button}}{{if .Owner}} <span class="owner">owner</span>{{end}}</summary><div class="action-form">{{with or .Hint .Description}}<p class="desc">{{.}}</p>{{end}}{{template "form" .}}</div></details>{{end}}{{end}}
+
+{{/* period-page is the page of a period (a week, a month, a year) in its view: the prose above, and the fold that edits
+     it. A period with no page shows the form that makes it (create-page, with the key as the title). It takes v (the
+     view, with page_id, body, version and cover as properties) and name (week, month or year). */}}
+{{define "period-page"}}{{$v := .v}}{{$name := .name}}{{$p := $v.Props}}{{with $p.page_id}}<section class="page-body" aria-label="The page of the period">
+<div class="panel-head"><h2>The {{$name}} page</h2><a href="/pages/{{num .}}">The page</a></div>
+{{if $p.body}}<div class="prose">{{$embed := ""}}{{with $p.cover}}{{$embed = .embed}}{{end}}{{markdownCover $p.body $embed}}</div>{{end}}
+{{template "body-editor" (dict "action" ($v.Action "save-body") "back" ($v.Link "self") "summary" "Edit the page")}}
+</section>{{else}}{{with $v.Action "create-page"}}<section class="group" aria-label="The page of the period">
+<p class="empty">This {{$name}} has no page yet.</p>
+{{template "boxed" (form . "hide" "title,category" "more" "*" "button" (printf "Make the %s page" $name) "back" ($v.Link "self"))}}
+</section>{{end}}{{end}}{{end}}
+
+{{/* menu is the ⋯ menu of a page (docs/plans/159-the-class-of-an-action.md): the actions of the entity that no template
+     places by name and that are not `create`, in three groups: the ones that edit it, the others, and the danger
+     actions, last and apart. The button opens a popover anchored to it (a sheet from the bottom on a phone). Each item
+     is a button that opens a modal dialog with the action's form in it (the command show-modal): no script. A page
+     whose menu is empty draws no button. menu-list and menu-dialogs are its two parts: the chat screen draws them in
+     the popover of its own. */}}
+{{define "menu"}}{{$m := .Menu}}{{if not $m.Empty}}<div class="menu">
+<button type="button" class="button menu-button" popovertarget="menu" aria-label="More actions">⋯</button>
+<div class="menu-list" id="menu" popover><div class="menu-head"><span class="label">More</span><button type="button" class="button small" popovertarget="menu" popovertargetaction="hide">Close</button></div>
+{{template "menu-list" $m}}</div>
+{{template "menu-dialogs" $m}}</div>{{end}}{{end}}
+
+{{/* menu-list is the buttons of the menu, by group. It takes the menu. */}}
+{{define "menu-list"}}{{with .Edit}}<div class="menu-group" role="group" aria-label="Edit"><span class="menu-label">Edit</span>{{template "menu-buttons" .}}</div>{{end}}
+{{with .Other}}<div class="menu-group" role="group" aria-label="Actions">{{template "menu-buttons" .}}</div>{{end}}
+{{with .Danger}}<div class="menu-group danger" role="group" aria-label="Danger">{{template "menu-buttons" .}}</div>{{end}}{{end}}
+
+{{define "menu-buttons"}}{{range .}}<button type="button" class="menu-item" commandfor="{{.ID}}" command="show-modal">{{.Title}}{{if .Owner}} <span class="owner">owner</span>{{end}}</button>{{end}}{{end}}
+
+{{/* menu-dialogs are the dialogs of the menu, one for each item: what the action does, its form and Close (Cancel for a
+     danger action: the dialog is its confirm step). A form that the page's link asked for (?new=<action>) is open in the
+     flow of the page, not modal. It takes the menu. */}}
+{{define "menu-dialogs"}}{{range .Items}}{{template "item-dialog" .}}{{end}}{{end}}
+
+{{/* item-dialog is the dialog of one item (a formItem): a modal one that its button opens, or, when the page's link
+     asked for the form, an open one that is not modal. */}}
+{{define "item-dialog"}}<dialog class="menu-dialog" id="{{.ID}}" closedby="any" aria-label="{{.Title}}"{{if .Open}} open{{end}}>
+<h2>{{.Title}}{{if .Owner}} <span class="owner">owner</span>{{end}}</h2>{{with .Note}}<p class="desc">{{.}}</p>{{end}}
+{{template "form" .Form}}
+<button type="button" class="button small quiet" commandfor="{{.ID}}" command="close"{{if .Danger}} autofocus{{end}}>{{.Close}}</button></dialog>{{end}}
+
+{{/* page-head is the head of every view but the day (docs/plans/159-the-class-of-an-action.md): the kind, the title with
+     the pencil of a title edit, the meta line, the categories, the create buttons and the ⋯ menu. It takes v (the view),
+     title, and optionally kind, categories (draw the categories of the page) and the names of the templates that a
+     view adds: above (before the kind), sub (under the categories) and tools (among the tools, after the create
+     buttons). A template of those names gets the arguments of this call, so it reads v and any more that the caller
+     gave. The pencil and the create buttons open a popover; a form that the page's link asked for (?new=<name>) is an
+     open dialog under the head, in the place of its popover. */}}
+{{define "page-head"}}{{$v := .v}}{{$pencil := $v.Pencil}}{{$creates := $v.Creates}}{{$meta := $v.Meta}}
+<header class="page-head"><div class="what">
+{{with .above}}{{slot . $}}{{end}}
+{{with .kind}}<span class="kind">{{.}}</span>{{end}}
+<div class="title-line"><h1>{{.title}}</h1>{{with $pencil}}<div class="pop"><button type="button" class="button pencil" aria-label="{{.Title}}" title="{{.Title}}" {{if .Open}}commandfor="{{.ID}}" command="close"{{else}}popovertarget="{{.ID}}"{{end}}><svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="currentColor"><path d="M11 1.5l3.5 3.5-8.5 8.5-4.5 1 1-4.5z"/></svg></button>{{template "head-popover" .}}</div>{{end}}</div>
+{{with $meta}}<p class="meta-line">{{range $i, $m := .}}{{if $i}} · {{end}}{{$m}}{{end}}</p>{{end}}
+{{if .categories}}{{template "categories" (dict "v" $v "back" $v.ReturnHere)}}{{end}}
+{{with .sub}}{{slot . $}}{{end}}
+</div>
+<div class="tools">{{range $creates}}<div class="pop"><button type="button" class="button{{if .Primary}} primary{{end}}" {{if .Open}}commandfor="{{.ID}}" command="close"{{else}}popovertarget="{{.ID}}"{{end}}>{{if .Primary}}{{icon "new"}}{{end}}{{.Title}}{{if .Owner}} <span class="owner">owner</span>{{end}}</button>{{template "head-popover" .}}</div>{{end}}
+{{with .tools}}{{slot . $}}{{end}}{{template "menu" $v}}</div></header>
+{{with $pencil}}{{if .Open}}{{template "item-dialog" .}}{{end}}{{end}}{{range $creates}}{{if .Open}}{{template "item-dialog" .}}{{end}}{{end}}{{end}}
+
+{{/* head-popover is the popover of the pencil or of a create button, anchored under its button: what the action does,
+     its form and Close. Nothing when the form is open as a dialog. It takes the item. */}}
+{{define "head-popover"}}{{if not .Open}}<div class="head-pop" id="{{.ID}}" popover aria-label="{{.Title}}">
+<h2>{{.Title}}{{if .Owner}} <span class="owner">owner</span>{{end}}</h2>{{with .Note}}<p class="desc">{{.}}</p>{{end}}
+{{template "form" .Form}}
+<button type="button" class="button small quiet" popovertarget="{{.ID}}" popovertargetaction="hide">{{.Close}}</button></div>{{end}}{{end}}
+
+{{/* generic is the view of any class without a template of its own: the whole entity. Its scalar properties are the meta
+     line of its head; the objects and lists are a panel. Its actions are drawn by their class, never by name: the
+     quick-add line, the create buttons, the pencil and the ⋯ menu. It reads the shape of the entity only,
+     never a class or the name of an app. The three rules (the quick-add, the rows, the two panes) are in
+     extensions/README.md, "How the browser draws a page of an app". */}}
+{{define "generic"}}{{template "head" .}}
+{{template "page-head" (dict "v" . "kind" (rel .Class) "title" .Title)}}
+<div class="panes">
+{{with .SideLinks}}<nav class="side" aria-label="Links"><ul>{{range .}}<li><a href="{{.Href}}" rel="{{rel .Rel}}"{{if $.IsHere .Href}} aria-current="page"{{end}}>{{or .Title .Href}}</a></li>{{end}}</ul></nav>{{end}}
+<div class="pane-main">
+{{with .QuickAdd}}{{template "form" (form ($.Action .Name) "more" "*" "class" "quick-add" "back" $.ReturnHere)}}{{end}}
+{{with .Structured}}<section class="panel" aria-label="Properties"><h2>Properties</h2><div class="scroll">{{$.Value .}}</div></section>{{end}}
+{{with .Entities}}<section class="section" aria-label="Links"><h2>Links</h2><ul class="plain">{{range .}}{{template "row" (dict "v" $ "l" .)}}{{end}}</ul></section>{{end}}
+</div></div>
+{{template "foot" .}}{{end}}
+
+{{/* catalog is /actions: every action of the server, each boxed, so a link with ?new=<action> opens its form (the rail's
+     Snapshot). It is the one page that draws the actions by their names and not by their class. */}}
+{{define "catalog"}}{{template "head" .}}
+<header class="page-head"><div class="what"><h1>{{.Title}}</h1></div></header>
+<div class="panes">
+{{with .SideLinks}}<nav class="side" aria-label="Links"><ul>{{range .}}<li><a href="{{.Href}}" rel="{{rel .Rel}}"{{if $.IsHere .Href}} aria-current="page"{{end}}>{{or .Title .Href}}</a></li>{{end}}</ul></nav>{{end}}
+<div class="pane-main">
+{{with .Actions}}<section class="section" aria-label="Actions"><h2>Actions</h2><div class="actions">{{range .}}{{template "boxed" (form ($.Action .Name))}}{{end}}</div></section>{{end}}
+</div></div>
+{{template "foot" .}}{{end}}
+
+{{/* row is an embedded link of the generic view. With no properties and no actions it is the link and its rel badge.
+     With them, an action of the class toggle with no field is a small round button before the title (its title is the accessible name),
+     the scalar properties are chips after it, and any other action is boxed. It takes v (the view) and l. */}}
+{{define "row"}}{{$v := .v}}{{with .l}}{{$chips := rowChips .}}{{$acts := .Actions}}<li class="row">
+{{if or $chips $acts}}{{range $acts}}{{if roundAction .}}{{template "form" (form . "class" "round" "aria" .Title "back" $v.ReturnHere)}}{{end}}{{end}}<a href="{{.Href}}">{{or .Title .Href}}</a>
+{{range $chips}}<span class="chip">{{.}}</span>{{end}}{{range $acts}}{{if not (roundAction .)}}{{template "boxed" (form . "back" $v.ReturnHere)}}{{end}}{{end}}
+{{else}}<a href="{{.Href}}">{{or .Title .Href}}</a> <span class="badge">{{rel .Rel}}</span>{{end}}</li>{{end}}{{end}}

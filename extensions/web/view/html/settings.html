@@ -1,0 +1,14 @@
+{{/* The settings of the application (docs/plans/146-settings-and-the-chat-column.md), the owner's alone: one form of
+     the action settings, the key as a password input with its value. A save is a redirect back here with the toast.
+     The generic view would list the properties, the key among them, so this view draws the form only, and the link
+     to the backup: a snapshot, which the toast of its answer offers for download. */}}
+{{define "settings"}}{{template "head" .}}
+{{template "page-head" (dict "v" . "kind" "owner" "title" "Settings")}}
+<div class="sheet">
+{{with .Action "settings"}}{{with .Hint}}<p class="desc">{{.}}</p>{{end}}{{template "form" (form . "button" "Save" "autocomplete" "off")}}{{end}}
+</div>
+{{with .Link "snapshot"}}<div class="sheet"><h2>Backup</h2>
+<p class="desc">A snapshot is a checked copy of life.db. When it is taken, download it to keep a copy on this device.</p>
+<p><a class="button" href="{{.}}">{{$.LinkTitle "snapshot"}}</a></p>
+</div>{{end}}
+{{template "foot" .}}{{end}}

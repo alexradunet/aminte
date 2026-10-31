@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"lifelog/internal/db"
-	"lifelog/internal/text"
+	"lifelog/text"
 
 	"modernc.org/sqlite"
 	sqlite3 "modernc.org/sqlite/lib"

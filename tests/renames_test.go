@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"lifelog/internal/core"
-	"lifelog/internal/text"
+	"lifelog/text"
 )
 
 // renames executes the canonical recipe and compares independent storage outcomes

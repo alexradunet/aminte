@@ -1,0 +1,25 @@
+{
+  "name": "Lifelog",
+  "short_name": "Lifelog",
+  "description": "The one writer of life.db",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#3a2210",
+  "theme_color": "#3a2210",
+  "icons": [
+    {"src": "/assets/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
+    {"src": "/assets/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
+    {"src": "/assets/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+  ],
+  "shortcuts": [
+    {"name": "Today", "url": "/days/today"},
+    {"name": "Add to today", "url": "/days/today#capture"}
+  ],
+  "share_target": {
+    "action": "/days/today/capture",
+    "method": "POST",
+    "enctype": "application/x-www-form-urlencoded",
+    "params": {"text": "text"}
+  }
+}

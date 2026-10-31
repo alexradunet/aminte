@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 
-	"lifelog/internal/text"
+	"lifelog/text"
 )
 
 // The calendar's reads (docs/plans/101-the-calendar-holds-every-dated-thing.md): what names a day, over a set of

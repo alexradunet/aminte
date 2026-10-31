@@ -12,12 +12,12 @@ import (
 	"strings"
 	"sync"
 
-	"lifelog/internal/text"
+	"lifelog/text"
 )
 
 // The save contract (contract/titles-and-wikilinks, cookbook/save-a-body, D19). Its vectors live in one place, the
 // table of contract/titles-and-wikilinks; the boundary cases under the table are computed here. The extraction is
-// the writer's (internal/text), every save is either the writer's own (internal/core) or the cookbook's SQL run
+// the writer's (text), every save is either the writer's own (internal/core) or the cookbook's SQL run
 // literally, and both run against the DDL under test.
 
 type vector struct {

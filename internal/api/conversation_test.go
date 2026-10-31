@@ -282,8 +282,19 @@ func TestAConversationPageHasOneViewInABrowser(t *testing.T) {
 	if e := apitest.Must(t)(c.Get(t.Context(), self)); strings.Join(e.Class, " ") != "page" || apitest.Href(e, "self") != self {
 		t.Errorf("the JSON of the page: %v %q, want the page", e.Class, apitest.Href(e, "self"))
 	}
+	// The JSON of the page links to the view that carries it, and the view does not link to itself: a client that
+	// shows the view and not the page (the extension that draws the browser) follows this link.
+	if got, want := apitest.Href(apitest.Must(t)(c.Get(t.Context(), self)), "conversation"), "/days/"+convDay+"/conversation"; got != want {
+		t.Errorf("the link conversation of the page: %q, want %q", got, want)
+	}
+	if got := apitest.Href(apitest.Must(t)(c.Get(t.Context(), "/days/"+convDay+"/conversation")), "conversation"); got != "" {
+		t.Errorf("the conversation links to itself: %q", got)
+	}
 	// A page that is not a conversation, and one with a title that is not of a day, are not redirected.
 	other := apitest.Must(t)(c.Do(t.Context(), apitest.Action(t, apitest.Must(t)(c.Get(t.Context(), "/")), "create-page"), map[string]string{"title": "Conversation notes"}))
+	if got := apitest.Href(apitest.Must(t)(c.Get(t.Context(), apitest.Href(other, "self"))), "conversation"); got != "" {
+		t.Errorf("a page titled Conversation notes links to a conversation: %q", got)
+	}
 	if rec := browser(apitest.Href(other, "self")); rec.Code != http.StatusOK {
 		t.Errorf("a page titled Conversation notes: %d, want 200", rec.Code)
 	}

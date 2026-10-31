@@ -14,7 +14,7 @@ import (
 
 	"golang.org/x/text/unicode/norm"
 	"lifelog/internal/photo/phototest"
-	"lifelog/internal/text"
+	"lifelog/text"
 )
 
 func TestStableRenameKeepsIdentityAndOldReferences(t *testing.T) {

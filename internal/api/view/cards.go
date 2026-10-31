@@ -4,8 +4,8 @@ import (
 	"slices"
 	"strings"
 
-	"lifelog/internal/text"
 	"lifelog/siren"
+	"lifelog/text"
 )
 
 // The cards of a thread (docs/plans/148-the-chat-screen.md): each address that an agent's tool line names is a thing

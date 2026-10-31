@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"lifelog/internal/text"
+	"lifelog/text"
 
 	"modernc.org/sqlite"
 )

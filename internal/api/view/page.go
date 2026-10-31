@@ -17,8 +17,8 @@ import (
 	"slices"
 	"strings"
 
-	"lifelog/internal/text"
 	"lifelog/siren"
+	"lifelog/text"
 )
 
 // The browser view is a template per class of entity (html/*.html), and the generic one for any other class:
