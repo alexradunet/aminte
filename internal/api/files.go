@@ -39,8 +39,8 @@ type fileForm struct {
 }
 
 // addFile keeps a file (docs/cookbook/keep-a-file.md, D9) and answers with its page; Result says what was written.
-func (h *server) addFile(r *http.Request, act spec, src string) (*siren.Entity, error) {
-	f, err := parseFileForm(r, act)
+func (h *server) addFile(r *http.Request, a admitted) (*siren.Entity, error) {
+	f, err := parseFileForm(r, a.act)
 	if err != nil {
 		return nil, err
 	}
@@ -56,7 +56,7 @@ func (h *server) addFile(r *http.Request, act spec, src string) (*siren.Entity, 
 	}
 	in.Day = h.dayNamed(in.Day)
 	if f.Dry {
-		k, err := h.s.TryAddFile(r.Context(), src, in)
+		k, err := h.s.TryAddFile(r.Context(), a.src, in)
 		if err != nil {
 			return nil, err
 		}
@@ -64,7 +64,7 @@ func (h *server) addFile(r *http.Request, act spec, src string) (*siren.Entity, 
 			Properties: map[string]any{"title": in.Title, "sha256": in.SHA256, "mime": in.MIME, "picture": in.Preview != nil},
 			Result:     k, Links: []siren.Link{link("index", "/", "Home")}}, nil
 	}
-	k, err := h.s.AddFile(r.Context(), src, in)
+	k, err := h.s.AddFile(r.Context(), a.src, in)
 	if err != nil {
 		return nil, err
 	}
@@ -348,23 +348,19 @@ func picture(get func(*http.Request) ([]byte, error), cache string) http.Handler
 
 // setCover makes a photo a page's cover (core.SetCover): a new photo sent as original, or a kept file named by
 // title. It answers with the page.
-func (h *server) setCover(r *http.Request, act spec, src string) (*siren.Entity, error) {
-	id, err := idOf(r)
-	if err != nil {
-		return nil, err
-	}
-	f, err := parseFileForm(r, act)
+func (h *server) setCover(r *http.Request, a admitted) (*siren.Entity, error) {
+	f, err := parseFileForm(r, a.act)
 	if err != nil {
 		return nil, err
 	}
 	if !f.Sent {
-		return h.setCoverOf(r, src, id, f.In.Title)
+		return h.setCoverOf(r, a.src, a.id, f.In.Title)
 	}
-	k, err := h.s.SetCover(r.Context(), src, id, h.s.Today(), f.In)
+	k, err := h.s.SetCover(r.Context(), a.src, a.id, h.s.Today(), f.In)
 	if err != nil {
 		return nil, err
 	}
-	return withResult(h.pageEntity(r.Context(), id))(k)
+	return withResult(h.pageEntity(r.Context(), a.id))(k)
 }
 
 func (h *server) setCoverOf(r *http.Request, src string, id int64, title string) (*siren.Entity, error) {

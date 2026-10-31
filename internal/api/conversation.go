@@ -209,11 +209,7 @@ func ParseTurns(day, body string) []Turn {
 }
 
 // say is the owner's turn: it adds the paragraph to the conversation page of the day, made on the first turn.
-func (h *server) say(r *http.Request, act spec, src string) (*siren.Entity, error) {
-	v, err := fieldsOf(r, act)
-	if err != nil {
-		return nil, err
-	}
+func (h *server) say(r *http.Request, a admitted) (*siren.Entity, error) {
 	day, err := h.conversationDayOf(r)
 	if err != nil {
 		return nil, err
@@ -221,15 +217,15 @@ func (h *server) say(r *http.Request, act spec, src string) (*siren.Entity, erro
 	if day != h.s.Today() {
 		return nil, core.Invalid("say is for today: the agent answers today's conversation")
 	}
-	entry := words(v.Get("text"))
+	entry := words(a.v.Get("text"))
 	if entry == "" {
 		return nil, core.Invalid("missing field text")
 	}
-	via := v.Get("via")
+	via := a.v.Get("via")
 	if via != "" && !writerRE.MatchString(via) {
 		return nil, core.Invalid("via %q: a name of letters, digits, _ : . -", via)
 	}
-	_, sync, err := h.s.AppendParagraph(r.Context(), src, ConversationTitle(day), day, conversationCategory,
+	_, sync, err := h.s.AppendParagraph(r.Context(), a.src, ConversationTitle(day), day, conversationCategory,
 		conversationFirstLine(day), ownerParagraph(h.stamp(via), entry))
 	if err != nil {
 		return nil, err

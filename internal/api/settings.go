@@ -43,18 +43,14 @@ func (h *server) settings(r *http.Request) (*siren.Entity, error) {
 
 // saveSettings is the action settings. A field that the request leaves out stays as it is, and an empty one clears
 // that setting (a form sends all of them).
-func (h *server) saveSettings(r *http.Request, act spec, _ string) (*siren.Entity, error) {
-	v, err := fieldsOf(r, act)
-	if err != nil {
-		return nil, err
-	}
+func (h *server) saveSettings(r *http.Request, a admitted) (*siren.Entity, error) {
 	s, err := h.s.ReadSettings()
 	if err != nil {
 		return nil, err
 	}
 	for name, to := range map[string]*string{"model_url": &s.ModelURL, "model": &s.Model, "model_key": &s.ModelKey, "owner_number": &s.OwnerNumber} {
-		if v.Has(name) {
-			*to = strings.TrimSpace(v.Get(name))
+		if a.v.Has(name) {
+			*to = strings.TrimSpace(a.v.Get(name))
 		}
 	}
 	if s.OwnerNumber != "" && strings.Trim(s.OwnerNumber, "0123456789") != "" {

@@ -22,7 +22,7 @@ import (
 // folder. That they are never MCP tools is a test of the extension extensions/mcp (TestTheToolsAreTheActionsThatAreNotTheOwners).
 func TestOwnerOnlyActionsPolicy(t *testing.T) {
 	d, snapshots := dbtest.New(t), t.TempDir()
-	h := api.New(&core.Store{DB: d, SnapshotDir: snapshots})
+	h := api.NewWith(&core.Store{DB: d, SnapshotDir: snapshots}, nil)
 	catalog := apitest.Must(t)(client.InProcess(h, "agent:policy-test").Get(t.Context(), "/actions"))
 	// The catalog has owner reads and owner writes, and an ordinary action is not the owner's. The loop below
 	// reads the catalog's own mark, so a new owner action needs no edit here.
@@ -73,7 +73,7 @@ func TestOwnerOnlyActionsPolicy(t *testing.T) {
 // CHECK, so the boundary refuses the name: "Agent:x" must not pass as the owner by missing the prefix "agent:".
 func TestMalformedWriterIsRefusedByTheSchemaOrTheOwnerCheck(t *testing.T) {
 	d := dbtest.New(t)
-	h := api.New(&core.Store{DB: d, SnapshotDir: t.TempDir()})
+	h := api.NewWith(&core.Store{DB: d, SnapshotDir: t.TempDir()}, nil)
 	catalog := apitest.Must(t)(client.InProcess(h, "cli").Get(t.Context(), "/actions"))
 	for _, source := range []string{"Bad Source!", "Agent:x", strings.Repeat("a", 65)} {
 		c := client.InProcess(h, source)
@@ -98,7 +98,7 @@ func TestMalformedWriterIsRefusedByTheSchemaOrTheOwnerCheck(t *testing.T) {
 func TestRebuildSearchIsTheOwnersRepair(t *testing.T) {
 	d := dbtest.New(t)
 	s := &core.Store{DB: d}
-	h := api.New(s)
+	h := api.NewWith(s, nil)
 	if _, err := d.W.ExecContext(t.Context(), `INSERT INTO entities_fts(rowid, preferred, all_names, body) VALUES (999, 'ghost', 'ghost', 'drifted')`); err != nil {
 		t.Fatal(err)
 	}
@@ -137,7 +137,7 @@ func TestRebuildSearchIsTheOwnersRepair(t *testing.T) {
 func TestResyncLinksIsTheOwnersRepair(t *testing.T) {
 	d := dbtest.New(t)
 	s := &core.Store{DB: d}
-	h := api.New(s)
+	h := api.NewWith(s, nil)
 	to, _, err := s.CreatePage(t.Context(), "cli", "Bridge", "", "")
 	if err != nil {
 		t.Fatal(err)

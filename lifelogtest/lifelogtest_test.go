@@ -2,9 +2,11 @@ package lifelogtest_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -112,14 +114,13 @@ func TestAConnectedAppIsInTheCatalogAndAnswersItsRoutes(t *testing.T) {
 	}
 }
 
-// TestConnectTasksMakesTheServiceTasks registers a small task service and reads Tasks through the server: the list of
-// the service is a list of the page.
-func TestConnectTasksMakesTheServiceTasks(t *testing.T) {
+// taskService is a small task service: the catalog has the class tasks and the six writes, and GET /lists gives one list.
+func taskService(t *testing.T) http.Handler {
 	var writes []siren.Action
 	for _, href := range []string{"/tasks", "/tasks/{id}", "/tasks/{id}/complete", "/tasks/{id}/reopen", "/tasks/{id}/delete", "/sync"} {
 		writes = append(writes, siren.Action{Name: "w" + href, Method: "POST", Href: href})
 	}
-	service := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		e := &siren.Entity{Class: []string{"tasks"}, Properties: map[string]any{"tasks": []any{}}}
 		switch r.URL.Path {
 		case "/actions":
@@ -132,17 +133,93 @@ func TestConnectTasksMakesTheServiceTasks(t *testing.T) {
 			t.Error(err)
 		}
 	})
+}
+
+// TestAChildWithTheClassTasksMakesTheServiceTasks registers a small task service and reads Tasks through the server:
+// the list of the service is a list of the page. Connect reads the class, as serve does, and so ConnectTasks, which is
+// Connect, does too.
+func TestAChildWithTheClassTasksMakesTheServiceTasks(t *testing.T) {
+	for name, connect := range map[string]func(*lifelogtest.Server, testing.TB, string, http.Handler){
+		"Connect":      (*lifelogtest.Server).Connect,
+		"ConnectTasks": (*lifelogtest.Server).ConnectTasks,
+	} {
+		t.Run(name, func(t *testing.T) {
+			s := lifelogtest.New(t, "2031-05-14")
+			connect(s, t, "svc", taskService(t))
+			tasks, err := client.Remote(s.URL, "cli", "").Get(t.Context(), "/tasks")
+			if err != nil {
+				t.Fatalf("GET /tasks: %v", err)
+			}
+			b, err := json.Marshal(tasks)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !strings.Contains(string(b), `"Home"`) {
+				t.Errorf("GET /tasks does not name the list Home: %s", b)
+			}
+		})
+	}
+}
+
+// failure is a testing.TB that records the first Fatalf and ends the goroutine, as t.Fatalf does: a test sees the
+// refusal of a helper that fails its test. The other methods are those of the test that made it.
+type failure struct {
+	testing.TB
+	said chan string
+}
+
+func (f failure) Fatalf(format string, args ...any) {
+	f.said <- fmt.Sprintf(format, args...)
+	runtime.Goexit()
+}
+
+// refusal runs Connect of a child on its own goroutine, as a test does, and gives what Connect said when it failed the
+// test, or "" when it did not.
+func refusal(t *testing.T, name string, h http.Handler) string {
+	t.Helper()
 	s := lifelogtest.New(t, "2031-05-14")
-	s.ConnectTasks(t, "svc", service)
-	tasks, err := client.Remote(s.URL, "cli", "").Get(t.Context(), "/tasks")
-	if err != nil {
-		t.Fatalf("GET /tasks: %v", err)
+	f := failure{TB: t, said: make(chan string, 1)}
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		s.Connect(f, name, h)
+	}()
+	<-done
+	select {
+	case said := <-f.said:
+		return said
+	default:
+		return ""
 	}
-	b, err := json.Marshal(tasks)
-	if err != nil {
-		t.Fatal(err)
+}
+
+// TestTheKitRefusesWhatServeRefuses: Connect makes the handshake of serve, so a catalog that serve refuses fails the
+// test with the words of the server. A child with no class actions has no catalog; a child with the class tasks and
+// not the six writes is refused by the registry.
+func TestTheKitRefusesWhatServeRefuses(t *testing.T) {
+	answer := func(class []string, actions ...siren.Action) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/vnd.siren+json")
+			e := &siren.Entity{Class: class, Title: "Child", Actions: actions, Properties: map[string]any{"lists": []any{}}}
+			if err := json.NewEncoder(w).Encode(e); err != nil {
+				t.Error(err)
+			}
+		})
 	}
-	if !strings.Contains(string(b), `"Home"`) {
-		t.Errorf("GET /tasks does not name the list Home: %s", b)
+	for _, tc := range []struct {
+		name string
+		h    http.Handler
+		want string // what the failure says; "" when the catalog is taken
+	}{
+		{"no class actions", answer([]string{"demo"}, siren.Action{Name: "ping", Method: "POST", Href: "/ping"}), "no catalog"},
+		{"a class tasks with no writes", answer([]string{"actions", "tasks"}), "catalog refused"},
+		{"an app", answer([]string{"actions"}, siren.Action{Name: "ping", Method: "POST", Href: "/ping"}), ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			said := refusal(t, "demo", tc.h)
+			if tc.want == "" && said != "" || !strings.Contains(said, tc.want) {
+				t.Errorf("Connect said %q, want %q", said, tc.want)
+			}
+		})
 	}
 }

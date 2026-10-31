@@ -24,7 +24,7 @@ func conversationStore(t *testing.T) (*client.Client, http.Handler, *core.Store)
 	t.Helper()
 	at := time.Date(2031, 5, 14, 9, 7, 0, 0, time.UTC)
 	s := &core.Store{DB: dbtest.New(t), Clock: func() time.Time { return at }, Zone: time.FixedZone("test", 2*3600)}
-	h := api.New(s)
+	h := api.NewWith(s, nil)
 	return client.InProcess(h, "cli"), h, s
 }
 

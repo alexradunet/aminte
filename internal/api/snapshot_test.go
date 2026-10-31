@@ -25,7 +25,7 @@ func TestSnapshotIsTheOwnersFromAnySurface(t *testing.T) {
 	d := dbtest.New(t)
 	dir := t.TempDir()
 	clock := func() time.Time { return time.Date(2026, 10, 2, 14, 30, 5, 0, time.UTC) }
-	h := api.New(&core.Store{DB: d, SnapshotDir: dir, Clock: clock, Zone: time.UTC})
+	h := api.NewWith(&core.Store{DB: d, SnapshotDir: dir, Clock: clock, Zone: time.UTC}, nil)
 	owner := client.InProcess(h, "cli")
 	agent := client.InProcess(h, "agent:lmstudio")
 	root := apitest.Must(t)(owner.Get(t.Context(), "/"))
@@ -78,7 +78,7 @@ func TestASnapshotThatFailsItsRestoreCheckIsAnError(t *testing.T) {
 	d := dbtest.New(t)
 	dir := t.TempDir()
 	clock := func() time.Time { return time.Date(2026, 10, 2, 14, 30, 5, 0, time.UTC) }
-	h := api.New(&core.Store{DB: d, SnapshotDir: dir, Clock: clock, Zone: time.UTC})
+	h := api.NewWith(&core.Store{DB: d, SnapshotDir: dir, Clock: clock, Zone: time.UTC}, nil)
 	owner := client.InProcess(h, "cli")
 	root := apitest.Must(t)(owner.Get(t.Context(), "/"))
 	apitest.Must(t)(owner.Do(t.Context(), apitest.Action(t, root, "register-metric"), map[string]string{"name": "Walk"}))
@@ -116,7 +116,7 @@ func TestOnlyARefusedSnapshotIsSnapshotRefused(t *testing.T) {
 		t.Helper()
 		req := httptest.NewRequestWithContext(ctx, "POST", "/snapshots", nil)
 		rec := httptest.NewRecorder()
-		api.New(&core.Store{DB: d, SnapshotDir: dir}).ServeHTTP(rec, req)
+		api.NewWith(&core.Store{DB: d, SnapshotDir: dir}, nil).ServeHTTP(rec, req)
 		var e siren.Entity
 		if err := json.Unmarshal(rec.Body.Bytes(), &e); err != nil {
 			t.Fatalf("the answer is not an entity: %v: %s", err, rec.Body.String())
@@ -164,7 +164,7 @@ func TestASnapshotIsDownloadedByTheOwner(t *testing.T) {
 	d := dbtest.New(t)
 	dir := t.TempDir()
 	clock := func() time.Time { return time.Date(2026, 10, 2, 14, 30, 5, 0, time.UTC) }
-	h := api.New(&core.Store{DB: d, SnapshotDir: dir, Clock: clock, Zone: time.UTC, SettingsPath: filepath.Join(t.TempDir(), "life.settings.json")})
+	h := api.NewWith(&core.Store{DB: d, SnapshotDir: dir, Clock: clock, Zone: time.UTC, SettingsPath: filepath.Join(t.TempDir(), "life.settings.json")}, nil)
 	owner := client.InProcess(h, "cli")
 	e := apitest.Must(t)(owner.Do(t.Context(), apitest.Action(t, apitest.Must(t)(owner.Get(t.Context(), "/")), "snapshot"), nil))
 	if got := apitest.Href(e, "download"); got != "/snapshots/life-2026-10-02.db" {

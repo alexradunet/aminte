@@ -24,7 +24,7 @@ func panicOf(f func()) (msg string) {
 // TestMountPanicsWhenTheCatalogAndTheHandlersDisagree: an action with no handler, or a handler with no action, stops
 // the server at start. When they agree, each action gets a route with its method and its path.
 func TestMountPanicsWhenTheCatalogAndTheHandlersDisagree(t *testing.T) {
-	run := func(*http.Request, spec, string) (*siren.Entity, error) { return &siren.Entity{}, nil }
+	run := func(*http.Request, admitted) (*siren.Entity, error) { return &siren.Entity{}, nil }
 	cat := []spec{{Name: "read", Method: "GET", Path: "/read"}, {Name: "write", Method: "POST", Path: "/things/{id}/write"}}
 	for _, tc := range []struct {
 		name     string
@@ -69,8 +69,8 @@ func TestMountReadsTheWriterAndRefusesAnAgentAnOwnerAction(t *testing.T) {
 		{Name: "keep", Method: "POST", Path: "/keep", Owner: true},
 	}
 	for _, s := range cat {
-		handlers[s.Name] = func(_ *http.Request, act spec, writer string) (*siren.Entity, error) {
-			ran, src, given = s.Name, writer, act.Method+" "+act.Path
+		handlers[s.Name] = func(_ *http.Request, a admitted) (*siren.Entity, error) {
+			ran, src, given = s.Name, a.src, a.act.Method+" "+a.act.Path
 			return &siren.Entity{Title: s.Name}, nil
 		}
 	}
@@ -114,12 +114,96 @@ func TestMountReadsTheWriterAndRefusesAnAgentAnOwnerAction(t *testing.T) {
 	}
 }
 
+// TestMountAdmitsARequestBeforeTheHandlerRuns: admit is the one opening of an action. An Owner row refuses a writer that
+// is not the owner first, then a path id that is not a number is 404, then the fields are checked (required, unknown
+// name, 415 for a multipart body). The handler runs only after all that, and gets the id and the fields. An action with a
+// file field gets no fields from admit: parseFileForm reads them.
+func TestMountAdmitsARequestBeforeTheHandlerRuns(t *testing.T) {
+	var got admitted
+	var ran bool
+	handlers := map[string]actionFunc{}
+	cat := []spec{
+		{Name: "edit", Method: "POST", Path: "/things/{id}/edit",
+			Fields: []siren.Field{path("id", "number", "Thing"), req("title", "text", "Title")}},
+		{Name: "keep", Method: "POST", Path: "/keep", Owner: true, Fields: []siren.Field{opt("word", "text", "Word")}},
+		{Name: "send", Method: "POST", Path: "/send", Fields: []siren.Field{opt("original", "file", "File")}},
+		{Name: "word", Method: "POST", Path: "/words/{id}", Fields: []siren.Field{path("id", "text", "Word")}},
+	}
+	for _, s := range cat {
+		handlers[s.Name] = func(_ *http.Request, a admitted) (*siren.Entity, error) {
+			ran, got = true, a
+			return &siren.Entity{Title: s.Name}, nil
+		}
+	}
+	m := http.NewServeMux()
+	(&server{}).mount(m, cat, handlers)
+	const form = "application/x-www-form-urlencoded"
+	const multipart = "multipart/form-data; boundary=x"
+	post := func(path, source, ctype, body string) *httptest.ResponseRecorder {
+		ran, got = false, admitted{}
+		req := httptest.NewRequest("POST", path, strings.NewReader(body))
+		req.Header.Set("Content-Type", ctype)
+		if source != "" {
+			req.Header.Set(siren.SourceHeader, source)
+		}
+		rec := httptest.NewRecorder()
+		m.ServeHTTP(rec, req)
+		return rec
+	}
+	for _, tc := range []struct {
+		name, path, source, ctype, body string
+		status                          int
+	}{
+		{"the id and the fields", "/things/7/edit", "", form, "title=a", http.StatusOK},
+		{"an id that is not a number", "/things/seven/edit", "", form, "title=a", http.StatusNotFound},
+		{"a missing field", "/things/7/edit", "", form, "", http.StatusUnprocessableEntity},
+		{"an unknown name", "/things/7/edit", "", form, "title=a&nope=1", http.StatusUnprocessableEntity},
+		{"a multipart body", "/things/7/edit", "", multipart, "--x--", http.StatusUnsupportedMediaType},
+		{"an agent at an owner action, with an unknown name", "/keep", "agent:x", form, "nope=1", http.StatusForbidden},
+		{"the owner at an owner action, with an unknown name", "/keep", "cli", form, "nope=1", http.StatusUnprocessableEntity},
+		{"a file field", "/send", "", multipart, "--x--", http.StatusOK},
+		{"an id that is text", "/words/seven", "", form, "", http.StatusOK},
+	} {
+		rec := post(tc.path, tc.source, tc.ctype, tc.body)
+		if rec.Code != tc.status || ran != (tc.status == http.StatusOK) {
+			t.Errorf("%s: status %d, handler ran %v; want %d, ran %v: %.200s", tc.name, rec.Code, ran, tc.status, tc.status == http.StatusOK, rec.Body.String())
+		}
+	}
+	post("/things/7/edit", "", form, "title=a")
+	if got.id != 7 || got.v.Get("title") != "a" || got.src != "api" || got.act.Name != "edit" {
+		t.Errorf("the handler got id %d, title %q, writer %q, action %q; want 7, a, api, edit", got.id, got.v.Get("title"), got.src, got.act.Name)
+	}
+	post("/send", "", multipart, "--x--")
+	if got.v != nil {
+		t.Errorf("the action with a file field got fields from admit: %v", got.v)
+	}
+}
+
+// TestTheForwardAdmitsTheRowOfTheAppAndParsesNoId: the route of the forward to an app names no {id}, so admit parses no
+// id, whatever the app says of its path fields. The values that the forward sends are the fields that the request names.
+func TestTheForwardAdmitsTheRowOfTheAppAndParsesNoId(t *testing.T) {
+	row := specOfApp("demo", siren.Action{Name: "touch", Method: "POST", Href: "/things/{id}/touch",
+		Fields: []siren.Field{path("id", "number", "Thing"), opt("note", "text", "Note"), opt("other", "text", "Other")}})
+	req := httptest.NewRequest("POST", "/with/demo/things/abc/touch", strings.NewReader("note=n"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	a, err := admit(req, row)
+	if err != nil {
+		t.Fatalf("admit: %v", err)
+	}
+	if a.id != 0 {
+		t.Errorf("id %d, want 0: the route has no {id}", a.id)
+	}
+	if got := a.sent(); len(got) != 1 || got["note"] != "n" {
+		t.Errorf("sent %v, want only note=n: a field that the request leaves out stays out", got)
+	}
+}
+
 // TestTheServerRoutesEachCatalogActionToItsOwnRoute asks the mux of the real server, which mount and the routes that
 // are not actions fill, which pattern takes a request of each catalog action. The pattern must be the action's own
 // method and path. A route that only takes the same path is not enough: GET /days/go must go to open-day, not to
 // GET /days/{day}. The routes do not use the store until a request runs, so the test gives none.
 func TestTheServerRoutesEachCatalogActionToItsOwnRoute(t *testing.T) {
-	h := newServer(nil)
+	h := newServer(nil, NewApps())
 	fill := strings.NewReplacer("{id}", "7", "{day}", "2026-09-01")
 	for _, s := range catalog {
 		path := fill.Replace(s.Path)

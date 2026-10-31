@@ -21,16 +21,16 @@ import (
 // actions to the service. The server names no service and no provider: the protocol is the whole interface, and the
 // file keeps no task (docs/decisions/D23-no-tasks.md).
 
-// TaskList is a list of the task service: its id for the protocol, its name for the owner.
-type TaskList struct {
+// taskList is a list of the task service: its id for the protocol, its name for the owner.
+type taskList struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
 }
 
-// TaskListsOf reads the lists from the answer of GET /lists of the task service.
-func TaskListsOf(e *siren.Entity) ([]TaskList, error) {
+// taskListsOf reads the lists from the answer of GET /lists of the task service.
+func taskListsOf(e *siren.Entity) ([]taskList, error) {
 	var p struct {
-		Lists []TaskList `json:"lists"`
+		Lists []taskList `json:"lists"`
 	}
 	if err := propertiesOf(e, &p); err != nil {
 		return nil, fmt.Errorf("the lists: %w", err)
@@ -78,7 +78,7 @@ type svcTask struct {
 }
 
 // taskWrites are the six writes that the protocol asks of the service: the name of the action of this server, and the
-// href of the service. SetTasks refuses a catalog that lacks one of them.
+// href of the service. setTasks refuses a catalog that lacks one of them.
 var taskWrites = []struct{ Name, Href string }{
 	{"add-task", "/tasks"},
 	{"edit-task", "/tasks/{id}"},
@@ -123,7 +123,7 @@ var taskCatalog = []spec{
 type taskService struct {
 	name  string
 	c     *client.Client
-	lists []TaskList
+	lists []taskList
 }
 
 // specs are the six actions with the names of the lists as the options of the field list of add-task.
@@ -439,10 +439,10 @@ func (h *server) tasksWeek(r *http.Request) (*siren.Entity, error) {
 }
 
 // listOf is the list of the request, or 404.
-func (s taskService) listOf(r *http.Request) (TaskList, error) {
-	i := slices.IndexFunc(s.lists, func(l TaskList) bool { return l.ID == r.PathValue("id") })
+func (s taskService) listOf(r *http.Request) (taskList, error) {
+	i := slices.IndexFunc(s.lists, func(l taskList) bool { return l.ID == r.PathValue("id") })
 	if i < 0 {
-		return TaskList{}, core.NotFound("no such list %s", r.PathValue("id"))
+		return taskList{}, core.NotFound("no such list %s", r.PathValue("id"))
 	}
 	return s.lists[i], nil
 }
@@ -525,28 +525,17 @@ func (s taskService) taskAt(ctx context.Context, r *http.Request, href string, v
 	return s.page(t), nil
 }
 
-// taskWrite is the handler of the action with that name. It checks the request against the row of the action as every
-// action of the catalog is checked (fieldsOf), then sends the fields that the request names to the service: a field
-// that is not sent stays as it is, which is what edit-task needs.
+// taskWrite is the handler of the action with that name. It admits the request against the row of the action as every
+// action of the catalog is admitted, then sends the fields that the request names to the service: a field that is not
+// sent stays as it is, which is what edit-task needs.
 func (h *server) taskWrite(name string) func(*http.Request) (*siren.Entity, error) {
 	return func(r *http.Request) (*siren.Entity, error) {
 		return h.withTasks(r, func(ctx context.Context, svc taskService) (*siren.Entity, error) {
-			row := svc.spec(name)
-			if row.Owner {
-				if err := requireOwner(source(r)); err != nil {
-					return nil, err
-				}
-			}
-			v, err := fieldsOf(r, row)
+			a, err := admit(r, svc.spec(name))
 			if err != nil {
 				return nil, err
 			}
-			values := map[string]string{}
-			for _, f := range fieldNames(row) {
-				if v.Has(f) {
-					values[f] = v.Get(f)
-				}
-			}
+			values := a.sent()
 			if err := svc.checkValues(values); err != nil {
 				return nil, err
 			}
@@ -575,7 +564,7 @@ func (s taskService) checkValues(values map[string]string) error {
 		}
 	}
 	if name, ok := values["list"]; ok && name != "" {
-		i := slices.IndexFunc(s.lists, func(l TaskList) bool { return l.Name == name })
+		i := slices.IndexFunc(s.lists, func(l taskList) bool { return l.Name == name })
 		if i < 0 { // fieldsOf checks the options, but a service with no list gives no options
 			return core.Invalid("list must be one of %s", strings.Join(listNames(s.lists), ", "))
 		}
@@ -586,7 +575,7 @@ func (s taskService) checkValues(values map[string]string) error {
 	return nil
 }
 
-func listNames(lists []TaskList) []string {
+func listNames(lists []taskList) []string {
 	names := make([]string, 0, len(lists))
 	for _, l := range lists {
 		names = append(names, l.Name)

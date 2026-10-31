@@ -82,12 +82,8 @@ func anchorIn(today string, first, last time.Time) time.Time {
 }
 
 // openDay answers with the address of the day the form names, or of today when it names none or the word "today".
-func (h *server) openDay(r *http.Request, act spec, _ string) (*siren.Entity, error) {
-	v, err := fieldsOf(r, act)
-	if err != nil {
-		return nil, err
-	}
-	day := h.dayNamed(v.Get("day"))
+func (h *server) openDay(r *http.Request, a admitted) (*siren.Entity, error) {
+	day := h.dayNamed(a.v.Get("day"))
 	if day == "" { // the field is optional: no day is today
 		day = h.s.Today()
 	}

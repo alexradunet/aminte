@@ -17,7 +17,7 @@ import (
 // the store's folder (named life-DATE.failed.db when its restore check fails); the answer is the path and the
 // restore check, with self at the root. Core reports a refusal as 422 snapshot_refused; a timeout and a failure are
 // answered as on every route.
-func (h *server) snapshot(r *http.Request, _ spec, _ string) (*siren.Entity, error) {
+func (h *server) snapshot(r *http.Request, _ admitted) (*siren.Entity, error) {
 	path, res, err := h.s.TakeSnapshot(r.Context(), h.s.Local())
 	if err != nil {
 		return nil, err
@@ -61,7 +61,7 @@ func (h *server) snapshotFile(w http.ResponseWriter, r *http.Request) {
 	http.ServeContent(w, r, name, fi.ModTime(), f)
 }
 
-func (h *server) integrity(r *http.Request, _ spec, _ string) (*siren.Entity, error) {
+func (h *server) integrity(r *http.Request, _ admitted) (*siren.Entity, error) {
 	res, err := h.s.Integrity(r.Context())
 	if err != nil {
 		return nil, err
@@ -74,7 +74,7 @@ func (h *server) integrity(r *http.Request, _ spec, _ string) (*siren.Entity, er
 
 // rebuildSearch is the owner's repair of the full-text index (docs/contract/integrity-checks.md). The answer is the
 // number of documents of the new index, with self at the root.
-func (h *server) rebuildSearch(r *http.Request, _ spec, _ string) (*siren.Entity, error) {
+func (h *server) rebuildSearch(r *http.Request, _ admitted) (*siren.Entity, error) {
 	documents, err := h.s.RebuildSearch(r.Context())
 	if err != nil {
 		return nil, err
@@ -86,8 +86,8 @@ func (h *server) rebuildSearch(r *http.Request, _ spec, _ string) (*siren.Entity
 
 // resyncLinks is the owner's repair of the links of the bodies (docs/contract/integrity-checks.md). The answer lists
 // the pages rewritten and what the rewrite made; self is the root, as for the other repairs.
-func (h *server) resyncLinks(r *http.Request, _ spec, src string) (*siren.Entity, error) {
-	res, err := h.s.ResyncLinks(r.Context(), src)
+func (h *server) resyncLinks(r *http.Request, a admitted) (*siren.Entity, error) {
+	res, err := h.s.ResyncLinks(r.Context(), a.src)
 	if err != nil {
 		return nil, err
 	}

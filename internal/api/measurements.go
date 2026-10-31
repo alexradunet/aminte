@@ -312,23 +312,19 @@ func (h *server) measurementEntity(ctx context.Context, id int64) (*siren.Entity
 	return e, nil
 }
 
-func (h *server) record(r *http.Request, act spec, src string) (*siren.Entity, error) {
-	v, err := fieldsOf(r, act)
+func (h *server) record(r *http.Request, a admitted) (*siren.Entity, error) {
+	value, err := number(a.v, "value")
 	if err != nil {
 		return nil, err
 	}
-	value, err := number(v, "value")
-	if err != nil {
-		return nil, err
-	}
-	day := h.dayNamed(v.Get("day"))
-	id, err := h.s.Record(r.Context(), src, core.Reading{Metric: v.Get("metric"), Day: day, Value: *value,
-		TakenAt: v.Get("taken_at"), TZ: v.Get("tz"), ImportKey: v.Get("import_key")})
+	day := h.dayNamed(a.v.Get("day"))
+	id, err := h.s.Record(r.Context(), a.src, core.Reading{Metric: a.v.Get("metric"), Day: day, Value: *value,
+		TakenAt: a.v.Get("taken_at"), TZ: a.v.Get("tz"), ImportKey: a.v.Get("import_key")})
 	if err != nil {
 		return nil, err
 	}
 	if id == 0 { // a re-send: the first one stands (docs/contract/imports.md), and the answer links its day
-		if day, err = h.s.RecordedDay(r.Context(), src, v.Get("import_key"), v.Get("metric")); err != nil {
+		if day, err = h.s.RecordedDay(r.Context(), a.src, a.v.Get("import_key"), a.v.Get("metric")); err != nil {
 			return nil, err
 		}
 		return &siren.Entity{Class: []string{"result"}, Title: "Already recorded",
@@ -339,24 +335,16 @@ func (h *server) record(r *http.Request, act spec, src string) (*siren.Entity, e
 	return h.measurementEntity(r.Context(), id)
 }
 
-func (h *server) correct(r *http.Request, act spec, src string) (*siren.Entity, error) {
-	id, v, err := idForm(r, act)
+func (h *server) correct(r *http.Request, a admitted) (*siren.Entity, error) {
+	value, err := number(a.v, "value") // never nil: the catalog requires value, and a nil value retracts
 	if err != nil {
 		return nil, err
 	}
-	value, err := number(v, "value") // never nil: the catalog requires value, and a nil value retracts
-	if err != nil {
-		return nil, err
-	}
-	return h.correctTo(r.Context(), src, id, value)
+	return h.correctTo(r.Context(), a.src, a.id, value)
 }
 
-func (h *server) retract(r *http.Request, _ spec, src string) (*siren.Entity, error) {
-	id, err := idOf(r)
-	if err != nil {
-		return nil, err
-	}
-	return h.correctTo(r.Context(), src, id, nil)
+func (h *server) retract(r *http.Request, a admitted) (*siren.Entity, error) {
+	return h.correctTo(r.Context(), a.src, a.id, nil)
 }
 
 // correctTo corrects or retracts a reading.
@@ -368,17 +356,13 @@ func (h *server) correctTo(ctx context.Context, src string, id int64, value *flo
 	return h.measurementEntity(ctx, fix)
 }
 
-func (h *server) registerMetric(r *http.Request, act spec, src string) (*siren.Entity, error) {
-	v, err := fieldsOf(r, act)
-	if err != nil {
-		return nil, err
-	}
-	m := core.NewMetric{Name: v.Get("name"), Unit: v.Get("unit"), Note: v.Get("note")}
-	if v.Has("daily") { // an unticked checkbox sends nothing: the mark is then not asked about
-		daily := flag(v, "daily")
+func (h *server) registerMetric(r *http.Request, a admitted) (*siren.Entity, error) {
+	m := core.NewMetric{Name: a.v.Get("name"), Unit: a.v.Get("unit"), Note: a.v.Get("note")}
+	if a.v.Has("daily") { // an unticked checkbox sends nothing: the mark is then not asked about
+		daily := flag(a.v, "daily")
 		m.Daily = &daily
 	}
-	added, err := h.s.CreateMetric(r.Context(), src, m)
+	added, err := h.s.CreateMetric(r.Context(), a.src, m)
 	if err != nil {
 		return nil, err
 	}

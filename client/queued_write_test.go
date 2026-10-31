@@ -44,7 +44,7 @@ func testQueuedWrite(t *testing.T, remote bool) {
 	released := false
 
 	entered := make(chan struct{})
-	h := api.New(&core.Store{DB: d})
+	h := api.NewWith(&core.Store{DB: d}, nil)
 	completed := make(chan struct{})
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		close(entered)

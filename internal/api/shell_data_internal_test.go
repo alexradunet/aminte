@@ -66,7 +66,7 @@ func TestTheDayOfTodayCarriesTheStrip(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	h := New(s)
+	h := NewWith(s, nil)
 	p := propsOf(*readData(t, h, "/days/"+dataToday))
 	if p["streak"] != 3.0 || p["written"] != true {
 		t.Errorf("today: streak %v, written %v; want 3 and true", p["streak"], p["written"])
@@ -89,7 +89,7 @@ func TestTheDayOfTodayCarriesTheStrip(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	p = propsOf(*readData(t, New(empty), "/days/"+dataToday))
+	p = propsOf(*readData(t, NewWith(empty, nil), "/days/"+dataToday))
 	if v, has := p["written"]; p["streak"] != 2.0 || !has || v != false || p["habits"] != nil {
 		t.Errorf("a day with no words yet: streak %v, written %v, habits %v; want 2, false and none", p["streak"], v, p["habits"])
 	}
@@ -124,14 +124,14 @@ func TestTheRootCarriesTheFrame(t *testing.T) {
 		t.Error("a root with no app and no task service has a link app or tasks")
 	}
 
-	if err := apps.Set("notes", "http://127.0.0.1:1", "Notes", nil); err != nil {
+	if err := apps.set("notes", "http://127.0.0.1:1", "Notes", nil); err != nil {
 		t.Fatal(err)
 	}
 	apps.Expect("quiet") // known, and not running: no link
-	if err := apps.Set("maps", "http://127.0.0.1:2", "", nil); err != nil {
+	if err := apps.set("maps", "http://127.0.0.1:2", "", nil); err != nil {
 		t.Fatal(err)
 	}
-	if err := apps.SetTasks("svc", "http://127.0.0.1:3", actionsOfWrites(), nil); err != nil {
+	if err := apps.setTasks("svc", "http://127.0.0.1:3", actionsOfWrites(), nil); err != nil {
 		t.Fatal(err)
 	}
 	var links []string
@@ -187,7 +187,7 @@ func TestAConversationNamesItsRefsAndTheEarlierDays(t *testing.T) {
 	if err := s.Tombstone(ctx, "cli", tomb); err != nil {
 		t.Fatal(err)
 	}
-	h := New(s)
+	h := NewWith(s, nil)
 
 	conv := readData(t, h, "/days/today/conversation")
 	var refs, earlier []string
@@ -233,7 +233,7 @@ func TestAConversationNamesItsRefsAndTheEarlierDays(t *testing.T) {
 	if _, _, err := far.CreatePage(ctx, "cli", ConversationTitle("2031-04-29"), "[[2031-04-29]]\n", ""); err != nil {
 		t.Fatal(err)
 	}
-	if e := readData(t, New(far), "/days/today/conversation"); e.LinkByRel("earlier") != nil {
+	if e := readData(t, NewWith(far, nil), "/days/today/conversation"); e.LinkByRel("earlier") != nil {
 		t.Errorf("a conversation 15 days back is on the day bar: %v", e.Links)
 	}
 }

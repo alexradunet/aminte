@@ -52,7 +52,7 @@ type liveApp struct {
 // NewApps returns a registry with no app.
 func NewApps() *Apps { return &Apps{apps: map[string]liveApp{}} }
 
-// Expect says that the app NAME exists, before it runs. Until Set, and after Remove, a request to it is 503
+// Expect says that the app NAME exists, before it runs. Until Register, and after Remove, a request to it is 503
 // unavailable.
 func (a *Apps) Expect(name string) {
 	a.mu.Lock()
@@ -62,12 +62,76 @@ func (a *Apps) Expect(name string) {
 	}
 }
 
-// Set says that the app NAME runs at base (http://127.0.0.1:PORT), with its home title and its catalog. It refuses
+// registerTimeout is the longest wait for one answer of a child in the handshake. A child that holds the connection
+// open must not stop the server.
+const registerTimeout = 5 * time.Second
+
+// Register is the one handshake of a child of `serve --with`, and of the child of a test (lifelogtest): it makes the
+// child at base (http://127.0.0.1:PORT) known as what its catalog says (extensions/README.md, "A catalog of its own"
+// and "A task service").
+//
+//	GET /actions    the entity must have the class actions. Else the child has no catalog.
+//	  class tasks   the child is the task service: GET /lists gives its lists (setTasks).
+//	  no tasks      the child is an app: GET / gives its title, and its name is the title when the home gives none (set).
+//
+// The registry refuses a catalog for the reasons of set and setTasks, and stays as it was. The answer says what the
+// child became, for the line of a log. When the child does not answer GET /actions, the error wraps the cause of the
+// client, so the caller can tell a child that is not up yet (a dial that fails, or a late answer) from a child that has
+// no catalog; no other error wraps a cause.
+func (a *Apps) Register(ctx context.Context, name, base string) (Registered, error) {
+	c := client.Remote(base, "", "")
+	get := func(href string) (*siren.Entity, error) {
+		ctx, cancel := context.WithTimeout(ctx, registerTimeout)
+		defer cancel()
+		return c.Get(ctx, href)
+	}
+	e, err := get("/actions")
+	var ce *client.Error
+	switch {
+	case errors.As(err, &ce):
+		return Registered{}, fmt.Errorf("no catalog (status %d)", ce.Status)
+	case err != nil:
+		return Registered{}, fmt.Errorf("no catalog (%w)", err)
+	case !slices.Contains(e.Class, "actions"):
+		return Registered{}, errors.New("no catalog (the answer is not an actions entity)")
+	case slices.Contains(e.Class, "tasks"):
+		listed, err := get("/lists")
+		var lists []taskList
+		if err == nil {
+			lists, err = taskListsOf(listed)
+		}
+		if err != nil {
+			return Registered{}, fmt.Errorf("catalog refused: the task service gives no lists: %v", err)
+		}
+		if err := a.setTasks(name, base, e.Actions, lists); err != nil {
+			return Registered{}, fmt.Errorf("catalog refused: %v", err)
+		}
+		return Registered{Tasks: true, Actions: len(e.Actions), Lists: len(lists)}, nil
+	}
+	title := name
+	if home, err := get("/"); err == nil && home.Title != "" {
+		title = home.Title
+	}
+	if err := a.set(name, base, title, e.Actions); err != nil {
+		return Registered{}, fmt.Errorf("catalog refused: %v", err)
+	}
+	return Registered{Actions: len(e.Actions)}, nil
+}
+
+// Registered says what Register made of a child: the task service (with its lists), or an app. Actions are the
+// actions of its catalog.
+type Registered struct {
+	Tasks   bool
+	Actions int
+	Lists   int
+}
+
+// set says that the app NAME runs at base (http://127.0.0.1:PORT), with its home title and its catalog. It refuses
 // the whole catalog, and the app stays as it was, when: the name of an action is not a-z 0-9 and -; the href of an
 // action is not a path (it does not start with one slash, or it has a scheme, a host, a query or a fragment); the
 // name of an action with the prefix NAME- is the name of an action of the static catalog or of another running app;
 // or an action has a field of type file. This version of the server does not forward a multipart body.
-func (a *Apps) Set(name, base, title string, actions []siren.Action) error {
+func (a *Apps) set(name, base, title string, actions []siren.Action) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	for _, act := range actions {
@@ -93,11 +157,11 @@ func (a *Apps) Set(name, base, title string, actions []siren.Action) error {
 	return nil
 }
 
-// SetTasks says that the child NAME is the task service, at base (http://127.0.0.1:PORT), with its catalog and its
+// setTasks says that the child NAME is the task service, at base (http://127.0.0.1:PORT), with its catalog and its
 // lists (docs/plans/158-one-task-service-behind-tasks.md). It refuses the child, and the registry stays as it was,
 // when another task service runs, or when the catalog lacks one of the six writes of the protocol (taskWrites). The
-// name stops being an app: Expect made it known, and SetTasks takes it back, so /with/NAME is 404.
-func (a *Apps) SetTasks(name, base string, actions []siren.Action, lists []TaskList) error {
+// name stops being an app: Expect made it known, and setTasks takes it back, so /with/NAME is 404.
+func (a *Apps) setTasks(name, base string, actions []siren.Action, lists []taskList) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	if a.tasks != nil && a.tasks.name != name {
@@ -124,7 +188,7 @@ func (a *Apps) taskService() (taskService, bool) {
 	return *a.tasks, true
 }
 
-// checkAppAction refuses an action that Set does not take, with the reason.
+// checkAppAction refuses an action that set does not take, with the reason.
 func checkAppAction(act siren.Action) error {
 	if !appNameRE.MatchString(act.Name) {
 		return fmt.Errorf("the action name %q: use a-z, 0-9 and -", act.Name)
@@ -156,8 +220,8 @@ func (a *Apps) Remove(name string) {
 	}
 }
 
-// Names are the names of the apps that run, sorted.
-func (a *Apps) Names() []string {
+// names are the names of the apps that run, sorted.
+func (a *Apps) names() []string {
 	a.mu.RLock()
 	defer a.mu.RUnlock()
 	var names []string
@@ -181,7 +245,7 @@ func (a *Apps) find(name string) (liveApp, bool) {
 // links are the apps that run, as the links app of the root: each with its home title, else its name.
 func (a *Apps) links() []siren.Link {
 	var out []siren.Link
-	for _, name := range a.Names() {
+	for _, name := range a.names() {
 		x, _ := a.find(name)
 		title := x.title
 		if title == "" {
@@ -196,7 +260,7 @@ func (a *Apps) links() []siren.Link {
 // The six actions of the task service follow while it runs.
 func (a *Apps) specs() []spec {
 	var out []spec
-	for _, name := range a.Names() {
+	for _, name := range a.names() {
 		x, _ := a.find(name)
 		for _, act := range x.actions {
 			out = append(out, specOfApp(name, act))
@@ -209,7 +273,7 @@ func (a *Apps) specs() []spec {
 }
 
 // specOfApp is the row of the merged catalog for an action of the app: the name and the path have the prefix of the
-// app. The short text of a form (Hint) is not the app's, so it is empty. pathValues, fieldsOf and the forms read
+// app. The short text of a form (Hint) is not the app's, so it is empty. admit and the forms read
 // the row as they read a row of the static catalog.
 func specOfApp(app string, act siren.Action) spec {
 	return spec{Name: app + "-" + act.Name, Title: act.Title, Description: act.Description, Method: act.Method,
@@ -256,12 +320,12 @@ func (h *server) withApp(r *http.Request) (*siren.Entity, error) {
 	var e *siren.Entity
 	var err error
 	if act, ok := matchAction(app.actions, r.Method, rest); ok {
-		values, err := appFields(r, name, act)
+		a, err := admit(r, specOfApp(name, act))
 		if err != nil { // the refusal is this server's own, so it does not go through forwardError
 			return nil, err
 		}
 		concrete := siren.Action{Name: act.Name, Method: act.Method, Href: rest} // nothing is left to fill in the path
-		e, err = app.c.As(source(r)).Do(ctx, concrete, values)
+		e, err = app.c.As(source(r)).Do(ctx, concrete, a.sent())
 		if err != nil {
 			return nil, forwardError(r, "the app "+name, err)
 		}
@@ -282,29 +346,6 @@ func (h *server) withApp(r *http.Request) (*siren.Entity, error) {
 		return nil, forwardError(r, "the app "+name, err)
 	}
 	return inNamespace(name, e), nil
-}
-
-// appFields checks the request against the action of the app in the way of every action of the catalog, and gives the
-// values to send to the app: the fields of the action that the request names. An owner action is refused to a writer
-// that is not the owner, so the app is never called for it.
-func appFields(r *http.Request, name string, act siren.Action) (map[string]string, error) {
-	row := specOfApp(name, act)
-	if act.Owner {
-		if err := requireOwner(source(r)); err != nil {
-			return nil, err
-		}
-	}
-	v, err := fieldsOf(r, row)
-	if err != nil {
-		return nil, err
-	}
-	values := map[string]string{}
-	for _, f := range fieldNames(row) {
-		if v.Has(f) {
-			values[f] = v.Get(f)
-		}
-	}
-	return values, nil
 }
 
 // matchAction is the action of the app with the method whose href fits the path, segment by segment: {x} fits one

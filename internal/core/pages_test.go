@@ -298,24 +298,9 @@ func TestSearchNewestKeepsRankThenIDInADay(t *testing.T) {
 	}
 }
 
-// TestSearchRefusesAnUnknownOrder: the order is one of the SearchOrders. Anything else is a 422 before any read.
-func TestSearchRefusesAnUnknownOrder(t *testing.T) {
-	s := fresh(t)
-	for _, order := range []string{"oldest", "NEWEST", "rank; DROP TABLE entities", " newest"} {
-		if _, err := s.SearchWith(ctx, "needle", SearchOptions{Order: order}, 10, 0); status(err) != 422 {
-			t.Errorf("order %q: status %d (%v), want 422", order, status(err), err)
-		}
-	}
-	for _, order := range []string{"", "best", "newest"} {
-		if _, err := s.SearchWith(ctx, "needle", SearchOptions{Order: order}, 10, 0); err != nil {
-			t.Errorf("order %q: %v, want none", order, err)
-		}
-	}
-}
-
 // TestSearchByKind: a hit has its kind (a day page is a day, a metric a page), the counts are the hits of each kind
-// with their sum, a kind keeps only its hits in either order, and another kind is a 422. A hit's picture is its
-// cover, or a file's own preview.
+// with their sum, and a kind keeps only its hits in either order. A hit's picture is its cover, or a file's own
+// preview.
 func TestSearchByKind(t *testing.T) {
 	s := streamStore(t)
 	captured(t, s, "2026-10-01", "A lantern by the lake.", nil)
@@ -357,9 +342,6 @@ func TestSearchByKind(t *testing.T) {
 		if slices.Sort(titles); strings.Join(titles, ",") != "Lantern hours,Shed" {
 			t.Errorf("the pages, %s: %v", order, titles)
 		}
-	}
-	if _, err := s.SearchWith(ctx, "lantern", SearchOptions{Kind: "metric"}, 50, 0); status(err) != 422 {
-		t.Errorf("the kind metric: %v, want a 422", err)
 	}
 }
 

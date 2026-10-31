@@ -32,7 +32,7 @@ func tokenHandler(t *testing.T) (http.Handler, *core.Store) {
 func tokenHandlerAt(t *testing.T, addr net.Addr) (http.Handler, *core.Store) {
 	t.Helper()
 	s := &core.Store{DB: dbtest.New(t)}
-	bearer, err := api.RequireToken(testToken, api.New(s))
+	bearer, err := api.RequireToken(testToken, api.NewWith(s, nil))
 	if err != nil {
 		t.Fatal(err)
 	}

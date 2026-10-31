@@ -375,26 +375,22 @@ func (h *server) dayEntity(ctx context.Context, day string) (*siren.Entity, erro
 	return e, nil
 }
 
-func (h *server) capture(r *http.Request, act spec, src string) (*siren.Entity, error) {
-	v, err := fieldsOf(r, act)
-	if err != nil {
-		return nil, err
-	}
-	mood, err := number(v, "mood")
+func (h *server) capture(r *http.Request, a admitted) (*siren.Entity, error) {
+	mood, err := number(a.v, "mood")
 	if err != nil {
 		return nil, err
 	}
 	day := h.dayNamed(r.PathValue("day")) // the share target of the manifest cannot know the day: it sends the word
-	entry := words(v.Get("text"))
+	entry := words(a.v.Get("text"))
 	if entry != "" { // the entry begins with its stamp, as a turn of say does; a mood alone writes no text
-		entry = h.stamp(relayOf(src)) + " " + entry
+		entry = h.stamp(relayOf(a.src)) + " " + entry
 	}
-	_, sync, already, err := h.s.CaptureWithKey(r.Context(), src, v.Get("import_key"), day, entry, mood)
+	_, sync, already, err := h.s.CaptureWithKey(r.Context(), a.src, a.v.Get("import_key"), day, entry, mood)
 	if err != nil {
 		return nil, err
 	}
 	if already { // a re-send: the first one stands (docs/decisions/D28-capture-keys.md), and the answer links its day
-		if day, err = h.s.CapturedDay(r.Context(), src, v.Get("import_key")); err != nil {
+		if day, err = h.s.CapturedDay(r.Context(), a.src, a.v.Get("import_key")); err != nil {
 			return nil, err
 		}
 		return &siren.Entity{Class: []string{"result"}, Title: "Already added",

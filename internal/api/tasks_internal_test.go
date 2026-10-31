@@ -106,25 +106,25 @@ func actionsOfWrites() []siren.Action {
 func TestTheRegistryHoldsOneTaskService(t *testing.T) {
 	a := NewApps()
 	a.Expect("svc")
-	lists := []TaskList{{ID: "l1", Name: "Home"}}
+	lists := []taskList{{ID: "l1", Name: "Home"}}
 
 	short := actionsOfWrites()[:5] // no sync
-	if err := a.SetTasks("svc", "http://127.0.0.1:1", short, lists); err == nil || !strings.Contains(err.Error(), "no action POST /sync") {
+	if err := a.setTasks("svc", "http://127.0.0.1:1", short, lists); err == nil || !strings.Contains(err.Error(), "no action POST /sync") {
 		t.Errorf("a catalog with no sync: got %v, want the missing write named", err)
 	}
 	if _, ok := a.taskService(); ok {
 		t.Error("a refused catalog made a task service")
 	}
-	if err := a.SetTasks("svc", "http://127.0.0.1:1", actionsOfWrites(), lists); err != nil {
+	if err := a.setTasks("svc", "http://127.0.0.1:1", actionsOfWrites(), lists); err != nil {
 		t.Fatal(err)
 	}
 	if _, known := a.find("svc"); known {
 		t.Error("the task service is an app too")
 	}
-	if names := a.Names(); len(names) != 0 {
+	if names := a.names(); len(names) != 0 {
 		t.Errorf("Names = %v, want none: a task service is not an app", names)
 	}
-	err := a.SetTasks("other", "http://127.0.0.1:2", actionsOfWrites(), lists)
+	err := a.setTasks("other", "http://127.0.0.1:2", actionsOfWrites(), lists)
 	if err == nil || err.Error() != "a task service runs already: svc" {
 		t.Errorf("a second service: got %v", err)
 	}
@@ -134,7 +134,7 @@ func TestTheRegistryHoldsOneTaskService(t *testing.T) {
 	if specs := a.specs(); len(specs) != len(taskCatalog) {
 		t.Errorf("specs = %d rows, want the %d task actions", len(specs), len(taskCatalog))
 	}
-	if err := a.Set("add", "http://127.0.0.1:3", "Add", []siren.Action{{Name: "task", Method: "POST", Href: "/x"}}); err == nil {
+	if err := a.set("add", "http://127.0.0.1:3", "Add", []siren.Action{{Name: "task", Method: "POST", Href: "/x"}}); err == nil {
 		t.Error("an app took the name add-task")
 	}
 	a.Remove("svc")
@@ -144,14 +144,14 @@ func TestTheRegistryHoldsOneTaskService(t *testing.T) {
 	if specs := a.specs(); len(specs) != 0 {
 		t.Errorf("specs = %d rows after Remove, want none", len(specs))
 	}
-	if err := a.SetTasks("other", "http://127.0.0.1:2", actionsOfWrites(), lists); err != nil {
+	if err := a.setTasks("other", "http://127.0.0.1:2", actionsOfWrites(), lists); err != nil {
 		t.Errorf("the role is free after Remove: %v", err)
 	}
 }
 
 // The field list of add-task has the names of the lists as its options, and the options of the static row stay empty.
 func TestAddTaskOffersTheNamesOfTheLists(t *testing.T) {
-	svc := taskService{lists: []TaskList{{ID: "a", Name: "Home"}, {ID: "b", Name: "Work"}}}
+	svc := taskService{lists: []taskList{{ID: "a", Name: "Home"}, {ID: "b", Name: "Work"}}}
 	if got := fieldOptions(svc.spec("add-task"), "list"); !slices.Equal(got, []string{"Home", "Work"}) {
 		t.Errorf("options = %v, want [Home Work]", got)
 	}
@@ -171,7 +171,7 @@ func fieldOptions(s spec, name string) []string {
 
 // checkValues gives the id of the list for its name, takes an empty list as the default list, and refuses the rest.
 func TestCheckValuesMapsTheListAndRefusesWhatTheProtocolCannotTake(t *testing.T) {
-	svc := taskService{lists: []TaskList{{ID: "a", Name: "Home"}}}
+	svc := taskService{lists: []taskList{{ID: "a", Name: "Home"}}}
 	v := map[string]string{"title": "x", "list": "Home", "due": "2031-02-03"}
 	if err := svc.checkValues(v); err != nil || v["list"] != "a" {
 		t.Errorf("a good set: err %v, list %q, want the id a", err, v["list"])
@@ -200,18 +200,18 @@ func listsEntity(lists ...map[string]any) *siren.Entity {
 // Two lists with one id are refused. A later list with a name that is taken gets the suffix " (2)", " (3)" ...
 // so the owner sees, and add-task takes, one name for one list.
 func TestListsWithTheSameNameGetUniqueNames(t *testing.T) {
-	got, err := TaskListsOf(listsEntity(
+	got, err := taskListsOf(listsEntity(
 		map[string]any{"id": "a", "name": "Work"}, map[string]any{"id": "b", "name": "Home"},
 		map[string]any{"id": "c", "name": "Work"}, map[string]any{"id": "d", "name": "Work"},
 		map[string]any{"id": "e", "name": "Work (2)"}))
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []TaskList{{"a", "Work"}, {"b", "Home"}, {"c", "Work (2)"}, {"d", "Work (3)"}, {"e", "Work (2) (2)"}}
+	want := []taskList{{"a", "Work"}, {"b", "Home"}, {"c", "Work (2)"}, {"d", "Work (3)"}, {"e", "Work (2) (2)"}}
 	if !slices.Equal(got, want) {
 		t.Errorf("lists = %v, want %v", got, want)
 	}
-	if _, err := TaskListsOf(listsEntity(map[string]any{"id": "a", "name": "One"}, map[string]any{"id": "a", "name": "Two"})); err == nil {
+	if _, err := taskListsOf(listsEntity(map[string]any{"id": "a", "name": "One"}, map[string]any{"id": "a", "name": "Two"})); err == nil {
 		t.Error("a duplicate id was taken")
 	}
 	svc := taskService{lists: got}
@@ -233,8 +233,8 @@ func tasksOver(t *testing.T) (h http.Handler, apps *Apps, requests *atomic.Int32
 	t.Cleanup(stand.Close)
 	apps = NewApps()
 	apps.Expect("svc")
-	lists := []TaskList{{ID: "home", Name: "Home"}, {ID: "work", Name: "Work"}}
-	if err := apps.SetTasks("svc", stand.URL, actionsOfWrites(), lists); err != nil {
+	lists := []taskList{{ID: "home", Name: "Home"}, {ID: "work", Name: "Work"}}
+	if err := apps.setTasks("svc", stand.URL, actionsOfWrites(), lists); err != nil {
 		t.Fatal(err)
 	}
 	return NewWith(&core.Store{DB: dbtest.New(t)}, apps), apps, requests

@@ -199,16 +199,6 @@ func idOf(r *http.Request) (int64, error) {
 	return id, nil
 }
 
-// idForm is the opening of a write on a resource: the {id} of the path, and the fields of the action act (fieldsOf).
-func idForm(r *http.Request, act spec) (int64, url.Values, error) {
-	id, err := idOf(r)
-	if err != nil {
-		return 0, nil, err
-	}
-	v, err := fieldsOf(r, act)
-	return id, v, err
-}
-
 // idParam is the path parameter of an action on the resource with this id.
 func idParam(id int64) map[string]string { return map[string]string{"id": strconv.FormatInt(id, 10)} }
 

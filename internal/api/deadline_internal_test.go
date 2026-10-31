@@ -20,7 +20,7 @@ import (
 // through the limits that the test gives; the program's limits are defaultLimits.
 func TestARequestPastItsDeadlineAnswers504(t *testing.T) {
 	s := &core.Store{DB: dbtest.New(t)}
-	h := newServer(s)
+	h := newServer(s, NewApps())
 	m := http.NewServeMux()
 	m.HandleFunc("GET /endless", h.serve(func(r *http.Request) (*siren.Entity, error) {
 		var n int

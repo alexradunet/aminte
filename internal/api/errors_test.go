@@ -83,7 +83,7 @@ func TestAnInternalErrorNamesNoCause(t *testing.T) {
 	if err := d.Close(); err != nil {
 		t.Fatal(err)
 	}
-	h := api.New(&core.Store{DB: d})
+	h := api.NewWith(&core.Store{DB: d}, nil)
 	const cause = "database is closed"
 	var logged bytes.Buffer
 	prev := log.Writer()

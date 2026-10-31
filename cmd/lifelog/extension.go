@@ -145,7 +145,7 @@ func serveTemporarily(ctx context.Context, e env, file string) (stop func() erro
 	if err != nil {
 		return nil, "", errors.Join(err, d.Close())
 	}
-	handler, err := api.NetworkAuthority(listener.Addr(), api.New(&core.Store{DB: d, SettingsPath: core.SettingsPathFor(file), Clock: e.clock}))
+	handler, err := api.NetworkAuthority(listener.Addr(), api.NewWith(&core.Store{DB: d, SettingsPath: core.SettingsPathFor(file), Clock: e.clock}, nil))
 	if err != nil {
 		return nil, "", errors.Join(err, listener.Close(), d.Close())
 	}

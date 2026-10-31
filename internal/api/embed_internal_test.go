@@ -31,7 +31,7 @@ import (
 func embedServer(t *testing.T, probe func() []siren.Link) *server {
 	t.Helper()
 	at := time.Date(2031, 5, 14, 9, 0, 0, 0, time.UTC)
-	h := newServer(&core.Store{DB: dbtest.New(t), Clock: func() time.Time { return at }, Zone: time.UTC})
+	h := newServer(&core.Store{DB: dbtest.New(t), Clock: func() time.Time { return at }, Zone: time.UTC}, NewApps())
 	h.mux.HandleFunc("GET /t/{n}", h.serve(func(r *http.Request) (*siren.Entity, error) {
 		n, _ := strconv.Atoi(r.PathValue("n"))
 		return &siren.Entity{Class: []string{"target"}, Title: "Target " + r.PathValue("n"), Properties: map[string]any{"n": n},
@@ -253,7 +253,7 @@ func TestAConnectedAppDoesNotSeeEmbed(t *testing.T) {
 	}))
 	t.Cleanup(app.Close)
 	h := embedServer(t, func() []siren.Link { return nil })
-	if err := h.with.Set("probe", app.URL, "Probe", nil); err != nil {
+	if err := h.with.set("probe", app.URL, "Probe", nil); err != nil {
 		t.Fatal(err)
 	}
 	req := httptest.NewRequest("GET", "/with/probe/items?q=1&embed=item", nil)
@@ -283,7 +283,7 @@ func TestAnEmbeddedLinkOfAnAppKeepsNoSubEntities(t *testing.T) {
 	}))
 	t.Cleanup(app.Close)
 	h := embedServer(t, func() []siren.Link { return nil })
-	if err := h.with.Set("probe", app.URL, "Probe", nil); err != nil {
+	if err := h.with.set("probe", app.URL, "Probe", nil); err != nil {
 		t.Fatal(err)
 	}
 	req := httptest.NewRequest("GET", "/with/probe/items", nil)

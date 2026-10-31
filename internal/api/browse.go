@@ -181,12 +181,8 @@ func (b browseQuery) values(kind string, drop ...string) url.Values {
 
 // browse is GET /browse and the action browse: the rows of one kind in one scope, the count of each chip, and the
 // category tree. Inside a category the list's New form files the new page there.
-func (h *server) browse(r *http.Request, act spec, _ string) (*siren.Entity, error) {
-	q, err := fieldsOf(r, act)
-	if err != nil {
-		return nil, err
-	}
-	b, err := browseQueryOf(q)
+func (h *server) browse(r *http.Request, a admitted) (*siren.Entity, error) {
+	b, err := browseQueryOf(a.v)
 	if err != nil {
 		return nil, err
 	}

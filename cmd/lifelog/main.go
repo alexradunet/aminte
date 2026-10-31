@@ -444,7 +444,7 @@ func runContext(ctx context.Context, e env) (err error) {
 	e.o.db = path
 	e.store = &core.Store{DB: d, SnapshotDir: o.snapshots, SettingsPath: core.SettingsPathFor(path), Clock: e.clock}
 	if !cmd.ownHandler {
-		e.c = client.InProcess(api.New(e.store), o.source)
+		e.c = client.InProcess(api.NewWith(e.store, nil), o.source)
 	}
 	return cmd.run(ctx, e, args)
 }

@@ -123,11 +123,11 @@ func TestAnAppIsRefusedAnActionWithTwoClasses(t *testing.T) {
 	act := func(class ...string) []siren.Action {
 		return []siren.Action{{Name: "classy", Class: class, Method: "POST", Href: "/classy", Title: "Classy"}}
 	}
-	err := NewApps().Set("two", "http://127.0.0.1:1", "Two", act("create", "edit"))
+	err := NewApps().set("two", "http://127.0.0.1:1", "Two", act("create", "edit"))
 	if err == nil || !strings.Contains(err.Error(), "classy") {
 		t.Errorf("two classes: err = %v, want a refusal that names the action", err)
 	}
-	if err := NewApps().Set("one", "http://127.0.0.1:1", "One", act("create")); err != nil {
+	if err := NewApps().set("one", "http://127.0.0.1:1", "One", act("create")); err != nil {
 		t.Errorf("one known class: err = %v, want none", err)
 	}
 }

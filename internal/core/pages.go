@@ -422,21 +422,20 @@ const (
 // SearchOrders are the values of the order of a search.
 func SearchOrders() []string { return []string{SearchBest, SearchNewest} }
 
-// SearchOrderOf is the order a request names: an empty order is the best match, and an order that is not one of the
-// SearchOrders is a 422.
-func SearchOrderOf(order string) (string, error) {
-	switch order {
-	case "":
-		return SearchBest, nil
-	case SearchBest, SearchNewest:
-		return order, nil
+// SearchOrderOf is the order a request names: an empty order is the best match. The caller gives one of the
+// SearchOrders or nothing: the options of the field order in the catalog of the API refuse any other value, once for
+// every surface, so this function does not check it again.
+func SearchOrderOf(order string) string {
+	if order == "" {
+		return SearchBest
 	}
-	return "", Invalid("order must be one of %s", strings.Join(SearchOrders(), ", "))
+	return order
 }
 
 // SearchOptions are what a search may ask besides the words. Order is one of the SearchOrders. Omit are pages that
 // are not hits, so the caller can list them in a group of their own and the paging counts only the pages that are left.
-// Kind is one of the SearchKinds, or "" for every kind.
+// Kind is one of the SearchKinds, or "" for every kind. The caller gives values that the options of the catalog of the
+// API have checked: a kind that is not a SearchKinds gives no hit.
 type SearchOptions struct {
 	Order string
 	Omit  []int64
@@ -444,7 +443,7 @@ type SearchOptions struct {
 }
 
 // where is the condition of the options on a hit p after the match, with its arguments: Omit and Kind.
-func (o SearchOptions) where() (string, []any, error) {
+func (o SearchOptions) where() (string, []any) {
 	var cond string
 	var args []any
 	if len(o.Omit) > 0 {
@@ -453,15 +452,11 @@ func (o SearchOptions) where() (string, []any, error) {
 			args = append(args, id)
 		}
 	}
-	switch {
-	case o.Kind == "":
-	case slices.Contains(searchKinds, o.Kind):
+	if o.Kind != "" {
 		cond += " AND " + searchKind + " = ?"
 		args = append(args, o.Kind)
-	default:
-		return "", nil, Invalid("kind must be one of %s", strings.Join(searchKinds, ", "))
 	}
-	return cond, args, nil
+	return cond, args
 }
 
 // searchFrom is the live pages that the FTS5 query ? matches: the one definition of a hit.
@@ -475,16 +470,9 @@ const searchFrom = `
 // page has the day of its title, any other page the day of its created_at in the zone of the store. Pages of one
 // day keep the order of the best match, then of the id.
 func (s *Store) SearchWith(ctx context.Context, q string, o SearchOptions, limit, offset int) ([]Hit, error) {
-	order, err := SearchOrderOf(o.Order)
-	if err != nil {
-		return nil, err
-	}
-	omit, rest, err := o.where()
-	if err != nil {
-		return nil, err
-	}
+	omit, rest := o.where()
 	args := append([]any{q}, rest...)
-	if order == SearchNewest {
+	if SearchOrderOf(o.Order) == SearchNewest {
 		return s.searchNewest(ctx, q, omit, args, limit, offset)
 	}
 	rows, err := s.DB.R.QueryContext(ctx, `

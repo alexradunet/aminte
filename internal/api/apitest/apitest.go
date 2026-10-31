@@ -39,7 +39,7 @@ func over(s *core.Store, source string) (*client.Client, http.Handler, *core.Sto
 	if s.SettingsPath == "" { // beside the file, as the program puts it
 		s.SettingsPath = core.SettingsPathFor(s.DB.Path())
 	}
-	h := api.New(s)
+	h := api.NewWith(s, nil)
 	return client.InProcess(h, source), h, s
 }
 

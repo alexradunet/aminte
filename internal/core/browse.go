@@ -347,12 +347,10 @@ func (s *Store) RandomDay(ctx context.Context) (string, error) {
 }
 
 // RandomThing is the id of a live thing of a Browse kind (BrowseKinds, or "all" for any of them) picked at random. It
-// is never a day page, as Browse holds none, and never a ghost page, which has nothing to show. A kind that is not one
-// is a 422; a kind with nothing in it, a 404.
+// is never a day page, as Browse holds none, and never a ghost page, which has nothing to show. A kind with nothing in
+// it, or that is not one, is a 404: the options of the catalog of the API refuse a kind that is not one, once for every
+// surface.
 func (s *Store) RandomThing(ctx context.Context, kind string) (int64, error) {
-	if kind != "all" && !slices.Contains(browseKinds, kind) {
-		return 0, Invalid("kind must be one of %s or all", strings.Join(browseKinds, ", "))
-	}
 	var id int64
 	err := s.DB.R.QueryRowContext(ctx, `
 		SELECT p.id FROM entities p LEFT JOIN files f ON f.id = p.id

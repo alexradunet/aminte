@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -30,6 +31,7 @@ func send(h http.Handler, method, target, ctype string, body io.Reader) (int, st
 // multipart body, and nothing is written. back and feedback were the names of a browser: they are unknown now, and so is new on a POST.
 func TestAnUnknownFieldIsRefused(t *testing.T) {
 	_, h, s := apitest.Fresh(t, "cli")
+	s.SnapshotDir = t.TempDir() // a snapshot that a refusal did not stop would land here
 	const form = "application/x-www-form-urlencoded"
 	pages := func() string { return scalar(t, s, "SELECT count(*) FROM entities") }
 	before := pages()
@@ -46,11 +48,22 @@ func TestAnUnknownFieldIsRefused(t *testing.T) {
 		{"back in a query", "GET", "/search?q=a&back=%2F", "", ""},
 		{"feedback in a query", "GET", "/search?q=a&feedback=t", "", ""},
 		{"new in a form", "POST", "/days/2026-09-01/capture", form, "text=x&new=create-page"},
+		// The actions that list no field, or only an id, refuse a name as the others do.
+		{"a name sent to snapshot", "POST", "/snapshots", form, "nope=1"},
+		{"a name sent to integrity-check", "GET", "/integrity?nope=1", "", ""},
+		{"a name sent to rebuild-search", "POST", "/search/rebuild", form, "nope=1"},
+		{"a name sent to resync-links", "POST", "/links/resync", form, "nope=1"},
+		{"a name sent to revive", "POST", "/pages/1/revive", form, "nope=1"},
+		{"a name sent to retract", "POST", "/measurements/1/retract", form, "nope=1"},
+		{"a JSON name sent to snapshot", "POST", "/snapshots", "application/json", `{"nope":"1"}`},
 	} {
 		code, body := send(h, tc.method, tc.target, tc.ctype, strings.NewReader(tc.body))
-		if code != 422 || !strings.Contains(body, "invalid") {
-			t.Errorf("%s: %d %s, want 422 invalid", tc.name, code, body)
+		if code != 422 || !strings.Contains(body, "invalid") || strings.Contains(tc.name, "sent to") && !strings.Contains(body, "unknown field nope") {
+			t.Errorf("%s: %d %s, want 422 invalid, unknown field nope", tc.name, code, body)
 		}
+	}
+	if left, err := os.ReadDir(s.SnapshotDir); err != nil || len(left) != 0 {
+		t.Errorf("the snapshot folder after the refusals: %v, %v, want it empty", left, err)
 	}
 	code, body := send(h, "POST", "/days/2026-09-01/capture", form, strings.NewReader("text=x&nope=1"))
 	if code != 422 || !strings.Contains(body, "nope") || !strings.Contains(body, "capture") {
@@ -71,6 +84,16 @@ func TestAnUnknownFieldIsRefused(t *testing.T) {
 	for _, target := range []string{"/search?q=a&nope=1", "/browse?new=typo"} {
 		if code, _ := send(h, "HEAD", target, "", nil); code != 422 {
 			t.Errorf("HEAD %s: %d, want 422 as the GET", target, code)
+		}
+	}
+	// A multipart body to an action that takes no file is 415, also when the action lists no field at all.
+	for _, target := range []string{"/snapshots", "/search/rebuild", "/links/resync", "/pages/1/revive", "/measurements/1/retract"} {
+		var b bytes.Buffer
+		mw := multipart.NewWriter(&b)
+		mw.WriteField("nope", "1")
+		mw.Close()
+		if code, body := send(h, "POST", target, mw.FormDataContentType(), &b); code != 415 {
+			t.Errorf("a multipart body to %s: %d %s, want 415", target, code, body)
 		}
 	}
 	// A multipart part named back, feedback or new is an unknown name too.
@@ -96,6 +119,12 @@ func TestAValueOutsideTheStaticOptionsIsRefused(t *testing.T) {
 	const form = "application/x-www-form-urlencoded"
 	for _, tc := range []struct{ method, target, body, field string }{
 		{"GET", "/search?q=a&kind=planet", "", "kind"},
+		{"GET", "/search?q=a&kind=metric", "", "kind"}, // a kind of Browse, not of a hit
+		{"GET", "/search?q=a&order=oldest", "", "order"},
+		{"GET", "/search?q=a&order=NEWEST", "", "order"},
+		{"GET", "/search?q=a&order=%20newest", "", "order"},
+		{"GET", "/search?q=a&order=rank%3B+DROP+TABLE+entities", "", "order"},
+		{"GET", "/pages/random?kind=metrics", "", "kind"},
 		{"GET", "/pages/random?kind=x", "", "kind"},
 		{"GET", "/browse?unfiled=yes", "", "unfiled"},
 		{"GET", "/browse?ghosts=2", "", "ghosts"},

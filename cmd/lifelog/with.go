@@ -13,9 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"lifelog/client"
 	"lifelog/internal/api"
-	"lifelog/siren"
 )
 
 // restartDelay is the wait before serve starts a failed extension again (extensions/README.md, run by serve). A test
@@ -153,7 +151,7 @@ func runWithOnce(ctx context.Context, e env, name, path string, env []string, ap
 	}
 	say("started (pid %d)", cmd.Process.Pid)
 	// The probe goroutine belongs to this start. It ends when the probe has an answer, when probeFor has passed, or
-	// when probeCtx ends; this function waits for it before it removes the app, so a late Set cannot follow Remove.
+	// when probeCtx ends; this function waits for it before it removes the app, so a late Register cannot follow Remove.
 	probeCtx, endProbe := context.WithCancel(ctx)
 	var probe sync.WaitGroup
 	probe.Add(1)
@@ -188,41 +186,25 @@ func runWithOnce(ctx context.Context, e env, name, path string, env []string, ap
 	return true, nil
 }
 
-// probeCatalog asks the child at addr for its catalog, once it is up, and registers the app. It says one line for the
-// outcome and returns; it never says a line for a probe. It returns when ctx ends (the child ended) without a line.
+// probeCatalog registers the child at addr (api.Apps.Register) once it is up, and says one line for the outcome. The
+// handshake is the registry's; this function only repeats it while the child does not answer, and writes the line. It
+// never says a line for a probe. It returns when ctx ends (the child ended) without a line.
 func probeCatalog(ctx context.Context, name, addr string, apps *api.Apps, say func(string, ...any)) {
-	base := "http://" + addr
-	c := client.Remote(base, "", "")
 	deadline := time.NewTimer(probeFor)
 	defer deadline.Stop()
 	for {
-		e, err := probeGet(ctx, c, "/actions")
-		var ce *client.Error
+		got, err := apps.Register(ctx, name, "http://"+addr)
 		switch {
 		case ctx.Err() != nil:
 			return
-		case err == nil && slices.Contains(e.Class, "actions") && slices.Contains(e.Class, "tasks"):
-			registerTasks(ctx, c, name, base, addr, e.Actions, apps, say)
-			return
-		case err == nil && slices.Contains(e.Class, "actions"):
-			title := name // the home gives the title; without it the name is the title
-			if home, err := probeGet(ctx, c, "/"); err == nil && home.Title != "" {
-				title = home.Title
-			}
-			if err := apps.Set(name, base, title, e.Actions); err != nil {
-				say("catalog refused: %v", err)
-			} else {
-				say("a catalog of %d actions on %s", len(e.Actions), addr)
-			}
+		case err == nil && got.Tasks:
+			say("the task service, %d lists, on %s", got.Lists, addr)
 			return
 		case err == nil:
-			say("no catalog (the answer is not an actions entity)")
-			return
-		case errors.As(err, &ce):
-			say("no catalog (status %d)", ce.Status)
+			say("a catalog of %d actions on %s", got.Actions, addr)
 			return
 		case !notUpYet(err):
-			say("no catalog (%v)", err)
+			say("%v", err)
 			return
 		}
 		t := time.NewTimer(probeEvery)
@@ -239,36 +221,7 @@ func probeCatalog(ctx context.Context, name, addr string, apps *api.Apps, say fu
 	}
 }
 
-// registerTasks makes the child the task service (extensions/README.md, "A task service"): it reads the lists and
-// registers the child with the role, not as an app. The registry refuses a second task service and a catalog that
-// lacks one of the six writes; the line says why.
-func registerTasks(ctx context.Context, c *client.Client, name, base, addr string, actions []siren.Action, apps *api.Apps, say func(string, ...any)) {
-	e, err := probeGet(ctx, c, "/lists")
-	var lists []api.TaskList
-	if err == nil {
-		lists, err = api.TaskListsOf(e)
-	}
-	if err != nil {
-		if ctx.Err() == nil {
-			say("catalog refused: the task service gives no lists: %v", err)
-		}
-		return
-	}
-	if err := apps.SetTasks(name, base, actions, lists); err != nil {
-		say("catalog refused: %v", err)
-		return
-	}
-	say("the task service, %d lists, on %s", len(lists), addr)
-}
-
-// probeGet is one probe: a GET that does not wait for a child that holds the connection open.
-func probeGet(ctx context.Context, c *client.Client, href string) (*siren.Entity, error) {
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-	return c.Get(ctx, href)
-}
-
-// notUpYet says that the probe failed because nothing answers at the address yet: the dial was refused, or the
+// notUpYet says that the handshake failed because nothing answers at the address yet: the dial was refused, or the
 // answer was late.
 func notUpYet(err error) bool {
 	var op *net.OpError

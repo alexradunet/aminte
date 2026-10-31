@@ -675,7 +675,4 @@ func TestARandomPickIsLiveAndOfItsKind(t *testing.T) {
 	if _, err := s.RandomThing(ctx, "page"); status(err) != 404 {
 		t.Errorf("a random page with only a ghost and day pages: %v, want a 404", err)
 	}
-	if _, err := s.RandomThing(ctx, "day"); status(err) != 422 {
-		t.Errorf("the kind day: %v, want a 422", err)
-	}
 }

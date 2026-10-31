@@ -44,16 +44,12 @@ func idsOf(values []string) ([]int64, error) {
 // tombstoneMany is tombstone-pages, the one delete: every id named is tombstoned in one write, or none is. The
 // answer is the class tombstoned: the ids, their count, and an item link to each. The result says the count, for a UI
 // that shows it and offers the Undo.
-func (h *server) tombstoneMany(r *http.Request, act spec, src string) (*siren.Entity, error) {
-	v, err := fieldsOf(r, act)
+func (h *server) tombstoneMany(r *http.Request, a admitted) (*siren.Entity, error) {
+	ids, err := idsOf(a.v["ids"])
 	if err != nil {
 		return nil, err
 	}
-	ids, err := idsOf(v["ids"])
-	if err != nil {
-		return nil, err
-	}
-	if err := h.s.Tombstone(r.Context(), src, ids...); err != nil {
+	if err := h.s.Tombstone(r.Context(), a.src, ids...); err != nil {
 		return nil, err
 	}
 	e := &siren.Entity{Class: []string{"tombstoned"}, Title: "Deleted",

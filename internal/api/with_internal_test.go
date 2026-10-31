@@ -26,7 +26,7 @@ func TestASlowAppIsTheTimeoutOfTheRequest(t *testing.T) {
 	t.Cleanup(slow.Close)
 	t.Cleanup(func() { close(release) })
 	apps := NewApps()
-	if err := apps.Set("slow", slow.URL, "Slow", nil); err != nil {
+	if err := apps.set("slow", slow.URL, "Slow", nil); err != nil {
 		t.Fatal(err)
 	}
 	rec := httptest.NewRecorder()

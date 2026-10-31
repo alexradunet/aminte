@@ -70,7 +70,7 @@ func absoluteForm(r *http.Request) bool {
 	return r.URL == nil || r.URL.IsAbs() || r.URL.Host != ""
 }
 
-// NetworkAuthority wraps only socket serving; api.New remains usable by the
+// NetworkAuthority wraps only socket serving; api.NewWith remains usable by the
 // in-process CLI (client.InProcess). The listener's actual port includes ephemeral port binds. It is the outer handler
 // of every serve, also one with a token (RequireToken): a request to a Host that is not the address of the listener is
 // refused with 403 before the token is looked at, so a page that rebinds a name to the loopback learns nothing.

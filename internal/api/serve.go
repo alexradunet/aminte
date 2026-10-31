@@ -27,21 +27,22 @@ type server struct {
 	with *Apps // the connected apps (with.go); shared with the other handler of the same serve
 }
 
-// New returns the whole API as one handler: lifelog serve mounts it on a socket, the CLI and the MCP server
+// NewWith returns the whole API as one handler: lifelog serve mounts it on a socket, the CLI and the MCP server
 // call it in-process. It trusts no browser origin other than its own. A test gives a store with a fixed clock, so
 // today is a fixed day and a time is written in fixed words.
-func New(s *core.Store) http.Handler {
-	return NewWith(s, NewApps())
-}
-
-// NewWith is New with the connected apps of apps: their actions are in the catalog, and /with/NAME leads to them.
+//
+// apps is the registry of the connected apps: their actions are in the catalog, and /with/NAME leads to them. serve
+// and the handler share one registry, so both see the same apps. A nil apps is a server with no connected app: the CLI
+// in-process and the temporary server of `lifelog NAME` have none.
 //
 // The guard refuses a write that a page of another origin sends through the browser of the owner. It trusts no
 // origin: a server that has no token must not take a form post from a page in the owner's browser. A program sends no
 // Origin and no Sec-Fetch-Site, so the guard lets it through.
 func NewWith(s *core.Store, apps *Apps) http.Handler {
-	h := newServer(s)
-	h.with = apps
+	if apps == nil {
+		apps = NewApps()
+	}
+	h := newServer(s, apps)
 	guard := http.NewCrossOriginProtection()
 	guard.SetDenyHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, crossOriginRefusal())
@@ -104,8 +105,8 @@ func (b stallBody) Read(p []byte) (int, error) {
 
 // newServer is the server with its routes: mount gives each action of the catalog its route, then the routes that are
 // not actions follow.
-func newServer(s *core.Store) *server {
-	h := &server{s: s, with: NewApps()}
+func newServer(s *core.Store, apps *Apps) *server {
+	h := &server{s: s, with: apps}
 	m := http.NewServeMux()
 	h.mux = m
 	h.mount(m, catalog, map[string]actionFunc{
@@ -167,16 +168,69 @@ type redirect struct{ to string }
 
 func (r redirect) Error() string { return "see " + r.to }
 
-// actionFunc runs one action of the catalog. act is the action's row of the catalog, which mount gives: the handler
-// reads its fields with it (fieldsOf), so a handler does not write its own name. src is the writer of the request
-// (lifelog_meta.source); a read that is not the owner's alone gets "".
-type actionFunc func(r *http.Request, act spec, src string) (*siren.Entity, error)
+// admitted is the request of an action after admit. The handler reads the writer, the fields and the id from it, and
+// reads nothing of the request that the catalog does not list.
+type admitted struct {
+	act spec       // the action's row of the catalog
+	src string     // the writer (lifelog_meta.source); "" for a read that is not the owner's alone
+	v   url.Values // the fields, checked against act; nil for an action with a file field (parseFileForm)
+	id  int64      // the {id} of the path, when the row has a numeric one; else 0
+}
 
-// mount gives each action of cat a route to its handler, with the method and the path of the action, and gives the
-// handler the action's row. An action that writes reads its writer. An Owner action reads its writer and refuses a
-// writer that is not the owner (an agent or an import). Any other read reads no writer, so its source header cannot
-// refuse it. mount panics when an action has no handler or a handler has no action: the server does not start when
-// the catalog and the routes disagree.
+// admit is the one opening of every action: mount, the forward to a connected app and the writes of the task service
+// all go through it, and a handler runs only after it. So a handler cannot skip a step, and a new action has none to
+// forget. In this order, admit
+//   - reads the writer of a write, and of an owner read, and refuses a writer that is not the owner for an Owner row
+//     (an agent or an import). Any other read reads no writer, so its source header cannot refuse it;
+//   - parses the {id} of the path when the row has one that is a number (404 when it is not a number);
+//   - reads the fields with fieldsOf and refuses a request that breaks the shape of the row (422, or 415 for a multipart
+//     body). An action with a file field is the one exception: parseFileForm reads its fields, and the handler calls it.
+func admit(r *http.Request, act spec) (admitted, error) {
+	a := admitted{act: act}
+	if act.Method != http.MethodGet || act.Owner {
+		a.src = source(r)
+	}
+	if act.Owner {
+		if err := requireOwner(a.src); err != nil {
+			return a, err
+		}
+	}
+	// A route without {id} has none to parse: the forward to a connected app has the path of the app, whatever its fields say.
+	if r.PathValue("id") != "" && slices.ContainsFunc(act.Fields, func(f siren.Field) bool { return f.In == "path" && f.Name == "id" && f.Type == "number" }) {
+		id, err := idOf(r)
+		if err != nil {
+			return a, err
+		}
+		a.id = id
+	}
+	if !slices.ContainsFunc(act.Fields, func(f siren.Field) bool { return f.Type == "file" }) {
+		v, err := fieldsOf(r, act)
+		if err != nil {
+			return a, err
+		}
+		a.v = v
+	}
+	return a, nil
+}
+
+// sent are the fields of the action that the request names, as the values to send to a service that this server
+// forwards the action to: a field that the request leaves out stays out, which is what an edit needs.
+func (a admitted) sent() map[string]string {
+	values := map[string]string{}
+	for _, f := range fieldNames(a.act) {
+		if a.v.Has(f) {
+			values[f] = a.v.Get(f)
+		}
+	}
+	return values
+}
+
+// actionFunc runs one action of the catalog on the request that admit let through.
+type actionFunc func(r *http.Request, a admitted) (*siren.Entity, error)
+
+// mount gives each action of cat a route to its handler, with the method and the path of the action, and runs admit
+// before the handler. mount panics when an action has no handler or a handler has no action: the server does not
+// start when the catalog and the routes disagree.
 func (h *server) mount(m *http.ServeMux, cat []spec, handlers map[string]actionFunc) {
 	named := map[string]bool{}
 	for _, s := range cat {
@@ -193,16 +247,11 @@ func (h *server) mount(m *http.ServeMux, cat []spec, handlers map[string]actionF
 	for _, s := range cat {
 		f := handlers[s.Name]
 		m.HandleFunc(s.Method+" "+s.Path, h.serve(func(r *http.Request) (*siren.Entity, error) {
-			var src string
-			if s.Method != "GET" || s.Owner {
-				src = source(r)
+			a, err := admit(r, s)
+			if err != nil {
+				return nil, err
 			}
-			if s.Owner {
-				if err := requireOwner(src); err != nil {
-					return nil, err
-				}
-			}
-			return f(r, s, src)
+			return f(r, a)
 		}))
 	}
 }

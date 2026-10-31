@@ -1,13 +1,19 @@
 package api_test
 
 import (
+	"context"
+	"encoding/json"
+	"errors"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strconv"
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"lifelog/app"
 	"lifelog/internal/api"
@@ -78,10 +84,27 @@ func withServer(t *testing.T) (http.Handler, *api.Apps, *testChild) {
 	apps := api.NewApps()
 	apps.Expect("testapp")
 	child := newChild(t)
-	if err := apps.Set("testapp", child.srv.URL, "Test app", childActions()); err != nil {
+	if _, err := apps.Register(t.Context(), "testapp", child.srv.URL); err != nil {
 		t.Fatal(err)
 	}
+	child.hits.Store(0) // the handshake is not a request of the tests
 	return api.NewWith(s, apps), apps, child
+}
+
+// appLinks are the hrefs of the apps that run, as the root of the server links them.
+func appLinks(t *testing.T, h http.Handler) []string {
+	t.Helper()
+	var root siren.Entity
+	if err := json.Unmarshal(call(h, "GET", "/", "", nil).Body.Bytes(), &root); err != nil {
+		t.Fatal(err)
+	}
+	var out []string
+	for _, l := range root.Links {
+		if slices.Contains(l.Rel, "app") {
+			out = append(out, l.Href)
+		}
+	}
+	return out
 }
 
 func call(h http.Handler, method, target, body string, header map[string]string) *httptest.ResponseRecorder {
@@ -197,8 +220,8 @@ func TestAnAppThatDoesNotRunIsUnavailable(t *testing.T) {
 	if rec := call(h, "GET", "/with/nosuch/", "", nil); rec.Code != 404 {
 		t.Errorf("an unknown app: %d, want 404", rec.Code)
 	}
-	if names := apps.Names(); len(names) != 0 {
-		t.Errorf("Names = %v, want none", names)
+	if links := appLinks(t, h); len(links) != 0 {
+		t.Errorf("the root links the apps %v, want none", links)
 	}
 	apps.Expect("later")
 	if rec := call(h, "GET", "/with/later/", "", nil); rec.Code != 503 {
@@ -206,8 +229,8 @@ func TestAnAppThatDoesNotRunIsUnavailable(t *testing.T) {
 	}
 }
 
-func TestAppsSetRefusesABadCatalogAndKeepsTheOldOne(t *testing.T) {
-	h, apps, child := withServer(t)
+func TestRegisterRefusesABadCatalogAndKeepsTheOldOne(t *testing.T) {
+	h, apps, _ := withServer(t)
 	for _, c := range []struct {
 		why, app string
 		act      siren.Action
@@ -218,8 +241,9 @@ func TestAppsSetRefusesABadCatalogAndKeepsTheOldOne(t *testing.T) {
 		{"a bad name", "testapp", siren.Action{Name: "Add_Item", Method: "GET", Href: "/x"}},
 		{"a file field", "testapp", siren.Action{Name: "up", Method: "POST", Href: "/up", Fields: []siren.Field{{Name: "f", Type: "file"}}}},
 	} {
-		if err := apps.Set(c.app, child.srv.URL, "Changed", []siren.Action{c.act}); err == nil {
-			t.Errorf("%s: want an error", c.why)
+		changed := catalogServer(t, "Changed", []string{"actions"}, c.act)
+		if _, err := apps.Register(t.Context(), c.app, changed.URL); err == nil || !strings.Contains(err.Error(), "catalog refused") {
+			t.Errorf("%s: error %v, want catalog refused", c.why, err)
 		}
 	}
 	if rec := call(h, "GET", "/with/testapp/", "", nil); rec.Code != 200 {
@@ -228,17 +252,131 @@ func TestAppsSetRefusesABadCatalogAndKeepsTheOldOne(t *testing.T) {
 	if body := call(h, "GET", "/actions", "", nil).Body.String(); !strings.Contains(body, "testapp-add-item") || strings.Contains(body, "Changed") {
 		t.Error("the earlier catalog is not as it was")
 	}
-	if names := apps.Names(); len(names) != 1 || names[0] != "testapp" {
-		t.Errorf("Names = %v, want [testapp]", names)
+	if links := appLinks(t, h); len(links) != 1 || links[0] != "/with/testapp" {
+		t.Errorf("the root links the apps %v, want [/with/testapp]", links)
+	}
+}
+
+// catalogServer is a child that serves a catalog of the class and the actions, and a home with the title, and nothing else.
+func catalogServer(t *testing.T, title string, class []string, actions ...siren.Action) *httptest.Server {
+	t.Helper()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		e := &siren.Entity{Class: class, Title: title, Actions: actions}
+		if r.URL.Path == "/" {
+			e = &siren.Entity{Class: []string{"home"}, Title: title}
+		}
+		w.Header().Set("Content-Type", "application/vnd.siren+json")
+		if err := json.NewEncoder(w).Encode(e); err != nil {
+			t.Error(err)
+		}
+	}))
+	t.Cleanup(srv.Close)
+	return srv
+}
+
+// TestRegisterSaysWhatTheChildBecame: the handshake gives an app its catalog and the title of its home (its name when the
+// home gives none), and says what it made for the line of the log.
+func TestRegisterSaysWhatTheChildBecame(t *testing.T) {
+	apps := api.NewApps()
+	ping := siren.Action{Name: "ping", Method: "POST", Href: "/ping"}
+	got, err := apps.Register(t.Context(), "demo", catalogServer(t, "Demo home", []string{"actions"}, ping).URL)
+	if err != nil || got != (api.Registered{Actions: 1}) {
+		t.Fatalf("Register = %+v, %v; want an app of 1 action", got, err)
+	}
+	if _, err := apps.Register(t.Context(), "bare", catalogServer(t, "", []string{"actions"}, ping).URL); err != nil {
+		t.Fatal(err)
+	}
+	_, _, s := apitest.Fresh(t, "cli")
+	h := api.NewWith(s, apps)
+	root := call(h, "GET", "/", "", nil).Body.String()
+	if !strings.Contains(root, `"title": "Demo home"`) || !strings.Contains(root, `"title": "bare"`) {
+		t.Errorf("the root does not link the apps by the title of the home, or by the name when the home has none: %s", root)
+	}
+}
+
+// TestRegisterTellsAChildThatIsNotUpFromOneWithNoCatalog: a child that does not answer yet gives an error that wraps the
+// dial, so a caller can try again. A child that answers and has no catalog gives an error that wraps nothing.
+func TestRegisterTellsAChildThatIsNotUpFromOneWithNoCatalog(t *testing.T) {
+	apps := api.NewApps()
+	gone := httptest.NewServer(http.NotFoundHandler())
+	gone.Close()
+	_, err := apps.Register(t.Context(), "demo", gone.URL)
+	var op *net.OpError
+	if err == nil || !errors.As(err, &op) || op.Op != "dial" {
+		t.Errorf("a child that is not up: %v, want an error that wraps the dial", err)
+	}
+	for _, tc := range []struct {
+		name string
+		h    http.HandlerFunc
+		want string
+	}{
+		{"an error entity", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/vnd.siren+json")
+			w.WriteHeader(http.StatusNotFound)
+			io.WriteString(w, `{"class":["error"],"properties":{"status":404,"code":"not_found","message":"no"}}`)
+		}, "no catalog (status 404)"},
+		{"an error status with no entity", func(w http.ResponseWriter, r *http.Request) { http.Error(w, "no", http.StatusNotFound) }, "no catalog (HTTP 404"},
+		{"an answer that is not an entity", func(w http.ResponseWriter, r *http.Request) { io.WriteString(w, "hello") }, "no catalog ("},
+		{"an entity with no class actions", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/vnd.siren+json")
+			io.WriteString(w, `{"class":["home"],"title":"Home"}`)
+		}, "no catalog (the answer is not an actions entity)"},
+	} {
+		srv := httptest.NewServer(tc.h)
+		_, err := apps.Register(t.Context(), "demo", srv.URL)
+		srv.Close()
+		if err == nil || !strings.Contains(err.Error(), tc.want) || errors.As(err, &op) {
+			t.Errorf("%s: %v, want %q that wraps no dial", tc.name, err, tc.want)
+		}
+	}
+}
+
+// TestRegisterEndsWithItsContext: a child that holds the connection open does not stop the handshake after the context
+// of the caller ends.
+func TestRegisterEndsWithItsContext(t *testing.T) {
+	release := make(chan struct{})
+	hang := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { <-release }))
+	t.Cleanup(hang.Close)
+	t.Cleanup(func() { close(release) }) // runs before hang.Close: the open request ends first
+	ctx, cancel := context.WithTimeout(t.Context(), 100*time.Millisecond)
+	defer cancel()
+	_, err := api.NewApps().Register(ctx, "demo", hang.URL)
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Errorf("Register against a child that holds the connection: %v, want the deadline", err)
+	}
+}
+
+// TestARegisteredTaskServiceNeedsItsListsAndItsWrites: a child with the class tasks is the task service, not an app. The
+// registry refuses it when it gives no lists, and the line says so.
+func TestARegisteredTaskServiceNeedsItsListsAndItsWrites(t *testing.T) {
+	service := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/vnd.siren+json")
+		if r.URL.Path == "/lists" {
+			http.Error(w, "no", http.StatusInternalServerError)
+			return
+		}
+		io.WriteString(w, `{"class":["actions","tasks"],"title":"Actions"}`)
+	}))
+	t.Cleanup(service.Close)
+	_, err := api.NewApps().Register(t.Context(), "svc", service.URL)
+	if err == nil || !strings.Contains(err.Error(), "catalog refused: the task service gives no lists") {
+		t.Errorf("a task service with no lists: %v, want catalog refused: the task service gives no lists", err)
 	}
 }
 
 func TestAnAppThatAnswersNoEntityIsBadGateway(t *testing.T) {
 	_, _, s := apitest.Fresh(t, "cli")
-	text := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { io.WriteString(w, "hello") }))
+	text := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/actions" { // a catalog with no action, then text for anything else
+			w.Header().Set("Content-Type", "application/vnd.siren+json")
+			io.WriteString(w, `{"class":["actions"],"title":"Actions"}`)
+			return
+		}
+		io.WriteString(w, "hello")
+	}))
 	t.Cleanup(text.Close)
 	apps := api.NewApps()
-	if err := apps.Set("plain", text.URL, "Plain", nil); err != nil {
+	if _, err := apps.Register(t.Context(), "plain", text.URL); err != nil {
 		t.Fatal(err)
 	}
 	rec := call(api.NewWith(s, apps), "GET", "/with/plain/", "", nil)

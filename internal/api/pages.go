@@ -15,12 +15,8 @@ import (
 	"lifelog/siren"
 )
 
-func (h *server) find(r *http.Request, act spec, _ string) (*siren.Entity, error) {
-	v, err := fieldsOf(r, act)
-	if err != nil {
-		return nil, err
-	}
-	title := v.Get("title")
+func (h *server) find(r *http.Request, a admitted) (*siren.Entity, error) {
+	title := a.v.Get("title")
 	id, err := h.s.PageID(r.Context(), title)
 	if err != nil {
 		return nil, err
@@ -33,12 +29,8 @@ func (h *server) find(r *http.Request, act spec, _ string) (*siren.Entity, error
 
 // randomPage answers with the address of a thing of the kind picked at random (docs/plans/130-the-explore-pass.md,
 // part 5); the kind is page when the request names none, and a day is the day view of a day page.
-func (h *server) randomPage(r *http.Request, act spec, _ string) (*siren.Entity, error) {
-	v, err := fieldsOf(r, act)
-	if err != nil {
-		return nil, err
-	}
-	kind := v.Get("kind")
+func (h *server) randomPage(r *http.Request, a admitted) (*siren.Entity, error) {
+	kind := a.v.Get("kind")
 	if kind == "" {
 		kind = "page"
 	}
@@ -234,16 +226,9 @@ func searchHref(q, order, kind string) string {
 	return "/search?" + v.Encode()
 }
 
-func (h *server) search(r *http.Request, act spec, _ string) (*siren.Entity, error) {
-	v, err := fieldsOf(r, act)
-	if err != nil {
-		return nil, err
-	}
-	q, kind := v.Get("q"), v.Get("kind")
-	order, err := core.SearchOrderOf(v.Get("order"))
-	if err != nil {
-		return nil, err
-	}
+func (h *server) search(r *http.Request, a admitted) (*siren.Entity, error) {
+	q, kind := a.v.Get("q"), a.v.Get("kind")
+	order := core.SearchOrderOf(a.v.Get("order"))
 	e := &siren.Entity{Class: []string{"search"}, Title: "Search",
 		Links:   []siren.Link{link("self", searchHref(q, order, kind), "Search"), link("index", "/", "Home")},
 		Actions: []siren.Action{action("search", nil, map[string]any{"q": q, "order": order, "kind": kind})}}
@@ -299,85 +284,61 @@ func (h *server) search(r *http.Request, act spec, _ string) (*siren.Entity, err
 	return e, nil
 }
 
-func (h *server) createPage(r *http.Request, act spec, src string) (*siren.Entity, error) {
-	v, err := fieldsOf(r, act)
-	if err != nil {
-		return nil, err
-	}
-	id, sync, err := h.s.CreatePage(r.Context(), src, v.Get("title"), v.Get("body"), v.Get("category"))
+func (h *server) createPage(r *http.Request, a admitted) (*siren.Entity, error) {
+	id, sync, err := h.s.CreatePage(r.Context(), a.src, a.v.Get("title"), a.v.Get("body"), a.v.Get("category"))
 	if err != nil {
 		return nil, err
 	}
 	return withResult(h.pageEntity(r.Context(), id))(sync)
 }
 
-func (h *server) saveBody(r *http.Request, act spec, src string) (*siren.Entity, error) {
-	id, v, err := idForm(r, act)
+func (h *server) saveBody(r *http.Request, a admitted) (*siren.Entity, error) {
+	sync, err := h.s.SaveBody(r.Context(), a.src, a.id, a.v.Get("body"), a.v.Get("version"))
 	if err != nil {
 		return nil, err
 	}
-	sync, err := h.s.SaveBody(r.Context(), src, id, v.Get("body"), v.Get("version"))
-	if err != nil {
-		return nil, err
-	}
-	return withResult(h.pageEntity(r.Context(), id))(sync)
+	return withResult(h.pageEntity(r.Context(), a.id))(sync)
 }
 
-func (h *server) createPerson(r *http.Request, act spec, src string) (*siren.Entity, error) {
-	v, err := fieldsOf(r, act)
+func (h *server) createPerson(r *http.Request, a admitted) (*siren.Entity, error) {
+	id, err := h.s.CreatePerson(r.Context(), a.src, a.v.Get("title"), a.v.Get("name"), h.dayNamed(a.v.Get("birth_day")), h.dayNamed(a.v.Get("death_day")))
 	if err != nil {
-		return nil, err
-	}
-	id, err := h.s.CreatePerson(r.Context(), src, v.Get("title"), v.Get("name"), h.dayNamed(v.Get("birth_day")), h.dayNamed(v.Get("death_day")))
-	if err != nil {
-		return nil, offerPromote(err, v)
+		return nil, offerPromote(err, a.v)
 	}
 	return h.pageEntity(r.Context(), id)
 }
 
-func (h *server) promote(r *http.Request, act spec, src string) (*siren.Entity, error) {
-	id, v, err := idForm(r, act)
-	if err != nil {
+func (h *server) promote(r *http.Request, a admitted) (*siren.Entity, error) {
+	if err := h.s.Promote(r.Context(), a.src, a.id, a.v.Get("name"), h.dayNamed(a.v.Get("birth_day")), h.dayNamed(a.v.Get("death_day"))); err != nil {
 		return nil, err
 	}
-	if err := h.s.Promote(r.Context(), src, id, v.Get("name"), h.dayNamed(v.Get("birth_day")), h.dayNamed(v.Get("death_day"))); err != nil {
-		return nil, err
-	}
-	return h.pageEntity(r.Context(), id)
+	return h.pageEntity(r.Context(), a.id)
 }
 
 // editPerson sets the fields that the request names. A field left out stays; core.PersonEdit says what an empty one does.
-func (h *server) editPerson(r *http.Request, act spec, src string) (*siren.Entity, error) {
-	id, v, err := idForm(r, act)
-	if err != nil {
-		return nil, err
-	}
+func (h *server) editPerson(r *http.Request, a admitted) (*siren.Entity, error) {
 	named := func(field string, read func(string) string) *string {
-		if !v.Has(field) {
+		if !a.v.Has(field) {
 			return nil
 		}
-		s := read(v.Get(field))
+		s := read(a.v.Get(field))
 		return &s
 	}
 	same := func(s string) string { return s }
 	e := core.PersonEdit{Name: named("name", same), Birth: named("birth_day", h.dayNamed), Death: named("death_day", h.dayNamed)}
-	if err := h.s.EditPerson(r.Context(), src, id, e); err != nil {
+	if err := h.s.EditPerson(r.Context(), a.src, a.id, e); err != nil {
 		return nil, err
 	}
-	return h.pageEntity(r.Context(), id)
+	return h.pageEntity(r.Context(), a.id)
 }
 
 // editMetric sets the daily mark of a metric. An unticked checkbox sends nothing, so a missing daily is 0.
-func (h *server) editMetric(r *http.Request, act spec, src string) (*siren.Entity, error) {
-	id, v, err := idForm(r, act)
-	if err != nil {
+func (h *server) editMetric(r *http.Request, a admitted) (*siren.Entity, error) {
+	daily := flag(a.v, "daily")
+	if err := h.s.EditMetric(r.Context(), a.src, a.id, daily); err != nil {
 		return nil, err
 	}
-	daily := flag(v, "daily")
-	if err := h.s.EditMetric(r.Context(), src, id, daily); err != nil {
-		return nil, err
-	}
-	e, err := h.pageEntity(r.Context(), id)
+	e, err := h.pageEntity(r.Context(), a.id)
 	if err != nil {
 		return nil, err
 	}
@@ -414,30 +375,22 @@ func offerPromote(err error, v url.Values) error {
 	return &existsOffer{ex, siren.PageHref(ex.ID) + "?" + q.Encode(), "make it a person, with what you typed"}
 }
 
-func (h *server) revive(r *http.Request, _ spec, src string) (*siren.Entity, error) {
-	id, err := idOf(r)
-	if err != nil {
+func (h *server) revive(r *http.Request, a admitted) (*siren.Entity, error) {
+	if err := h.s.Revive(r.Context(), a.src, a.id); err != nil {
 		return nil, err
 	}
-	if err := h.s.Revive(r.Context(), src, id); err != nil {
-		return nil, err
-	}
-	return h.pageEntity(r.Context(), id)
+	return h.pageEntity(r.Context(), a.id)
 }
 
-func (h *server) rename(r *http.Request, act spec, src string) (*siren.Entity, error) {
-	id, v, err := idForm(r, act)
+func (h *server) rename(r *http.Request, a admitted) (*siren.Entity, error) {
+	p, err := h.s.PageByID(r.Context(), a.id)
 	if err != nil {
 		return nil, err
 	}
-	p, err := h.s.PageByID(r.Context(), id)
-	if err != nil {
-		return nil, err
-	}
-	if conversationDay(p.Title) != "" || conversationDay(strings.TrimSpace(v.Get("title"))) != "" {
+	if conversationDay(p.Title) != "" || conversationDay(strings.TrimSpace(a.v.Get("title"))) != "" {
 		return nil, core.Conflict("a conversation page keeps its title: its day names it")
 	}
-	to, err := h.s.Rename(r.Context(), src, id, v.Get("title"))
+	to, err := h.s.Rename(r.Context(), a.src, a.id, a.v.Get("title"))
 	if err != nil {
 		return nil, err
 	}

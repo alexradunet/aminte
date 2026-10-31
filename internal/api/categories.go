@@ -12,18 +12,14 @@ import (
 // filePages is file-pages: every page named is filed in the category page, in one write (D26). The answer is the
 // class filed: the category, whether it was made, the ids, and how many links were added and removed (with from, how many were removed from it), with an item
 // link to each page. The result is the sentence that a UI shows after the write.
-func (h *server) filePages(r *http.Request, act spec, src string) (*siren.Entity, error) {
-	v, err := fieldsOf(r, act)
+func (h *server) filePages(r *http.Request, a admitted) (*siren.Entity, error) {
+	ids, err := idsOf(a.v["ids"])
 	if err != nil {
 		return nil, err
 	}
-	ids, err := idsOf(v["ids"])
-	if err != nil {
-		return nil, err
-	}
-	from := v.Get("from")
-	move := flag(v, "move")
-	f, err := h.s.FilePages(r.Context(), src, ids, v.Get("category"), from, move)
+	from := a.v.Get("from")
+	move := flag(a.v, "move")
+	f, err := h.s.FilePages(r.Context(), a.src, ids, a.v.Get("category"), from, move)
 	if err != nil {
 		return nil, err
 	}

@@ -189,7 +189,7 @@ func TestSettingsAreRefusedToAnAgentAndAnImport(t *testing.T) {
 
 // TestAStoreWithNoSettingsPathRefusesBoth: a read and a write say that the store has no settings file.
 func TestAStoreWithNoSettingsPathRefusesBoth(t *testing.T) {
-	h := api.New(&core.Store{DB: dbtest.New(t)})
+	h := api.NewWith(&core.Store{DB: dbtest.New(t)}, nil)
 	c := client.InProcess(h, "cli")
 	_, err := c.Get(t.Context(), "/settings")
 	if apitest.Status(err) != 500 || !strings.Contains(err.Error(), "no settings file") {

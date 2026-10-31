@@ -401,7 +401,7 @@ func TestAReadingLinkWritesItsNumberAsNumDoes(t *testing.T) {
 // day=today on 2026-10-13. The next ones come on the next day: one says today again, and one names another day.
 func TestAReadingSentAgainLinksTheDayOfTheStoredReading(t *testing.T) {
 	now := time.Date(2026, 10, 13, 9, 0, 0, 0, time.UTC)
-	c := client.InProcess(api.New(&core.Store{DB: dbtest.New(t), Clock: func() time.Time { return now }, Zone: time.UTC}), "cli")
+	c := client.InProcess(api.NewWith(&core.Store{DB: dbtest.New(t), Clock: func() time.Time { return now }, Zone: time.UTC}, nil), "cli")
 	ctx := t.Context()
 	root := apitest.Must(t)(c.Get(ctx, "/"))
 	apitest.Must(t)(c.Do(ctx, apitest.Action(t, root, "register-metric"), map[string]string{"name": "Weight", "unit": "kg"}))

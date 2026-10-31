@@ -32,7 +32,7 @@ func TestTheStoresClockIsTheOneClock(t *testing.T) {
 	zone := time.FixedZone("+14", 14*60*60)               // the offset of Pacific/Kiritimati, with no zone database
 	now := time.Date(2026, 3, 10, 11, 30, 0, 0, time.UTC) // 2026-03-11 01:30:00 in the zone
 	s := &core.Store{DB: d, SnapshotDir: t.TempDir(), Clock: func() time.Time { return now }, Zone: zone}
-	h := api.New(s)
+	h := api.NewWith(s, nil)
 	c := client.InProcess(h, "cli")
 	ctx := t.Context()
 
@@ -100,7 +100,7 @@ func TestEveryDayFieldReadsTheWordToday(t *testing.T) {
 	zone := time.FixedZone("+14", 14*60*60)               // the offset of Pacific/Kiritimati, with no zone database
 	now := time.Date(2026, 3, 10, 11, 30, 0, 0, time.UTC) // 2026-03-11 01:30:00 in the zone; the UTC day is 2026-03-10
 	s := &core.Store{DB: dbtest.New(t), Clock: func() time.Time { return now }, Zone: zone}
-	c := client.InProcess(api.New(s), "cli")
+	c := client.InProcess(api.NewWith(s, nil), "cli")
 	ctx := t.Context()
 	catalog := apitest.Must(t)(c.Get(ctx, "/actions"))
 	do := func(action string, v map[string]string) (*siren.Entity, error) {

@@ -281,7 +281,7 @@ func fixture(t *testing.T) (http.Handler, *core.Store, map[string]string) {
 	if _, err := s.CreateMetric(ctx, "cli", core.NewMetric{Name: "Walk", Note: "1 = done"}); err != nil {
 		t.Fatal(err)
 	}
-	h := New(s)
+	h := NewWith(s, nil)
 	return h, s, ids
 }
 
