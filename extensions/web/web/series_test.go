@@ -158,7 +158,7 @@ func TestAMetricsViewHoldsItsPage(t *testing.T) {
 // The other readings of the year are in a closed fold under them. That fold says how many readings it holds.
 // So the other groups of the page stay near. Every reading is still on the page, newest first.
 func TestAYearShowsItsNewestReadingsFirst(t *testing.T) {
-	l := lifeWithTodayAt(t, "2026-10-13")
+	l := lifeStartingOn(t, "2026-10-13")
 	l.do(t, "/", "register-metric", map[string]string{"name": "Weight", "unit": "kg"})
 	for d := 1; d <= 15; d++ {
 		l.do(t, "/", "record", map[string]string{"metric": "Weight", "day": fmt.Sprintf("2026-09-%02d", d), "value": fmt.Sprint(70 + d)})
@@ -192,7 +192,7 @@ func TestAYearShowsItsNewestReadingsFirst(t *testing.T) {
 // A year of eleven readings folds one reading under its newest ten.
 // The fold says "1 more reading", not "1 more readings".
 func TestTheFoldOfOneOlderReadingSaysReading(t *testing.T) {
-	l := lifeWithTodayAt(t, "2026-10-13")
+	l := lifeStartingOn(t, "2026-10-13")
 	l.do(t, "/", "register-metric", map[string]string{"name": "Weight", "unit": "kg"})
 	for d := 1; d <= 11; d++ {
 		l.do(t, "/", "record", map[string]string{"metric": "Weight", "day": fmt.Sprintf("2026-09-%02d", d), "value": fmt.Sprint(70 + d)})

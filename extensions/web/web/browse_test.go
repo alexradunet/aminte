@@ -372,9 +372,6 @@ func isReceiptLocation(location, back string) bool {
 	return len(receipt) == 1 && len(receipt[0]) == 64 && got.Path == want.Path && query.Encode() == want.Query().Encode()
 }
 
-// refererOnWeb is the Referer of a form that was sent from the page at path of the host of the requests of the tests.
-func refererOnWeb(path string) string { return "http://example.com" + path }
-
 // TestTheListsDeleteWhatIsChecked follows the browser: the media list of Browse draws a box on each tile for one form,
 // the Delete button of the form posts the checked ids to tombstone-pages and returns to the list with the count, and a
 // post with no box checked comes back to the list with the refusal.

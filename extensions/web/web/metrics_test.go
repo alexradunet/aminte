@@ -13,23 +13,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
-
-	"lifelog/client"
-	"lifelog/lifelogtest"
 )
-
-// lifeWithTodayAt is emptyLife with the clock of the core on another day (YYYY-MM-DD).
-// A test uses it when the words and the years of the page are those of that day.
-// The clock of web stays as it is. Web uses its clock for the sessions and the receipts only.
-func lifeWithTodayAt(t *testing.T, day string) *life {
-	t.Helper()
-	core := lifelogtest.New(t, day)
-	clk := newClock()
-	state := t.TempDir()
-	browser := newBrowser(t, core.URL, clk, state)
-	cookie := login(t, browser)
-	return &life{core: core, api: client.Remote(core.URL, "cli", ""), web: signedIn{browser, cookie}, browser: browser, cookie: cookie, clock: clk, state: state, hrefs: map[string]string{}}
-}
 
 // lifeWithWeightSeries is a life whose today is 2026-10-13.
 // Weight has the unit kg and the note "Before breakfast.". It has readings on 2024-03-01, 2026-10-01 and 2026-10-12.
@@ -37,7 +21,7 @@ func lifeWithTodayAt(t *testing.T, day string) *life {
 // The function returns the addresses of the three readings, oldest first.
 func lifeWithWeightSeries(t *testing.T) (*life, []string) {
 	t.Helper()
-	l := lifeWithTodayAt(t, "2026-10-13")
+	l := lifeStartingOn(t, "2026-10-13")
 	l.do(t, "/", "register-metric", map[string]string{"name": "Weight", "unit": "kg", "note": "Before breakfast."})
 	var readings []string
 	for _, r := range [][2]string{{"2024-03-01", "81.5"}, {"2026-10-01", "77.4"}, {"2026-10-12", "77.1"}} {

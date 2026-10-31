@@ -10,35 +10,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
-
-	"lifelog/client"
-	"lifelog/lifelogtest"
 )
-
-// lifeStartingOn is emptyLife on another day: the clock of the core stands at the start of day (YYYY-MM-DD), so a day of
-// the year of that day has no year in its words.
-func lifeStartingOn(t *testing.T, day string) *life {
-	t.Helper()
-	core := lifelogtest.New(t, day)
-	clk := newClock()
-	state := t.TempDir()
-	browser := newBrowser(t, core.URL, clk, state)
-	cookie := login(t, browser)
-	return &life{core: core, api: client.Remote(core.URL, "cli", ""), web: signedIn{browser, cookie}, browser: browser, cookie: cookie, clock: clk, state: state, hrefs: map[string]string{}}
-}
-
-// locationWithoutReceipt is a Location without the receipt of the toast that a write adds: the path that the write returned to.
-func locationWithoutReceipt(t *testing.T, location string) string {
-	t.Helper()
-	u, err := url.Parse(location)
-	if err != nil {
-		t.Fatalf("Location %q: %v", location, err)
-	}
-	query := u.Query()
-	query.Del("feedback")
-	u.RawQuery = query.Encode()
-	return u.String()
-}
 
 // TestPeopleListCarriesItsMentions: the sheet of the people list says in words how many pages link to each person and the
 // newest day page among them.
@@ -123,7 +95,7 @@ func TestBrowserStableNameResolution(t *testing.T) {
 	ref := pageIDOf(t, href(l.do(t, "/", "create-page", map[string]string{"title": "Old reference", "body": "See [[Old person]]."}), "self"))
 
 	rec := postForm(l.web, "/pages/"+person+"/rename", url.Values{"title": {"New person"}})
-	if rec.Code != http.StatusSeeOther || locationWithoutReceipt(t, rec.Header().Get("Location")) != "/pages/"+person {
+	if rec.Code != http.StatusSeeOther || locationWithoutFeedback(t, rec.Header().Get("Location")) != "/pages/"+person {
 		t.Fatalf("rename: %d %q", rec.Code, rec.Header().Get("Location"))
 	}
 	if page := htmlPageAt(t, l.web, "/pages/"+person, http.StatusOK); !strings.Contains(page, "New person") {

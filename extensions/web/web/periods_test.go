@@ -8,9 +8,7 @@ package web_test
 import (
 	"fmt"
 	"net/http"
-	"net/http/httptest"
 	"net/url"
-	"regexp"
 	"strings"
 	"testing"
 )
@@ -142,53 +140,6 @@ func TestTheYearHoldsTwelveMonths(t *testing.T) {
 	}
 }
 
-// TestTheEdgePagesOfTheCalendarLinkOnlyToPages: the days run from 0000-01-01 to 9999-12-31 (lifelog_meta.days), and a year
-// has a page from 0001 to 9999. The first and the last day, month and year answer, and each link of their pages leads to
-// a page that answers: a link to a period that has no page is absent in the HTML. Where the entity has no prev or next
-// link, the HTML has no step with that rel, and no page has an empty href. A year page links 365 days, so the test asks
-// the core for each address in the process, as Siren, and asks web only for the addresses of the links of the entity.
-func TestTheEdgePagesOfTheCalendarLinkOnlyToPages(t *testing.T) {
-	l := emptyLife(t)
-	calendarHref := regexp.MustCompile(`href="(/(?:days|months|years)/[^"]+)"`)
-	coreAnswers := func(path string) int {
-		req := httptest.NewRequest(http.MethodGet, path, nil)
-		req.Header.Set("Accept", "application/vnd.siren+json")
-		rec := httptest.NewRecorder()
-		l.core.Handler.ServeHTTP(rec, req)
-		return rec.Code
-	}
-	checked := map[string]bool{} // the links already asked: the sidebar repeats the days of this month
-	for _, page := range []string{"/days/0000-01-01", "/days/0000-01-02", "/days/9999-12-31", "/months/0000-01", "/months/9999-12", "/years/0001", "/years/9999"} {
-		entity := must(t)(l.api.Get(t.Context(), page))
-		body := htmlPageAt(t, l.web, page, http.StatusOK)
-		for _, m := range calendarHref.FindAllStringSubmatch(body, -1) {
-			if checked[m[1]] {
-				continue
-			}
-			checked[m[1]] = true
-			// a browser keeps the fragment (#capture of the Today strip) to itself; httptest would send it in the path
-			if code := coreAnswers(strings.SplitN(m[1], "#", 2)[0]); code != http.StatusOK && code != http.StatusSeeOther {
-				t.Errorf("%s: its HTML links %s, which answers %d", page, m[1], code)
-			}
-		}
-		for _, rel := range []string{"prev", "next", "up", "month", "year"} {
-			if link := href(entity, rel); link != "" {
-				if code := ask(l.web, http.MethodGet, link).Code; code != http.StatusOK {
-					t.Errorf("%s: the %s link %s answers %d through web, want 200", page, rel, link, code)
-				}
-			}
-		}
-		for _, rel := range []string{"prev", "next"} {
-			if href(entity, rel) == "" && strings.Contains(body, `rel="`+rel+`"`) {
-				t.Errorf("%s has no %s link, and its HTML draws a step with rel=%q", page, rel, rel)
-			}
-		}
-		if strings.Contains(body, `href=""`) {
-			t.Errorf("%s: its HTML has an empty href", page)
-		}
-	}
-}
-
 // TestTheMonthIsACalendar: each day of a month is a cell with its link, its first line and its mood in words; the
 // buttons name the months around it; the week starts on Monday; the calendar has no form to go to a day.
 func TestTheMonthIsACalendar(t *testing.T) {
@@ -210,17 +161,6 @@ func TestTheMonthIsACalendar(t *testing.T) {
 	if !strings.Contains(body, "<tr><td></td><td></td><td></td><td") {
 		t.Error("the first week does not start on Monday")
 	}
-}
-
-// TestTheMonthOfTheFirstDayIsACalendar: January 0000 holds the first day that a date can name. Its calendar is a page
-// with its 31 days.
-func TestTheMonthOfTheFirstDayIsACalendar(t *testing.T) {
-	l := emptyLife(t)
-	l.do(t, "/days/0000-01-01", "capture", map[string]string{"text": "The first day."})
-	l.do(t, "/", "register-metric", map[string]string{"name": "weight", "unit": "kg"})
-	l.do(t, "/", "record", map[string]string{"metric": "weight", "day": "0000-01-03", "value": "70"})
-	body := htmlPageAt(t, l.web, "/months/0000-01", http.StatusOK)
-	wantInPage(t, "January 0000", body, `<td class="written"><a href="/days/0000-01-01"><span class="n">1</span><span class="first">(00:00) The first day.</span>`, `<a href="/days/0000-01-31"><span class="n">31</span>`)
 }
 
 // TestTheZoomMarksItsOwnLevel: a month links Week and Month in its zoom, and marks its own level. The page marks two

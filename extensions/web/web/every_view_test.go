@@ -10,22 +10,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
-
-	"lifelog/client"
-	"lifelog/lifelogtest"
 )
-
-// lifeStartingOn is a fresh file whose clock stands at the start of day, with web in front of it and a browser that has
-// logged in. emptyLife is the same for the day of the other tests of web.
-func lifeStartingOn(t *testing.T, day string) *life {
-	t.Helper()
-	core := lifelogtest.New(t, day)
-	clk := newClock()
-	state := t.TempDir()
-	browser := newBrowser(t, core.URL, clk, state)
-	cookie := login(t, browser)
-	return &life{core: core, api: client.Remote(core.URL, "cli", ""), web: signedIn{browser, cookie}, browser: browser, cookie: cookie, clock: clk, state: state, hrefs: map[string]string{}}
-}
 
 // wholePageAt asks web for uri and fails the test unless the answer has the status and is a whole page.
 func wholePageAt(t *testing.T, l *life, uri string, status int) string {

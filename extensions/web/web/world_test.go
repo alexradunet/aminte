@@ -137,7 +137,15 @@ func href(e *siren.Entity, rel string) string {
 // emptyLife is a fresh file with web in front of it and nothing written.
 func emptyLife(t *testing.T) *life {
 	t.Helper()
-	core := lifelogtest.New(t, today)
+	return lifeStartingOn(t, today)
+}
+
+// lifeStartingOn is emptyLife with the clock of the core at the start of day (YYYY-MM-DD): a test uses it when the words
+// and the years of the page are those of that day. The clock of web stays as it is: web uses it for the sessions and the
+// receipts only.
+func lifeStartingOn(t *testing.T, day string) *life {
+	t.Helper()
+	core := lifelogtest.New(t, day)
 	clk := newClock()
 	state := t.TempDir()
 	browser := newBrowser(t, core.URL, clk, state)
