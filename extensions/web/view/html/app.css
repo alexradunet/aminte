@@ -3,13 +3,13 @@
    colour, size and font is a token of base.css; no rule here names a colour of its own. A material sets its text
    through the aliases of base.css (--text, --text-strong, --text-muted, --text-link, --rule): a parchment element
    and a wood element reset them once, here. Five pictures are drawn by
-   internal/pixelart: the wood tile of the rail (wood.png), the faint ground tile of the page (ground.png), the sparks
+   the package pixelart (go run ./tools/pixelart): the wood tile of the rail (wood.png), the faint ground tile of the page (ground.png), the sparks
    of the embers floor (embers.png), one sheet of small sprites (sprites.png: the seal, the mood faces, the inkwell)
    and the icon sheet (icons.png). A pixel drawing is a picture, and a gradient cannot be one; the two glows of the
    firelight floor are the one gradient, light and not a thing. The chart is inline <svg>, and the grain and the
    stitch are CSS. This sheet is the components and the utilities
    layers of the one cascade base.css declares (docs/plans/108-the-browser-made-current.md): a utility is a class
-   no component restyles, so it may come last. There is one script (chat.js), for the chat column only: a sheet, a dialog and a popover are the
+   no component restyles, so it may come last. A script only adds a convenience (README.md, "The scripts"): a sheet, a dialog and a popover are the
    browser's own, and a rule here only dresses them. */
 
 @layer components{

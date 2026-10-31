@@ -1,4 +1,4 @@
-// The one script of the app (README, "No script"). Every form works without it. On every page it gives the focus back
+// The script of every page of the shell (README.md, "The scripts"). Every form works without it. On every page it gives the focus back
 // when a menu dialog closes: its opening button is in a hidden popover, so the focus goes to the ⋯ button, or, for a
 // form that the page's link asked for, to its head button (close does not bubble: one listener, capture phase). On the
 // chat column (#chat) and the chat screen (#conversation) it polls while the agent has not answered, posts the
