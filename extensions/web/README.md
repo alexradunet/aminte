@@ -24,10 +24,11 @@ This part is the whole of the browser, and it runs beside the browser that is st
 side), the forms (the write side), the login, the lock and the settings of the browser are here. The test side by side
 (`web/sidebyside_test.go` for the pages, `web/forms_sidebyside_test.go` for the forms) shows a browser the same pages
 from both. The differences that these tests allow are named in [the differences](#the-differences-from-the-browser-of-the-core).
+The end-to-end test (`e2e_test.go`) runs this program under the real `lifelog serve --public --with web`, and the parity
+test (`web/parity_test.go`) shows that each action of `GET /actions` has its form ([tests](#tests)).
 
-Not yet done: the test of this program against the real `lifelog serve --with web`, the parity test (each action of
-`GET /actions` has its form) and the move of the service. Until then the core keeps its browser, and its form of the
-settings still has `ground`, `lock_after` and the PIN. Web ignores them: web keeps its own.
+Not yet done: the move of the service ([run it live](#run-it-live)). Until then the core keeps its browser, and its form
+of the settings still has `ground`, `lock_after` and the PIN. Web ignores them: web keeps its own.
 
 ## Build and run
 
@@ -69,6 +70,53 @@ service stopped. It copies these three keys only (never the key of the model), a
 ```
 python3 -c 'import json,os,sys; s=json.load(open(sys.argv[1])); o=os.path.expanduser(sys.argv[2]); os.makedirs(os.path.dirname(o),exist_ok=True); os.umask(0o077); json.dump({k:s[k] for k in ("ground","lock_after","lock_pin_hash") if s.get(k)}, open(o,"w"))' /path/to/life.settings.json ~/.config/lifelog-web/settings.json
 ```
+
+## Run it live
+
+In stage 2 the core is still `--public`, and its own browser still answers on its address, so the owner can compare the two
+pages. Web is added beside it. The owner does these steps in this order:
+
+```mermaid
+flowchart TD
+  B["build lifelog and lifelog-web into the install folder"] --> S["stop the service"]
+  S --> C["copy the settings: the python3 line above"]
+  C --> U["add --with web, the two Environment lines and ReadWritePaths to the unit; daemon-reload"]
+  U --> R["start the service; read its log"]
+  R --> P["point the proxy to LIFELOG_WEB_LISTEN"]
+```
+
+1. Build both programs into the folder where the unit's `ExecStart` runs `lifelog`. `serve` refuses to start without
+   `lifelog-web` beside `lifelog`, before the file opens.
+
+   ```
+   go build -o <install folder>/lifelog ./cmd/lifelog
+   go build -C extensions/web -o <install folder>/lifelog-web ./cmd/lifelog-web
+   ```
+
+2. Stop the service, and copy the settings with [the python3 line](#one-step-for-the-owner-copy-the-settings). The new file
+   is `~/.config/lifelog-web/settings.json`, with the mode 0600.
+3. Change the unit. Keep the line that runs `lifelog serve --public` (its address, its `--token-file`, its `--allow-origin`)
+   and add `--with web`. Add the two variables and the folder of the state:
+
+   ```
+   ExecStart=/home/OWNER/.local/bin/lifelog --db /home/OWNER/lifelog/life.db serve --public --token-file /home/OWNER/life/token --allow-origin https://lifelog.example --snapshots /home/OWNER/snapshots --with web
+   Environment=LIFELOG_WEB_LISTEN=127.0.0.1:7780
+   Environment=LIFELOG_WEB_ORIGINS=https://lifelog.example
+   ReadWritePaths=/home/OWNER/.config/lifelog-web
+   ```
+
+   The unit has no token: `serve` reads it from the token file and gives it to web as `LIFELOG_TOKEN`. The origin in
+   `LIFELOG_WEB_ORIGINS` is the one that the proxy shows to the browser; `--allow-origin` lists the same origin for the
+   browser of the core. `ReadWritePaths` is needed when the unit has `ProtectHome=read-only`.
+4. `systemctl daemon-reload`, then start the service. The log (`journalctl -u lifelog.service -n 30`) must show these three
+   lines: `lifelog: with web: started (pid N)`, `lifelog-web: DATE TIME the browser is on http://127.0.0.1:7780` and
+   `lifelog: with web: a catalog of 1 actions on 127.0.0.1:PORT`. A line `ended with status 2: not started again` means a
+   bad variable: web wrote the reason to the log, and the owner acts first.
+5. Point the local proxy to `LIFELOG_WEB_LISTEN` (`127.0.0.1:7780`) in place of the address of the core. The proxy ends TLS.
+   The core stays on its own address for the programs: the CLI, the MCP server and the connected apps.
+
+To go back, point the proxy to the core again and remove `--with web`. The settings of the core are unchanged: web writes
+only its own file.
 
 ## What web does with a request
 
@@ -249,6 +297,8 @@ that the owner gave in 2026-10-14 is that the browser does what HTML can do, eve
 | `web` | The handler: `web.New(web.Options{...})`. `web.go` the options and the routes; `door.go` the checks of every request, the login and the logout; `sessions.go` the sessions and their cookie; `lock.go` the lock; `page.go` the read; `write.go` the write; `feedback.go` the toast; `shell.go` the shell; `assets.go` the files and `/render`; `settings.go` the file of the settings and the PIN; `catalog.go` the catalog of this program. |
 | `view` | A copy of the view of the core: the templates, the sheets, the scripts, the fonts, the pictures. Stage 3 of [plan 161](../../docs/plans/161-the-browser-as-an-extension.md) deletes the one in the core, and this copy is then the only one. Two changes of the copy: a form of a file puts `back` in the query of its address (`formView.ActionHref`), and the settings page draws the form "This browser". |
 | `pixelart` | A copy of the drawings that the pictures of the view are tested against. |
+| `internal/formdoc` | Reads the forms of a page of HTML as a browser reads them. Only the tests import it. |
+| `e2e_test.go` | The end-to-end test against the real `lifelog serve --with web` ([tests](#tests)). |
 
 ## Tests
 
@@ -266,3 +316,33 @@ the core (`web/feedback_internal_test.go`), the tests of the PIN too (`web/setti
 settings are the settings part of the core's `TestLockSettings` (`web/catalog_test.go`). A test of the write side
 (`web/write_test.go`) holds the requests that reach the core, the stream of a file, and the answers that a real core does not
 give.
+
+**The parity test** (`web/parity_test.go`). Web holds its own parity: the API and the CLI are held in the core, and the MCP
+server by its own end-to-end test. The test reads `GET /actions` of the core with the app `web` connected. For each action it
+asks web for `/actions` (for an action with a path field, `/actions?new=NAME&FIELD=VALUE` with a synthetic value, as the pages
+link to it) and reads the forms of the HTML as a browser reads them. The page must hold a form with the method and the address
+of the action. No action is exempt. The test fails for an action without a form and for a path field with no synthetic value.
+
+**The end-to-end test** (`e2e_test.go`). It builds the real `lifelog` and `lifelog-web` into one folder, makes a synthetic
+`life.db` there, and starts the line of [the live unit](#run-it-live): `lifelog serve --public --addr 127.0.0.1:0
+--token-file F --with web`, with `LIFELOG_WEB_LISTEN`, `LIFELOG_WEB_ORIGINS` (its own origin and one proxy origin) and
+`LIFELOG_WEB_STATE` set. Then it is a browser on the door of web alone: a cookie jar, `Accept: text/html`, and the fetch
+headers of a navigation. It checks, in order:
+
+```mermaid
+flowchart TD
+  A["a page before the login goes to /login; a bearer header opens nothing"] --> B["a wrong token stays out; the right token sets the session cookie"]
+  B --> C["Home draws the day of today in the shell; a script is served and cacheable"]
+  C --> D["the capture form of the day: 303 with a toast once; the core holds the words"]
+  D --> E["add-file with a small JPEG: the core holds the file; the preview streams through web byte for byte"]
+  E --> F["the guard: the origin of the proxy is trusted, a foreign origin is 403 and writes nothing"]
+  F --> G["/settings: the form This browser sets the ground, lock_after and a PIN; the file has the hash, not the PIN, mode 0600"]
+  G --> H["the core lists web-settings as the owner's and refuses it to agent:x with 403"]
+  H --> I["POST /lock, a locked write is 401 and writes nothing, a wrong PIN stays locked, the right PIN opens"]
+  I --> J["an interrupt of lifelog ends both programs, with status 0, within 25 seconds"]
+```
+
+It reads the stored state back through the API of the core with the bearer token, and it never trusts a page for what the file
+holds. Every wait polls a fact (a line of the log, a port, an exit) with a deadline. The test needs `go` and the sources of
+`lifelog` two folders up, else it is skipped; `-short` and Windows skip it too. It reads the clock of the real core, so a run
+that crosses midnight can fail once.

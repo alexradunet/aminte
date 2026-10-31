@@ -9,7 +9,18 @@
 - **Priority:** P2. **Effort:** XL, in three stages. **Risk:** LOW for the file: nothing of `schema.sql` changes.
   HIGH for ring 2 and the service: the browser moves to a second process, the core loses `--public`, and the proxy
   points to a new port.
-- **Status:** IN PROGRESS. Stage 1 is next.
+- **Status:** IN PROGRESS. Stage 1 and the parts A1, A2 and B of stage 2 are built; part B waits for its commit. The live
+  move (item 6 of stage 2) and stage 3 are next.
+
+| part | commit | what it holds | page time on a synthetic file (60 GETs, median) |
+|---|---|---|---|
+| stage 1 | `bc548e4` | `embed`; the shell reads only the API | day page 4.7 to 5.9 ms, browse 4.2 to 4.8 ms, metrics 4.9 to 6.3 ms, conversation 2.7 to 4.1 ms |
+| stage 2 A1 | `c100c76` | `extensions/web`: the read side; 68 routes side by side | day page 14.3 ms from the core, 19.7 ms through web; browse 13.9 and 19.7 ms |
+| stage 2 A2 | `7da7a3f` | the forms, the login, the lock and the settings of the browser; the catalog of web | none given |
+| stage 2 B | not committed | `extensions/web/e2e_test.go` (the real `lifelog serve --public --with web`), `web/parity_test.go` (each action has its form), the steps to run it live in its README | none |
+
+The commit messages give the page times. Each row was measured by its own test, so the rows are not one series: the time
+before stage 1 and the time through web on the same file are still to measure with the same test, as the checks below say.
 
 ## Context
 
