@@ -89,12 +89,24 @@ func readForm(w http.ResponseWriter, r *http.Request, limit int64, d time.Durati
 	if err := rc.SetReadDeadline(time.Now().Add(d)); err != nil && !errors.Is(err, http.ErrNotSupported) { // a recorder in a test is not a connection
 		logFault(r, "the form has no read deadline", err)
 	}
-	r.Body = http.MaxBytesReader(w, r.Body, limit)
+	r.Body = http.MaxBytesReader(serverWriter(w), r.Body, limit)
 	err := r.ParseForm()
 	if err == nil {
 		rc.SetReadDeadline(time.Time{}) // supported or not, as above
 	}
 	return err
+}
+
+// serverWriter is the ResponseWriter of the server under the wrappers of web (noStore). http.MaxBytesReader tells the
+// server to close the connection through a method that only that writer has, and it does not call Unwrap itself.
+func serverWriter(w http.ResponseWriter) http.ResponseWriter {
+	for {
+		u, ok := w.(interface{ Unwrap() http.ResponseWriter })
+		if !ok {
+			return w
+		}
+		w = u.Unwrap()
+	}
 }
 
 // stallBody is the body of an upload. Each read moves the read deadline of the connection on by stall, so a sender that

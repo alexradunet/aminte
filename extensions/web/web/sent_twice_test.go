@@ -33,8 +33,8 @@ func drawnFormPostingTo(t *testing.T, h http.Handler, uri, action string) formdo
 	return form
 }
 
-// locationWithoutReceipt is a Location without the receipt of the toast (feedback), which only web reads.
-func locationWithoutReceipt(t *testing.T, location string) string {
+// locationWithoutFeedback is a Location without the receipt of the toast (feedback), which only web reads.
+func locationWithoutFeedback(t *testing.T, location string) string {
 	t.Helper()
 	u, err := url.Parse(location)
 	if err != nil {
@@ -78,14 +78,14 @@ func TestACaptureFormSentAgainIsAddedOnce(t *testing.T) {
 	form := url.Values{"text": {"Walked the dog"}, "mood": {"4"}, "import_key": {"form-key-1"}}
 	toDay := "/days/" + today
 	first := postForm(l.web, toDay+"/capture", form)
-	if first.Code != http.StatusSeeOther || locationWithoutReceipt(t, first.Header().Get("Location")) != toDay {
+	if first.Code != http.StatusSeeOther || locationWithoutFeedback(t, first.Header().Get("Location")) != toDay {
 		t.Fatalf("first send: %d %q", first.Code, first.Header().Get("Location"))
 	}
 	if body := ask(l.web, http.MethodGet, first.Header().Get("Location")).Body.String(); strings.Contains(body, "Already added") {
 		t.Errorf("the first send says Already added:\n%.400s", body)
 	}
 	again := postForm(l.web, toDay+"/capture", form)
-	if again.Code != http.StatusSeeOther || locationWithoutReceipt(t, again.Header().Get("Location")) != toDay {
+	if again.Code != http.StatusSeeOther || locationWithoutFeedback(t, again.Header().Get("Location")) != toDay {
 		t.Fatalf("send again: %d %q, want 303 to the day", again.Code, again.Header().Get("Location"))
 	}
 	if body := ask(l.web, http.MethodGet, again.Header().Get("Location")).Body.String(); !strings.Contains(body, "Already added") {
@@ -113,7 +113,7 @@ func TestAReadingSentAgainLandsOnTheDayOfTheStoredReading(t *testing.T) {
 		t.Fatalf("the first form: %d, want 303: %.300s", first.Code, first.Body.String())
 	}
 	again := postForm(l.web, "/measurements", form)
-	if again.Code != http.StatusSeeOther || locationWithoutReceipt(t, again.Header().Get("Location")) != "/days/2026-10-14" {
+	if again.Code != http.StatusSeeOther || locationWithoutFeedback(t, again.Header().Get("Location")) != "/days/2026-10-14" {
 		t.Fatalf("the form sent again: %d %q, want 303 to /days/2026-10-14", again.Code, again.Header().Get("Location"))
 	}
 	if body := ask(l.web, http.MethodGet, again.Header().Get("Location")).Body.String(); !strings.Contains(body, "Already added. Nothing changed.") {
@@ -137,7 +137,7 @@ func TestARecordGoesBackToTheDayItWasMadeOn(t *testing.T) {
 			t.Fatalf("%s: the browser sends %v, want the key, the metric Walk and the day %s", page, sent, day)
 		}
 		got := postForm(l.web, "/measurements", sent)
-		if got.Code != http.StatusSeeOther || locationWithoutReceipt(t, got.Header().Get("Location")) != page {
+		if got.Code != http.StatusSeeOther || locationWithoutFeedback(t, got.Header().Get("Location")) != page {
 			t.Errorf("%s: %d, returned to %q, want %q", page, got.Code, got.Header().Get("Location"), page)
 		}
 		if again := postForm(l.web, "/measurements", sent); again.Code != http.StatusSeeOther {
