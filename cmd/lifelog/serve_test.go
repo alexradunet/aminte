@@ -109,7 +109,8 @@ func TestServeFlagsParse(t *testing.T) {
 
 // TestServeTokenOfTheFileOrTheEnvironment: tokenOf reads the token of the server before anything opens. The file wins
 // over $LIFELOG_TOKEN; one line break is cut; no token anywhere is no token (the check is off); a token that is short,
-// has two lines or sits in an empty file is refused with its reason.
+// has two lines, has a space at an end or sits in an empty file is refused with its reason. An empty value of
+// --token-file is refused too, whatever $LIFELOG_TOKEN holds: the owner asked for a token file and named none.
 func TestServeTokenOfTheFileOrTheEnvironment(t *testing.T) {
 	absent := filepath.Join(t.TempDir(), "absent.db")
 	write := func(name, content string) string {
@@ -123,6 +124,9 @@ func TestServeTokenOfTheFileOrTheEnvironment(t *testing.T) {
 	two := write("two.txt", testToken+"\n"+testToken+"\n")
 	empty := write("empty.txt", "")
 	good := write("token.txt", testToken+"\r\n")
+	spaceAfter := write("space-after.txt", testToken+" \n")
+	spaceBefore := write("space-before.txt", " "+testToken+"\n")
+	tabAfter := write("tab-after.txt", testToken+"\t\r\n")
 	for _, tc := range []struct {
 		name string
 		o    opts
@@ -131,6 +135,11 @@ func TestServeTokenOfTheFileOrTheEnvironment(t *testing.T) {
 		{"short token file", opts{serve: serveFlags{tokenFile: short}}, "at least 32"},
 		{"two-line token file", opts{serve: serveFlags{tokenFile: two}}, "one line"},
 		{"empty token file", opts{serve: serveFlags{tokenFile: empty}}, "at least 32"},
+		{"token file with a space after the token", opts{serve: serveFlags{tokenFile: spaceAfter}}, "start or end with a space"},
+		{"token file with a space before the token", opts{serve: serveFlags{tokenFile: spaceBefore}}, "start or end with a space"},
+		{"token file with a tab after the token", opts{serve: serveFlags{tokenFile: tabAfter}}, "start or end with a space"},
+		{"token in the environment with a space after it", opts{token: testToken + " "}, "start or end with a space"},
+		{"token in the environment with a tab before it", opts{token: "\t" + testToken}, "start or end with a space"},
 		{"missing token file", opts{serve: serveFlags{tokenFile: filepath.Join(t.TempDir(), "none")}}, "token file"},
 		{"short token in the environment", opts{token: "short"}, "at least 32"},
 		{"non-loopback address with a token", opts{serve: serveFlags{addr: "0.0.0.0:0", tokenFile: good}}, "serve address"},
@@ -151,6 +160,25 @@ func TestServeTokenOfTheFileOrTheEnvironment(t *testing.T) {
 				t.Fatalf("error=%v want %q", err, tc.want)
 			}
 		})
+	}
+	// An empty value of --token-file, in both forms of the flag, with and without a token in the environment: the line
+	// is parsed as the program parses it, and it is refused before the file opens (it is absent).
+	for _, vars := range []map[string]string{nil, {"LIFELOG_TOKEN": testToken}} {
+		for _, line := range [][]string{{"serve", "--token-file="}, {"serve", "--token-file", ""}} {
+			t.Run(fmt.Sprintf("%q with %d variables", line, len(vars)), func(t *testing.T) {
+				o, err := parse(line, func(name string) string { return vars[name] })
+				if err != nil {
+					t.Fatal(err)
+				}
+				o.db = absent
+				o.serve.addr = "127.0.0.1:0"
+				e, _, _ := testEnv(t)
+				e.o = o
+				if err := runContext(t.Context(), e); err == nil || !strings.Contains(err.Error(), "--token-file needs a path") {
+					t.Fatalf("error=%v want %q", err, "--token-file needs a path")
+				}
+			})
+		}
 	}
 	for _, tc := range []struct {
 		name  string

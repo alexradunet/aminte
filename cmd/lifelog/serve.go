@@ -17,9 +17,14 @@ import (
 
 // tokenOf is the token of the server: the first line of the file --token-file names (one trailing line break is cut),
 // else $LIFELOG_TOKEN. "" means that the server needs no token. A token must pass api.CheckToken, so a file that is
-// empty is refused: the owner asked for a token and none is there. The check is made before anything opens.
+// empty is refused: the owner asked for a token and none is there. So is an empty path (--token-file=), whatever
+// $LIFELOG_TOKEN holds: the owner named a token file, and no file is not a reason to drop the check. The checks are
+// made before anything opens.
 func tokenOf(o opts) (string, error) {
 	token := o.token
+	if o.serve.tokenFile == "" && slices.Contains(o.given, "--token-file") {
+		return "", errors.New("--token-file needs a path")
+	}
 	if o.serve.tokenFile != "" {
 		b, err := os.ReadFile(o.serve.tokenFile)
 		if err != nil {

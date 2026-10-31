@@ -146,10 +146,11 @@ func unknownField(name string, s spec) error {
 
 // known refuses a name that is not a field of the action. A GET may carry embed, which serve reads (embed.go), and
 // new, which names an action whose form a link of a UI asks for; the GET may then carry the fields of that action too.
+// A HEAD is a GET without a body, so it takes the same names and gets the same status.
 // A new that names no action is refused. Every other name, back and feedback too, is refused on every method.
 func known(v url.Values, act spec, r *http.Request) error {
 	allowed := fieldNames(act)
-	if r.Method == "GET" {
+	if r.Method == http.MethodGet || r.Method == http.MethodHead {
 		allowed = append(allowed, newField, embedField)
 		if asked := v.Get(newField); asked != "" {
 			s, ok := lookup(asked)

@@ -52,6 +52,25 @@ func TestTheDayCarriesItsMood(t *testing.T) {
 	}
 }
 
+// TestADayListsItsDailyMetricsInNameOrder: props.daily of a day are the names of the daily metrics, in name order, on
+// every day: the day of today and a day in the past. A metric that is not daily is not in the list. The metrics are
+// registered in an order that is not the order of their names.
+func TestADayListsItsDailyMetricsInNameOrder(t *testing.T) {
+	c, _, _ := apitest.FreshOn(t, "cli", fixedToday)
+	root := apitest.Must(t)(c.Get(t.Context(), "/"))
+	register := apitest.Action(t, root, "register-metric")
+	apitest.Must(t)(c.Do(t.Context(), register, map[string]string{"name": "Sleep", "unit": "h", "daily": "1"}))
+	apitest.Must(t)(c.Do(t.Context(), register, map[string]string{"name": "Weight", "unit": "kg"}))
+	apitest.Must(t)(c.Do(t.Context(), register, map[string]string{"name": "Meditate", "daily": "1"}))
+
+	for _, day := range []string{fixedToday, dayOf(-9)} {
+		got, ok := props(apitest.Must(t)(c.Get(t.Context(), "/days/"+day)))["daily"].([]any)
+		if !ok || fmt.Sprint(got) != "[Meditate Sleep]" {
+			t.Errorf("%s: daily %v, want [Meditate Sleep]: the daily metrics by name, and not Weight", day, got)
+		}
+	}
+}
+
 // TestTheRootIsTodayAtAGlance: GET / is the entry point of the API for every client: the newest day pages and every
 // action that starts something. A client that accepts HTML gets the same entity, not the page of today: the core draws
 // no page.

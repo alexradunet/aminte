@@ -175,10 +175,13 @@ func TestAWrongHostIsRefusedBeforeTheToken(t *testing.T) {
 	}
 }
 
-// TestRequireTokenRefusesATokenThatCheckTokenRefuses: the constructor refuses the token before the server listens.
+// TestRequireTokenRefusesATokenThatCheckTokenRefuses: the constructor refuses the token before the server listens. A
+// token with a space or a tab at an end is one of them: the compare cuts the white space of the credential, and a
+// header value has none at its ends, so no client could send that token.
 func TestRequireTokenRefusesATokenThatCheckTokenRefuses(t *testing.T) {
 	next := http.NotFoundHandler()
-	for _, token := range []string{"", "short", strings.Repeat("x", 31), testToken + "\n", testToken + "\r\n", "line one line two\nline three abcdefghijklmnop"} {
+	for _, token := range []string{"", "short", strings.Repeat("x", 31), testToken + "\n", testToken + "\r\n", "line one line two\nline three abcdefghijklmnop",
+		testToken + " ", " " + testToken, testToken + "\t", "\t" + testToken} {
 		if h, err := api.RequireToken(token, next); err == nil || h != nil {
 			t.Errorf("token %q accepted", token)
 		}

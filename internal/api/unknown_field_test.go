@@ -25,9 +25,9 @@ func send(h http.Handler, method, target, ctype string, body io.Reader) (int, st
 	return rec.Code, rec.Body.String()
 }
 
-// TestAnUnknownFieldIsRefused: a request names only the fields of its action. A GET may also name new (the action whose
-// form a link asks for) and embed. Any other name is 422, in a form, in JSON, in a query and in a multipart body, and
-// nothing is written. back and feedback were the names of a browser: they are unknown now, and so is new on a POST.
+// TestAnUnknownFieldIsRefused: a request names only the fields of its action. A GET or a HEAD may also name new (the
+// action whose form a link asks for) and embed. Any other name is 422, in a form, in JSON, in a query and in a
+// multipart body, and nothing is written. back and feedback were the names of a browser: they are unknown now, and so is new on a POST.
 func TestAnUnknownFieldIsRefused(t *testing.T) {
 	_, h, s := apitest.Fresh(t, "cli")
 	const form = "application/x-www-form-urlencoded"
@@ -60,9 +60,17 @@ func TestAnUnknownFieldIsRefused(t *testing.T) {
 		t.Errorf("entities %s, want %s: a refused request wrote", got, before)
 	}
 
+	// A HEAD gets the status of the GET (RFC 9110), so it takes new and embed too.
 	for _, target := range []string{"/search?q=a", "/browse?new=create-page&title=x", "/search?q=a&new=create-page&embed=item"} {
-		if code, body := send(h, "GET", target, "", nil); code != 200 {
-			t.Errorf("%s: %d %s, want 200", target, code, body)
+		for _, method := range []string{"GET", "HEAD"} {
+			if code, body := send(h, method, target, "", nil); code != 200 {
+				t.Errorf("%s %s: %d %s, want 200", method, target, code, body)
+			}
+		}
+	}
+	for _, target := range []string{"/search?q=a&nope=1", "/browse?new=typo"} {
+		if code, _ := send(h, "HEAD", target, "", nil); code != 422 {
+			t.Errorf("HEAD %s: %d, want 422 as the GET", target, code)
 		}
 	}
 	// A multipart part named back, feedback or new is an unknown name too.

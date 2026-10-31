@@ -15,13 +15,18 @@ import (
 // tokenMinLength is the shortest token that RequireToken accepts.
 const tokenMinLength = 32
 
-// CheckToken reports whether t may be the token of a server: one line of at least tokenMinLength characters.
+// CheckToken reports whether t may be the token of a server: one line of at least tokenMinLength characters, with no
+// white space at its start or end. RequireToken cuts the white space of the credential, and a header value has none at
+// its ends, so a client could not send such a token.
 func CheckToken(t string) error {
 	if len(t) < tokenMinLength {
 		return fmt.Errorf("the token must be at least %d characters", tokenMinLength)
 	}
 	if strings.ContainsAny(t, "\r\n") {
 		return errors.New("the token must be one line")
+	}
+	if strings.TrimSpace(t) != t {
+		return errors.New("the token must not start or end with a space")
 	}
 	return nil
 }
