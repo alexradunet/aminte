@@ -1,4 +1,4 @@
-# 162 — The simple architecture: one home for each thing, and the agent in the core
+# 162 — The simple architecture: one home for each thing, and the agent on its own
 
 > Dated implementation record. Tests use temporary folders and synthetic data. The owner's live `life.db` is never
 > opened by a test.
@@ -7,8 +7,8 @@
 
 - **Date / baseline:** 2026-10-31, `cf5d373` (master), after [plan 161](161-the-browser-as-an-extension.md).
 - **Priority:** P2. **Effort:** XL, in three waves. **Risk:** LOW for the file: nothing of `schema.sql` changes.
-  MEDIUM for ring 2: the agent moves into `lifelog serve`, and every handler gets one admission step. The status of
-  this plan is in [the index](README.md).
+  MEDIUM for ring 2: every handler gets one admission step. MEDIUM for the chat: the agent leaves `lifelog-whatsapp`
+  for an extension of its own. The status of this plan is in [the index](README.md).
 
 ## Context
 
@@ -45,9 +45,9 @@ reply when WhatsApp does not run.
 | subject | decision |
 |---|---|
 | the task pages | They stay in the core ([plan 158](158-one-task-service-behind-tasks.md)). Only the clean-up of Part G. |
-| the agent | **The agent runs in `lifelog serve`.** The core holds its settings and its loop. `lifelog-whatsapp` is only a transport. |
-| what starts a turn | Only `say`, on every surface. Text that `save-body` adds is an edit, never a turn. |
-| the reply | `say` answers at once. The core writes the reply on the conversation page when the model is done. A client reads the page. |
+| the agent | **The agent is the extension `extensions/agent`, the program `lifelog-agent`, run by `serve --with agent`.** Its settings stay in the core (`lifelog do settings`). `lifelog-whatsapp` is only a transport. The core calls no model, and the rings do not change. The owner first chose the core, then the extension: the defect was that the agent lived in a transport, and an extension of its own removes it. |
+| what starts a turn | Only `say` writes an owner's turn, on every surface. Text that `save-body` adds is an edit, never a turn. |
+| the reply | `say` answers at once. The agent writes the reply on the conversation page when the model is done. A client reads the page. |
 | the terminal mode | `lifelog-whatsapp --terminal` is deleted. The chat of the browser and `lifelog do say` do the same. |
 | the writer of the agent | `agent:lifelog`, whatever the surface. The turn keeps its `via`. |
 | the README table "Every action on every surface" | It is generated: `lifelog actions --human` prints it. The table and its test leave the README. The rule of parity stays. |
@@ -59,10 +59,11 @@ reply when WhatsApp does not run.
 ```mermaid
 flowchart LR
   S["a say: the browser, WhatsApp, lifelog do say, an MCP tool"] --> C["lifelog serve: the owner's turn on today's conversation page; say answers at once"]
-  C --> Q["the agent of the core: one turn at a time, 16 steps and 5 minutes at most"]
-  Q -->|"chat completions, the model URL of the settings"| M["the model server"]
-  Q -->|"the tools: the catalog without the owner actions, in process, as agent:lifelog"| C
-  Q -->|"save-body as agent:lifelog: the tool lines and the reply"| P["today's conversation page"]
+  C --> P["today's conversation page"]
+  P -->|"lifelog-agent reads the page and finds the owner's turns after its last reply"| Q["lifelog-agent, a child of serve: one turn at a time, 16 steps and 5 minutes at most"]
+  Q -->|"chat completions, the model URL of the settings of the core"| M["the model server"]
+  Q -->|"the tools: the catalog without the owner actions, as agent:lifelog"| C
+  Q -->|"save-body as agent:lifelog: the tool lines and the reply"| P
   P -->|"the browser polls the page"| B["the chat of the browser"]
   P -->|"lifelog-whatsapp reads the page and sends each new turn"| W["the phone"]
 ```
@@ -84,34 +85,35 @@ flowchart LR
 Done: the six refusals pass; a test of `lifelogtest` shows that a catalog with no class `actions` is refused, as
 `serve` refuses it.
 
-## Part B — the agent in the core
+## Part B — the agent on its own (`extensions/agent`)
 
-1. A new package `internal/agent` (ring 2: it dispatches the catalog) holds the loop, the tools and the instructions
-   from `extensions/whatsapp/agent`, and the client of the model from `extensions/whatsapp/model`. The client of the
-   model is the one dial of the core to a host that is not its own: the file is named in `remoteAllowed`, and the
-   boundary test `TestTheCoreDialsOnlyItsServer` names it as the exception. The core still never writes the name of a
-   vendor: the protocol is "chat completions" (`thirdParties` has `openai`).
-2. `say` writes the owner's turn, answers at once, and gives the turn to the agent. The agent runs one turn at a time,
-   with a queue of 32, at most 16 model steps and 5 minutes for a turn. `serve` owns its goroutine: it starts with the
-   listener, ends on the interrupt before the drain, and is awaited. A turn that the stop cuts writes nothing more.
-3. The tools are the catalog without the owner actions and without a file field, as today. The agent runs them in
-   process through the handler as `agent:lifelog`, so the server holds the owner rule. The reply and the tool lines go
-   to the page with `save-body` as `agent:lifelog`, in the form of the conversation class of API.md.
-4. The settings stay in the core (`model_url`, `model`, `model_key`, `owner_number`). The agent reads them at each turn,
-   in process. With no model set, the reply is one line: "No model is set: open Settings."
-5. `lifelog-whatsapp` becomes the transport. A message of the owner's number becomes `say` with `via=whatsapp`. It reads
-   today's conversation page, and it sends to the phone each new turn that did not come from WhatsApp: the replies,
-   and the owner's turns from another surface, marked "You wrote in lifelog:". It keeps the login, the filter of the
-   owner's number and its state folder. `agent/`, `model/`, `terminal/` and `--terminal` are deleted.
-6. The temporary server of `lifelog NAME` runs the agent too, so `lifelog web` and `lifelog whatsapp` by hand get
-   replies.
-7. The docs: the README decision "the core calls no model" is written again; AGENTS.md (the rings and the boundary
-   tests), API.md (`say` and the conversation class), `extensions/README.md` and the README of whatsapp.
+1. A new module `extensions/agent`, the program `lifelog-agent`, takes the packages `agent` and `model` from
+   `extensions/whatsapp`. It is a client of [API.md](../../API.md), like every extension, and it writes as
+   `agent:lifelog`. The core does not change: it calls no model, and its boundary tests stay as they are.
+2. The turns: the agent reads today's conversation every 3 seconds, as whatsapp does today. The owner's turns after
+   its last reply start a turn of the agent; only `say` writes an owner's turn. After a restart, a page whose last turn
+   is the owner's is answered. The agent runs one turn at a time, with at most 16 model steps and 5 minutes. It writes
+   the tool lines and the reply in one `save-body`, so a page has the whole answer or none. It needs no state folder:
+   the page says what is answered.
+3. The tools are the catalog without the owner actions and without a file field (`client/tools`), read at each turn.
+   The settings (`model_url`, `model`, `model_key`) come from `GET /settings` at each turn, through a second client with
+   the owner's token and no source, so the key never reaches the model. With no model set, the reply is one line: "No
+   model is set: open Settings."
+4. `lifelog-whatsapp` becomes the transport. A message of the owner's number becomes `say` with `via=whatsapp`. It
+   reads today's conversation page, and it sends to the phone each new turn that did not come from WhatsApp: the
+   replies, and the owner's turns from another surface, marked "You wrote in lifelog:". It keeps the login, the
+   filter of the owner's number (`owner_number` of the settings of the core) and its state folder. `agent/`, `model/`,
+   `terminal/` and `--terminal` leave it.
+5. The unit runs `--with agent` beside `--with whatsapp` and `--with web`. `lifelog agent` by hand runs it against the
+   temporary server, as for any extension.
+6. The docs: the README (the extensions), `extensions/README.md`, the README of whatsapp, a README for the agent,
+   API.md (`say`: the agent answers when it runs), `deploy/lifelog.service`.
 
-Done: an end-to-end test of the core: a `say` with a fake model server (an `httptest` server in the test) gets its
-reply on the page, written as `agent:lifelog`, and a tool call of an owner action is refused. The chat test of web gets
-a reply with no WhatsApp. The end-to-end test of whatsapp: a message of the fake chat becomes a `say`, and the reply
-reaches the fake chat. The live move ships `lifelog` and `lifelog-whatsapp` together.
+Done: the end-to-end test of `extensions/agent` runs the real `lifelog serve --with agent` with a fake model server
+(an `httptest` server in the test): a `say` gets its reply on the page, written as `agent:lifelog`, and a tool call of
+an owner action is refused. The end-to-end test of whatsapp: a message of the fake chat becomes a `say`, and a reply
+on the page reaches the fake chat. The live move ships `lifelog-agent` and `lifelog-whatsapp` together, so that no
+turn gets two replies or none.
 
 ## Part C — `extensions/web`: one copy of each thing
 
@@ -159,7 +161,7 @@ Done: all 284 mutants are still killed; the baseline is faster, with the time be
    takes only 78.
 2. The package `app` gets `Main(name, run)` (the signal context, the line `lifelog-NAME: err`, the exit code: 0, 78 for
    `app.OwnerActs`, else 1) and `API(url, source)` (it refuses an empty URL with one sentence, and reads
-   `LIFELOG_TOKEN`). The five programs use them: the two `exitCode` types, the four refusals of the URL, the reads of
+   `LIFELOG_TOKEN`). The six programs use them: the two `exitCode` types, the four refusals of the URL, the reads of
    the token, `--token-file` of whatsapp and `LIFELOG_WEB_STATE` are deleted. `lifelog-gphotos` then refuses a missing
    `LIFELOG_URL`.
 
@@ -190,16 +192,17 @@ counter-review. The waves keep the scopes apart:
 
 | wave | parts | why this order |
 |---|---|---|
-| 1 | A (`internal/api`, `cmd/lifelog/with.go`, `lifelogtest`), C (`extensions/web`), H (`internal/photo`), I (`docs/plans`), D1 and D2 (`tests/`, the tests of `internal/core`) | No two parts share a file. |
-| 2 | B (`internal/agent`, `cmd/lifelog`, the `say` of `internal/api`, `extensions/whatsapp`), G2 (`internal/api/tasks.go`, `app`, ticktick) | B needs the admission of A. G2 and B share no file. |
-| 3 | F (`app`, the five programs), G1 (CI, the build line), D3 to D5 (the tests of `internal/api` and `cmd/lifelog`), E (the pages) | F touches the main of whatsapp after B. E says what the code says at the end. |
+| 1 | A (`internal/api`, `cmd/lifelog/with.go`, `lifelogtest`), B (`extensions/agent`, `extensions/whatsapp`), C (`extensions/web`), H (`internal/photo`), I (`docs/plans`), D1 and D2 (`tests/`, the tests of `internal/core`) | No two parts share a file. |
+| 2 | G2 (`internal/api/tasks.go`, `app`, ticktick), D3 and D4 (the tests of `internal/api` and `cmd/lifelog`) | They come after the admission of A. |
+| 3 | F (`app`, the six programs), G1 (CI, the build line), D5, E (the pages) | F touches the mains of whatsapp and of the agent after B. E says what the code says at the end. |
 
 ## Checks
 
 - Each wave: `gofmt`; at the root `go vet ./... && go test ./...`, `go test -count=1 -shuffle=on ./...`, `staticcheck
-  ./...`, `govulncheck ./...`; the race check for `internal/api`, `internal/agent` and `cmd/lifelog`; each extension
+  ./...`, `govulncheck ./...`; the race check for `internal/api`, `cmd/lifelog` and `extensions/agent`; each extension
   `go vet ./... && go test ./...` and `go mod tidy -diff`.
 - The time of the baseline before and after Part D, on the same machine.
-- Live: Part B ships `lifelog` and `lifelog-whatsapp` together; the report names the install paths, the restart and the
-  log lines. A reply in the chat of the browser with WhatsApp stopped is the check of the owner.
+- Live: Part B ships `lifelog-agent` and `lifelog-whatsapp` together, and the unit gets `--with agent`; the report
+  names the install paths, the restart and the log lines. A reply in the chat of the browser with WhatsApp stopped is
+  the check of the owner.
 - Linux only. Windows is not tested.
