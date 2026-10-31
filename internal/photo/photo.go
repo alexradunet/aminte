@@ -1,12 +1,11 @@
 // Package photo reads what a photo's metadata says about when it was taken and its orientation
-// (docs/cookbook/keep-a-file.md): the EXIF of a JPEG (its APP1 segment) or of a HEIC (the Exif item of its meta box).
+// (docs/cookbook/keep-a-file.md): the EXIF of a JPEG (its APP1 segment). It reads no other format: a HEIC says nothing.
 // It does not read where a photo was taken: it does not read the GPS IFD (D21). It reads bytes it is handed, never
 // more: a caller holding only a file's head gets what the head holds.
 package photo
 
 import (
 	"encoding/binary"
-	"math"
 	"strings"
 	"time"
 )
@@ -25,12 +24,9 @@ func (m Meta) Day() string {
 	return m.Taken[:10]
 }
 
-// Read is the metadata of a JPEG or a HEIC; a file of any other kind, or with no metadata, says nothing.
+// Read is the metadata of a JPEG; a file of any other kind, or with no metadata, says nothing.
 func Read(b []byte) Meta {
 	if t := jpegExif(b); t != nil {
-		return parseTIFF(t)
-	}
-	if t := heifExif(b); t != nil {
 		return parseTIFF(t)
 	}
 	return Meta{Orientation: 1}
@@ -66,229 +62,6 @@ func jpegExif(b []byte) []byte {
 		i += 2 + n
 	}
 	return nil
-}
-
-// heifExif is the TIFF data of a HEIC's (ISOBMFF) Exif item: found by its type in iinf, located by iloc, in the file
-// (construction method 0) or in idat (1). Nil when the file is not one, or the item lies beyond b.
-func heifExif(b []byte) []byte {
-	if len(b) < 12 || string(b[4:8]) != "ftyp" {
-		return nil
-	}
-	meta := child(b, "meta")
-	if len(meta) < 4 {
-		return nil
-	}
-	meta = meta[4:] // a full box: version and flags
-	id, ok := exifItem(child(meta, "iinf"))
-	if !ok {
-		return nil
-	}
-	data := itemData(b, child(meta, "iloc"), child(meta, "idat"), id)
-	if len(data) < 4 {
-		return nil
-	}
-	off := int(binary.BigEndian.Uint32(data)) // exif_tiff_header_offset: from the end of these four bytes
-	if off < 0 || 4+off >= len(data) {
-		return nil
-	}
-	return data[4+off:]
-}
-
-// boxes calls fn with each box's type and body, in order, until fn returns false.
-func boxes(b []byte, fn func(typ string, body []byte) bool) {
-	for len(b) >= 8 {
-		size, head := uint64(binary.BigEndian.Uint32(b)), 8
-		typ := string(b[4:8])
-		switch size {
-		case 0:
-			size = uint64(len(b))
-		case 1:
-			if len(b) < 16 {
-				return
-			}
-			size, head = binary.BigEndian.Uint64(b[8:]), 16
-		}
-		if size < uint64(head) || size > uint64(len(b)) {
-			if typ != "mdat" || len(b) <= head { // the file's head may end inside mdat: what came before it is whole
-				return
-			}
-			size = uint64(len(b))
-		}
-		if !fn(typ, b[head:size]) {
-			return
-		}
-		b = b[size:]
-	}
-}
-
-func child(b []byte, typ string) []byte {
-	var out []byte
-	boxes(b, func(t string, body []byte) bool {
-		if t == typ {
-			out = body
-			return false
-		}
-		return true
-	})
-	return out
-}
-
-// exifItem is the id of the item of type Exif in an iinf box.
-func exifItem(iinf []byte) (uint32, bool) {
-	if len(iinf) < 6 {
-		return 0, false
-	}
-	p := 6 // version, flags, a 16-bit entry count
-	if iinf[0] != 0 {
-		p = 8
-	}
-	if p > len(iinf) {
-		return 0, false
-	}
-	var id uint32
-	found := false
-	boxes(iinf[p:], func(t string, e []byte) bool {
-		if t != "infe" || len(e) < 4 || e[0] < 2 {
-			return true
-		}
-		var typ string
-		switch {
-		case e[0] == 2 && len(e) >= 12:
-			id, typ = uint32(binary.BigEndian.Uint16(e[4:])), string(e[8:12])
-		case e[0] >= 3 && len(e) >= 14:
-			id, typ = binary.BigEndian.Uint32(e[4:]), string(e[10:14])
-		}
-		found = typ == "Exif"
-		return !found
-	})
-	return id, found
-}
-
-// maxHEIFItemData bounds iloc reconstruction to the metadata head the API keeps. Metadata outside the supplied head
-// stays unknown rather than being fetched. A photo's position is never read (D21).
-const maxHEIFItemData = 1 << 20
-
-// itemData is an item's bytes, by its iloc entry; nil when they are not all in file (the head given) or idat.
-func itemData(file, iloc, idat []byte, item uint32) []byte {
-	if len(iloc) < 8 {
-		return nil
-	}
-	v := iloc[0]
-	if v > 2 {
-		return nil
-	}
-	r := reader{b: iloc, p: 4}
-	sizes := r.n(2)
-	offSize, lenSize, baseSize, idxSize := int(sizes>>12&15), int(sizes>>8&15), int(sizes>>4&15), int(sizes&15)
-	if v == 0 {
-		idxSize = 0
-	}
-	if !validItemLocationSize(offSize) || !validItemLocationSize(lenSize) || !validItemLocationSize(baseSize) || !validItemLocationSize(idxSize) {
-		return nil
-	}
-	var count uint64
-	if v == 2 {
-		count = r.n(4)
-	} else {
-		count = r.n(2)
-	}
-	if r.bad {
-		return nil
-	}
-	for range count {
-		var id uint64
-		if v == 2 {
-			id = r.n(4)
-		} else {
-			id = r.n(2)
-		}
-		method := uint64(0)
-		if v == 1 || v == 2 {
-			method = r.n(2) & 15
-		}
-		dataRef := r.n(2)
-		base := r.n(baseSize)
-		extents := r.n(2)
-		if r.bad {
-			return nil
-		}
-		target := uint32(id) == item
-		extentBytes := idxSize + offSize + lenSize
-		if !target {
-			skip := extents * uint64(extentBytes)
-			if extentBytes != 0 && skip/uint64(extentBytes) != extents || !r.skip(skip) {
-				return nil
-			}
-			continue
-		}
-		if dataRef != 0 {
-			return nil
-		}
-		var out []byte
-		for range extents {
-			r.n(idxSize)
-			rel := r.n(offSize)
-			n := r.n(lenSize)
-			if r.bad {
-				return nil
-			}
-			src := file
-			switch method {
-			case 0:
-			case 1:
-				src = idat
-			default:
-				return nil
-			}
-			if n == 0 || base > math.MaxUint64-rel {
-				return nil
-			}
-			off := base + rel
-			if off > uint64(len(src)) || n > uint64(len(src))-off || n > uint64(maxHEIFItemData-len(out)) {
-				return nil
-			}
-			start, end := int(off), int(off+n)
-			out = append(out, src[start:end]...)
-		}
-		return out
-	}
-	return nil
-}
-
-func validItemLocationSize(size int) bool {
-	return size == 0 || size == 2 || size == 4 || size == 8
-}
-
-// reader reads big-endian numbers of 0, 2, 4 or 8 bytes; past the end it reads 0 and marks bad.
-type reader struct {
-	b   []byte
-	p   int
-	bad bool
-}
-
-func (r *reader) n(size int) uint64 {
-	if size == 0 {
-		return 0
-	}
-	if r.p+size > len(r.b) {
-		r.bad = true
-		return 0
-	}
-	var v uint64
-	for _, c := range r.b[r.p : r.p+size] {
-		v = v<<8 | uint64(c)
-	}
-	r.p += size
-	return v
-}
-
-func (r *reader) skip(n uint64) bool {
-	if n > uint64(len(r.b)-r.p) {
-		r.bad = true
-		return false
-	}
-	r.p += int(n)
-	return true
 }
 
 // parseTIFF reads IFD0 (orientation, the Exif IFD pointer) and the Exif IFD (DateTimeOriginal, else DateTimeDigitized).

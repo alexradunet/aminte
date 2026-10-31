@@ -19,7 +19,8 @@ incident ──▶ issue ──▶ proposal (RFC) ──▶ decision (ADR) ─�
 4. **Change** — [schema.sql](schema/schema.sql) is edited in place (until the freeze), with the contract pages, the
    cookbook, the diagrams and the suites it touches, in one commit; every suite ends green.
 5. **Plan** — [plans/](plans/README.md). When a change is large enough to hand to another agent, it is written as a
-   self-contained plan with done criteria, and its status is kept in the plans index.
+   self-contained plan with done criteria. The plans index holds the status of a plan, and a plan is DONE when it is
+   live. The plan file holds the record: its dates, its commits and its checks.
 
 ## Before the freeze
 

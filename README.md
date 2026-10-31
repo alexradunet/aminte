@@ -38,7 +38,7 @@ lifelog serve --token-file ~/life/token --with web --with agent --with whatsapp 
 lifelog mcp --agent lmstudio               # MCP on stdio (the extension lifelog-mcp); rows are written as agent:lmstudio
 lifelog snapshot --snapshots ~/snapshots --human  # life-YYYY-MM-DD.db and its restore check
 lifelog file memo.m4a --text memo.txt     # keep a file: its text, the original hashed and never stored
-lifelog file IMG_0001.HEIC --preview IMG_0001.jpg   # a photo lifelog cannot read: send a JPEG of it
+lifelog file IMG_0001.HEIC --preview IMG_0001.jpg --day 2026-10-05   # a HEIC: lifelog reads neither its picture nor its day; send a JPEG and the day
 lifelog cover 12 lake.jpg                  # a new photo as page 12's cover; `lifelog cover 12 --title Lake.jpg` takes a kept one
 ```
 
@@ -285,7 +285,8 @@ These are this application's own engineering decisions ([D14](docs/decisions/D14
   before stays as it was: a JPEG encoded again loses more, and its original may be gone. An agent sends the path of a local file, which the MCP server reads and sends, or `sha256`, `mime` and the text. A
   file with no `title` takes its original's file name. `![[Title]]` renders the
   picture; `GET /pages/{id}/preview` and `GET /previews?title=` serve it. A photo's day comes from its EXIF
-  (`internal/photo`: a JPEG's APP1, a HEIC's Exif item, read from the original's first megabyte); its position is
+  (`internal/photo`: a JPEG's APP1, read from the original's first megabyte). A HEIC has no day of its own: it takes the
+  `day` that the request gives, and with none it has no day and goes in no day page. A photo's position is
   never read ([D21](docs/decisions/D21-location-history.md), [plan 116](docs/plans/116-strip-to-the-core.md)).
   `lifelog file` keeps one file, with `--dry-run`. Unknown capture-local day follows [keep a file](docs/cookbook/keep-a-file.md).
 - **`serve` listens on the loopback only.** `life.db` holds health data, and the API is for this machine. The default
@@ -392,7 +393,7 @@ which the CLI's `get` and the MCP tool `get` read.
 | `text` | the title predicate, `title_key`, wikilink and `#tag` extraction, the parse of a day and an instant, the markers that a plain-text line cuts (`BlockMark`) and the marks of a match in a snippet of the search (`SnippetOpen`, `SnippetClose`); tested against the vectors of [titles and wikilinks](docs/contract/titles-and-wikilinks.md) | the pure functions with table tests, and the vectors of the contract page (`TestWikilinkVectors`, `TestTitleKeyVectors`) |
 | `internal/core` | the cookbook's writes and reads; the save contract; metrics; renames; files | `core.Store` on `dbtest.New`, with a fixed `Clock` for a test of today |
 | `internal/preview` | the picture a file page keeps: decode, scale to 1280 px (the contract allows 1600), EXIF orientation, a JPEG at quality 80 of at most 1 MB with no metadata | `preview.Make` and `preview.Check` on pictures that the test makes |
-| `internal/photo` | what a photo's metadata says: the day and time taken and the orientation (JPEG and HEIC); `phototest` builds synthetic ones | `photo.Read` on the photos of `phototest`; `FuzzRead` |
+| `internal/photo` | what a photo's metadata says: the day and time taken and the orientation (a JPEG); `phototest` builds synthetic ones | `photo.Read` on the photos of `phototest`; `FuzzRead` |
 | `internal/api` | the action catalog, the routes, Siren JSON and the bytes of a picture, a file or a snapshot; the guard of the loopback authority and the bearer check; `apitest` makes a fresh handler and its clients for a test | `api.New` on a store, through `apitest.Fresh`, or `apitest.FreshOn` for a store with a fixed clock; a test inside package `api` cannot import `apitest` (an import cycle), so it makes its store with `dbtest.New`; the pure functions of the handler (`errorEntity`, `browseQueryOf`) with table tests |
 | `siren` | the Siren types, the `Lifelog-Source` header, the error codes, the JSON writer and the addresses of the resources; standard library only; public: the Go extensions import it | the tests of the package and of `internal/api`, which both use it |
 | `client` | the hypermedia client, transport only; public: the Go extensions import it; in-process or remote; `DoFiles` sends file parts from readers, and `Do` sends paths through it; of this module it imports only `siren`, so it builds no `core`, no `db` and no SQLite | `client.InProcess` and `client.Remote` on one handler: `TestTheTwoTransportsGiveEqualAnswers` |

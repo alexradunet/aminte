@@ -142,25 +142,6 @@ func TestAddFileFromAnAgentAndWithAPicture(t *testing.T) {
 	}
 }
 
-func TestAddFileKeepsMalformedHEIFWithUnknownMetadata(t *testing.T) {
-	c, _, _ := apitest.Fresh(t, "cli")
-	add := apitest.Action(t, apitest.Must(t)(c.Get(t.Context(), "/")), "add-file")
-	heic := filepath.Join(t.TempDir(), "bad.HEIC")
-	overflow := phototest.HEIF(photo.Meta{Taken: "2019-06-03 07:41:12"}, phototest.Layout{InIdat: true, Version: 1, Overflow: true})
-	if err := os.WriteFile(heic, overflow, 0o644); err != nil {
-		t.Fatal(err)
-	}
-	e := apitest.Must(t)(c.Do(t.Context(), add, map[string]string{"title": "bad.HEIC", "body": "kept despite bad metadata", "original": heic}))
-	file, _ := props(e)["file"].(map[string]any)
-	res, _ := e.Result.(map[string]any)
-	if file["mime"] != "image/heic" || file["preview"] != false || props(e)["body"] != "kept despite bad metadata" {
-		t.Fatalf("malformed HEIF was not kept as an unknown file: props=%+v result=%+v", props(e), res)
-	}
-	if res["day"] != nil || res["unmatched"] != nil || res["linked"] == true {
-		t.Errorf("bad metadata derived photo facts: %+v", res)
-	}
-}
-
 // TestFileEntities: the lists and the pages of a file give a UI what it draws: the add-file action takes the file as
 // its first field, the media list has the picture of the file, the file page has its type and its preview, and the day
 // page that embeds the file has it as its cover, once.
@@ -218,12 +199,33 @@ func TestAPhotosDay(t *testing.T) {
 	if page := apitest.Must(t)(c.Get(t.Context(), apitest.Href(day, "page"))); apitest.Href(page, "cover") != apitest.Href(e, "preview") {
 		t.Errorf("the day page has the cover %q, want the preview of the photo %q", apitest.Href(page, "cover"), apitest.Href(e, "preview"))
 	}
-	// a HEIC: no picture, no embed, its day still read
-	heic := write("IMG_2.HEIC", phototest.HEIF(photo.Meta{Taken: "2019-06-04 10:00:00"}, phototest.Layout{Version: 1}))
-	e = apitest.Must(t)(c.Do(t.Context(), add, map[string]string{"title": "2019-06-04 IMG_2.HEIC", "original": heic}))
-	res, _ = e.Result.(map[string]any)
-	if res["day"] != "2019-06-04" || res["embedded"] == true {
-		t.Fatalf("a HEIC: %+v", res)
+}
+
+// TestAHEICTakesTheDayOfTheRequest: lifelog reads no metadata of a HEIC. The file has the day that the request gives.
+// With none, it has no day and goes in no day page: a photo whose day is unknown is never given the day it is kept.
+func TestAHEICTakesTheDayOfTheRequest(t *testing.T) {
+	c, _, _ := apitest.Fresh(t, "cli")
+	add := apitest.Action(t, apitest.Must(t)(c.Get(t.Context(), "/")), "add-file")
+	// a HEIC: its box of type ftyp, then bytes that no reader of lifelog looks into; each name has its own bytes, so its own hash
+	heic := func(name string) []byte {
+		return []byte("\x00\x00\x00\x10ftypheic\x00\x00\x00\x00the Exif item of " + name + " is not read")
+	}
+	write := func(name string, b []byte) string {
+		p := filepath.Join(t.TempDir(), name)
+		if err := os.WriteFile(p, b, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return p
+	}
+	sent := apitest.Must(t)(c.Do(t.Context(), add, map[string]string{"title": "IMG_2.HEIC", "original": write("IMG_2.HEIC", heic("IMG_2")), "day": "2019-06-05", "body": "a HEIC with a day"}))
+	res, _ := sent.Result.(map[string]any)
+	if file, _ := props(sent)["file"].(map[string]any); file["mime"] != "image/heic" || file["preview"] != false || res["day"] != "2019-06-05" || props(sent)["day"] != "2019-06-05" || res["embedded"] == true {
+		t.Errorf("a HEIC with a day: props=%+v result=%+v", props(sent), res)
+	}
+	none := apitest.Must(t)(c.Do(t.Context(), add, map[string]string{"title": "IMG_3.HEIC", "original": write("IMG_3.HEIC", heic("IMG_3")), "body": "a HEIC with no day"}))
+	res, _ = none.Result.(map[string]any)
+	if file, _ := props(none)["file"].(map[string]any); file["mime"] != "image/heic" || file["preview"] != false || res["day"] != nil || props(none)["day"] != nil || res["embedded"] == true || props(none)["body"] != "a HEIC with no day" {
+		t.Errorf("a HEIC with no day: props=%+v result=%+v", props(none), res)
 	}
 }
 

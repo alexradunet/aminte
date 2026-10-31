@@ -362,7 +362,7 @@ offer no action.
 | `rows[].picture` | string | the address of its cover's picture, or of a file's own; absent when none |
 | `rows[].mime` | string | a file (not in `all`): the type of the original |
 | `rows[].file_kind` | string | a file: the first part of its type, `image`, `video`, `audio`, `application`, `text`, … |
-| `rows[].day` | string | a file (not in `all`): its day (the day given, a photo's EXIF day, else the day it was kept), else the day of the newest live day page that shows it; absent when it has neither |
+| `rows[].day` | string | a file (not in `all`): its day (the day given, a JPEG's EXIF day, else the day it was kept), else the day of the newest live day page that shows it; absent when it has neither |
 | `rows[].unit` | string | a metric: its unit; absent for a count or a habit |
 | `rows[].deleted_at` | instant | the list of the deleted only: when it was deleted |
 | `limit` | integer | the page size used |
@@ -1030,7 +1030,7 @@ What the save contract did with the body's `[[wikilinks]]` and `#tags`:
 | `day_sync.created` | list | |
 | `day_sync.revived` | list | |
 | `day_sync.skipped` | list | |
-| `day` | day | its own day: the `day` sent, else the EXIF date of a photo; absent when it has neither, or when its page is deleted |
+| `day` | day | its own day: the `day` sent, else the EXIF date of a JPEG (a HEIC has none); absent when it has neither, or when its page is deleted |
 | `embedded` | boolean | `![[title]]` was appended to its day page |
 
 ### result of tombstone-pages
