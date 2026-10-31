@@ -9,8 +9,10 @@
 - **Priority:** P2. **Effort:** XL, in three stages. **Risk:** LOW for the file: nothing of `schema.sql` changes.
   HIGH for ring 2 and the service: the browser moves to a second process, the core loses `--public`, and the proxy
   points to a new port.
-- **Status:** IN PROGRESS. Stage 1 and the parts A1, A2 and B of stage 2 are built and committed, and the findings of the
-  counter-review (Opus, 2026-10-31) are fixed. The live move (item 6 of stage 2) and stage 3 are next.
+- **Status:** BUILT, NOT LIVE. Stages 1, 2 and 3 are built and committed on the branch `plan-161-stage3`, and the
+  findings of both counter-reviews (Opus, 2026-10-31) are fixed. The live move (item 6 of stage 2) waits for the owner:
+  the new core refuses the line of the old unit, so the unit, the settings of the browser and the proxy change in one
+  step.
 
 | part | commit | what it holds | page time on a synthetic file (60 GETs, median) |
 |---|---|---|---|
@@ -18,9 +20,55 @@
 | stage 2 A1 | `c100c76` | `extensions/web`: the read side; 68 routes side by side | day page 14.3 ms from the core, 19.7 ms through web; browse 13.9 and 19.7 ms |
 | stage 2 A2 | `7da7a3f` | the forms, the login, the lock and the settings of the browser; the catalog of web | none given |
 | stage 2 B | `4bd6b6b` | `extensions/web/e2e_test.go` (the real `lifelog serve --public --with web`), `web/parity_test.go` (each action has its form), the steps to run it live in its README | none |
+| stage 3 | `7be5af0..ca3ba7f` (17 commits on `c8768bd`) | the core with no presentation; the HTML claims of its tests ported to `extensions/web`; the docs; the fixes of the second counter-review | the table below |
 
-The commit messages give the page times. Each row was measured by its own test, so the rows are not one series: the time
-before stage 1 and the time through web on the same file are still to measure with the same test, as the checks below say.
+The commit messages give the page times of stages 1 and 2. Each of those rows was measured by its own test, so they
+are not one series.
+
+The table below is one series: the page time before stage 1 and through web after stage 3, with one harness, on one
+synthetic file (400 days with a capture, 3 metrics
+and 2 habits, 1825 readings, 12 linked pages, 5 people, a conversation of 5 turns; 720896 bytes). The old program is
+`4899fbe` (the core drew the page); the new one is `ca3ba7f` (`serve --token-file F --with web`, the page through web
+with a session). 5 warm-up GETs, then 60 timed GETs per route and server, old and new in turn, one keep-alive client
+each. Times in ms, run 1 of 3:
+
+| route | old median | old p90 | web median | web p90 | median difference, over 3 runs |
+|---|---|---|---|---|---|
+| the day page | 16.40 | 18.18 | 22.42 | 25.05 | +5.1 to +6.5 |
+| `/browse` | 16.05 | 17.73 | 20.35 | 22.38 | +4.2 to +4.8 |
+| `/metrics` | 14.66 | 16.19 | 18.25 | 20.50 | +3.6 to +5.1 |
+| the conversation of today | 14.11 | 15.88 | 26.46 | 28.57 | +12.3 to +12.4 |
+
+Linux, 4 shared vCPUs (AMD EPYC 9645), go1.27.3; the files on tmpfs. The two programs differ by stages 1 to 3, not
+only by the move. Both draw the same titles and the same data, and each page of web is 183 bytes larger. The
+conversation page costs more than the others through web; why is not measured. No change is made for speed: a page
+of a single owner in under 30 ms needs none ([the suite guide](../../tests/README.md#performance-evidence-not-speculative-optimization)).
+
+Stage 3 in lines (`git diff --shortstat c8768bd ca3ba7f`): 273 files, 10429 lines in and 19943 out, so 9514 fewer.
+The core (`internal`, `cmd`, the public packages, `tools`) has 18707 lines out and 2120 in. `extensions/web` has 7986
+in, mostly the ported tests. 125 files are deleted, among them `internal/api/view`, `internal/pixelart` and
+`tools/pixelart`.
+
+### The counter-review of stage 3 (Opus, 2026-10-31, on `c8768bd..1000447`)
+
+Four reviewers (the core, the ports of the tests, web, the docs) and one skeptic for each. Of 23 findings, 17 were
+confirmed and 6 refuted. None was a BLOCKER. Each fix of a fault has a test that failed first.
+
+| severity | finding | fix |
+|---|---|---|
+| MEDIUM | `--token-file=` (an empty path) started the core with no bearer check. | The empty value is refused: "--token-file needs a path". |
+| MEDIUM | A token with a space at its start or end was taken, and then no client could send it (a header value loses the space). | The core and web refuse it before they listen. |
+| MEDIUM | A panic in web after the status was sent added the page of the internal error after the partial body, as a 200. | Web cuts the answer (`http.ErrAbortHandler`) after one log record. The page of a panic before the answer has `Cache-Control: no-store`. |
+| MEDIUM | No web test drew the task pages end to end (decision 15): the round Complete form, the quick-add, the side column, a POST through web, a failed read of the service. | `web/tasks_test.go` with `lifelogtest.ConnectTasks`; a mutant that drops the actions of the rows fails it. |
+| MEDIUM | The reload checks of the toast ports checked no status, so an error page passed them. | They read the page through a helper that needs 200 and a whole page. |
+| MEDIUM | The order of the daily metrics of a day had no JSON test in the core. | `TestADayListsItsDailyMetricsInNameOrder`. |
+| MEDIUM | The way back in the Install section of web left the service down: the old core refuses the new unit. | The README gives the steps back across the move: the old programs, the old unit, the proxy to 7777. |
+| LOW | HEAD with `?new=` was 422 where the GET is 200. | `known()` takes HEAD as GET. |
+| LOW | A test export with no caller; stale lines in API.md, the README and the READMEs of web and ticktick (the answers that are not Siren, the names a read takes, "lifelog draws the tasks", the line of the browser without a token, `ReadWritePaths`). | Deleted; the pages say the current truth. |
+
+At the merge the main session also fixed a fault of web that a port found (a form over the limit did not close the
+connection, because `noStore` hid the writer of the server from `http.MaxBytesReader`), and made one copy of the
+helpers and tests that two ports had made.
 
 ### The counter-review (Opus, 2026-10-31, on `4899fbe..4bd6b6b`)
 
@@ -169,12 +217,43 @@ flowchart TD
    (embed in, HTML out), AGENTS.md (the rings, the line "the browser stays in ring 2", the public packages, the rule
    of parity), `extensions/README.md`, `site/`.
 
+### What stage 3 decided (the main session, 2026-10-31)
+
+An inventory of the core found the questions that the plan left open. The main session decided them before the
+build, and the builders followed them.
+
+| subject | decision |
+|---|---|
+| the answer of a write | A POST answers its entity, with `Location` from its self link. There is no 303 for a POST. The redirects of the API stay: `/days/today`, `/weeks/today`, `find`, `random-page`, `open-day`, a title to its page. |
+| the writer | A request with no `Lifelog-Source` writes as `api`. Web sends `ui`. |
+| the names of a browser | The core keeps `new`, on a read only. `back` and `feedback` are unknown fields to the core (422). Web takes them out before it asks the core. |
+| the settings | The action `settings` keeps `model_url`, `model`, `model_key` and `owner_number`. The core reads an old file with `ground`, `lock_after` and `lock_pin_hash`, and its next save drops them. |
+| the line of `serve` | `lifelog serve [--addr 127.0.0.1:7777] [--snapshots DIR] [--token-file PATH] [--with NAME]...`. A line with `--public`, `--allow-origin`, `--tls-cert` or `--tls-key` is refused as an unknown flag. |
+| the token | From `--token-file` (one trailing line break is cut), else `$LIFELOG_TOKEN`. It must be one line of 32 characters or more, with no space or tab at its start or end; an empty `--token-file` is refused. `api.RequireToken` answers a request without it with 401 `token_required`, compares in the same time for every value, and exempts no route. |
+| the guards | `NetworkAuthority` is outside (a wrong `Host` is 403 before a missing token is 401), then the bearer check, then the API. `http.CrossOriginProtection` stays, with no trusted origin. |
+| the children of `serve --with` | They get the token of the server or none. Web exits 78 with none. |
+| `siren.CodeLocked` | It stays in the list of codes. API.md says that lifelog-web answers it, and the core never does. |
+| the boundary | `TestTheCoreHoldsNoPresentation` (`cmd/lifelog/boundary_test.go`). |
+| the tests | Each HTML assertion of a core test got a home in `extensions/web` before the core test went. The core kept the JSON part of each mixed test. A port keeps the strings of the core test and runs against the real core through `lifelogtest`. The ticktick end-to-end test asks for Siren. |
+| a panic in web | A 500 page that says "internal error", and one log record with the pattern of the route, never the path. |
+| the docs | The decisions of an extension live in its README: the browser sections of README.md moved to `extensions/web/README.md`. CI runs `extensions/web`. |
+
+### The one-off copy of the settings (a record)
+
+The owner runs this line once, with the service stopped, before the first start of the new unit: the next save of
+the core's settings drops the three keys. It makes the folder with mode 0700 and the file with mode 0600, and it
+refuses to write over a file of web that exists.
+
+```
+python3 -c 'import json,os,sys; s=json.load(open(sys.argv[1])); o=os.path.expanduser(sys.argv[2]); os.umask(0o077); os.makedirs(os.path.dirname(o),exist_ok=True); json.dump({k:s[k] for k in ("ground","lock_after","lock_pin_hash") if s.get(k)}, open(o,"x"))' /home/cico/dev/lifelogdb/life.settings.json ~/.config/lifelog-web/settings.json
+```
+
 ## Checks
 
 - Each stage: `gofmt`; `go vet ./... && go test ./...`; `staticcheck ./...`; `govulncheck ./...`.
 - Stage 1: `go test -count=1 -shuffle=on ./...`; the race check on Linux for `internal/api`.
-- `extensions/web`: `go vet ./... && go test ./...` in its folder, with the test side by side and the parity test;
-  `go mod tidy -diff`.
+- `extensions/web`: `go vet ./... && go test ./...` in its folder, with the parity test and the end-to-end test;
+  `go mod tidy -diff`. The test side by side ran in stage 2, and stage 3 deleted it with the old browser.
 - Performance evidence ([the suite guide](../../tests/README.md#performance-evidence-not-speculative-optimization)):
   the time of a page of the shell before stage 1 and through web after stage 2, on the same synthetic file.
 - Linux only. Windows is not tested.
