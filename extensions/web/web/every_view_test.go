@@ -15,9 +15,6 @@ import (
 	"lifelog/lifelogtest"
 )
 
-// chatScriptTag is the one script element that a page may carry.
-const chatScriptTag = `<script src="/assets/chat.js" defer></script>`
-
 // lifeStartingOn is a fresh file whose clock stands at the start of day, with web in front of it and a browser that has
 // logged in. emptyLife is the same for the day of the other tests of web.
 func lifeStartingOn(t *testing.T, day string) *life {
