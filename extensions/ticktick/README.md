@@ -77,7 +77,7 @@ lifelog serve --with ticktick                          # the task service beside
 | `lifelog serve --with ticktick` | the program with no argument and with `LIFELOG_LISTEN` set: it serves the task protocol, polls once at the start, then every `poll`. Without `LIFELOG_LISTEN` it prints the usage and exits 2. |
 
 An unknown argument or flag is refused. Exit status 1 is an error (`serve` starts the program again after 10 seconds).
-Exit status 2 means that you act first: the login is missing or refused, or the usage is wrong.
+Exit status 78 means that you act first: the login is missing or refused, or the usage is wrong.
 
 ## What comes back
 
@@ -168,7 +168,7 @@ A unit with `ProtectHome=read-only` must let the program write its state folder:
 again every 10 seconds ([deploy/lifelog.service](../../deploy/lifelog.service)). `serve` logs the line
 `with ticktick: the task service, N lists, on ...` when the service is up.
 
-With no `token.json`, the program serves no catalog: it logs the login line and ends with status 2.
+With no `token.json`, the program serves no catalog: it logs the login line and ends with status 78.
 
 ## Tests
 
@@ -189,6 +189,6 @@ staticcheck ./...
 - `e2e_test.go` builds the real `lifelog` and `lifelog-ticktick`, runs `lifelog serve --with ticktick` on a new
   `life.db` in a temporary folder (with `XDG_CONFIG_HOME` there too) and a fake TickTick, once with `/task/completed` and
   once without it. It reads the pages Tasks and a list as HTML (no word TickTick), posts the round Complete form, and checks that
-  `/with/ticktick/` is 404. It also checks that a refused token ends the app with status 2. `go test -short` skips it.
+  `/with/ticktick/` is 404. It also checks that a refused token ends the app with status 78. `go test -short` skips it.
 
 No test calls TickTick, and none opens your `life.db`.

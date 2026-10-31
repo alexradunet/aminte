@@ -9,18 +9,35 @@
 - **Priority:** P2. **Effort:** XL, in three stages. **Risk:** LOW for the file: nothing of `schema.sql` changes.
   HIGH for ring 2 and the service: the browser moves to a second process, the core loses `--public`, and the proxy
   points to a new port.
-- **Status:** IN PROGRESS. Stage 1 and the parts A1, A2 and B of stage 2 are built; part B waits for its commit. The live
-  move (item 6 of stage 2) and stage 3 are next.
+- **Status:** IN PROGRESS. Stage 1 and the parts A1, A2 and B of stage 2 are built and committed, and the findings of the
+  counter-review (Opus, 2026-10-31) are fixed. The live move (item 6 of stage 2) and stage 3 are next.
 
 | part | commit | what it holds | page time on a synthetic file (60 GETs, median) |
 |---|---|---|---|
 | stage 1 | `bc548e4` | `embed`; the shell reads only the API | day page 4.7 to 5.9 ms, browse 4.2 to 4.8 ms, metrics 4.9 to 6.3 ms, conversation 2.7 to 4.1 ms |
 | stage 2 A1 | `c100c76` | `extensions/web`: the read side; 68 routes side by side | day page 14.3 ms from the core, 19.7 ms through web; browse 13.9 and 19.7 ms |
 | stage 2 A2 | `7da7a3f` | the forms, the login, the lock and the settings of the browser; the catalog of web | none given |
-| stage 2 B | not committed | `extensions/web/e2e_test.go` (the real `lifelog serve --public --with web`), `web/parity_test.go` (each action has its form), the steps to run it live in its README | none |
+| stage 2 B | `4bd6b6b` | `extensions/web/e2e_test.go` (the real `lifelog serve --public --with web`), `web/parity_test.go` (each action has its form), the steps to run it live in its README | none |
 
 The commit messages give the page times. Each row was measured by its own test, so the rows are not one series: the time
 before stage 1 and the time through web on the same file are still to measure with the same test, as the checks below say.
+
+### The counter-review (Opus, 2026-10-31, on `4899fbe..4bd6b6b`)
+
+Each finding was fixed with a test that held the fault first.
+
+| severity | finding | fix |
+|---|---|---|
+| BLOCKER | The poll of `chat.js` asks for Siren JSON, and web drew a page: the column waited for ever, and its lock branch was dead. | A request that asks for Siren JSON and not for HTML gets the core's entity through web (no-store), and web's own errors as JSON. |
+| HIGH | `/settings` had the core's `ground`, `lock_after` and `lock_pin` beside the form "This browser": a lock set in the core's form never locked web. | Web draws the core's form without the settings of the browser; one field for each. |
+| MEDIUM | Web's catalog on `LIFELOG_LISTEN` took the settings from any local caller, also with another `Host` (DNS rebinding). | `app.Listen` refuses a `Host` that is not its address and a cross-site browser write, for every connected app. |
+| MEDIUM | An address with a space in a tool line made the core panic in the embedded read. | The embedded read is made from the URL, not from a request line. |
+| MEDIUM | The door decided by the decoded path, the routes by the escaped one (`/assets%2Ficon.svg`). | The door decides by the pattern of the route that answers. |
+| MEDIUM | Exit status 2 meant "the owner acts", and the Go runtime exits with 2 on a panic: a crash stopped the browser for good. | `app.ExitOwnerActs` is 78 (owner's word); `serve` starts a child again after 2. A settings file that cannot be read now is status 1. |
+| LOW | "This browser" was an app of the rail, and `/with/web` drew its form a second time; a double prefix of the log; the proxy of the environment could get the token; history in the README. | The rail lists no app web and `/with/web` leads to `/settings`; one prefix; no proxy; the README states the current truth. |
+
+Left as they are: `quietKey` (stage 3 deletes the shell of the core with it); a redirect or a HEAD answer of the core is
+closed unread; a restart of web gives 5 tries again (plan 160 accepts it).
 
 ## Context
 

@@ -48,6 +48,7 @@ func (b *Browser) shellFacts(r *http.Request, status int, root, e *siren.Entity,
 		}
 		return
 	}
+	shell.Apps = slices.DeleteFunc(shell.Apps, func(a view.AppLink) bool { return a.Name == appName }) // its form is on /settings
 	settings := b.settings()
 	shell.Ground, shell.LockMinutes = groundOf(settings), settings.lockMinutes()
 	if good && shell.Strip == nil {

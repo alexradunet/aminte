@@ -9,6 +9,7 @@ import (
 	"net/http/cookiejar"
 	"net/url"
 	"os"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -83,6 +84,24 @@ func TestTheEnvironmentIsRefusedWithAReason(t *testing.T) {
 		if !errors.As(err, &config) || !strings.Contains(err.Error(), c.want) {
 			t.Errorf("%s: %v, want a configuration error with %q", name, err, c.want)
 		}
+	}
+}
+
+// TestASettingsFileThatCannotBeReadNowStartsAgain: a fault of the file system may pass, so it is not a refusal of the
+// owner's values. run returns a plain error, main exits with 1, and serve starts web again after its wait. Only a
+// value that the owner must change (the damaged file above) is a configuration error, which serve does not start again.
+func TestASettingsFileThatCannotBeReadNowStartsAgain(t *testing.T) {
+	if os.Getuid() == 0 || runtime.GOOS == "windows" {
+		t.Skip("root, and Windows, read a file of mode 000")
+	}
+	dir := t.TempDir()
+	if err := os.WriteFile(dir+"/settings.json", []byte(`{"ground":"oak"}`), 0o000); err != nil {
+		t.Fatal(err)
+	}
+	err := run(t.Context(), good(t, "LIFELOG_WEB_STATE", dir), func(string) { t.Error("the door opened") })
+	var config *configError
+	if err == nil || errors.As(err, &config) || !strings.Contains(err.Error(), "settings") {
+		t.Errorf("an unreadable settings file: %v, want a plain error about the settings", err)
 	}
 }
 

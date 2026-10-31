@@ -81,7 +81,7 @@ func (h *server) entityAt(r *http.Request, ref string, hops int) *siren.Entity {
 	if err != nil || !strings.HasPrefix(path, "/") || strings.HasPrefix(path, "//") || u.Query().Has(embedField) {
 		return nil
 	}
-	rec := h.inside(r, u.RequestURI())
+	rec := h.inside(r, u)
 	if rec.Code/100 == 3 {
 		if to := rec.Header().Get("Location"); hops > 0 && strings.HasPrefix(to, "/") {
 			return h.entityAt(r, to, hops-1)
@@ -91,12 +91,14 @@ func (h *server) entityAt(r *http.Request, ref string, hops int) *siren.Entity {
 	return answeredEntity(rec)
 }
 
-// inside asks the server's own handler for a GET of uri, as the writer embedSource. The page's own guard has passed
-// already, so the request goes straight to the routes. It carries the context and the host of r, so the deadline of r
-// ends it, and the authority of r is the one it was let in with.
-func (h *server) inside(r *http.Request, uri string) *httptest.ResponseRecorder {
-	req := httptest.NewRequestWithContext(r.Context(), http.MethodGet, uri, nil)
-	req.Host, req.RemoteAddr = r.Host, r.RemoteAddr
+// inside asks the server's own handler for a GET of u (a path and a query), as the writer embedSource. The page's own
+// guard has passed already, so the request goes straight to the routes. It carries the context and the host of r, so
+// the deadline of r ends it, and the authority of r is the one it was let in with. The request is made from the URL and
+// not from a request line: an address from a tool line can hold a space or a line break, which a request line cannot.
+func (h *server) inside(r *http.Request, u *url.URL) *httptest.ResponseRecorder {
+	req := (&http.Request{Method: http.MethodGet, URL: &url.URL{Path: u.Path, RawPath: u.RawPath, RawQuery: u.RawQuery},
+		Proto: "HTTP/1.1", ProtoMajor: 1, ProtoMinor: 1, Header: http.Header{}, Body: http.NoBody,
+		Host: r.Host, RemoteAddr: r.RemoteAddr, RequestURI: u.RequestURI()}).WithContext(r.Context())
 	req.Header.Set("Accept", sirenType)
 	req.Header.Set(siren.SourceHeader, embedSource)
 	rec := httptest.NewRecorder()

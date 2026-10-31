@@ -273,12 +273,13 @@ func TestManyReadersAndWritersSeeWholeSettings(t *testing.T) {
 // the settings has the form of the core and, under it, the form "This browser", which is the action web-settings of the
 // catalog of the core, with the values that web keeps. A save through web goes to the core, which forwards it to the
 // catalog with its owner rule, and the browser returns to the page with the toast. The page lacks the form without the app
-// (the pages side by side). The form of the core still has ground, lock_after and the PIN until stage 3 takes them out.
+// (the pages side by side). The core's form has no field of the browser: each setting of the browser is one field, in
+// the form "This browser" (a lock set in the core's form would never lock web).
 func TestTheSettingsPageHasTheFormOfThisBrowser(t *testing.T) {
 	l := emptyLife(t)
 	l.core.Connect(t, "web", l.browser.Catalog())
 	page := ask(l.web, http.MethodGet, "/settings").Body.String()
-	for _, want := range []string{"<h2>This browser</h2>", `action="/with/web/settings"`, `name="lock_pin"`, // the core's own form is still there
+	for _, want := range []string{"<h2>This browser</h2>", `action="/with/web/settings"`, `name="model"`, // the core's own form is still there
 		`<input type="password" name="pin" value="" autocomplete="new-password">`, `<option selected>boards</option>`, `<option selected>off</option>`,
 		`<input type="hidden" name="back" value="/settings">`} {
 		if !strings.Contains(page, want) {
@@ -287,6 +288,11 @@ func TestTheSettingsPageHasTheFormOfThisBrowser(t *testing.T) {
 	}
 	if strings.Count(page, "<h2>This browser</h2>") != 1 || strings.Contains(page, "pbkdf2") {
 		t.Errorf("the settings page draws the form twice, or shows a hash")
+	}
+	for field, want := range map[string]int{`name="ground"`: 1, `name="lock_after"`: 1, `name="pin"`: 1, `name="lock_pin"`: 0} {
+		if n := strings.Count(page, field); n != want {
+			t.Errorf("the settings page has %s %d times, want %d: one way to set each setting of the browser", field, n, want)
+		}
 	}
 	if n := strings.Count(page, `data-action="web-settings"`); n != 1 {
 		t.Errorf("the action is drawn %d times, want once, in its own place and not in the menu", n)
@@ -317,5 +323,22 @@ func TestTheSettingsPageHasTheFormOfThisBrowser(t *testing.T) {
 	catalog := request(l.core.Handler, http.MethodGet, "/actions", "", map[string]string{"Accept": "application/vnd.siren+json"}).Body.String()
 	if !strings.Contains(catalog, `"name": "web-settings"`) || !strings.Contains(catalog, `"owner": true`) {
 		t.Errorf("the catalog of the core lacks web-settings")
+	}
+}
+
+// TestThisBrowserIsNoAppOfTheRail: the catalog of web is a connected app of the core, but its one form is on /settings.
+// The rail lists no app "This browser", and the home of the app leads a browser to /settings, so the form is drawn in
+// one place.
+func TestThisBrowserIsNoAppOfTheRail(t *testing.T) {
+	l := emptyLife(t)
+	l.core.Connect(t, "web", l.browser.Catalog())
+	page := ask(l.web, http.MethodGet, "/days/"+today).Body.String()
+	if strings.Contains(page, `href="/with/web"`) || strings.Contains(page, "This browser") {
+		t.Error("the rail lists the app web")
+	}
+	for _, path := range []string{"/with/web", "/with/web/"} {
+		if rec := ask(l.web, http.MethodGet, path); rec.Code != http.StatusSeeOther || rec.Header().Get("Location") != "/settings" {
+			t.Errorf("GET %s: %d %q, want 303 to /settings", path, rec.Code, rec.Header().Get("Location"))
+		}
 	}
 }

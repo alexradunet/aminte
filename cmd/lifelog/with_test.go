@@ -210,19 +210,22 @@ func TestServeWithGivesTheChildTheTokenOfAPublicListener(t *testing.T) {
 	}
 }
 
-// TestServeWithAppliesTheExitRule: 1 starts the child again; 0, 2 and 3 do not, and each has its line.
+// TestServeWithAppliesTheExitRule: 1 and 2 start the child again (2 is the status of a Go program that panics); 0, 78
+// and 3 do not, and each has its line.
 func TestServeWithAppliesTheExitRule(t *testing.T) {
-	t.Run("1 starts again", func(t *testing.T) {
-		w := startWithServer(t, map[string]string{"fake": "exit-once=1"})
-		w.logOf(t, "fake", 2) // the second start: the first one ended with 1
-		w.waitFor(t, "lifelog: with fake: ended with status 1, started again in "+restartDelay.String())
-		if n := strings.Count(w.stderr.String(), "lifelog: with fake: started (pid "); n < 2 {
-			t.Errorf("%d start lines, want 2\n%s", n, w.stderr.String())
-		}
-	})
+	for _, status := range []string{"1", "2"} {
+		t.Run(status+" starts again", func(t *testing.T) {
+			w := startWithServer(t, map[string]string{"fake": "exit-once=" + status})
+			w.logOf(t, "fake", 2) // the second start: the first one ended with the status
+			w.waitFor(t, "lifelog: with fake: ended with status "+status+", started again in "+restartDelay.String())
+			if n := strings.Count(w.stderr.String(), "lifelog: with fake: started (pid "); n < 2 {
+				t.Errorf("%d start lines, want 2\n%s", n, w.stderr.String())
+			}
+		})
+	}
 	for _, c := range []struct{ mode, line string }{
 		{"exit=0", "lifelog: with fake: ended\n"},
-		{"exit=2", "lifelog: with fake: ended with status 2: not started again (the owner acts first)\n"},
+		{"exit=78", "lifelog: with fake: ended with status 78: not started again (the owner acts first)\n"},
 		{"exit=3", "lifelog: with fake: ended with status 3: not started again (the owner acts first)\n"},
 	} {
 		t.Run(c.mode, func(t *testing.T) {

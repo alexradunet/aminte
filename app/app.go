@@ -17,8 +17,9 @@ import (
 )
 
 // ExitOwnerActs is the exit status of a connected app that cannot go on until the owner acts (for example, pairs a
-// device). `serve` does not start it again (extensions/README.md, "Run by serve").
-const ExitOwnerActs = 2
+// device). `serve` does not start it again (extensions/README.md, "Run by serve"). It is 78, EX_CONFIG of sysexits:
+// the Go runtime ends a program that panics with the status 2, and a crash must start again, not wait for the owner.
+const ExitOwnerActs = 78
 
 const (
 	listenEnv      = "LIFELOG_LISTEN"
@@ -42,7 +43,7 @@ func Listen(ctx context.Context, h http.Handler) error {
 	if ip := net.ParseIP(host); ip == nil || !ip.IsLoopback() {
 		return fmt.Errorf("%s=%q: a connected app listens on a loopback address only", listenEnv, addr)
 	}
-	srv := &http.Server{Addr: addr, Handler: h, ReadHeaderTimeout: headerTimeout}
+	srv := &http.Server{Addr: addr, Handler: serverAlone(addr, h), ReadHeaderTimeout: headerTimeout}
 	done := make(chan error, 1)
 	go func() { done <- srv.ListenAndServe() }()
 	select {
@@ -59,6 +60,25 @@ func Listen(ctx context.Context, h http.Handler) error {
 		return err
 	}
 	return nil
+}
+
+// serverAlone lets in the calls of the server alone. The server calls the app on the address of LIFELOG_LISTEN, so the
+// Host of its request is that address. Any other Host is a request that is not the server's: for example a page whose
+// DNS name points at the loopback. A write of a browser from another site is refused too. The owner rule of an action
+// (owner: true) is held by the server, so a request that goes around the server must not reach the action.
+func serverAlone(addr string, h http.Handler) http.Handler {
+	guard := http.NewCrossOriginProtection()
+	guard.SetDenyHandler(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		Fail(w, http.StatusForbidden, siren.CodeCrossOrigin, "cross-origin browser request refused")
+	}))
+	inner := guard.Handler(h)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Host != addr {
+			Fail(w, http.StatusForbidden, siren.CodeForbidden, "this app answers the lifelog server alone")
+			return
+		}
+		inner.ServeHTTP(w, r)
+	})
 }
 
 // Error is an error of a handler with the status and the code that the client gets. Any other error that a handler

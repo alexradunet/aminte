@@ -36,6 +36,10 @@ func (b *Browser) page(w http.ResponseWriter, r *http.Request) {
 		b.fail(w, r, http.StatusUnprocessableEntity, siren.CodeInvalid, "embed is a parameter of the Siren answer, not of a page")
 		return
 	}
+	if (r.URL.Path == appHome || r.URL.Path == appHome+"/") && wantsHTML(r) {
+		http.Redirect(w, r, "/settings", http.StatusSeeOther) // the form of this browser is on the page of the settings
+		return
+	}
 	uri := coreURI(r.URL)
 	if r.URL.Path == "/" { // Home is the page of today, and one read gives the shell too (homeOf)
 		uri = withEmbed(uri, "today,conversation")
@@ -49,6 +53,10 @@ func (b *Browser) page(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case isRedirect(res.StatusCode):
 		b.redirect(w, r, res.Header.Get("Location"), res.StatusCode)
+	case isSiren(res) && wantsSiren(r):
+		// A script of the page (the poll of chat.js) reads the entity itself. The session is the owner's, and the
+		// answer is no-store as every answer of a session is (serveSession).
+		stream(w, r, res)
 	case isSiren(res):
 		e, err := b.core.readEntity(res)
 		if err != nil {
@@ -114,14 +122,21 @@ func (b *Browser) draw(w http.ResponseWriter, r *http.Request, status int, e *si
 	write(w, r, status, body, retryAfter, true)
 }
 
-// browserSettingsAction is the name that the core gives the action settings of this program: web is its name as a
-// connected app (extensions/README.md, "A catalog of its own"), and the core prefixes each name of an app.
-const browserSettingsAction = "web-settings"
+// appName is the name of this program as a connected app: `serve --with web` runs lifelog-web. browserSettingsAction is
+// the name that the core gives its action settings, for the core prefixes each name of an app (extensions/README.md, "A
+// catalog of its own"). The home of the app is /with/web; its one form is drawn on /settings ("This browser"), so the
+// rail does not list it as an app and its home leads to /settings (one form for one thing).
+const (
+	appName               = "web"
+	browserSettingsAction = appName + "-settings"
+	appHome               = "/with/" + appName
+)
 
 // offerBrowserSettings adds the form of this browser to the settings page, under the form of the core: the action
 // web-settings of the catalog of the core, with the values that this program keeps. Without `serve --with web` the core
 // has no such action, and the page is the page of the core.
 func (b *Browser) offerBrowserSettings(r *http.Request, e *siren.Entity) {
+	dropBrowserFields(e)
 	actions, err := b.core.catalog(r.Context())
 	if err != nil {
 		logFault(r, "the catalog of the core cannot be read", err)
@@ -129,6 +144,23 @@ func (b *Browser) offerBrowserSettings(r *http.Request, e *siren.Entity) {
 	}
 	if i := slices.IndexFunc(actions, func(a siren.Action) bool { return a.Name == browserSettingsAction }); i >= 0 {
 		e.Actions = append(e.Actions, withValues(actions[i], b.settings()))
+	}
+}
+
+// coreBrowserFields are the fields of the core's action settings that hold the settings of a browser. Web keeps them
+// itself, so a value sent in the core's form would never reach web: the owner would set a lock that does not lock. The
+// core keeps a setting that a request leaves out (API.md, settings), so the form without them changes nothing else.
+// Stage 3 of plan 161 takes them out of the core, and this list with them.
+var coreBrowserFields = []string{"ground", "lock_after", "lock_pin"}
+
+// dropBrowserFields takes coreBrowserFields out of the core's action settings of e.
+func dropBrowserFields(e *siren.Entity) {
+	for i := range e.Actions {
+		if e.Actions[i].Name == "settings" {
+			e.Actions[i].Fields = slices.DeleteFunc(slices.Clone(e.Actions[i].Fields), func(f siren.Field) bool {
+				return slices.Contains(coreBrowserFields, f.Name)
+			})
+		}
 	}
 }
 
@@ -259,5 +291,5 @@ func logFault(r *http.Request, what string, err error) {
 	if route == "" {
 		route = r.Method
 	}
-	log.Printf("lifelog-web: %s: %s: %v", route, what, err)
+	log.Printf("%s: %s: %v", route, what, err)
 }

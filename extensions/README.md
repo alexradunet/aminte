@@ -81,7 +81,7 @@ flowchart TD
   S["serve: the listener is up"] --> A["start lifelog-NAME with no arguments"]
   A --> W["wait for the end"]
   W -->|"exit 0"| E0["ended: not started again"]
-  W -->|"exit 2 or 3"| E2["the owner acts first: not started again"]
+  W -->|"exit 78 or 3"| E2["the owner acts first: not started again"]
   W -->|"any other end: 1, a signal"| R["wait 10 seconds, then start again"]
   R --> A
   T["interrupt or SIGTERM"] -->|"interrupt the child, 10 seconds at most, then a kill"| W
@@ -98,9 +98,10 @@ flowchart TD
   `os.UserConfigDir()/lifelog-NAME` in `ReadWritePaths`, else the extension fails at its start and `serve` starts it
   again every 10 seconds.
   stdout and stderr are those of the server, so the lines go to its log.
-- **The exit status** decides. 0: the extension ended by its own choice, and is not started again. 2 or 3: the owner
-  must act first (for example pair a device); it is not started again until `serve` starts again. Any other end (1, a
-  signal, a crash): `serve` starts it again after 10 seconds. `serve` logs each start and each end.
+- **The exit status** decides. 0: the extension ended by its own choice, and is not started again. 78 (`EX_CONFIG` of
+  sysexits) or 3: the owner must act first (for example pair a device); it is not started again until `serve` starts
+  again. Any other end (1; 2, which the Go runtime gives a program that panics; a signal): `serve` starts it again after
+  10 seconds. `serve` logs each start and each end.
 - **The stop.** On an interrupt or SIGTERM, `serve` interrupts the child first and waits for it, 10 seconds at most,
   then kills it. Then it drains its own requests and closes the file, so the child may still write while it ends.
 - `--with` and `--tls-cert` together are refused: the child would have to trust the certificate.
@@ -138,7 +139,10 @@ flowchart TD
   address and probes that one. It does not read the output of the app. An app that serves nothing ignores
   `LIFELOG_LISTEN`.
 - **The catalog is read again at each start.** An app that ended has no actions in the catalog.
-- **The address is a loopback address.** The app listens on no other. The server calls it and nothing else does.
+- **The address is a loopback address.** The app listens on no other. The server calls it and nothing else does. The
+  server's call has the address as its `Host`. An app refuses any other `Host` and a write of a browser from another
+  site (403): the server holds the owner rule, so a request that goes around the server must not reach an action.
+  `app.Listen` does both.
 - **A catalog is refused as a whole** (one line in the log, and the app stays unregistered) when:
   a name of an action is not `[a-z0-9-]+`; an `href` is not a path (it must start with one `/` and have no scheme,
   host, query or fragment); `NAME-` and the name of an action is the name of an action of the server or of another app;
@@ -231,7 +235,7 @@ third party on a timer of its own, and it writes through the API and never into 
 The app keeps its state in `os.UserConfigDir()/lifelog-NAME/`, with mode `0700`, as any extension does. A secret of the
 third party lives there and nowhere else: not in the settings of `lifelog`, not in `life.db`. The step that makes it is
 a command of the connector, `lifelog NAME login`, which the owner runs once. A connector that cannot go on until the
-owner acts (the login is missing) ends with status 2, so `serve` does not start it again every 10 seconds.
+owner acts (the login is missing) ends with status 78, so `serve` does not start it again every 10 seconds.
 
 ### In Go: the package `lifelog/app`
 
@@ -239,7 +243,7 @@ The package `lifelog/app` serves a catalog and never dials. `Listen(ctx, handler
 unset value or an address that is not a loopback address, and drains on the end of `ctx`. `Catalog(title, home, actions,
 handlers)` is the handler (`CatalogOf(role, ...)` adds a role to the class of `GET /actions`; the role `tasks` marks the [task service](#a-task-service)): it serves `GET /actions`, `GET /` and one route for each action, and it panics at the start
 when an action has no handler. `Fail` writes an error entity. `StateDir(name)` makes the state folder. `ExitOwnerActs`
-is 2. [`cmd/lifelog/testdata/withapp/main.go`](../cmd/lifelog/testdata/withapp/main.go) is the whole example, and
+is 78. [`cmd/lifelog/testdata/withapp/main.go`](../cmd/lifelog/testdata/withapp/main.go) is the whole example, and
 `cmd/lifelog/with_app_test.go` runs it on the real `lifelog serve --with`. An app in another language serves the same
 routes with any HTTP library.
 

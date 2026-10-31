@@ -19,6 +19,7 @@ import (
 	"testing"
 	"time"
 
+	"lifelog/app"
 	"lifelog/siren"
 )
 
@@ -297,7 +298,7 @@ func TestTheAgentRefusesWhatItCannotRun(t *testing.T) {
 
 // TestServingWithoutAPairingExitsWithTwo: the session store is new, so the device is not paired (no network). The
 // check comes before the wait for the owner's number: no number is set here, and the exit is still 2.
-func TestServingWithoutAPairingExitsWithTwo(t *testing.T) {
+func TestServingWithoutAPairingExitsAsTheOwnerActs(t *testing.T) {
 	b := build(t)
 	cmd := exec.Command(b.lifelog, "whatsapp", "--db", b.db)
 	cmd.Env = env(t)
@@ -305,8 +306,8 @@ func TestServingWithoutAPairingExitsWithTwo(t *testing.T) {
 	cmd.Stderr = &stderr
 	err := cmd.Run()
 	var ee *exec.ExitError
-	if !errors.As(err, &ee) || ee.ExitCode() != 2 {
-		t.Fatalf("%v, want exit status 2; stderr %s", err, stderr.String())
+	if !errors.As(err, &ee) || ee.ExitCode() != app.ExitOwnerActs {
+		t.Fatalf("%v, want exit status %d; stderr %s", err, app.ExitOwnerActs, stderr.String())
 	}
 	if !strings.Contains(stderr.String(), "not paired: run lifelog whatsapp login") {
 		t.Errorf("stderr %q", stderr.String())

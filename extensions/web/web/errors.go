@@ -28,6 +28,14 @@ func (b *Browser) fail(w http.ResponseWriter, r *http.Request, status int, code,
 // bare answers with the page of e with no shell: the page of an error that web found itself, the login and the lock. A
 // refusal of a form has a link back to the page that the form came from (backOf).
 func (b *Browser) bare(w http.ResponseWriter, r *http.Request, status int, e *siren.Entity) {
+	if wantsSiren(r) { // a script of the page reads the error itself: the poll of chat.js reads the code locked
+		w.Header().Set("Content-Type", sirenType)
+		w.WriteHeader(status)
+		if err := siren.WriteJSON(w, e, ""); err != nil {
+			logFault(r, "the error was not sent", err)
+		}
+		return
+	}
 	f := view.Facts{URL: r.URL}
 	if status >= http.StatusBadRequest {
 		f.Back = refererOf(r)

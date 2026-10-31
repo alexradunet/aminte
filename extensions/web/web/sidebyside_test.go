@@ -74,7 +74,8 @@ var allowedExtraHeaders = map[string]string{
 }
 
 // routes covers every template of the view and the shell. A route that the core redirects is compared by its status
-// and its Location.
+// and its Location. /settings is not here: web draws the core's form without the settings of the browser
+// (coreBrowserFields), so the page differs on purpose; TestTheSettingsPageHasTheFormOfThisBrowser holds that page.
 func routes(l *life) []string {
 	return []string{
 		"/", "/?new=record&metric=Walk&value=1", "/?new=capture",
@@ -89,7 +90,7 @@ func routes(l *life) []string {
 		"/browse?deleted=1", "/browse?in=Conversations", "/browse?unfiled=1", "/browse?ghosts=1", "/browse?kind=all", "/browse?new=create-page",
 		"/search?q=heron", "/search?q=nothingwillmatchthis", "/search",
 		"/months/2031-05", "/months/2031-04", "/weeks/today", "/weeks/2031-W20", "/years/2031", "/years/2030",
-		"/actions", "/actions?new=rename&id=3", "/actions?new=capture", "/settings", "/integrity",
+		"/actions", "/actions?new=rename&id=3", "/actions?new=capture", "/integrity",
 		"/days/today/conversation", "/days/" + today + "/conversation", "/days/2031-05-13/conversation", "/days/2031-05-10/conversation",
 		"/days/2031-05-01/conversation", "/days/today/conversation?new=rename",
 		"/tasks", "/with/none", "/nowhere", "/days/bogus",

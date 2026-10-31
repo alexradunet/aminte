@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -217,5 +218,62 @@ func TestStateDir(t *testing.T) {
 	}
 	if fi, err := os.Stat(dir); err != nil || !fi.IsDir() {
 		t.Errorf("the folder is not there: %v", err)
+	}
+}
+
+// TestListenLetsInTheServerAlone: the address of a connected app is a loopback address that the server alone calls,
+// with the Host of that address. A request with another Host (a page that a DNS name points at the loopback) and a
+// write of a browser from another site are refused, and the handler never sees them.
+func TestListenLetsInTheServerAlone(t *testing.T) {
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	addr := l.Addr().String()
+	l.Close()
+	t.Setenv("LIFELOG_LISTEN", addr)
+	ctx, cancel := context.WithCancel(context.Background())
+	var calls atomic.Int32
+	h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { calls.Add(1); write(w, 200, &siren.Entity{Title: "ok"}) })
+	ended := make(chan error, 1)
+	go func() { ended <- Listen(ctx, h) }()
+	t.Cleanup(func() { cancel(); <-ended })
+	send := func(method, host string, header map[string]string) int {
+		req, err := http.NewRequest(method, "http://"+addr+"/settings", nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		req.Host = host
+		for k, v := range header {
+			req.Header.Set(k, v)
+		}
+		for range 200 {
+			res, err := http.DefaultClient.Do(req)
+			if err == nil {
+				res.Body.Close()
+				return res.StatusCode
+			}
+			time.Sleep(10 * time.Millisecond) // the listener is not up yet
+		}
+		t.Fatal("the app never answered")
+		return 0
+	}
+	if got := send("POST", addr, nil); got != 200 {
+		t.Fatalf("a call of the server: %d", got)
+	}
+	for _, tc := range []struct {
+		name, host string
+		header     map[string]string
+	}{
+		{"another host", "evil.example", nil},
+		{"the loopback by another name", "localhost:" + strings.Split(addr, ":")[1], nil},
+		{"a browser write from another site", addr, map[string]string{"Sec-Fetch-Site": "cross-site", "Origin": "https://evil.example"}},
+	} {
+		if got := send("POST", tc.host, tc.header); got != http.StatusForbidden {
+			t.Errorf("%s: %d, want 403", tc.name, got)
+		}
+	}
+	if n := calls.Load(); n != 1 {
+		t.Errorf("the handler saw %d requests, want the one of the server", n)
 	}
 }

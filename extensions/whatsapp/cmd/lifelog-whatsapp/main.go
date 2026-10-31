@@ -19,15 +19,16 @@ import (
 	"lifelog-whatsapp/agent"
 	"lifelog-whatsapp/terminal"
 	"lifelog-whatsapp/whatsapp"
+	"lifelog/app"
 	"lifelog/client"
 	"lifelog/siren"
 )
 
-// Exit codes: 0 an interrupt or the end of the input, 1 an error (a new process may try again), 2 not paired,
-// 3 the connection ended for good (logged out, replaced, banned, outdated: the owner acts first).
+// Exit codes: 0 an interrupt or the end of the input, 1 an error (a new process may try again), app.ExitOwnerActs
+// (78) not paired, 3 the connection ended for good (logged out, replaced, banned, outdated: the owner acts first).
 const (
 	exitError     = 1
-	exitNotPaired = 2
+	exitNotPaired = app.ExitOwnerActs
 	exitEnded     = 3
 )
 

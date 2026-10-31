@@ -117,8 +117,9 @@ the extension's own last save. To pair again, delete `session.db`.
 |---|---|
 | 0 | An interrupt or SIGTERM, or (with `--terminal`) the end of the input. `serve` does not start it again. |
 | 1 | An error, or a failure of the connection that a new process may try again. `serve` starts it again after 10 seconds. |
-| 2 | Not paired: run `lifelog whatsapp login`. `serve` does not start it again: restart `serve` after the pairing. |
+| 2 | A crash (the Go runtime ends a program that panics with 2). `serve` starts it again after 10 seconds. |
 | 3 | The connection ended for good: logged out (the owner unlinked the device on the phone), the session taken over by another client, the number banned for a time, or the client refused as outdated. `serve` does not start it again: act first (the line on stderr says what), then restart `serve`. |
+| 78 | Not paired: run `lifelog whatsapp login`. `serve` does not start it again: restart `serve` after the pairing. |
 
 ## No unit of its own
 
@@ -140,5 +141,5 @@ lifelog. Run `lifelog whatsapp login` once, as the same user, before the unit st
 chat. `e2e_test.go` builds the real `lifelog` and `lifelog-whatsapp` into one folder and runs
 `lifelog whatsapp --terminal` (no number) against a fake model, and `lifelog serve --with whatsapp` with both real binaries. It sets the model with `lifelog do settings`, so it needs a `lifelog` that has the action. It needs the `go` command and the sources of the repository.
 
-**What has no test:** the answer to a `say` under `lifelog serve --with whatsapp`: it needs a paired session, so the end-to-end test of `serve` holds the start, the exit 2 of an unpaired child, the line that it is not started again, and the stop by SIGTERM. The wait for the owner's number is tested in `agent/` with a fake settings client. The connection to WhatsApp (`login`, the connection, `Send`, `Typing`, `MarkRead`, the
+**What has no test:** the answer to a `say` under `lifelog serve --with whatsapp`: it needs a paired session, so the end-to-end test of `serve` holds the start, the exit 78 of an unpaired child, the line that it is not started again, and the stop by SIGTERM. The wait for the owner's number is tested in `agent/` with a fake settings client. The connection to WhatsApp (`login`, the connection, `Send`, `Typing`, `MarkRead`, the
 `LoggedOut` event). It needs a real number. The filter, the QR renderer and the state folder have tests.

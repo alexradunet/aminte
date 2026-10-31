@@ -11,6 +11,7 @@ package web_test
 
 import (
 	"bytes"
+	"encoding/json"
 	"io"
 	"log"
 	"net/http"
@@ -129,8 +130,8 @@ func (f *lockFixture) fetch(path string) *httptest.ResponseRecorder {
 	return request(f.h, "GET", path, "", map[string]string{"Accept": "application/vnd.siren+json", "Cookie": f.cookie, "Sec-Fetch-Site": "same-origin", "Sec-Fetch-Mode": "cors"})
 }
 
-// isLocked probes the session with a script's fetch. The core answers its API with JSON. Web answers a page, so the
-// probe reads the status and the first words of the page of the code locked.
+// isLocked probes the session with a script's fetch, as the poll of chat.js reads it: the status, and the code locked
+// of the JSON of the error.
 func (f *lockFixture) isLocked() bool {
 	f.t.Helper()
 	rec := f.fetch("/days/" + secretDay)
@@ -138,8 +139,11 @@ func (f *lockFixture) isLocked() bool {
 	case 200:
 		return false
 	case 401:
-		if !strings.Contains(rec.Body.String(), "Locked.") {
-			f.t.Fatalf("401 without the words of the code locked: %.200s", rec.Body.String())
+		var e struct {
+			Properties struct{ Code string } `json:"properties"`
+		}
+		if err := json.Unmarshal(rec.Body.Bytes(), &e); err != nil || e.Properties.Code != "locked" {
+			f.t.Fatalf("401 without the JSON of the code locked: %v %.200s", err, rec.Body.String())
 		}
 		return true
 	}
@@ -844,14 +848,14 @@ func TestLockJSIsServedLikeChatJS(t *testing.T) {
 
 // Core test: TestOnlyTheLoginFieldOffersTheSavedLogin. A browser fills an empty password field with the saved login, and
 // the settings form then sends the token as the PIN. Every password field of the settings page says new-password; the
-// login form keeps current-password. The page has the field of the core and the field of this browser.
+// login form keeps current-password. The page has the key of the model (the core's form) and the PIN (this browser's).
 func TestOnlyTheLoginFieldOffersTheSavedLogin(t *testing.T) {
 	f := newLockFixture(t, "5")
 	f.l.core.Connect(t, "web", f.l.browser.Catalog())
 	page := f.browse("/settings", nil).Body.String()
 	pw := regexp.MustCompile(`<input type="password"[^>]*>`).FindAllString(page, -1)
-	if len(pw) != 3 {
-		t.Fatalf("the settings page has %d password fields, want model_key, lock_pin and pin", len(pw))
+	if len(pw) != 2 {
+		t.Fatalf("the settings page has %d password fields, want model_key and pin", len(pw))
 	}
 	for _, in := range pw {
 		if !strings.Contains(in, `autocomplete="new-password"`) {
@@ -861,5 +865,49 @@ func TestOnlyTheLoginFieldOffersTheSavedLogin(t *testing.T) {
 	login := request(f.h, "GET", "/login", "", map[string]string{"Accept": "text/html"}).Body.String()
 	if !strings.Contains(login, `name="token" required autocomplete="current-password"`) {
 		t.Error("the login field lost current-password")
+	}
+}
+
+// TestThePollOfTheChatReadsTheVersionAndTheLock: the poll of chat.js asks for the conversation of today as Siren JSON
+// and reads its version, and a locked session answers it 401 with the code locked in JSON, so the poll goes to the lock
+// page. A page drawn as HTML would make the poll fail at its parse and wait for ever.
+func TestThePollOfTheChatReadsTheVersionAndTheLock(t *testing.T) {
+	f := newLockFixture(t, "5")
+	f.l.do(t, "/days/"+today+"/conversation", "say", map[string]string{"text": "Synthetic question?"})
+	rec := f.fetch("/days/" + today + "/conversation")
+	if rec.Code != 200 || !strings.HasPrefix(rec.Header().Get("Content-Type"), "application/vnd.siren+json") {
+		t.Fatalf("poll: %d %q %.200s", rec.Code, rec.Header().Get("Content-Type"), rec.Body.String())
+	}
+	if cc := rec.Header().Get("Cache-Control"); cc != "no-store" {
+		t.Errorf("poll: Cache-Control %q, want no-store", cc)
+	}
+	var e struct {
+		Properties struct{ Version string } `json:"properties"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &e); err != nil || e.Properties.Version == "" {
+		t.Fatalf("poll: no version in the JSON: %v %.200s", err, rec.Body.String())
+	}
+	if rec := f.post("/lock", "", nil); rec.Code != 303 {
+		t.Fatalf("lock: %d", rec.Code)
+	}
+	if !f.isLocked() {
+		t.Error("the poll of a locked session is not 401 locked")
+	}
+}
+
+// TestAnEscapedPathIsNoInstallFile: the door lets an install file in with no session, and keeps the cache of an asset.
+// It must decide by the path that the routes match, the escaped one: /assets%2Ficon.svg is not the file /assets/icon.svg
+// to the routes, so it is a page of the core, which needs a session and is no-store.
+func TestAnEscapedPathIsNoInstallFile(t *testing.T) {
+	f := newLockFixture(t, "")
+	for _, path := range []string{"/assets%2Ficon.svg", "/assets/..%2Fpages%2F1", "/assets%2F..%2Fdays%2Ftoday"} {
+		rec := request(f.h, "GET", path, "", map[string]string{"Accept": "text/html"})
+		if rec.Code != http.StatusSeeOther || rec.Header().Get("Location") != "/login" {
+			t.Errorf("%s with no session: %d %q, want 303 to /login", path, rec.Code, rec.Header().Get("Location"))
+		}
+		rec = request(f.h, "GET", path, "", map[string]string{"Accept": "text/html", "Cookie": f.cookie})
+		if cc := rec.Header().Get("Cache-Control"); cc != "no-store" {
+			t.Errorf("%s with a session: Cache-Control %q, want no-store", path, cc)
+		}
 	}
 }

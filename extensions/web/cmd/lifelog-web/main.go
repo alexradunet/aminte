@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"log"
 	"net"
 	"net/http"
@@ -83,7 +84,11 @@ func run(ctx context.Context, getenv func(string) string, started func(addr stri
 		return &configError{"the state folder: " + err.Error()}
 	}
 	browser, err := web.New(web.Options{CoreURL: base, Token: token, Origins: strings.FieldsFunc(getenv("LIFELOG_WEB_ORIGINS"), isSeparator), StateDir: state})
-	if err != nil {
+	var fault *fs.PathError
+	switch {
+	case errors.As(err, &fault): // a fault of the file system (the settings cannot be read now) may pass: serve starts web again
+		return err
+	case err != nil: // a value that the owner must change: a bad token, an origin, a settings file that is not JSON
 		return &configError{err.Error()}
 	}
 	addr := getenv("LIFELOG_WEB_LISTEN")

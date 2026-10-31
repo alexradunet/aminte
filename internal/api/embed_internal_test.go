@@ -298,3 +298,29 @@ func TestAnEmbeddedLinkOfAnAppKeepsNoSubEntities(t *testing.T) {
 		t.Errorf("the sub-entity of the app: %+v", got)
 	}
 }
+
+// TestEmbedOfAnAddressWithASpaceAnswers: a tool line is text that an agent wrote, and its address may hold a space or
+// a tab ("/search?q=grey heron"). The read of such an address must not end the answer: it is embedded when it answers,
+// else it stays a reference, and every other sub-entity is embedded as before.
+func TestEmbedOfAnAddressWithASpaceAnswers(t *testing.T) {
+	odd := []string{"/t/1?q=grey heron", "/t/2 x", "/t/3\tz", "/t/4\r\nHost: evil"}
+	h := embedServer(t, func() []siren.Link {
+		links := []siren.Link{}
+		for _, href := range odd {
+			links = append(links, ref("item", href))
+		}
+		return append(links, ref("item", "/t/5"))
+	})
+	got := readProbe(t, h, "?embed=item").Entities // a panic of the read ends the answer, and readProbe fails
+	if len(got) != len(odd)+1 || !got[len(odd)].Embedded() {
+		t.Fatalf("the sub-entities after the odd addresses: %+v", got)
+	}
+	if !got[0].Embedded() || got[0].Href != odd[0] {
+		t.Errorf("%q is an address with words in its query: embedded %v, href %q", odd[0], got[0].Embedded(), got[0].Href)
+	}
+	for i, href := range odd {
+		if got[i].Href != href || !got[i].HasRel("item") {
+			t.Errorf("%q: href %q, rel %v; the sub-entity keeps its href and its rel", href, got[i].Href, got[i].Rel)
+		}
+	}
+}

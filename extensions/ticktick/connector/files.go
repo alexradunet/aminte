@@ -19,7 +19,7 @@ import (
 const Name = "ticktick"
 
 // ErrLoginAgain says that TickTick refused the token, or that there is none. The owner must run
-// `lifelog ticktick login`; a program that meets it ends with status 2 (app.ExitOwnerActs).
+// `lifelog ticktick login`; a program that meets it ends with app.ExitOwnerActs (78).
 var ErrLoginAgain = errors.New("login again: lifelog ticktick login")
 
 // Dir is the state folder: os.UserConfigDir()/lifelog-ticktick.

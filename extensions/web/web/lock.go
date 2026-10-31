@@ -58,7 +58,7 @@ func (b *Browser) serveSession(w http.ResponseWriter, r *http.Request, id string
 	lockOn := s.lockMinutes() > 0
 	idle := time.Duration(s.lockMinutes())*time.Minute + idleSlack
 	locked := b.sessions.locked(id, now, lockOn, idle)
-	if !strings.HasPrefix(r.URL.Path, "/assets/") { // the assets are the same for every browser: they keep their cache
+	if !strings.HasPrefix(b.routeOf(r), "/assets/") { // the assets are the same for every browser: they keep their cache
 		w = &noStore{ResponseWriter: w}
 	}
 	switch {
@@ -146,7 +146,7 @@ func (b *Browser) unlock(w http.ResponseWriter, r *http.Request, id string, now 
 		return
 	}
 	if !b.sessions.tryPIN(id, now) {
-		log.Printf("lifelog-web: %s %s: no tries left, the session ends", r.Method, r.URL.Path)
+		log.Printf("%s %s: no tries left, the session ends", r.Method, r.URL.Path)
 		ended()
 		return
 	}
@@ -159,7 +159,7 @@ func (b *Browser) unlock(w http.ResponseWriter, r *http.Request, id string, now 
 		return
 	}
 	n, done := b.sessions.failed(id, now)
-	log.Printf("lifelog-web: %s %s: the PIN does not match (%d of %d)", r.Method, r.URL.Path, n, wrongPINLimit)
+	log.Printf("%s %s: the PIN does not match (%d of %d)", r.Method, r.URL.Path, n, wrongPINLimit)
 	if done {
 		ended()
 		return

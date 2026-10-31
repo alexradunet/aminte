@@ -50,15 +50,16 @@ and the temporary server of the core checks no token.
 
 | environment | meaning |
 |---|---|
-| `LIFELOG_URL` | The address of the core, `http://127.0.0.1:PORT`. Required: the program refuses to start without it, with exit status 2, so `serve` does not start it again. |
+| `LIFELOG_URL` | The address of the core, `http://127.0.0.1:PORT`. Required: the program refuses to start without it, with exit status 78, so `serve` does not start it again. |
 | `LIFELOG_TOKEN` | The owner's token, the same as the token of the core. Required, 32 characters or more, one line. It is the login of the browser and the bearer token of every request to the core. A new token ends every session of every browser. |
-| `LIFELOG_WEB_LISTEN` | The address of the door of the browser. A loopback address only (`127.0.0.1:7780` by default). Another address is refused with exit status 2. The proxy of the owner points to it and ends TLS. |
+| `LIFELOG_WEB_LISTEN` | The address of the door of the browser. A loopback address only (`127.0.0.1:7780` by default). Another address is refused with exit status 78. The proxy of the owner points to it and ends TLS. |
 | `LIFELOG_WEB_ORIGINS` | The browser origins that the guard of the writes trusts besides its own, separated by commas or spaces: `https://lifelog.example`. Each is a scheme, a host, an optional port and nothing else, in lower case. The origin that the proxy shows to the browser is the one to list: behind a proxy the `Origin` of a form is not the `Host` that web sees. |
 | `LIFELOG_WEB_STATE` | The state folder. The default is `os.UserConfigDir()/lifelog-web`. The tests set it. |
 | `LIFELOG_LISTEN` | Set by `serve --with` only: the loopback address where this program serves its catalog ([the settings](#the-settings-of-the-browser)). Not set: there is no catalog, and the form "This browser" is not drawn, because the core has no `web-settings` action. |
 
-A bad value of any of these is a refusal with exit status 2: the owner acts first, and `serve` does not start the program
-again. So is a settings file that cannot be read, and a state folder that cannot be made. The unit of the service lists
+A bad value of any of these is a refusal with exit status 78: the owner acts first, and `serve` does not start the program
+again. So is a settings file that is not JSON, and a state folder that cannot be made. A settings file that cannot be read
+now (a fault of the file system) ends the program with status 1, and `serve` starts it again after 10 seconds. The unit of the service lists
 `~/.config/lifelog-web` in `ReadWritePaths`, else the program cannot write its settings.
 
 ### One step for the owner: copy the settings
@@ -110,7 +111,7 @@ flowchart TD
    browser of the core. `ReadWritePaths` is needed when the unit has `ProtectHome=read-only`.
 4. `systemctl daemon-reload`, then start the service. The log (`journalctl -u lifelog.service -n 30`) must show these three
    lines: `lifelog: with web: started (pid N)`, `lifelog-web: DATE TIME the browser is on http://127.0.0.1:7780` and
-   `lifelog: with web: a catalog of 1 actions on 127.0.0.1:PORT`. A line `ended with status 2: not started again` means a
+   `lifelog: with web: a catalog of 1 actions on 127.0.0.1:PORT`. A line `ended with status 78: not started again` means a
    bad variable: web wrote the reason to the log, and the owner acts first.
 5. Point the local proxy to `LIFELOG_WEB_LISTEN` (`127.0.0.1:7780`) in place of the address of the core. The proxy ends TLS.
    The core stays on its own address for the programs: the CLI, the MCP server and the connected apps.
@@ -217,7 +218,7 @@ flowchart TD
 
 ## The login and the lock
 
-The login is the login of the public listener of the core, moved here ([plan 160](../../docs/plans/160-the-lock.md)).
+The login and the lock follow [plan 160](../../docs/plans/160-the-lock.md).
 
 - `POST /login` with the token sets the cookie `lifelog_session`: 16 random bytes and the HMAC-SHA256 of them, `HttpOnly`,
   `SameSite=Strict`, for one year. The key of the HMAC is derived from the token in the way of the core, so a cookie of the
@@ -243,9 +244,10 @@ has mode 0600 and holds a salted PBKDF2 hash of the PIN, never the PIN. A write 
 syncs it and renames it, so a reader never sees half a file.
 
 This program is the only writer of the file. It reads the file at the start and keeps the settings in memory. A request
-reads memory, and a change is live at once. A hand edit of the file is live after the next start. A file that cannot be
-read stops the start: the core read the file at each request and locked a session when it could not, and here there is no
-read that can fail while the program runs.
+reads memory, and a change is live at once. A hand edit of the file is live after the next start. A file that is not JSON
+stops the start (status 78), and a file that cannot be read now ends the program with status 1, so `serve` starts it
+again: there is no read of the file that can fail while the program runs, so a session never meets a lock that cannot
+be read.
 
 With `LIFELOG_LISTEN`, the program serves a catalog on that address, and `lifelog serve --with web` merges it into its own:
 

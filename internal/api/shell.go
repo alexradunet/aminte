@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"net/url"
 	"slices"
 
 	"lifelog/internal/api/view"
@@ -27,7 +28,7 @@ func (h *server) shellFacts(r *http.Request, status int, e *siren.Entity, f *vie
 	if !good {
 		r = r.WithContext(context.WithValue(r.Context(), quietKey{}, true))
 	}
-	root := answeredEntity(h.inside(r, "/?"+embedField+"=today,conversation"))
+	root := answeredEntity(h.inside(r, &url.URL{Path: "/", RawQuery: embedField + "=today,conversation"}))
 	if root == nil {
 		if good {
 			logFault(r, "the shell cannot be read", errors.New("the root gave no entity"))

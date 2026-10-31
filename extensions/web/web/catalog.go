@@ -110,7 +110,7 @@ func (b *Browser) saveSettings(r *http.Request) (*siren.Entity, error) {
 		}
 		var err error
 		if hash, err = hashPIN(pin); err != nil {
-			log.Printf("lifelog-web: settings: %v", err)
+			log.Printf("settings: %v", err)
 			return nil, err
 		}
 	}
@@ -135,7 +135,7 @@ func (b *Browser) saveSettings(r *http.Request) (*siren.Entity, error) {
 	if err != nil {
 		var refusal *app.Error
 		if !errors.As(err, &refusal) {
-			log.Printf("lifelog-web: settings: %v", err) // the cause stays in the log: the client gets "internal error"
+			log.Printf("settings: %v", err) // the cause stays in the log: the client gets "internal error"
 		}
 		return nil, err
 	}

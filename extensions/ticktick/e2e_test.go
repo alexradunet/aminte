@@ -394,12 +394,12 @@ func TestTickTickOnTheRealLifelog(t *testing.T) {
 	}{{"with /task/completed", false}, {"vanish and fetch", true}} {
 		t.Run(tc.name, func(t *testing.T) { holdsTheWholeLine(t, b, tc.noCompleted) })
 	}
-	t.Run("a refused token ends the app with status 2", func(t *testing.T) {
+	t.Run("a refused token ends the app as the owner acts", func(t *testing.T) {
 		fake := &fakeTick{extra: map[string]map[string]any{}, tasks: map[string]*ticktick.Task{}, unauthorized: true}
 		srv := httptest.NewServer(fake)
 		defer srv.Close()
 		s := startServer(t, b, srv)
-		s.waitFor("with ticktick: ended with status 2: not started again")
+		s.waitFor("with ticktick: ended with status 78: not started again")
 		if !strings.Contains(s.stderr.String(), "login again: lifelog ticktick login") {
 			t.Errorf("the log has no line that tells the owner to log in:\n%s", s.stderr)
 		}

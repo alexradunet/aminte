@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"lifelog-ticktick/connector"
+	"lifelog/app"
 )
 
 func noEnv(string) string { return "" }
@@ -42,8 +43,8 @@ func TestUsageAndRefusals(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			err := run(t.Context(), tc.args, tc.env, strings.NewReader(""), io.Discard, io.Discard)
 			var ec *exitCode
-			if !errors.As(err, &ec) || ec.code != 2 || !strings.Contains(err.Error(), tc.want) {
-				t.Errorf("err = %v, want status 2 and %q", err, tc.want)
+			if !errors.As(err, &ec) || ec.code != app.ExitOwnerActs || !strings.Contains(err.Error(), tc.want) {
+				t.Errorf("err = %v, want status %d and %q", err, app.ExitOwnerActs, tc.want)
 			}
 		})
 	}
@@ -62,7 +63,7 @@ func TestSyncWithoutATokenSaysToLogInAndWithoutAnAddressSaysWhatToRun(t *testing
 		return ""
 	}, strings.NewReader(""), io.Discard, io.Discard)
 	if !errors.Is(err, connector.ErrLoginAgain) {
-		t.Errorf("serve with no token: err = %v, want ErrLoginAgain (exit 2 at once)", err)
+		t.Errorf("serve with no token: err = %v, want ErrLoginAgain (exit app.ExitOwnerActs at once)", err)
 	}
 }
 

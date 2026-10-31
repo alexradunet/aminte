@@ -79,7 +79,7 @@ func (b *Browser) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		b.login(w, r)
 	case r.URL.Path == "/logout" && r.Method == http.MethodPost:
 		b.logout(w, r)
-	case installFiles[r.URL.Path] && (r.Method == http.MethodGet || r.Method == http.MethodHead):
+	case installFiles[b.routeOf(r)] && (r.Method == http.MethodGet || r.Method == http.MethodHead):
 		b.mux.ServeHTTP(w, r)
 	default:
 		id, ok := b.sessions.idOf(r)
@@ -94,10 +94,28 @@ func (b *Browser) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// routeOf is the path of the pattern of the route that answers r: "/assets/icon.svg" for GET /assets/icon.svg, "/" for a
+// page of the core. The door decides by it, and not by r.URL.Path, because the routes match the escaped path:
+// /assets%2Ficon.svg decodes to the path of the icon, but it is a page of the core to the routes.
+func (b *Browser) routeOf(r *http.Request) string {
+	_, pattern := b.mux.Handler(r)
+	if _, path, ok := strings.Cut(pattern, " "); ok { // "GET /assets/icon.svg"
+		return path
+	}
+	return pattern
+}
+
 // wantsHTML reports a request of a browser for a page: it accepts HTML and does not ask for JSON.
 func wantsHTML(r *http.Request) bool {
 	a := r.Header.Get("Accept")
 	return strings.Contains(a, "text/html") && !strings.Contains(a, "json")
+}
+
+// wantsSiren reports a request of a script of the page that reads an entity: it asks for Siren JSON and not for HTML.
+// Web answers it with the entity, not with a page.
+func wantsSiren(r *http.Request) bool {
+	a := r.Header.Get("Accept")
+	return strings.Contains(a, sirenType) && !strings.Contains(a, "text/html")
 }
 
 // matches reports whether credential is the owner's token. The compare takes the same time for every value.
@@ -117,7 +135,7 @@ func (b *Browser) login(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := readForm(w, r, 4096, smallWithin); err != nil || !b.matches(r.PostForm.Get("token")) {
 		// One line for the owner, who reads the log: a guess shows there. Never the token that was sent, or the body.
-		log.Printf("lifelog-web: %s %s: the token does not match", r.Method, r.URL.Path)
+		log.Printf("%s %s: the token does not match", r.Method, r.URL.Path)
 		http.Redirect(w, r, "/login?failed=1", http.StatusSeeOther)
 		return
 	}

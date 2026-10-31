@@ -56,7 +56,7 @@ func newCore(rawURL, token string) (*core, error) {
 		return nil, errors.New("the token must be one line")
 	}
 	transport := &http.Transport{
-		Proxy:                 http.ProxyFromEnvironment,
+		Proxy:                 nil, // no proxy of the environment: the requests carry the owner's token, and the core is on the loopback
 		DialContext:           (&net.Dialer{Timeout: dialTimeout}).DialContext,
 		TLSHandshakeTimeout:   dialTimeout,
 		ResponseHeaderTimeout: headerWait,
