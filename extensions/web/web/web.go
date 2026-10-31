@@ -85,13 +85,17 @@ func New(o Options) (*Browser, error) {
 // is the login of the browser and the bearer token of the core.
 const tokenMinLength = 32
 
-// checkToken reports whether t may be the owner's token: one line of at least tokenMinLength characters.
+// checkToken reports whether t may be the owner's token: one line of at least tokenMinLength characters, with no space at
+// its start or end. These are the rules of the core for its own token.
 func checkToken(t string) error {
 	if len(t) < tokenMinLength {
 		return fmt.Errorf("the token must be at least %d characters", tokenMinLength)
 	}
 	if strings.ContainsAny(t, "\r\n") {
 		return errors.New("the token must be one line")
+	}
+	if strings.TrimSpace(t) != t {
+		return errors.New("the token must not start or end with a space") // a header value loses it, so no request could send it
 	}
 	return nil
 }

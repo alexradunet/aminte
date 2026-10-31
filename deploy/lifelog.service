@@ -8,7 +8,8 @@ Type=simple
 # Replace OWNER and the paths.
 User=OWNER
 ExecStart=/home/OWNER/.local/bin/lifelog --db /home/OWNER/lifelog/life.db serve --token-file /home/OWNER/life/token --snapshots /home/OWNER/snapshots --with web
-# the core listens on 127.0.0.1:7777 only. The token file turns on its bearer check: one line of 32 characters or more
+# the core listens on 127.0.0.1:7777 only. The token file turns on its bearer check: one line of 32 characters or more,
+# with no space or tab at its start or end
 # --with web runs the browser (extensions/web) beside the server: lifelog-web must be beside lifelog
 # the browser listens on LIFELOG_WEB_LISTEN. The local proxy points to it, and not to the core
 # LIFELOG_WEB_ORIGINS is the origin that the proxy shows to the browser

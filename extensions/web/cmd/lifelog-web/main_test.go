@@ -68,6 +68,8 @@ func TestTheEnvironmentIsRefusedWithAReason(t *testing.T) {
 		"no LIFELOG_TOKEN":                {env("LIFELOG_URL", "http://127.0.0.1:7777"), "no LIFELOG_TOKEN"},
 		"a short token":                   {good(t, "LIFELOG_TOKEN", "short"), "at least 32 characters"},
 		"a token of two lines":            {good(t, "LIFELOG_TOKEN", token+"\nb"), "one line"},
+		"a token that ends with a space":  {good(t, "LIFELOG_TOKEN", token+" "), "start or end with a space"},
+		"a token that starts with a tab":  {good(t, "LIFELOG_TOKEN", "\t"+token), "start or end with a space"},
 		"a bad core":                      {good(t, "LIFELOG_URL", "127.0.0.1:7777"), "use http://host:port"},
 		"all interfaces":                  {good(t, "LIFELOG_WEB_LISTEN", "0.0.0.0:7780"), "loopback address only"},
 		"a name":                          {good(t, "LIFELOG_WEB_LISTEN", "localhost:7780"), "loopback address only"},
