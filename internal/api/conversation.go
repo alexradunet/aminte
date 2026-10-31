@@ -11,8 +11,8 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"time"
 
-	"lifelog/internal/api/view"
 	"lifelog/internal/core"
 	"lifelog/internal/text"
 	"lifelog/siren"
@@ -76,15 +76,71 @@ type Turn struct {
 
 var turnStart = regexp.MustCompile(`^\*\*(Owner|lifelog)\*\* \((\d\d[:.]\d\d)(?:, via ([a-z0-9_:.-]+))?\): ?`)
 
-// toolRefs are the addresses that the tool lines name after an arrow (view.ToolChip), in order, each once.
+// toolRefs are the addresses that the tool lines name after an arrow (siren.ToolLine), in order, each once.
 func toolRefs(tools []string) []string {
 	var refs []string
 	for _, l := range tools {
-		if ref := view.ToolChip(l).Href; ref != "" && !slices.Contains(refs, ref) {
+		if ref := siren.ToolLine(l).Href; ref != "" && !slices.Contains(refs, ref) {
 			refs = append(refs, ref)
 		}
 	}
 	return refs
+}
+
+// refRel is the rel of the sub-entities of a conversation that name what its agent touched, and refsPerTurn is how
+// many addresses of one turn they name: a turn that names more shows the others as plain links.
+const (
+	refRel      = "ref"
+	refsPerTurn = 6
+)
+
+// refsOf are the addresses that the conversation names as sub-entities with the rel ref: the addresses of each turn,
+// the newest turn first, each address once, at most refsPerTurn of a turn. A client that asks for ?embed=ref gets the
+// things that were touched last, within the bound of one embedding.
+func refsOf(turns []Turn) []string {
+	var refs []string
+	for _, t := range slices.Backward(turns) {
+		for _, ref := range t.Refs[:min(len(t.Refs), refsPerTurn)] {
+			if !slices.Contains(refs, ref) {
+				refs = append(refs, ref)
+			}
+		}
+	}
+	return refs
+}
+
+// earlierDays is how many earlier days the day bar of the chat names, and earlierSpan is how far back it looks.
+const (
+	earlierDays = 3
+	earlierSpan = 14
+)
+
+// earlierConversations are the days before today that have a live conversation page, the newest earlierDays of them,
+// oldest first. It looks back over earlierSpan days: a day further back is a link from the day view.
+func (h *server) earlierConversations(ctx context.Context, today string) ([]string, error) {
+	t, ok := text.ParseDay(today)
+	if !ok {
+		return nil, core.Invalid("today %q is not a day", today)
+	}
+	var days []string
+	for i := 1; i <= earlierSpan && len(days) < earlierDays; i++ {
+		day := t.AddDate(0, 0, -i).Format(time.DateOnly)
+		id, err := h.s.PageID(ctx, ConversationTitle(day))
+		if err != nil {
+			return nil, err
+		}
+		if id == 0 {
+			continue
+		}
+		p, err := h.s.PageByID(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		if p.DeletedAt == "" {
+			days = append([]string{day}, days...)
+		}
+	}
+	return days, nil
 }
 
 // ParseTurns reads the turns of the body of the conversation page of day (CRLF is read as LF). A marker line starts
@@ -202,14 +258,24 @@ func (h *server) conversationDayOf(r *http.Request) (string, error) {
 // conversationHref is the address of the conversation of a day.
 func conversationHref(day string) string { return siren.DayHref(day) + "/conversation" }
 
-// conversationEntity is the conversation of a day: its turns, and say. When the page exists it carries the page as a
-// metric's series does (plan 144): its properties, links and actions, so one view draws both.
+// conversationEntity is the conversation of a day: its turns, say, the links earlier to the conversations of the
+// days before today (the day bar of a chat client) and, when a turn names addresses, the sub-entities ref. When the
+// page exists it carries the page as a metric's series does (plan 144): its properties, links and actions, so one view
+// draws both.
 func (h *server) conversationEntity(ctx context.Context, day string) (*siren.Entity, error) {
 	title := ConversationTitle(day)
+	today := h.s.Today()
 	e := &siren.Entity{Class: []string{"conversation"}, Title: title,
 		Links:   []siren.Link{link("self", conversationHref(day), title), link("day", siren.DayHref(day), day), link("index", "/", "Home")},
 		Actions: []siren.Action{}}
-	if day == h.s.Today() { // say is for today: the agent answers today's conversation
+	earlier, err := h.earlierConversations(ctx, today)
+	if err != nil {
+		return nil, err
+	}
+	for _, d := range earlier {
+		e.Links = append(e.Links, link("earlier", conversationHref(d), d))
+	}
+	if day == today { // say is for today: the agent answers today's conversation
 		e.Actions = append(e.Actions, action("say", map[string]string{"day": day}, nil))
 	}
 	props := map[string]any{"day": day, "turns": []Turn{}}
@@ -230,6 +296,10 @@ func (h *server) conversationEntity(ctx context.Context, day string) (*siren.Ent
 	}
 	e.Class = append(e.Class, "page")
 	e.Links = append(e.Links, link("page", siren.PageHref(id), title))
-	props["turns"] = ParseTurns(day, fmt.Sprint(props["body"]))
+	turns := ParseTurns(day, fmt.Sprint(props["body"]))
+	props["turns"] = turns
+	for _, ref := range refsOf(turns) {
+		e.Entities = append(e.Entities, link(refRel, ref, ""))
+	}
 	return e, nil
 }

@@ -46,6 +46,7 @@ README of the core. The README of the extension states its own rule for its two 
 | the data of the shell | A generic `embed` in the API (below), not many small requests. |
 | the rollout | In stages, side by side: stage 1 cuts the seam in the core; stage 2 runs web beside the old browser and compares their pages; stage 3 deletes the old browser. |
 | the name | `web`: `extensions/web`, the program `lifelog-web`, `/with/web`. |
+| the tests of web | A public test kit, `lifelog/lifelogtest`, gives a test an `httptest` server that runs the real core handler over a fresh synthetic file, in process. Only `_test.go` files import it. The tests of the pages move to web with their cases and keep their speed. |
 | execution | Sonnet sub-agents build each stage. The main session briefs, reviews and runs the checks. Opus 5.5 does the counter-review. |
 
 ```mermaid

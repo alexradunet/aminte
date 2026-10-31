@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"html/template"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
 	"lifelog/internal/text"
+	"lifelog/siren"
 )
 
 // The browser's words for a value (docs/plans/093-words-phone-and-today.md): a value is drawn by its type, never by
@@ -225,7 +225,7 @@ func (c clock) writeValue(sb *strings.Builder, x any) {
 			sb.WriteString("no")
 		}
 	case float64:
-		sb.WriteString(strconv.FormatFloat(x, 'f', -1, 64))
+		sb.WriteString(siren.Num(x))
 	case nil:
 		sb.WriteString(`<small>—</small>`)
 	default:

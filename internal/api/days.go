@@ -10,7 +10,6 @@ import (
 	"strconv"
 	"time"
 
-	"lifelog/internal/api/view"
 	"lifelog/internal/core"
 	"lifelog/internal/text"
 	"lifelog/siren"
@@ -92,10 +91,13 @@ func (h *server) sameDayEarlier(ctx context.Context, day string) ([]recentDay, e
 
 // The root is the entry point of the API: the newest day pages, and every action that starts something. A browser's
 // Home is the page of today instead (docs/plans/129-the-ux-pass.md, part 10), which carries the same lists.
+// It names the clock (zone, utc_offset), the day of today and its conversation as sub-entities that ?embed=today,
+// conversation reads in the same answer, the connected apps that run (the links app) and the task service (the link
+// tasks): what a client needs to draw its frame once (API.md, root).
 func (h *server) root(r *http.Request) (*siren.Entity, error) {
 	ctx := r.Context()
-	today := h.s.Today()
-	now, _ := text.ParseDay(today)
+	now := h.s.Local() // one read of the clock, so today and the zone agree
+	today := now.Format(time.DateOnly)
 	if wantsHTML(r) { // a browser's Home is the page of today (docs/plans/129-the-ux-pass.md, part 10)
 		return h.dayEntity(ctx, today)
 	}
@@ -112,9 +114,11 @@ func (h *server) root(r *http.Request) (*siren.Entity, error) {
 		action("capture", map[string]string{"day": today}, nil), action("search", nil, nil), action("find", nil, nil), action("open-day", nil, nil),
 		action("create-page", nil, nil), action("create-person", nil, nil), action("add-file", nil, nil),
 		record, action("register-metric", nil, nil), action("snapshot", nil, nil)}
-	return &siren.Entity{
+	_, offset := now.Zone()
+	e := &siren.Entity{
 		Class: []string{"root"}, Title: "Lifelog",
-		Properties: map[string]any{"today": today, "recent": recent},
+		Properties: map[string]any{"today": today, "zone": now.Location().String(), "utc_offset": offset, "recent": recent},
+		Entities:   []siren.Link{link("today", siren.DayHref(today), "Today"), link("conversation", conversationHref(today), "Chat")},
 		Links: []siren.Link{link("self", "/", "Lifelog"), link("today", siren.DayHref(today), "Today"), link("days", "/days", "Days"),
 			link("browse", siren.BrowseHref(nil), "Browse"), link("people", siren.BrowseKindHref("person"), "People"),
 			link("media", siren.BrowseKindHref("media"), "Media"), link("files", siren.BrowseKindHref("document"), "Documents"),
@@ -122,7 +126,12 @@ func (h *server) root(r *http.Request) (*siren.Entity, error) {
 			link("calendar", siren.MonthHref(now), "Calendar"),
 			link("year", siren.YearHref(now.Year()), "This year")},
 		Actions: actions,
-	}, nil
+	}
+	e.Links = append(e.Links, h.with.links()...)
+	if _, ok := h.with.taskService(); ok {
+		e.Links = append(e.Links, link("tasks", "/tasks", "Tasks"))
+	}
+	return e, nil
 }
 
 func (h *server) today(*http.Request) (*siren.Entity, error) {
@@ -280,6 +289,15 @@ type dayView struct {
 	Units map[string]string `json:"units,omitempty"`
 	// Daily are the names of the daily metrics, in name order: the day asks for a reading of each.
 	Daily []string `json:"daily"`
+	// Streak, Written and Habits are the Today strip of the rail, on the day of today only, as Recent is: the strip is
+	// about today. A client that draws the strip reads the day of today (the root names it). Streak is the days
+	// written in a row that end today, or yesterday when today has no words yet (cookbook/streaks.md). Written says that
+	// the day page of today has words. Habits are the daily metrics with no unit, by name, each with whether the
+	// newest reading of today is not 0 (null when it has no reading). They are pointers and a list with omitempty so
+	// that a streak of 0 and a day with no words are on the wire on today, and absent on any other day.
+	Streak  *int         `json:"streak,omitempty"`
+	Written *bool        `json:"written,omitempty"`
+	Habits  []core.Habit `json:"habits,omitempty"`
 }
 
 func (h *server) day(r *http.Request) (*siren.Entity, error) {
@@ -317,10 +335,22 @@ func (h *server) dayEntity(ctx context.Context, day string) (*siren.Entity, erro
 	}
 	record, daily := recordAction(ms, "", day), dailyOf(ms)
 	units := unitsOf(ms, d.Readings, daily)
+	props := dayView{Day: *d, Mood: mood, Today: today, Recent: recent, Earlier: earlier, Units: units, Daily: daily}
+	if day == today {
+		streak, written, err := h.s.Streak(ctx, day)
+		if err != nil {
+			return nil, err
+		}
+		habits, err := h.s.Habits(ctx, day)
+		if err != nil {
+			return nil, err
+		}
+		props.Streak, props.Written, props.Habits = &streak, &written, habits
+	}
 	t, _ := text.ParseDay(day)
 	e := &siren.Entity{
 		Class: []string{"day"}, Title: day,
-		Properties: dayView{Day: *d, Mood: mood, Today: today, Recent: recent, Earlier: earlier, Units: units, Daily: daily},
+		Properties: props,
 		Links:      []siren.Link{link("self", siren.DayHref(day), day)},
 		Actions:    []siren.Action{action("capture", map[string]string{"day": day}, nil), record},
 	}
@@ -345,7 +375,7 @@ func (h *server) dayEntity(ctx context.Context, day string) (*siren.Entity, erro
 		e.Properties = dv
 	}
 	for _, m := range d.Readings {
-		e.Entities = append(e.Entities, link("reading", siren.MeasurementHref(m.ID), m.Metric+" "+view.Num(m.Value)))
+		e.Entities = append(e.Entities, link("reading", siren.MeasurementHref(m.ID), m.Metric+" "+siren.Num(m.Value)))
 	}
 	return e, nil
 }

@@ -1,6 +1,7 @@
 package view
 
 import (
+	"fmt"
 	"html/template"
 	"slices"
 	"strings"
@@ -12,7 +13,8 @@ import (
 )
 
 // The shell is the frame of every page a browser gets (docs/plans/092-the-app-shell.md): the sidebar, with today's
-// date. It reads the clock and the Today strip. This month is on Calendar, so the sidebar does not draw it a second time.
+// date. It knows the clock and the Today strip, which ShellOf reads from the root of the API. This month is on
+// Calendar, so the sidebar does not draw it a second time.
 
 // Shell is what the sidebar knows: today, and its zone, and the Today strip.
 type Shell struct {
@@ -47,6 +49,97 @@ type Turn struct {
 	Tools              []string
 }
 
+// ShellOf is the shell that the root of the API describes when it is read with ?embed=today,conversation (API.md,
+// root): the day of today and the zone of the words from the properties of the root, the Today strip from the embedded
+// day of today, the chat column from the embedded conversation of today, the connected apps that run from the links
+// app, and whether a task service runs from the link tasks. The root was read as JSON, so its properties are the lists
+// and maps of the JSON client. A part whose sub-entity was not embedded stays nil: the shell then draws no strip and
+// no column. Ground and LockMinutes are not in the root: the caller reads them.
+func ShellOf(root *siren.Entity) (*Shell, error) {
+	props, _ := root.Properties.(map[string]any)
+	today := Num(props["today"])
+	if !text.IsDay(today) {
+		return nil, fmt.Errorf("the root names no day as today: %q", today)
+	}
+	offset, _ := props["utc_offset"].(float64)
+	shell := &Shell{Today: today, Zone: zoneOf(Num(props["zone"]), int(offset))}
+	for _, sub := range root.Entities {
+		switch {
+		case !sub.Embedded():
+		case sub.HasRel("today"):
+			shell.Strip = stripOf(sub)
+		case sub.HasRel("conversation"):
+			shell.Chat = chatOf(sub, today)
+		}
+	}
+	for _, l := range root.Links {
+		switch {
+		case l.HasRel("app"):
+			shell.Apps = append(shell.Apps, AppLink{Name: strings.TrimPrefix(l.Href, "/with/"), Title: l.Title})
+		case l.HasRel("tasks"):
+			shell.Tasks = true
+		}
+	}
+	return shell, nil
+}
+
+// zoneOf is the zone of the root's clock. "Local" is the zone of this machine, as the server runs on the same
+// machine as the page that draws its words. Any other name is looked up in the zone database; a name that the database
+// does not have (a fixed offset such as +14) is the fixed offset that the root gave.
+func zoneOf(name string, offset int) *time.Location {
+	if name == "" || name == "Local" {
+		return time.Local
+	}
+	if zone, err := time.LoadLocation(name); err == nil {
+		return zone
+	}
+	return time.FixedZone(name, offset)
+}
+
+// stripOf is the Today strip that an embedded day describes: whether it has words and a mood, its streak and its habits.
+func stripOf(day siren.Link) *Strip {
+	props, _ := day.Properties.(map[string]any)
+	streak, _ := props["streak"].(float64)
+	written, _ := props["written"].(bool)
+	strip := &Strip{Written: written, Mood: len(anyList(props["mood"])) > 0, Streak: int(streak)}
+	for _, x := range anyList(props["habits"]) {
+		m, _ := x.(map[string]any)
+		habit := Habit{Name: Num(m["name"])}
+		if done, ok := m["done"].(bool); ok {
+			habit.Done = &done
+		}
+		strip.Habits = append(strip.Habits, habit)
+	}
+	return strip
+}
+
+// chatOf is the chat column that an embedded conversation of today describes: its turns, the version of its page
+// (empty when the day has none) and its action say. The column posts to the word today and not to the date, so a
+// page that stays open past midnight writes to the new today.
+func chatOf(conversation siren.Link, today string) *Chat {
+	props, _ := conversation.Properties.(map[string]any)
+	chat := &Chat{Turns: turnsOf(props), Version: Num(props["version"])}
+	for _, a := range conversation.Actions {
+		if a.Name == "say" {
+			a.Href = strings.Replace(a.Href, siren.DayHref(today), siren.DayHref("today"), 1)
+			chat.Say = a
+		}
+	}
+	return chat
+}
+
+// ChatDaysOf are the days of the links earlier of a conversation, oldest first: the days before today that have a
+// conversation page (Facts.ChatDays). The title of such a link is its day.
+func ChatDaysOf(links []siren.Link) []string {
+	var days []string
+	for _, l := range links {
+		if l.HasRel("earlier") {
+			days = append(days, l.Title)
+		}
+	}
+	return days
+}
+
 // Chat is the chat column of the shell. The conversation view is the column at full size, so it has none.
 func (v *view) Chat() *Chat {
 	if v.Shell == nil || v.IsConversation() {
@@ -62,6 +155,11 @@ func (v *view) IsConversation() bool { return slices.Contains(v.Class, "conversa
 // Turns are the turns of the conversation view, read from the property turns of the entity.
 func (v *view) Turns() []Turn {
 	props, _ := v.Props.(map[string]any)
+	return turnsOf(props)
+}
+
+// turnsOf reads the property turns of a conversation, as the JSON client reads it.
+func turnsOf(props map[string]any) []Turn {
 	var out []Turn
 	for _, x := range anyList(props["turns"]) {
 		m, _ := x.(map[string]any)
@@ -101,50 +199,11 @@ func (v *view) ChatDays() []dayChip {
 	return out
 }
 
-// Tool is a tool line as a badge says it: the name of the tool, the words after it and, when the words are an
-// address of this server, that address.
-type Tool struct{ Name, Words, Href string }
-
-// ToolChip reads a tool line as the page writes it (API.md, conversation): “- `name` “, “- `name` → [href](href)“,
-// “- `name` → href“ or “- `name` failed: code“. The words are what follows the name, without the arrow and the mark
-// of a link; Href is the address after the arrow when it starts with a slash, else "". The API's refs of a turn and
-// the badges of the thread read the line through this one function. A line that is no such line is a name alone.
-func ToolChip(line string) Tool {
-	line = strings.TrimSpace(strings.TrimPrefix(line, "- "))
-	rest, ok := strings.CutPrefix(line, "`")
-	if !ok {
-		return Tool{Name: line}
-	}
-	name, words, ok := strings.Cut(rest, "`")
-	if !ok {
-		return Tool{Name: line}
-	}
-	words = strings.TrimSpace(words)
-	after, arrow := strings.CutPrefix(words, "→")
-	words = strings.TrimSpace(after)
-	t := Tool{Name: name, Words: words}
-	if !arrow {
-		return t
-	}
-	if inner, ok := strings.CutPrefix(words, "["); ok {
-		if label, href, ok := strings.Cut(inner, "]("); ok {
-			t.Words = label
-			t.Href, _, _ = strings.Cut(href, ")")
-		}
-	} else if f := strings.Fields(words); len(f) > 0 {
-		t.Href = f[0]
-	}
-	if !strings.HasPrefix(t.Href, "/") {
-		t.Href = ""
-	}
-	return t
-}
-
 // waiting reports a conversation whose last turn is the owner's: the agent has not answered yet.
 func waiting(turns []Turn) bool { return len(turns) > 0 && turns[len(turns)-1].Who == "owner" }
 
-// Strip is the Today strip of the rail: what is done today, and how many days in a row the owner wrote. The server
-// fills it once a page, so the rail and the head of the day read the same streak.
+// Strip is the Today strip of the rail: what is done today, and how many days in a row the owner wrote. ShellOf fills
+// it once a page from the day of today, so the rail and the head of the day read the same streak.
 type Strip struct {
 	Written bool    // the day page of today has words
 	Mood    bool    // a mood reading of today

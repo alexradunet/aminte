@@ -391,7 +391,7 @@ func TestTheColumnDrawsTheCards(t *testing.T) {
 	}
 }
 
-// TestACardAsksForWhatThePageMayRead: the card is read with a source of its own, agent:card, which the owner-only
+// TestACardAsksForWhatThePageMayRead: the card is read with a source of its own, agent:embed, which the owner-only
 // reads refuse. A tool line that names /settings or /integrity draws the plain link on the owner's page and on an
 // agent's page alike, and the integrity check does not run. On a public listener the cards follow the guard of the
 // page: the cookie opens the page and its cards.
@@ -401,9 +401,9 @@ func TestACardAsksForWhatThePageMayRead(t *testing.T) {
 	conversationBody(t, c, "\n\n"+toolLines("/settings", "/integrity")+"\n**lifelog** (09:30): No.\n")
 	// The card's source is refused the owner-only reads by the API itself.
 	for _, path := range []string{"/settings", "/integrity"} {
-		rec := request(h, "GET", path, "", map[string]string{"Accept": "application/vnd.siren+json", siren.SourceHeader: "agent:card"})
+		rec := request(h, "GET", path, "", map[string]string{"Accept": "application/vnd.siren+json", siren.SourceHeader: "agent:embed"})
 		if rec.Code != http.StatusForbidden {
-			t.Errorf("GET %s as agent:card: %d, want 403", path, rec.Code)
+			t.Errorf("GET %s as agent:embed: %d, want 403", path, rec.Code)
 		}
 	}
 	owner := browse(t, h, "/days/"+fixedToday+"/conversation")

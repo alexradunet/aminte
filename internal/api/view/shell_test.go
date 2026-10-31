@@ -219,7 +219,7 @@ func TestTheColumnIsTheShellsAndTheConversationHasNone(t *testing.T) {
 		map[string]any{"who": "owner", "at": "09.09", "text": "Thanks"},
 	}}}
 	turns := v.Turns()
-	if len(turns) != 3 || turns[1].Who != "lifelog" || turns[1].At != "09.08" || turns[1].Text != "Hi" || len(turns[1].Tools) != 1 || ToolChip(turns[1].Tools[0]) != (Tool{Name: "read_day"}) {
+	if len(turns) != 3 || turns[1].Who != "lifelog" || turns[1].At != "09.08" || turns[1].Text != "Hi" || len(turns[1].Tools) != 1 || siren.ToolLine(turns[1].Tools[0]) != (siren.Tool{Name: "read_day"}) {
 		t.Errorf("the turns: %+v", turns)
 	}
 	if turns[0].Via != "whatsapp" || turns[1].Via != "" {
@@ -227,27 +227,6 @@ func TestTheColumnIsTheShellsAndTheConversationHasNone(t *testing.T) {
 	}
 	if !waiting(turns) || waiting(turns[:2]) || waiting(nil) {
 		t.Error("the agent waits only when the last turn is the owner's")
-	}
-}
-
-// TestAToolLineIsABadge: the name of the tool, the words after it without the arrow and the mark of a link, and
-// the address after the arrow when it is one of this server.
-func TestAToolLineIsABadge(t *testing.T) {
-	for line, want := range map[string]Tool{
-		"- `read_day`": {"read_day", "", ""},
-		"- `open_day` → [/days/2026-10-27](/days/2026-10-27)": {"open_day", "/days/2026-10-27", "/days/2026-10-27"},
-		"- `open_day` → [the day](/days/2026-10-27)":          {"open_day", "the day", "/days/2026-10-27"},
-		"- `get` → /pages/12":                                 {"get", "/pages/12", "/pages/12"},
-		"- `get` → /pages/12 and more":                        {"get", "/pages/12 and more", "/pages/12"},
-		"- `fetch` → https://example.org/x":                   {"fetch", "https://example.org/x", ""},
-		"- `fetch` → [x](https://example.org/x)":              {"fetch", "x", ""},
-		"- `get` failed: forbidden":                           {"get", "failed: forbidden", ""},
-		"- `search_pages` words=sleep":                        {"search_pages", "words=sleep", ""},
-		"- not a tool line":                                   {"not a tool line", "", ""},
-	} {
-		if got := ToolChip(line); got != want {
-			t.Errorf("ToolChip(%q) = %+v, want %+v", line, got, want)
-		}
 	}
 }
 

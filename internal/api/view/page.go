@@ -15,7 +15,6 @@ import (
 	"net/url"
 	"regexp"
 	"slices"
-	"strconv"
 	"strings"
 
 	"lifelog/internal/text"
@@ -111,7 +110,7 @@ var templates = template.Must(template.New("").Funcs(template.FuncMap{
 	"beyond":        beyond,
 	"kindIcon":      kindIcon,
 	"waiting":       waiting,
-	"toolChip":      ToolChip,
+	"toolChip":      siren.ToolLine,
 	"roundAction":   roundAction,
 	"rowChips":      rowChips,
 	"slot":          slot,
@@ -144,7 +143,7 @@ func Num(v any) string {
 	case nil:
 		return ""
 	case float64:
-		return strconv.FormatFloat(x, 'f', -1, 64)
+		return siren.Num(x)
 	}
 	return fmt.Sprint(v)
 }
@@ -254,15 +253,15 @@ const DrawFailed = `<!doctype html>
 `
 
 // Facts are what a page shows beyond its entity. The one who draws the page reads them from the request and the
-// store: the address the browser asked for, the shell's read and, for an error that answers a form, the text that
-// form sent and the page it came from.
+// API: the address the browser asked for, the shell's read (ShellOf) and, for an error that answers a form, the text
+// that form sent and the page it came from.
 type Facts struct {
 	URL       *url.URL // the address the browser asked for
 	Shell     *Shell   // the sidebar's read; nil when the page is drawn without it
 	Submitted string   // the body (or the text) that a refused form sent
 	Back      string   // the page that a refused form came from, when it is a page of this server
-	// Cards are the entities that the addresses of a conversation's tool lines answer, by address (docs/plans/148-the-chat-screen.md).
-	// An address that answered an error, or no entity, is in the map with a nil entity: it is drawn as a plain link.
+	// Cards are the entities that the addresses of a conversation's tool lines answer, by address (CardsOf,
+	// docs/plans/148-the-chat-screen.md). An address with no entity is drawn as a plain link.
 	Cards map[string]*siren.Entity
 	// ChatDays are the days before today that have a conversation page, oldest first: the chips of the chat screen.
 	ChatDays []string

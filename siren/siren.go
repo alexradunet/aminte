@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"slices"
 	"strconv"
 	"time"
 )
@@ -90,13 +91,43 @@ type Entity struct {
 // Properties and Actions are an extension of Siren, for an embedded link only: an embedded link that carries them
 // is a short form of an embedded representation that keeps its href. The browser draws it as a row
 // (extensions/README.md, "How the browser draws a page of an app").
+// Entities and Links complete the representation (API.md, "Embedding"): a sub-entity that carries properties,
+// sub-entities, actions or links is an embedded representation of the thing at its href, as the Siren specification
+// has it, and Embedded says so.
 type Link struct {
 	Rel        []string `json:"rel"`
 	Href       string   `json:"href"`
 	Title      string   `json:"title,omitempty"`
 	Class      []string `json:"class,omitempty"`
 	Properties any      `json:"properties,omitempty"`
+	Entities   []Link   `json:"entities,omitempty"`
 	Actions    []Action `json:"actions,omitempty"`
+	Links      []Link   `json:"links,omitempty"`
+}
+
+// HasRel reports whether the link has that rel.
+func (l Link) HasRel(rel string) bool { return slices.Contains(l.Rel, rel) }
+
+// Embedded reports a sub-entity that carries the representation of the thing at its href: properties, sub-entities,
+// actions or links. A sub-entity that carries none is a reference, and a reference is what embed replaces.
+func (l Link) Embedded() bool {
+	return l.Properties != nil || len(l.Entities) > 0 || len(l.Actions) > 0 || len(l.Links) > 0
+}
+
+// Embedding is the link l with the representation of e in place of the reference: the class, the title (when e has
+// one), the properties, the sub-entities, the actions and the links of e. The rel and the href stay, so a reader finds
+// the sub-entity by the address that named it. e.Result is not part of a representation.
+func (l Link) Embedding(e *Entity) Link {
+	l.Class, l.Properties, l.Entities, l.Actions, l.Links = e.Class, e.Properties, e.Entities, e.Actions, e.Links
+	if e.Title != "" {
+		l.Title = e.Title
+	}
+	return l
+}
+
+// Entity is the representation that the link carries, as an entity of its own.
+func (l Link) Entity() *Entity {
+	return &Entity{Class: l.Class, Title: l.Title, Properties: l.Properties, Entities: l.Entities, Actions: l.Actions, Links: l.Links}
 }
 
 // Action is a Siren action. Class (standard Siren) is at most one of ActionClasses: what the action does to the
@@ -168,6 +199,10 @@ func WriteJSON(w io.Writer, v any, indent string) error {
 	enc.SetIndent("", indent)
 	return enc.Encode(v)
 }
+
+// Num is a number as a page shows it: written in full, never with an exponent. The JSON client reads every number as a
+// float64, and an id of a million must still make the link /pages/1000000, not /pages/1e+06.
+func Num(x float64) string { return strconv.FormatFloat(x, 'f', -1, 64) }
 
 // PageHref is the address of a page.
 func PageHref(id int64) string { return "/pages/" + strconv.FormatInt(id, 10) }

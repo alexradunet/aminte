@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"lifelog/client"
-	"lifelog/internal/api/view"
 	"lifelog/internal/core"
 	"lifelog/siren"
 )
@@ -179,15 +178,16 @@ func (a *Apps) find(name string) (liveApp, bool) {
 	return x, ok
 }
 
-// links are the apps that run, for the rail of the browser: each with its home title, else its name.
-func (a *Apps) links() []view.AppLink {
-	var out []view.AppLink
+// links are the apps that run, as the links app of the root: each with its home title, else its name.
+func (a *Apps) links() []siren.Link {
+	var out []siren.Link
 	for _, name := range a.Names() {
 		x, _ := a.find(name)
-		out = append(out, view.AppLink{Name: name, Title: x.title})
-		if x.title == "" {
-			out[len(out)-1].Title = name
+		title := x.title
+		if title == "" {
+			title = name
 		}
+		out = append(out, link("app", "/with/"+name, title))
 	}
 	return out
 }
@@ -271,6 +271,7 @@ func (h *server) withApp(r *http.Request) (*siren.Entity, error) {
 		for _, f := range browserFields { // the fields of this server: the app never sees them
 			q.Del(f)
 		}
+		q.Del(embedField) // this server embeds in the answer (serve)
 		href := rest
 		if len(q) > 0 {
 			href += "?" + q.Encode()
@@ -384,12 +385,14 @@ func inNamespace(name string, e *siren.Entity) *siren.Entity {
 }
 
 // relinked keeps the links with a path. It also rewrites the actions of an embedded link, as the actions of the entity.
+// A link of an app carries no sub-entities and no links of its own: a hostile app cannot hide an address in them.
 func relinked(prefix, name string, links []siren.Link) []siren.Link {
 	var out []siren.Link
 	for _, l := range links {
 		if isPath(l.Href) {
 			l.Href = prefix + l.Href
 			l.Actions = prefixed(prefix, name, l.Actions)
+			l.Entities, l.Links = nil, nil // an embedded link of an app is the short form: its own sub-entities are not forwarded
 			out = append(out, l)
 		}
 	}

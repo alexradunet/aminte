@@ -39,8 +39,8 @@ func (s *Store) Streak(ctx context.Context, today string) (streak int, writtenTo
 // Habit is a daily metric with no unit (D31, D24). Done is nil when it has no reading today, else whether the newest
 // reading of today is not 0.
 type Habit struct {
-	Name string
-	Done *bool
+	Name string `json:"name"`
+	Done *bool  `json:"done"`
 }
 
 // Habits are the chips of the day today, by name: the live metrics that are daily and have no unit (D31, D24). A

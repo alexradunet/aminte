@@ -146,10 +146,10 @@ func unknownField(name string, s spec) error {
 	return core.Invalid("unknown field %s: %s takes %s", name, s.Name, strings.Join(fieldNames(s), ", "))
 }
 
-// known refuses a name that is not a field of the action and not one of browserFields. A GET that has new may carry
-// the fields of the action that new names, as a link asks for its form (view/forms.go). A new that names no action is
-// refused. A browser form also carries the fields of the form that view.SharedForms gives the action; another client
-// does not.
+// known refuses a name that is not a field of the action and not one of browserFields. A GET may carry embed, which
+// serve reads (embed.go). A GET that has new may carry the fields of the action that new names, as a link asks for its
+// form (view/forms.go). A new that names no action is refused. A browser form also carries the fields of the form that
+// view.SharedForms gives the action; another client does not.
 func known(v url.Values, act spec, r *http.Request) error {
 	allowed := fieldNames(act)
 	if shared, ok := view.SharedForms[act.Name]; ok && wantsHTML(r) {
@@ -163,7 +163,7 @@ func known(v url.Values, act spec, r *http.Request) error {
 		allowed = append(allowed, fieldNames(s)...)
 	}
 	for _, name := range slices.Sorted(maps.Keys(v)) {
-		if !slices.Contains(allowed, name) && !slices.Contains(browserFields, name) {
+		if !slices.Contains(allowed, name) && !slices.Contains(browserFields, name) && !(name == embedField && r.Method == "GET") {
 			return unknownField(name, act)
 		}
 	}

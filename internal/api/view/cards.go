@@ -9,12 +9,23 @@ import (
 )
 
 // The cards of a thread (docs/plans/148-the-chat-screen.md): each address that an agent's tool line names is a thing
-// of the database. The server asks its own handler for the entity at the address (Facts.Cards); this file draws the
-// entity as a badge by its class, as the browser draws a value by its type. A card is one link to the thing, on the
-// badge of the tool line that named it, above the words of the turn.
+// of the database. The conversation names the addresses as sub-entities with the rel ref, and ?embed=ref replaces
+// them by the entity at the address (Facts.Cards); this file draws the entity as a badge by its class, as the browser
+// draws a value by its type. A card is one link to the thing, on the badge of the tool line that named it, above the
+// words of the turn.
 
-// CardsPerTurn is how many of a turn's addresses the server resolves; a badge beyond them draws the plain link.
-const CardsPerTurn = 6
+// CardsOf are the entities that the sub-entities ref of a conversation carry, by address (Facts.Cards). A reference
+// that was not embedded (an address that answered an error, one beyond the bound of the embedding, or none that this
+// server serves) has no entity: it draws as a plain link.
+func CardsOf(links []siren.Link) map[string]*siren.Entity {
+	cards := map[string]*siren.Entity{}
+	for _, l := range links {
+		if l.HasRel("ref") && l.Embedded() {
+			cards[l.Href] = l.Entity()
+		}
+	}
+	return cards
+}
 
 // Card is one address of a turn, as a badge of the thread draws it: an icon (or a small picture), a title and one
 // value. Kind picks the icon and the words: link (the address alone), day, page, person, file, metric, series,
@@ -27,7 +38,8 @@ type Card struct {
 }
 
 // CardOf is the card of one address of a turn. An address that the server did not resolve (an older turn, beyond
-// the bound of the view, or beyond CardsPerTurn) is the plain link, as an address that answered an error.
+// the bound of the embedding or of the column, or beyond the six of a turn) is the plain link, as an address that
+// answered an error.
 func (v *view) CardOf(href string) Card { return v.cardOf(href, v.cards[href]) }
 
 // cardIcons are the icons of the kinds of a card that is not a leaf.

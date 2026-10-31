@@ -11,7 +11,6 @@ import (
 	"slices"
 	"strings"
 
-	"lifelog/internal/api/view"
 	"lifelog/internal/core"
 	"lifelog/siren"
 )
@@ -213,7 +212,7 @@ func (h *server) seriesEntity(ctx context.Context, name string, q url.Values) (*
 		props["daily"] = m.Daily
 	}
 	for _, m := range rows {
-		e.Entities = append(e.Entities, link("reading", siren.MeasurementHref(m.ID), m.Day+" "+view.Num(m.Value)))
+		e.Entities = append(e.Entities, link("reading", siren.MeasurementHref(m.ID), m.Day+" "+siren.Num(m.Value)))
 	}
 	if m != nil {
 		if err := h.carryPage(ctx, e, m.ID); err != nil {

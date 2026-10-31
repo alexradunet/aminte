@@ -24,7 +24,7 @@ func TestAPIReferenceMatchesTheCode(t *testing.T) {
 	documented := readReference(t, filepath.Join("..", "..", "API.md"))
 	// The shape behind each section: a Go value whose JSON names, walked, are the paths the table must list.
 	shapes := map[string]any{
-		"root": map[string]any{"today": "", "recent": []recentDay{}},
+		"root": map[string]any{"today": "", "zone": "", "utc_offset": 0, "recent": []recentDay{}},
 		"days": map[string]any{"today": "", "limit": 0, "offset": 0, "cards": []dayCard{}},
 		"browse": map[string]any{"kind": "", "in": browseIn{}, "unfiled": false, "ghosts": false, "deleted": false, "media": "", "counts": browseCounts{},
 			"media_counts": mediaCounts{}, "categories": []core.Category{}, "rows": []browseRow{}, "limit": 0, "offset": 0},

@@ -236,7 +236,13 @@ func (h *server) mount(m *http.ServeMux, cat []spec, handlers map[string]actionF
 
 func (h *server) serve(f func(*http.Request) (*siren.Entity, error)) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		e, err := guarded(f, r)
+		var e *siren.Entity
+		var err error
+		if r.Method == "GET" && wantsHTML(r) && r.URL.Query().Has(embedField) { // refused, not ignored: a page reads its sub-entities itself
+			err = core.Invalid("embed is for the Siren answer: send Accept: application/vnd.siren+json")
+		} else {
+			e, err = guarded(f, r)
+		}
 		status := http.StatusOK
 		var rd redirect
 		switch {
@@ -263,6 +269,9 @@ func (h *server) serve(f func(*http.Request) (*siren.Entity, error)) http.Handle
 				w.Header().Set("Location", self)
 			}
 		}
+		if r.Method == "GET" && status < 400 && !wantsHTML(r) {
+			h.embed(r, e) // the Siren answer only: a page reads its sub-entities itself (shellFacts)
+		}
 		if r.Method == "GET" && wantsHTML(r) && status < 400 {
 			if feedback := h.feedback.take(r.URL.Path, r.URL.Query().Get("feedback")); feedback != "" {
 				e.Result = feedback
@@ -270,7 +279,7 @@ func (h *server) serve(f func(*http.Request) (*siren.Entity, error)) http.Handle
 				w.Header().Set("Referrer-Policy", "no-referrer")
 			}
 		}
-		answer(w, r, status, e, frame{shell: h.s, submitted: submittedText(r), srv: h})
+		answer(w, r, status, e, frame{srv: h, submitted: submittedText(r)})
 	}
 }
 
@@ -390,12 +399,20 @@ func errorEntity(r *http.Request, err error) (*siren.Entity, int) {
 // its path, because a path can name a metric or a title. A request that a guard answers before the routes has no
 // pattern: its method stands for the route.
 func logFault(r *http.Request, what string, err error) {
+	if r.Context().Value(quietKey{}) != nil {
+		return
+	}
 	route := r.Pattern
 	if route == "" {
 		route = r.Method
 	}
 	log.Printf("lifelog: %s: %s: %v", route, what, err)
 }
+
+// quietKey marks the context of a read whose faults the log does not repeat: the reads that the page of an error makes
+// for its shell (shellFacts). The error has logged its own cause already, and a fault that has the same cause again
+// would be a second line for one failure.
+type quietKey struct{}
 
 // codeOf is the general code of a status, for an error that names no more specific one.
 func codeOf(status int) string {
@@ -441,21 +458,24 @@ func writeError(w http.ResponseWriter, r *http.Request, err error) {
 // frame says how answer draws an entity as a page, and for whom. The zero frame gives a program JSON and a browser a
 // page with no sidebar: the answer of a guard, of a picture's error and of a refusal before the routes.
 type frame struct {
-	shell    *core.Store // the store whose clock the sidebar reads; nil: no sidebar, so the page shows nothing of the database
-	pageOnly bool        // a page for every client, a program too: the answer is presentation and has no JSON form
+	// srv is the server whose own handler gives the page its shell (shellFacts); nil: no sidebar, so the page shows
+	// nothing of the database.
+	srv      *server
+	pageOnly bool // a page for every client, a program too: the answer is presentation and has no JSON form
 	// submitted is the long text that a refused browser form sent (submittedText), which the page of the refusal shows
 	// again. It is used only when the answer is the error of a POST.
 	submitted string
-	// srv is the server whose own handler the chat asks for its cards (cards.go); nil: the page draws no cards.
-	srv *server
 }
+
+// hasShell reports a page that has the sidebar. A server with no store has no database to show.
+func (fr frame) hasShell() bool { return fr.srv != nil && fr.srv.s != nil }
 
 // answer is the one way an entity leaves the API: the answer of every route, guard and error. A program gets Siren
 // JSON; a browser, and every client of a pageOnly frame, gets a page, and only then is the shell read. The answer is
 // held whole before its first byte, so a fault found while it is made can still answer 500. A failed write is
 // logged: the client went away, and nothing else can be done.
 func answer(w http.ResponseWriter, r *http.Request, status int, e *siren.Entity, fr frame) {
-	typ, b := "application/vnd.siren+json", []byte(nil)
+	typ, b := sirenType, []byte(nil)
 	if fr.pageOnly || wantsHTML(r) {
 		typ = "text/html; charset=utf-8"
 		status, b = pageAnswer(r, status, e, fr)
@@ -464,7 +484,7 @@ func answer(w http.ResponseWriter, r *http.Request, status int, e *siren.Entity,
 	}
 	w.Header().Set("Content-Type", typ)
 	w.Header().Add("Vary", "Accept") // one URL, two representations
-	if fr.shell != nil && typ == "text/html; charset=utf-8" {
+	if fr.hasShell() && typ == "text/html; charset=utf-8" {
 		w.Header().Set("Speculation-Rules", `"/assets/speculation.json"`) // a quoted URL string
 	}
 	if status == http.StatusServiceUnavailable {
@@ -480,36 +500,8 @@ func answer(w http.ResponseWriter, r *http.Request, status int, e *siren.Entity,
 // the owner reads the cause in the log and a client never does: the page is DrawFailed, with 500.
 func pageAnswer(r *http.Request, status int, e *siren.Entity, fr frame) (int, []byte) {
 	f := view.Facts{URL: r.URL}
-	if fr.shell != nil {
-		now := fr.shell.Local() // one read of the clock, so today and the zone of the words agree
-		f.Shell = &view.Shell{Today: now.Format(time.DateOnly), Zone: now.Location()}
-		// A failed read draws the boards, as a failed strip draws no strip: the floor is a help. The page of an error has
-		// logged its own cause.
-		ground, err := shellGround(fr.shell)
-		if err != nil && status < http.StatusBadRequest {
-			logFault(r, "the settings cannot be read", err)
-		}
-		f.Shell.Ground = ground
-		f.Shell.LockMinutes = lockMinutesOf(r)
-		// A failed read draws the page with no strip: the strip is a help. The page of an error has logged its own
-		// cause, so only the page of a good answer logs this one.
-		strip, err := todayStrip(r.Context(), fr.shell, f.Shell.Today)
-		if err != nil && status < http.StatusBadRequest {
-			logFault(r, "the Today strip cannot be read", err)
-		}
-		f.Shell.Strip = strip
-		chat, err := todayChat(r.Context(), fr.shell, f.Shell.Today)
-		if err != nil && status < http.StatusBadRequest {
-			logFault(r, "the chat column cannot be read", err)
-		}
-		f.Shell.Chat = chat
-		if fr.srv != nil {
-			f.Shell.Apps = fr.srv.with.links()
-			_, f.Shell.Tasks = fr.srv.with.taskService()
-		}
-		if fr.srv != nil && status < http.StatusBadRequest {
-			f.Cards, f.ChatDays = fr.srv.chatExtras(r, e, chat, f.Shell.Today)
-		}
+	if fr.hasShell() {
+		fr.srv.shellFacts(r, status, e, &f)
 	}
 	if status >= 400 && r.Method == "POST" {
 		f.Submitted = fr.submitted

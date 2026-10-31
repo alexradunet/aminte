@@ -36,7 +36,7 @@ Every answer is one [Siren](https://github.com/kevinswiber/siren) entity:
 | `class` | the kind of resource: one of the classes below, sometimes with a second word (`day-page`, `deleted`, `dry-run`) |
 | `title` | a human title |
 | `properties` | the resource's own data, per class below |
-| `entities` | embedded links: `{rel, href, title, class}` each, the things this resource lists or links to. An embedded link of a connected app may also carry `properties` and `actions` (an extension of Siren): a short form of an embedded representation that keeps its `href`. The browser draws it as a [row](extensions/README.md#how-the-browser-draws-a-page-of-an-app). |
+| `entities` | embedded links: `{rel, href, title, class}` each, the things this resource lists or links to. An embedded link of a connected app may also carry `properties` and `actions` (an extension of Siren): a short form of an embedded representation that keeps its `href`. The browser draws it as a [row](extensions/README.md#how-the-browser-draws-a-page-of-an-app). `?embed=` replaces an embedded link by the full entity that its `href` answers ([embedding](#embedding)): then the sub-entity also carries `entities` and `links`. |
 | `links` | `{rel, href, title}`: `self`, `index` (home), `prev`/`next` (a neighbour or the next page), and the rels named per class |
 | `actions` | what may be done here: `{name, class, title, description, method, href, type, fields, owner, danger}`, each field `{name, type, title, value, required, options, in, rows, pages, accept, placeholder}` with its current value filled in; `class` is at most one word that says what the action does ([action classes](#action-classes)); `owner: true` marks the owner's alone and `danger: true` marks one that hides or retracts what is there, so a client can warn before it sends; `in: "path"` marks a field of a templated href (`GET /actions` only) and `rows` is how many lines a `textarea` is drawn; `pages: true` says the value is a page's title, so a client can offer the names of the pages; `accept` is what a `file` field takes (`audio/*`); `placeholder` is the words that a client may show in an empty field, an example of a value (`Weight, Mood, Walk`) or a short prompt (`What happened? Who was there?`), and a client may ignore it |
 | `result` | after a write: what it did (the result shapes below) |
@@ -59,7 +59,43 @@ another kind is 422.
 **Types** in the tables: `string`, `integer`, `number`, `boolean`, `day` (a local day, `YYYY-MM-DD`), `instant`
 (UTC, `2026-06-09T21:14:03.482Z`), `list`, `object`. A property marked *absent when empty* is left out of the JSON
 when it has no value. A `number` field is written in decimal digits; `mood`, `value` and `line` also take a sign, a point and an exponent (`-0.5`, `1e3`). `NaN`, `Inf`, a hexadecimal number and an underscore are refused.
-A request names only the fields of the action, and a browser's own `back`, `feedback` and `new`; any other name is 422 `invalid`. A browser form may also carry the fields of a form it shares with another action (the pick bar of a list sends the form of `file-pages` to `tombstone-pages` too); another client is refused them. A value outside a field's `options`, as `GET /actions` lists them, is 422 `invalid`. A multipart part with an unknown name is refused before its bytes are read.
+A request names only the fields of the action, and a browser's own `back`, `feedback` and `new`; any other name is 422 `invalid`. A read also takes `embed` ([embedding](#embedding)). A browser form may also carry the fields of a form it shares with another action (the pick bar of a list sends the form of `file-pages` to `tombstone-pages` too); another client is refused them. A value outside a field's `options`, as `GET /actions` lists them, is 422 `invalid`. A multipart part with an unknown name is refused before its bytes are read.
+
+## Embedding
+
+`GET <a read>?embed=rel1,rel2` (the rels, cut at the commas) replaces each sub-entity of the answer that has one of
+those rels and that is a reference by the entity that its `href` answers. A reference is an embedded link with an
+`href` and no `properties`, no `entities`, no `actions` and no `links`. The sub-entity that takes its place is an
+embedded representation, as Siren has it. It keeps its `rel` and its `href`. It has the `class`, the `title`, the
+`properties`, the `entities`, the `actions` and the `links` of the answer, and no `result`. One answer then holds what a
+client would read in many requests.
+
+```mermaid
+flowchart TD
+  R["GET /days/2031-05-14/conversation?embed=ref"] --> A["the handler answers the entity"]
+  A --> S["each sub-entity with rel ref and an href and nothing else: 36 at most"]
+  S --> G["GET href through the same handler, as the writer agent:embed"]
+  G -->|"2xx Siren entity with content"| E["the sub-entity is the answer, with its rel and href kept"]
+  G -->|"a redirect to a path of this server"| H["follow it once"]
+  H --> G
+  G -->|"any other answer"| K["the sub-entity stays a reference"]
+```
+
+- **Which reads.** Every `GET` that answers a Siren entity takes `embed`. An error answer does not embed. A request
+  for HTML with `embed` is 422 `invalid`, because a page reads its sub-entities itself. A `POST` that names `embed` is
+  422 `invalid` as for any name that the action does not list.
+- **The depth is 1.** An embedded read does not embed. An `href` that has an `embed` parameter of its own stays a
+  reference.
+- **The bound.** One answer makes 36 reads at most. The sub-entities are taken in order, and the ones after the 36th
+  stay references. A read that fails still counts.
+- **The writer.** Each embedded read is made in the server, in the context and with the host of the request, as the
+  writer `agent:embed`. An embedded `href` can come from a text that an agent wrote (a tool line of a conversation),
+  so it must never make the server run an owner-only read. The owner-only reads refuse an `agent:` writer, and their
+  sub-entity stays a reference.
+- **A failure keeps the reference.** An `href` that is not a path of this server, an answer that is not 2xx, an answer
+  that is not a Siren entity and an entity with no content leave the sub-entity as it is. A redirect to a path of this
+  server is followed once. The fragment of an `href` (`#row-3`) is left out of the read and stays in the `href`.
+- **A connected app** does not see `embed`. The server embeds in the answer of the app.
 
 ## Action classes
 
@@ -189,7 +225,10 @@ first page. Orders: days newest first; search by rank, or newest first with `ord
 [day](#day) of today instead, the page of today. Links: `today`, `days`, `browse` (`/browse`), `people`
 (`/browse?kind=person`), `media` (`/browse?kind=media`), `files`
 (`/browse?kind=document`), `metrics`, `ghosts` (`/browse?ghosts=1&kind=page`), `actions`, `calendar` (this month),
-`year` (this year). Actions: `capture` (for today), `search`,
+`year` (this year), one `app` for each connected app that runs (`/with/NAME`; the title is the home title of the app,
+else its name) and `tasks` (`/tasks`) while a task service runs. Embedded: `today` (the [day](#day) of today) and
+`conversation` (the [conversation](#conversation) of today), two references that `?embed=today,conversation`
+[replaces](#embedding): a client that draws a frame reads them with the root. Actions: `capture` (for today), `search`,
 `find`, `open-day`,
 `create-page`, `create-person`, `add-file`,
 `record`, `register-metric` (owner), `snapshot` (owner).
@@ -197,6 +236,8 @@ first page. Orders: days newest first; search by rank, or newest first with `ord
 | property | type | meaning |
 |---|---|---|
 | `today` | day | this machine's local day |
+| `zone` | string | the name of the zone of the server's clock: an IANA name (`Europe/Bucharest`), `Local` for the zone of the machine that runs the server, or the name of a fixed offset that the zone database does not have (`+14`) |
+| `utc_offset` | integer | the seconds that the zone of the clock is east of UTC at this moment; a client that cannot find `zone` in its zone database uses this offset |
 | `recent[]` | list | the 5 newest live day pages up to today, the newest first |
 | `recent[].day` | day | the day |
 | `recent[].page_id` | integer | the day page's id |
@@ -392,6 +433,11 @@ unchanged on a retry, and the answer is then the class [result](#result), not th
 | `mood` | list | the values of the day's current Mood readings, in the order they were recorded (the Mood metric found by its name key); empty when none |
 | `today` | day | this machine's local day |
 | `daily` | list | the names of the live daily metrics, in name order: the day asks for a reading of each; empty when none |
+| `streak` | integer | on the day of today only, as `recent[]` is: the days written in a row that end today, or yesterday when today has no words yet ([the streak recipe](docs/cookbook/streaks.md)); 0 when there is none; absent on any other day |
+| `written` | boolean | on the day of today only: the day page has words; absent on any other day |
+| `habits[]` | list | on the day of today only: the live daily metrics that have no unit, in name order, the chips of the Today strip; absent on any other day and when there is none |
+| `habits[].name` | string | the name of the metric |
+| `habits[].done` | boolean | whether the newest reading of today is not 0; `null` when the metric has no reading today |
 | `units` | object | the unit of each metric that the day reads or asks for, by metric name; a metric with no unit is absent, and so is the property when none is left |
 | `recent[]` | list | on the day of today only: the 5 newest live day pages up to today, as `recent[]` of [the root](#root); absent on any other day, and when there is none |
 | `recent[].day` | day | the day |
@@ -904,7 +950,12 @@ no settings file path refuses both routes (500, the message says so).
 `GET /days/{day}/conversation` (`day` is a local day or the word `today`; another value is 422): the talk of a day
 with an agent, as the turns of one plain page. Class `conversation`, and `page` too when the page exists. The core calls
 no model: an agent (an extension) reads the page and writes its own paragraphs in the format below. Links: `self`, `day`
-(the day view), `index`, and `page` (the conversation page) when it exists. Actions: `say` first, with `day` filled in,
+(the day view), `index`, and `page` (the conversation page) when it exists. The links `earlier` are the days before
+today that have a live conversation page: the newest three of the last 14 days, the oldest first, each with the day as
+its `title` and the conversation of that day as its `href`. The answer of every day has them, as of today, not as of its
+own day: they are the day bar of a chat client. Embedded: one `ref` for each address that the tool lines name (the
+`refs` of the turns), the newest turn first, each address once, at most 6 of one turn. Each is a reference, so
+`?embed=ref` [replaces](#embedding) it by the thing that the agent touched, in the 36 newest. Actions: `say` first, with `day` filled in,
 only when `day` is the server's local today (the conversation of another day offers none);
 when the page exists, the actions of [the page](#page-person-file) after it (`save-body` with the `version`, and
 the others). When the page exists, the answer carries the page as a series carries a metric's page: its properties
