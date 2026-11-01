@@ -1,6 +1,8 @@
-// Package app is what a connected app serves its catalog with. A connected app is an extension that `lifelog serve
-// --with NAME` runs and that serves its own Siren catalog on a loopback address; the server merges the actions into its
-// own. The package serves and never dials: the contract is in extensions/README.md.
+// Package app is what a Go extension program is built with. A connected app is an extension that `lifelog serve --with
+// NAME` runs and that serves its own Siren catalog on a loopback address; the server merges the actions into its own.
+// Catalog, Listen, Fail, Entity and Error serve that catalog, and never dial. Main, API, OwnerActs and ExitCode are the
+// shell that every extension program has: the signal, the last line, the exit status and the client of the API
+// (program.go). StateDir is the folder of its state. The contract is in extensions/README.md.
 package app
 
 import (

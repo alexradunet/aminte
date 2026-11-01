@@ -27,9 +27,10 @@ type Client struct {
 	addFile *siren.Action // the add-file action, read from the catalog once; a failed read is not kept
 }
 
-// New makes a client of the server at base, for example http://127.0.0.1:7777. token is the bearer token; "" sends none.
-func New(base, token string) *Client {
-	return &Client{c: client.Remote(base, Source, token)}
+// New makes the client of the extension over c, the client of the server. c writes as Source: app.API(url, Source) makes
+// it from the address and the token of the environment.
+func New(c *client.Client) *Client {
+	return &Client{c: c}
 }
 
 // MonthsWithoutCover gives, for each month (YYYY-MM), the days that show no picture. A day with no page is one.

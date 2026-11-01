@@ -76,6 +76,7 @@ var remoteAllowed = map[string]bool{
 	"lifelogtest/lifelogtest.go":      true, // the app that a test started over its own handler (Server.Connect), as serve probes a child
 	"internal/api/with.go":            true, // a connected app that `serve --with` started, on the loopback address it gave (plan 154)
 	"cmd/lifelog/with.go":             true, // the same children, when serve probes them before it registers them (plan 154)
+	"app/program.go":                  true, // app.API: the client of the server that an extension program was given in LIFELOG_URL (plan 162)
 }
 
 // presentationExtensions are the extensions of the files that draw a page: a page, a style sheet, a script, a

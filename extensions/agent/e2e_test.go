@@ -600,8 +600,8 @@ func catalogServer(t *testing.T, names ...string) *httptest.Server {
 }
 
 // TestTheAgentRefusesWhatItCannotRun: each missing piece is refused with its name or the line that says what to run. A
-// catalog with no say is the one case where the owner acts first: the status is 78, and serve does not start the
-// program again.
+// missing address of lifelog and a catalog with no say or no reply are the cases where the owner acts first: the status
+// is 78, and serve does not start the program again.
 func TestTheAgentRefusesWhatItCannotRun(t *testing.T) {
 	b := build(t)
 	noSay := catalogServer(t, "reply")
@@ -612,7 +612,7 @@ func TestTheAgentRefusesWhatItCannotRun(t *testing.T) {
 		status int
 		want   string
 	}{
-		{"no server", nil, 1, "no LIFELOG_URL and no --url"},
+		{"no server", nil, app.ExitOwnerActs, "no LIFELOG_URL and no --url"},
 		{"an argument", []string{"--url", noSay.URL, "now"}, 1, `unexpected argument "now"`},
 		{"a source flag", []string{"--url", noSay.URL, "--source", "x"}, 1, "flag provided but not defined: -source"},
 		{"a token file flag", []string{"--url", noSay.URL, "--token-file", "f"}, 1, "flag provided but not defined: -token-file"},

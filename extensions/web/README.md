@@ -53,7 +53,6 @@ of 32 characters or more, in one line, that does not start or end with a space o
 | `LIFELOG_TOKEN` | The token of the server. Required, 32 characters or more, one line, and no space or tab at its start or end; without it the program exits with status 78. It is the login of the browser and the bearer token of every request to the core. `serve --with` sets it from the token of the server. A new token ends every session of every browser. |
 | `LIFELOG_WEB_LISTEN` | The address of the door of the browser. A loopback address only (`127.0.0.1:7780` by default). Another address is refused with exit status 78. The proxy of the owner points to it and ends TLS. |
 | `LIFELOG_WEB_ORIGINS` | The browser origins that the guard of the writes trusts besides its own, separated by commas or spaces: `https://lifelog.example`. Each is a scheme, a host, an optional port and nothing else, in lower case. The origin that the proxy shows to the browser is the one to list: behind a proxy the `Origin` of a form is not the `Host` that web sees. |
-| `LIFELOG_WEB_STATE` | The state folder. The default is `os.UserConfigDir()/lifelog-web`. The tests set it. |
 | `LIFELOG_LISTEN` | Set by `serve --with` only: the loopback address where this program serves its catalog ([the settings](#the-settings-of-the-browser)). Not set: there is no catalog, and the form "This browser" is not drawn, because the core has no `web-settings` action. |
 
 A bad value of any of these is a refusal with exit status 78: the owner acts first, and `serve` does not start the program
@@ -713,7 +712,7 @@ of the action. No action is exempt. The test fails for an action without a form 
 
 **The end-to-end test** (`e2e_test.go`). It builds the real `lifelog` and `lifelog-web` into one folder, makes a synthetic
 `life.db` there, and starts the line of [the install](#install): `lifelog serve --addr 127.0.0.1:0 --token-file F --with web`,
-with `LIFELOG_WEB_LISTEN`, `LIFELOG_WEB_ORIGINS` (its own origin and one proxy origin) and `LIFELOG_WEB_STATE` set. It reads
+with `LIFELOG_WEB_LISTEN` and `LIFELOG_WEB_ORIGINS` (its own origin and one proxy origin) set, and `XDG_CONFIG_HOME` and `APPDATA` at a folder of the test (the state folder is `lifelog-web` in it). It reads
 the address of the core from the startup line of `serve`. Then it is a browser on the door of web alone: a cookie jar,
 `Accept: text/html`, and the fetch headers of a navigation. It checks, in order:
 

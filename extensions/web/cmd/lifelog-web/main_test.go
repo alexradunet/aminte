@@ -2,18 +2,19 @@ package main
 
 import (
 	"context"
-	"errors"
 	"io"
 	"net"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
 	"time"
 
+	"lifelog/app"
 	"lifelog/client"
 	"lifelog/lifelogtest"
 	"lifelog/siren"
@@ -30,10 +31,26 @@ func env(pairs ...string) func(string) string {
 // token is the owner's token of the tests: 36 characters of no meaning.
 const token = "synthetic-token-synthetic-token-1234"
 
-// good is the environment that runs: the core, the token and a state folder of the test, and what else the test adds.
-func good(t *testing.T, pairs ...string) func(string) string {
+// good is the environment that runs: the core and the token, and what else the test adds.
+func good(pairs ...string) func(string) string {
+	return env(append([]string{"LIFELOG_URL", "http://127.0.0.1:7777", "LIFELOG_TOKEN", token}, pairs...)...)
+}
+
+// configFolder sets the configuration folder of the user to dir, on Linux and on Windows: the state folder of the
+// program is app.StateDir("web"), which is dir/lifelog-web. A test that runs the program calls it first, so the
+// folder of the owner stays alone.
+func configFolder(t *testing.T, dir string) {
 	t.Helper()
-	return env(append([]string{"LIFELOG_URL", "http://127.0.0.1:7777", "LIFELOG_TOKEN", token, "LIFELOG_WEB_STATE", t.TempDir()}, pairs...)...)
+	t.Setenv("XDG_CONFIG_HOME", dir)
+	t.Setenv("APPDATA", dir)
+}
+
+// ownConfig gives the test a configuration folder of its own and returns the state folder in it.
+func ownConfig(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	configFolder(t, dir)
+	return filepath.Join(dir, "lifelog-web")
 }
 
 // freeAddress is a loopback address that nothing listens on now.
@@ -52,41 +69,67 @@ func freeAddress(t *testing.T) string {
 // of the catalog that is not a loopback address are each refused, and the refusal is a configuration error: the owner
 // acts first, so the exit status is not the one that makes `serve` start the program again.
 func TestTheEnvironmentIsRefusedWithAReason(t *testing.T) {
-	file := t.TempDir() + "/a-file"
-	if err := os.WriteFile(file, nil, 0o600); err != nil {
+	// The state folder is dir/lifelog-web. In the first, that is a file. In the second, it holds a damaged settings file.
+	fileAsState := t.TempDir()
+	if err := os.WriteFile(filepath.Join(fileAsState, "lifelog-web"), nil, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	damaged := t.TempDir()
-	if err := os.WriteFile(damaged+"/settings.json", []byte("{not json"), 0o600); err != nil {
+	if err := os.Mkdir(filepath.Join(damaged, "lifelog-web"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(damaged, "lifelog-web", "settings.json"), []byte("{not json"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	for name, c := range map[string]struct {
 		getenv func(string) string
+		config string // the configuration folder of the user; empty: a new one
 		want   string
 	}{
-		"no LIFELOG_URL":                  {env("LIFELOG_TOKEN", token), "no LIFELOG_URL"},
-		"no LIFELOG_TOKEN":                {env("LIFELOG_URL", "http://127.0.0.1:7777"), "no LIFELOG_TOKEN"},
-		"a short token":                   {good(t, "LIFELOG_TOKEN", "short"), "at least 32 characters"},
-		"a token of two lines":            {good(t, "LIFELOG_TOKEN", token+"\nb"), "one line"},
-		"a token that ends with a space":  {good(t, "LIFELOG_TOKEN", token+" "), "start or end with a space"},
-		"a token that starts with a tab":  {good(t, "LIFELOG_TOKEN", "\t"+token), "start or end with a space"},
-		"a bad core":                      {good(t, "LIFELOG_URL", "127.0.0.1:7777"), "use http://host:port"},
-		"all interfaces":                  {good(t, "LIFELOG_WEB_LISTEN", "0.0.0.0:7780"), "loopback address only"},
-		"a name":                          {good(t, "LIFELOG_WEB_LISTEN", "localhost:7780"), "loopback address only"},
-		"another host":                    {good(t, "LIFELOG_WEB_LISTEN", "192.168.1.5:7780"), "loopback address only"},
-		"no port":                         {good(t, "LIFELOG_WEB_LISTEN", "127.0.0.1"), "not host:port"},
-		"a catalog elsewhere":             {good(t, "LIFELOG_LISTEN", "0.0.0.0:9000"), "LIFELOG_LISTEN"},
-		"a bad origin":                    {good(t, "LIFELOG_WEB_ORIGINS", "https://lifelog.example/path"), "use scheme://host[:port] exactly"},
-		"one bad origin":                  {good(t, "LIFELOG_WEB_ORIGINS", "https://a.example, https://B.example"), "lower case"},
-		"a state folder that is a file":   {good(t, "LIFELOG_WEB_STATE", file+"/inside"), "state folder"},
-		"a settings file that is damaged": {good(t, "LIFELOG_WEB_STATE", damaged), "settings"},
+		"no LIFELOG_URL":                  {env("LIFELOG_TOKEN", token), "", "no LIFELOG_URL"},
+		"no LIFELOG_TOKEN":                {env("LIFELOG_URL", "http://127.0.0.1:7777"), "", "no LIFELOG_TOKEN"},
+		"a short token":                   {good("LIFELOG_TOKEN", "short"), "", "at least 32 characters"},
+		"a token of two lines":            {good("LIFELOG_TOKEN", token+"\nb"), "", "one line"},
+		"a token that ends with a space":  {good("LIFELOG_TOKEN", token+" "), "", "start or end with a space"},
+		"a token that starts with a tab":  {good("LIFELOG_TOKEN", "\t"+token), "", "start or end with a space"},
+		"a bad core":                      {good("LIFELOG_URL", "127.0.0.1:7777"), "", "use http://host:port"},
+		"all interfaces":                  {good("LIFELOG_WEB_LISTEN", "0.0.0.0:7780"), "", "loopback address only"},
+		"a name":                          {good("LIFELOG_WEB_LISTEN", "localhost:7780"), "", "loopback address only"},
+		"another host":                    {good("LIFELOG_WEB_LISTEN", "192.168.1.5:7780"), "", "loopback address only"},
+		"no port":                         {good("LIFELOG_WEB_LISTEN", "127.0.0.1"), "", "not host:port"},
+		"a catalog elsewhere":             {good("LIFELOG_LISTEN", "0.0.0.0:9000"), "", "LIFELOG_LISTEN"},
+		"a bad origin":                    {good("LIFELOG_WEB_ORIGINS", "https://lifelog.example/path"), "", "use scheme://host[:port] exactly"},
+		"one bad origin":                  {good("LIFELOG_WEB_ORIGINS", "https://a.example, https://B.example"), "", "lower case"},
+		"a state folder that is a file":   {good(), fileAsState, "state folder"},
+		"a settings file that is damaged": {good(), damaged, "settings"},
 	} {
+		if c.config == "" {
+			c.config = t.TempDir()
+		}
+		configFolder(t, c.config)
 		err := run(t.Context(), c.getenv, func(string) { t.Errorf("%s: the door opened", name) })
-		var config *configError
-		if !errors.As(err, &config) || !strings.Contains(err.Error(), c.want) {
-			t.Errorf("%s: %v, want a configuration error with %q", name, err, c.want)
+		if app.ExitCode(err) != app.ExitOwnerActs || !strings.Contains(err.Error(), c.want) {
+			t.Errorf("%s: %v with exit status %d, want a configuration error with %q and exit status %d", name, err, app.ExitCode(err), c.want, app.ExitOwnerActs)
 		}
 	}
+}
+
+// TestTheStateFolderIsTheOneOfTheUser: the state folder is lifelog-web in the configuration folder of the user, and
+// nothing else names it. LIFELOG_WEB_STATE is not read: the program that ignored the folder it was given would write the
+// settings of the owner to the wrong place, so the variable is gone, and this test holds that it has no effect.
+func TestTheStateFolderIsTheOneOfTheUser(t *testing.T) {
+	core := lifelogtest.New(t, "2031-05-14")
+	state := ownConfig(t)
+	elsewhere := filepath.Join(t.TempDir(), "elsewhere")
+	_, done, stop := started(t, good("LIFELOG_URL", core.URL, "LIFELOG_WEB_LISTEN", "127.0.0.1:0", "LIFELOG_WEB_STATE", elsewhere))
+	if info, err := os.Stat(state); err != nil || !info.IsDir() {
+		t.Errorf("the state folder %s: %v, want a folder", state, err)
+	}
+	if _, err := os.Stat(elsewhere); err == nil {
+		t.Errorf("LIFELOG_WEB_STATE made %s: the variable must have no effect", elsewhere)
+	}
+	stop()
+	waitFor(t, done)
 }
 
 // TestASettingsFileThatCannotBeReadNowStartsAgain: a fault of the file system may pass, so it is not a refusal of the
@@ -96,14 +139,16 @@ func TestASettingsFileThatCannotBeReadNowStartsAgain(t *testing.T) {
 	if os.Getuid() == 0 || runtime.GOOS == "windows" {
 		t.Skip("root, and Windows, read a file of mode 000")
 	}
-	dir := t.TempDir()
-	if err := os.WriteFile(dir+"/settings.json", []byte(`{"ground":"oak"}`), 0o000); err != nil {
+	state := ownConfig(t)
+	if err := os.Mkdir(state, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	err := run(t.Context(), good(t, "LIFELOG_WEB_STATE", dir), func(string) { t.Error("the door opened") })
-	var config *configError
-	if err == nil || errors.As(err, &config) || !strings.Contains(err.Error(), "settings") {
-		t.Errorf("an unreadable settings file: %v, want a plain error about the settings", err)
+	if err := os.WriteFile(filepath.Join(state, "settings.json"), []byte(`{"ground":"oak"}`), 0o000); err != nil {
+		t.Fatal(err)
+	}
+	err := run(t.Context(), good(), func(string) { t.Error("the door opened") })
+	if err == nil || app.ExitCode(err) != 1 || !strings.Contains(err.Error(), "settings") {
+		t.Errorf("an unreadable settings file: %v with exit status %d, want a plain error about the settings and exit status 1", err, app.ExitCode(err))
 	}
 }
 
@@ -171,7 +216,8 @@ func loggedIn(t *testing.T, addr string) *http.Client {
 // page of the real core through its door for a browser that has logged in, and ends with no error when its context ends.
 func TestRunServesTheBrowserAndDrainsOnTheEndOfItsContext(t *testing.T) {
 	core := lifelogtest.New(t, "2031-05-14")
-	addr, done, stop := started(t, good(t, "LIFELOG_URL", core.URL, "LIFELOG_WEB_LISTEN", "127.0.0.1:0"))
+	ownConfig(t)
+	addr, done, stop := started(t, good("LIFELOG_URL", core.URL, "LIFELOG_WEB_LISTEN", "127.0.0.1:0"))
 	anonymous := &http.Client{Transport: &http.Transport{}, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	res, err := anonymous.Get("http://" + addr + "/days/2031-05-14")
 	if err != nil {
@@ -204,11 +250,11 @@ func TestRunServesTheBrowserAndDrainsOnTheEndOfItsContext(t *testing.T) {
 // error, so `serve` starts it again.
 func TestRunFailsWhenTheDoorIsTaken(t *testing.T) {
 	core := lifelogtest.New(t, "2031-05-14")
-	addr, done, stop := started(t, good(t, "LIFELOG_URL", core.URL, "LIFELOG_WEB_LISTEN", "127.0.0.1:0"))
-	err := run(t.Context(), good(t, "LIFELOG_URL", core.URL, "LIFELOG_WEB_LISTEN", addr), func(string) { t.Error("a second door opened") })
-	var config *configError
-	if err == nil || errors.As(err, &config) {
-		t.Errorf("a taken door: %v, want an error that is not a configuration error", err)
+	ownConfig(t)
+	addr, done, stop := started(t, good("LIFELOG_URL", core.URL, "LIFELOG_WEB_LISTEN", "127.0.0.1:0"))
+	err := run(t.Context(), good("LIFELOG_URL", core.URL, "LIFELOG_WEB_LISTEN", addr), func(string) { t.Error("a second door opened") })
+	if err == nil || app.ExitCode(err) != 1 {
+		t.Errorf("a taken door: %v with exit status %d, want an error that is not a configuration error (exit status 1)", err, app.ExitCode(err))
 	}
 	stop()
 	waitFor(t, done)
@@ -218,9 +264,10 @@ func TestRunFailsWhenTheDoorIsTaken(t *testing.T) {
 // both end with the context. The catalog offers the action settings, owner-only. Without LIFELOG_LISTEN there is none.
 func TestRunServesTheCatalogBesideTheDoor(t *testing.T) {
 	core := lifelogtest.New(t, "2031-05-14")
+	ownConfig(t)
 	listen := freeAddress(t)
 	t.Setenv("LIFELOG_LISTEN", listen) // lifelog/app reads the variable itself
-	addr, done, stop := started(t, good(t, "LIFELOG_URL", core.URL, "LIFELOG_WEB_LISTEN", "127.0.0.1:0", "LIFELOG_LISTEN", listen))
+	addr, done, stop := started(t, good("LIFELOG_URL", core.URL, "LIFELOG_WEB_LISTEN", "127.0.0.1:0", "LIFELOG_LISTEN", listen))
 	var catalog *siren.Entity
 	for range 100 { // the second goroutine opens its socket a moment after the door
 		var err error
@@ -248,6 +295,7 @@ func TestRunServesTheCatalogBesideTheDoor(t *testing.T) {
 // error, and the door closes. One owner ends both, so nothing is left half alive.
 func TestAFailureOfTheCatalogEndsTheDoor(t *testing.T) {
 	core := lifelogtest.New(t, "2031-05-14")
+	ownConfig(t)
 	taken, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
@@ -255,11 +303,10 @@ func TestAFailureOfTheCatalogEndsTheDoor(t *testing.T) {
 	t.Cleanup(func() { taken.Close() })
 	listen := taken.Addr().String()
 	t.Setenv("LIFELOG_LISTEN", listen)
-	addr, done, _ := started(t, good(t, "LIFELOG_URL", core.URL, "LIFELOG_WEB_LISTEN", "127.0.0.1:0", "LIFELOG_LISTEN", listen))
+	addr, done, _ := started(t, good("LIFELOG_URL", core.URL, "LIFELOG_WEB_LISTEN", "127.0.0.1:0", "LIFELOG_LISTEN", listen))
 	err = waitFor(t, done)
-	var config *configError
-	if err == nil || errors.As(err, &config) || !strings.Contains(err.Error(), "address already in use") {
-		t.Errorf("a catalog that cannot listen: %v, want an error that is not a configuration error", err)
+	if err == nil || app.ExitCode(err) != 1 || !strings.Contains(err.Error(), "address already in use") {
+		t.Errorf("a catalog that cannot listen: %v with exit status %d, want an error that is not a configuration error (exit status 1)", err, app.ExitCode(err))
 	}
 	if c, err := net.Dial("tcp", addr); err == nil {
 		c.Close()

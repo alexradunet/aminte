@@ -57,7 +57,7 @@ func titlesServer(t *testing.T, taken int) (*Client, *[]string, *int) {
 		fmt.Fprint(w, `{"class":["file"]}`)
 	}))
 	t.Cleanup(srv.Close)
-	return New(srv.URL+"/", "secret"), &titles, &catalogReads
+	return New(client.Remote(srv.URL+"/", Source, "secret")), &titles, &catalogReads
 }
 
 func TestAddCoverTriesNumberedTitlesAfterExists(t *testing.T) {
@@ -93,7 +93,7 @@ func TestAnErrorEntityGivesItsCodeAndMessage(t *testing.T) {
 		fmt.Fprint(w, `{"class":["error"],"properties":{"status":422,"code":"invalid","message":"missing field day"}}`)
 	}))
 	defer srv.Close()
-	_, err := New(srv.URL, "").DayHasCover(context.Background(), "2031-05-04")
+	_, err := New(client.Remote(srv.URL, Source, "")).DayHasCover(context.Background(), "2031-05-04")
 	var ce *client.Error
 	if !errors.As(err, &ce) || ce.Status != 422 || ce.Code() != "invalid" || !strings.Contains(err.Error(), "missing field day") {
 		t.Errorf("error = %v, want the code and message of the entity", err)

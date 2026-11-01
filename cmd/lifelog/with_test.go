@@ -210,10 +210,10 @@ func TestServeWithGivesTheChildTheTokenOfTheServer(t *testing.T) {
 	}
 }
 
-// TestServeWithAppliesTheExitRule: 1 and 2 start the child again (2 is the status of a Go program that panics); 0, 78
-// and 3 do not, and each has its line.
+// TestServeWithAppliesTheExitRule: 1, 2 and 3 start the child again (2 is the status of a Go program that panics); 0
+// and 78 do not, and each has its line. 78 is the one status for "the owner acts first": 3 is not.
 func TestServeWithAppliesTheExitRule(t *testing.T) {
-	for _, status := range []string{"1", "2"} {
+	for _, status := range []string{"1", "2", "3"} {
 		t.Run(status+" starts again", func(t *testing.T) {
 			w := startWithServer(t, map[string]string{"fake": "exit-once=" + status})
 			w.logOf(t, "fake", 2) // the second start: the first one ended with the status
@@ -226,7 +226,6 @@ func TestServeWithAppliesTheExitRule(t *testing.T) {
 	for _, c := range []struct{ mode, line string }{
 		{"exit=0", "lifelog: with fake: ended\n"},
 		{"exit=78", "lifelog: with fake: ended with status 78: not started again (the owner acts first)\n"},
-		{"exit=3", "lifelog: with fake: ended with status 3: not started again (the owner acts first)\n"},
 	} {
 		t.Run(c.mode, func(t *testing.T) {
 			w := startWithServer(t, map[string]string{"fake": c.mode})

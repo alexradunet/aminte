@@ -42,8 +42,7 @@ func TestUsageAndRefusals(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			err := run(t.Context(), tc.args, tc.env, strings.NewReader(""), io.Discard, io.Discard)
-			var ec *exitCode
-			if !errors.As(err, &ec) || ec.code != app.ExitOwnerActs || !strings.Contains(err.Error(), tc.want) {
+			if app.ExitCode(err) != app.ExitOwnerActs || !strings.Contains(err.Error(), tc.want) {
 				t.Errorf("err = %v, want status %d and %q", err, app.ExitOwnerActs, tc.want)
 			}
 		})
@@ -53,8 +52,8 @@ func TestUsageAndRefusals(t *testing.T) {
 func TestSyncWithoutATokenSaysToLogInAndWithoutAnAddressSaysWhatToRun(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	err := run(t.Context(), []string{"sync", "--url", "http://127.0.0.1:1"}, noEnv, strings.NewReader(""), io.Discard, io.Discard)
-	if !errors.Is(err, connector.ErrLoginAgain) {
-		t.Errorf("no token: err = %v, want ErrLoginAgain", err)
+	if !errors.Is(err, connector.ErrLoginAgain) || app.ExitCode(err) != app.ExitOwnerActs {
+		t.Errorf("no token: err = %v with status %d, want ErrLoginAgain and status %d", err, app.ExitCode(err), app.ExitOwnerActs)
 	}
 	err = run(t.Context(), nil, func(k string) string {
 		if k == "LIFELOG_LISTEN" {
@@ -62,8 +61,27 @@ func TestSyncWithoutATokenSaysToLogInAndWithoutAnAddressSaysWhatToRun(t *testing
 		}
 		return ""
 	}, strings.NewReader(""), io.Discard, io.Discard)
-	if !errors.Is(err, connector.ErrLoginAgain) {
-		t.Errorf("serve with no token: err = %v, want ErrLoginAgain (exit app.ExitOwnerActs at once)", err)
+	if !errors.Is(err, connector.ErrLoginAgain) || app.ExitCode(err) != app.ExitOwnerActs {
+		t.Errorf("serve with no token: err = %v with status %d, want ErrLoginAgain and status %d at once", err, app.ExitCode(err), app.ExitOwnerActs)
+	}
+}
+
+// TestSyncWithoutAnAddressSaysWhatToRun: the login is there, and the address of lifelog is not. The program never guesses
+// one, so it refuses with the line that says what to run. The owner mends it, so the status is 78.
+func TestSyncWithoutAnAddressSaysWhatToRun(t *testing.T) {
+	config := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", config)
+	t.Setenv("LIFELOG_TOKEN", "")
+	dir := filepath.Join(config, "lifelog-ticktick")
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := connector.SaveToken(dir, "the-token"); err != nil {
+		t.Fatal(err)
+	}
+	err := run(t.Context(), []string{"sync"}, noEnv, strings.NewReader(""), io.Discard, io.Discard)
+	if err == nil || !strings.Contains(err.Error(), "no LIFELOG_URL and no --url") || app.ExitCode(err) != app.ExitOwnerActs {
+		t.Errorf("sync with no address: err = %v with status %d, want the refusal and status %d", err, app.ExitCode(err), app.ExitOwnerActs)
 	}
 }
 

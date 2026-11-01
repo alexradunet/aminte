@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"lifelog/app"
 	"lifelog/client"
 	"lifelog/siren"
 )
@@ -898,14 +899,14 @@ func TestACatalogWithoutSayOrReplyIsRefusedButACatalogThatFailsIsNot(t *testing.
 	for _, name := range []string{"say", "reply"} {
 		api := &fakeAPI{}
 		api.dropAction(name)
-		if err := runOnce(t, api); !errors.Is(err, ErrNoAction) || !strings.Contains(err.Error(), name) {
-			t.Errorf("a catalog with no %s: %v, want ErrNoAction naming it", name, err)
+		if err := runOnce(t, api); app.ExitCode(err) != app.ExitOwnerActs || !strings.Contains(err.Error(), name) {
+			t.Errorf("a catalog with no %s: %v, want an error that names it, and exit status %d", name, err, app.ExitOwnerActs)
 		}
 	}
 	api := &fakeAPI{}
 	api.failCatalog(true)
-	if err := runOnce(t, api); err == nil || errors.Is(err, ErrNoAction) {
-		t.Errorf("a catalog that fails: %v, want an error that is not ErrNoAction", err)
+	if err := runOnce(t, api); err == nil || app.ExitCode(err) != 1 {
+		t.Errorf("a catalog that fails: %v, want an error with exit status 1", err)
 	}
 }
 

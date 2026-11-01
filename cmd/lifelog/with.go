@@ -13,16 +13,13 @@ import (
 	"sync"
 	"time"
 
+	"lifelog/app"
 	"lifelog/internal/api"
 )
 
 // restartDelay is the wait before serve starts a failed extension again (extensions/README.md, run by serve). A test
 // shortens it.
 var restartDelay = 10 * time.Second
-
-// exitOwnerActs is the status of a child that waits for the owner, app.ExitOwnerActs (extensions/README.md, run by
-// serve). It is not 2: the Go runtime ends a program that panics with 2, and a crash starts again.
-const exitOwnerActs = 78
 
 // probeEvery is the wait between two probes of the catalog of a child that is not up yet. The wait is on another
 // process, and nothing signals that it is ready, so it is a poll. probeFor is the longest time a child has to serve
@@ -78,7 +75,7 @@ func withEnv(e env, exe, file, url string) []string {
 }
 
 // superviseWith runs the extension at path until it ends for good or ctx ends, by the rule of extensions/README.md:
-// exit 0 is an end by its own choice; 78 (exitOwnerActs) and 3 want the owner first; any other end, 2 of a panic too,
+// exit 0 is an end by its own choice; 78 (app.ExitOwnerActs) wants the owner first; any other end, 2 of a panic too,
 // starts it again after restartDelay.
 func superviseWith(ctx context.Context, e env, name, path, url string, apps *api.Apps) {
 	say := func(format string, a ...any) {
@@ -178,7 +175,7 @@ func runWithOnce(ctx context.Context, e env, name, path string, env []string, ap
 		return true, nil
 	}
 	status := ee.ExitCode()
-	if status == exitOwnerActs || status == 3 {
+	if status == app.ExitOwnerActs {
 		say("ended with status %d: not started again (the owner acts first)", status)
 		return false, nil
 	}

@@ -36,8 +36,8 @@ import (
 )
 
 // The end-to-end test builds the real lifelog and lifelog-web into one folder and runs the line of the live unit on a new
-// life.db: `lifelog serve --token-file F --with web`, with LIFELOG_WEB_LISTEN, LIFELOG_WEB_ORIGINS and
-// LIFELOG_WEB_STATE in the environment. Then it is a browser: a cookie jar, Accept: text/html, the fetch headers of a
+// life.db: `lifelog serve --token-file F --with web`, with LIFELOG_WEB_LISTEN and LIFELOG_WEB_ORIGINS in the
+// environment, and a configuration folder of the test for the state folder. Then it is a browser: a cookie jar, Accept: text/html, the fetch headers of a
 // navigation, and no other door than the door of web. It holds what the tests of ./web cannot: the program, its
 // environment, the handshake of the catalog "This browser" (served on LIFELOG_LISTEN, merged by the core as /with/web),
 // the owner rule of the core, and the stop by an interrupt. The pages, the forms and the lock are held in detail by the
@@ -148,16 +148,16 @@ func startStack(t *testing.T, b bins) *stack {
 	if err := os.WriteFile(tokenFile, []byte(ownerToken+"\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	s := &stack{t: t, bin: b.lifelog, stderr: new(lockedBuffer), exited: make(chan error, 1), state: filepath.Join(work, "state")}
+	s := &stack{t: t, bin: b.lifelog, stderr: new(lockedBuffer), exited: make(chan error, 1), state: filepath.Join(work, "config", "lifelog-web")}
 	listen := loopbackAddr(t)
 	s.door = "http://" + listen
 	s.cmd = exec.Command(b.lifelog, "--db", db, "serve", "--addr", "127.0.0.1:0", "--token-file", tokenFile, "--with", "web")
 	// The environment of the unit, and nothing of the owner's: any LIFELOG_ variable of the shell could point the child
-	// at another file or server.
+	// at another file or server, and the configuration folder of the user holds the state folder of web (s.state).
 	s.cmd.Env = append(slices.DeleteFunc(os.Environ(), func(kv string) bool {
-		return strings.HasPrefix(kv, "LIFELOG_") || strings.HasPrefix(kv, "XDG_CONFIG_HOME=")
-	}), "LIFELOG_WEB_LISTEN="+listen, "LIFELOG_WEB_ORIGINS="+s.door+" "+proxyOrigin, "LIFELOG_WEB_STATE="+s.state,
-		"XDG_CONFIG_HOME="+filepath.Join(work, "config"))
+		return strings.HasPrefix(kv, "LIFELOG_") || strings.HasPrefix(kv, "XDG_CONFIG_HOME=") || strings.HasPrefix(kv, "APPDATA=")
+	}), "LIFELOG_WEB_LISTEN="+listen, "LIFELOG_WEB_ORIGINS="+s.door+" "+proxyOrigin,
+		"XDG_CONFIG_HOME="+filepath.Join(work, "config"), "APPDATA="+filepath.Join(work, "config"))
 	s.cmd.Stderr = s.stderr
 	if err := s.cmd.Start(); err != nil {
 		t.Fatal(err)

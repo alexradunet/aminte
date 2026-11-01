@@ -18,22 +18,17 @@ import (
 	"go.mau.fi/whatsmeow/store"
 	"go.mau.fi/whatsmeow/store/sqlstore"
 	_ "modernc.org/sqlite" // the pure-Go driver, the one that lifelog pins: no cgo
+
+	"lifelog/app"
 )
 
-// ErrNotPaired is the error of a store with no device: run the login first.
-var ErrNotPaired = errors.New("not paired: run lifelog whatsapp login")
+// ErrNotPaired is the error of a store with no device: run the login first. It is an error that the owner acts on
+// (app.OwnerActs): a restart does not pair the device.
+var ErrNotPaired = app.OwnerActs(errors.New("not paired: run lifelog whatsapp login"))
 
-// StateDir is the state folder of the relay: os.UserConfigDir()/lifelog-whatsapp.
-func StateDir() (string, error) {
-	base, err := os.UserConfigDir()
-	if err != nil {
-		return "", fmt.Errorf("state folder: %w", err)
-	}
-	return filepath.Join(base, "lifelog-whatsapp"), nil
-}
-
-// Prepare makes the state folder with mode 0700 and returns the paths of the session store and the state file of the conversation.
-// A folder that exists gets mode 0700 too, because the store in it holds the keys of the account.
+// Prepare makes the state folder dir (app.StateDir("whatsapp")) with mode 0700 and returns the paths of the session
+// store and the state file of the conversation. A folder that exists gets mode 0700 too, because the store in it holds
+// the keys of the account.
 func Prepare(dir string) (session, state string, err error) {
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return "", "", fmt.Errorf("state folder: %w", err)

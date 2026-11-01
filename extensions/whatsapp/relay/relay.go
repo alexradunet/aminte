@@ -11,6 +11,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"lifelog/app"
 	"lifelog/client"
 	"lifelog/siren"
 )
@@ -23,10 +24,6 @@ const (
 	// maxSend is the largest text that goes to the chat in one message. A longer text is cut and says so.
 	maxSend = 16 << 10
 )
-
-// ErrNoAction says that the catalog has no action say. The owner acts first: the server is too old, or it is not a
-// lifelog server. A restart of the relay does not help.
-var ErrNoAction = errors.New("the catalog lacks the action say")
 
 // Relay carries the messages of the owner to the conversation page and the turns of the page to the chat.
 type Relay struct {
@@ -84,7 +81,9 @@ func (r *Relay) Run(ctx context.Context) error {
 	}
 }
 
-// readCatalog finds the action say. Any other answer than a catalog with say is an error.
+// readCatalog finds the action say. Any other answer than a catalog with say is an error. A catalog with no say is an
+// error that the owner acts on (app.OwnerActs): the server is too old, or it is not a lifelog server, and a restart of
+// the relay does not help.
 func (r *Relay) readCatalog(ctx context.Context) error {
 	list, err := r.API.Catalog(ctx)
 	if err != nil {
@@ -96,7 +95,7 @@ func (r *Relay) readCatalog(ctx context.Context) error {
 			return nil
 		}
 	}
-	return ErrNoAction
+	return app.OwnerActs(errors.New("the catalog lacks the action say"))
 }
 
 // accept applies the rules of who may talk: another sender is ignored and logged, a message of the owner that is not

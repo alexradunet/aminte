@@ -17,6 +17,7 @@ import (
 	"unicode/utf8"
 
 	"lifelog-agent/model"
+	"lifelog/app"
 	"lifelog/client"
 	"lifelog/client/tools"
 	"lifelog/siren"
@@ -49,10 +50,6 @@ const noModel = "No model is set: open Settings."
 
 // errNoModel says that the settings hold no model_url or no model.
 var errNoModel = errors.New("no model is set")
-
-// ErrNoAction says that the catalog lacks an action that the agent needs. The owner acts first: the server is too
-// old, or it is not a lifelog server. A restart of the agent does not help.
-var ErrNoAction = errors.New("the catalog lacks an action")
 
 // Agent answers the turns of the owner. The conversation of a day is a page of life.db.
 type Agent struct {
@@ -116,9 +113,10 @@ func (a *Agent) Run(ctx context.Context) error {
 }
 
 // readCatalog reads the catalog and replaces the tools and the actions with it. The tools and the actions come from
-// the same read, so a tool and its action agree. A catalog with no say or no reply is ErrNoAction: say is the only
-// way to write a turn of the owner, so with no say there is nothing to answer, and reply is the only way that the
-// core takes the agent's turn. On an error the tools and the actions stay as they were.
+// the same read, so a tool and its action agree. A catalog with no say or no reply is an error that the owner acts on
+// (app.OwnerActs): the server is too old, or it is not a lifelog server, and a restart of the agent does not help. say
+// is the only way to write a turn of the owner, so with no say there is nothing to answer, and reply is the only way
+// that the core takes the agent's turn. On an error the tools and the actions stay as they were.
 func (a *Agent) readCatalog(ctx context.Context) error {
 	list, err := a.Client.Catalog(ctx)
 	if err != nil {
@@ -130,7 +128,7 @@ func (a *Agent) readCatalog(ctx context.Context) error {
 	}
 	for _, name := range []string{"say", "reply"} {
 		if _, ok := actions[name]; !ok {
-			return fmt.Errorf("%w: %q", ErrNoAction, name)
+			return app.OwnerActs(fmt.Errorf("the catalog lacks an action: %q", name))
 		}
 	}
 	ts, err := toolsOf(list)

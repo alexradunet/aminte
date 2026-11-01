@@ -11,30 +11,24 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"os/signal"
 	"path/filepath"
-	"syscall"
 	"time"
 
 	"lifelog-googlephotos/google"
 	"lifelog-googlephotos/lifelog"
 	"lifelog-googlephotos/review"
+	"lifelog/app"
 )
 
 func main() {
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
-	if err := run(ctx, os.Args[1:]); err != nil {
-		fmt.Fprintln(os.Stderr, "lifelog-gphotos:", err)
-		os.Exit(1)
-	}
+	app.Main("gphotos", func(ctx context.Context) error { return run(ctx, os.Args[1:]) })
 }
 
 func run(ctx context.Context, args []string) error {
 	fs := flag.NewFlagSet("lifelog-gphotos", flag.ContinueOnError)
 	addr := fs.String("addr", "127.0.0.1:7790", "address of the review page (a loopback address)")
-	// The address is $LIFELOG_URL, which `lifelog gphotos` sets, or --url. There is no default: a guess such as
-	// 127.0.0.1:7777 could be another file's server.
+	// The address is $LIFELOG_URL, which `lifelog gphotos` sets, or --url. There is no default: app.API refuses an
+	// empty address.
 	base := fs.String("url", os.Getenv("LIFELOG_URL"), "address of lifelog (default $LIFELOG_URL); $LIFELOG_TOKEN is sent as a bearer token when it is set")
 	credentials := fs.String("credentials", "", "JSON of the Desktop OAuth client from Google Cloud (default: credentials.json beside the token file)")
 	zoneName := fs.String("zone", "", "IANA zone that gives the day of a photo (default: the local zone)")
@@ -43,6 +37,10 @@ func run(ctx context.Context, args []string) error {
 	}
 	if fs.NArg() > 0 {
 		return fmt.Errorf("unexpected argument %q", fs.Arg(0))
+	}
+	api, err := app.API(*base, lifelog.Source)
+	if err != nil {
+		return err
 	}
 	if _, err := review.LoopbackAddr(*addr); err != nil {
 		return err
@@ -70,7 +68,7 @@ func run(ctx context.Context, args []string) error {
 	srv := review.New(review.Config{
 		Auth:    auth,
 		Picker:  &google.Picker{Base: google.DefaultPickerBase, HTTP: client, Tokens: auth},
-		Lifelog: lifelog.New(*base, os.Getenv("LIFELOG_TOKEN")),
+		Lifelog: lifelog.New(api),
 		Zone:    zone,
 	})
 	ln, err := net.Listen("tcp", *addr)

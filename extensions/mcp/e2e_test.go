@@ -19,6 +19,7 @@ import (
 
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"lifelog/app"
 	"lifelog/client/tools"
 	"lifelog/siren"
 )
@@ -233,7 +234,7 @@ func TestSourceIsRefusedOnTheLineOfMCP(t *testing.T) {
 
 // TestWithoutAServerTheMCPServerRefuses: lifelog-mcp never guesses an address, because 127.0.0.1:7777 may be the
 // server of another file. Alone with no LIFELOG_URL and no --url it refuses, and so does `lifelog mcp` on a file that
-// does not exist, which gives it no LIFELOG_URL.
+// does not exist, which gives it no LIFELOG_URL. The refusal is the owner's to mend: the status is 78.
 func TestWithoutAServerTheMCPServerRefuses(t *testing.T) {
 	b := build(t)
 	const want = "no LIFELOG_URL and no --url"
@@ -247,8 +248,8 @@ func TestWithoutAServerTheMCPServerRefuses(t *testing.T) {
 		cmd.Stderr = &stderr
 		err := cmd.Run()
 		var ee *exec.ExitError
-		if !errors.As(err, &ee) || ee.ExitCode() == 0 {
-			t.Fatalf("%v: %v, want a non-zero status", line[1:], err)
+		if !errors.As(err, &ee) || ee.ExitCode() != app.ExitOwnerActs {
+			t.Fatalf("%v: %v, want exit status %d", line[1:], err, app.ExitOwnerActs)
 		}
 		if !strings.Contains(stderr.String(), want) {
 			t.Errorf("%v: stderr %q, want %q", line[1:], stderr.String(), want)

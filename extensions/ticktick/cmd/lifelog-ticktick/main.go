@@ -16,60 +16,34 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"os/signal"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	"lifelog-ticktick/connector"
 	"lifelog-ticktick/ticktick"
 	"lifelog/app"
-	"lifelog/client"
 	"lifelog/siren"
 )
-
-// Exit codes: 1 an error (serve starts the program again), 2 the owner acts first (usage, or the login is missing).
-const exitError = 1
 
 const usage = `usage:
   lifelog ticktick login [--client-id ID] [--client-secret SECRET] [--port 8765]
   lifelog ticktick sync [--url URL]
   lifelog serve --with ticktick     (the program serves its catalog and polls)`
 
-// exitCode carries the exit status of the process with the error.
-type exitCode struct {
-	code int
-	err  error
-}
-
-func (e *exitCode) Error() string { return e.err.Error() }
-func (e *exitCode) Unwrap() error { return e.err }
-
+// usageError is a refusal of the line: the owner acts first (app.OwnerActs), so serve does not start the program again.
 func usageError(msg string) error {
-	return &exitCode{app.ExitOwnerActs, errors.New(msg + "\n" + usage)}
+	return app.OwnerActs(errors.New(msg + "\n" + usage))
 }
 
+// The exit status is the one of app.Main: 78 for a usage error and for a login that is missing (connector.ErrLoginAgain),
+// 1 for any other error (serve starts the program again).
 func main() {
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
 	log.SetFlags(log.LstdFlags)
 	log.SetPrefix("lifelog-ticktick: ")
-	err := run(ctx, os.Args[1:], os.Getenv, os.Stdin, os.Stdout, os.Stderr)
-	if err == nil || errors.Is(err, context.Canceled) {
-		return // an interrupt is the owner's word
-	}
-	fmt.Fprintln(os.Stderr, "lifelog-ticktick:", err)
-	code := exitError
-	var ec *exitCode
-	switch {
-	case errors.As(err, &ec):
-		code = ec.code
-	case errors.Is(err, connector.ErrLoginAgain):
-		code = app.ExitOwnerActs
-	}
-	stop()
-	os.Exit(code)
+	app.Main(connector.Name, func(ctx context.Context) error {
+		return run(ctx, os.Args[1:], os.Getenv, os.Stdin, os.Stdout, os.Stderr)
+	})
 }
 
 func run(ctx context.Context, args []string, getenv func(string) string, stdin io.Reader, stdout, stderr io.Writer) error {
@@ -93,7 +67,7 @@ func run(ctx context.Context, args []string, getenv func(string) string, stdin i
 func parse(fs *flag.FlagSet, args []string, stderr io.Writer) error {
 	fs.SetOutput(stderr)
 	if err := fs.Parse(args); err != nil {
-		return &exitCode{app.ExitOwnerActs, err}
+		return app.OwnerActs(err)
 	}
 	if fs.NArg() > 0 {
 		return usageError(fmt.Sprintf("unexpected argument %q", fs.Arg(0)))
@@ -102,7 +76,7 @@ func parse(fs *flag.FlagSet, args []string, stderr io.Writer) error {
 }
 
 // connect makes the clients from the files of the state folder. It is ErrLoginAgain without a token.
-func connect(getenv func(string) string, base string) (*connector.Poller, string, connector.Config, error) {
+func connect(base string) (*connector.Poller, string, connector.Config, error) {
 	dir, err := connector.Dir()
 	if err != nil {
 		return nil, "", connector.Config{}, err
@@ -115,17 +89,17 @@ func connect(getenv func(string) string, base string) (*connector.Poller, string
 	if err != nil {
 		return nil, "", cfg, err
 	}
-	if base == "" {
-		return nil, "", cfg, errors.New("no LIFELOG_URL and no --url: run it as `lifelog ticktick sync`, or give --url")
+	ll, err := app.API(base, siren.ImportPrefix+connector.Name)
+	if err != nil {
+		return nil, "", cfg, err
 	}
 	tt := &ticktick.Client{Base: cfg.API, Token: token}
-	ll := client.Remote(base, siren.ImportPrefix+connector.Name, getenv("LIFELOG_TOKEN"))
 	p, err := connector.NewPoller(tt, ll, dir)
 	return p, dir, cfg, err
 }
 
 func serve(ctx context.Context, getenv func(string) string) error {
-	p, _, cfg, err := connect(getenv, getenv("LIFELOG_URL"))
+	p, _, cfg, err := connect(getenv("LIFELOG_URL"))
 	if err != nil {
 		return err
 	}
@@ -149,7 +123,7 @@ func syncOnce(ctx context.Context, args []string, getenv func(string) string, st
 	if err := parse(fs, args, stderr); err != nil {
 		return err
 	}
-	p, _, _, err := connect(getenv, *base)
+	p, _, _, err := connect(*base)
 	if err != nil {
 		return err
 	}

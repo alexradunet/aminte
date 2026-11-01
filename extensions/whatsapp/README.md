@@ -74,12 +74,11 @@ answer without it.
 |---|---|
 | `lifelog whatsapp login` | Pairs the number of lifelog. It draws a QR code. On that phone, open WhatsApp, Linked devices, Link a device, and scan it. After the scan it waits for the connection that finishes the pairing (up to a minute), then the session is saved and it exits. It needs nothing else. Run it once, as the user of the service, before `serve --with whatsapp`. |
 | `lifelog whatsapp [--db FILE]` | A try by hand: carries the messages. `lifelog` serves the file on a temporary loopback server for it ([extensions/README.md](../README.md)). |
-| `lifelog-whatsapp --url URL [--token-file F]` | The same against a running `lifelog serve` at `URL` (default `$LIFELOG_URL`). With neither, it refuses: a guessed address could be another file's server. |
+| `lifelog-whatsapp --url URL` | The same against a running `lifelog serve` at `URL` (default `$LIFELOG_URL`; the bearer token is `$LIFELOG_TOKEN`). With neither, it refuses with status 78: a guessed address could be another file's server. |
 
 | flag | meaning |
 |---|---|
 | `--url` | The address of lifelog. Default `$LIFELOG_URL`. |
-| `--token-file` | A file with the bearer token. `$LIFELOG_TOKEN` wins when it is set. |
 
 `--source` is not a flag: the program writes as the owner, because `say` is the owner's action.
 

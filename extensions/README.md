@@ -81,7 +81,7 @@ flowchart TD
   S["serve: the listener is up"] --> A["start lifelog-NAME with no arguments"]
   A --> W["wait for the end"]
   W -->|"exit 0"| E0["ended: not started again"]
-  W -->|"exit 78 or 3"| E2["the owner acts first: not started again"]
+  W -->|"exit 78"| E2["the owner acts first: not started again"]
   W -->|"any other end: 1, a signal"| R["wait 10 seconds, then start again"]
   R --> A
   T["interrupt or SIGTERM"] -->|"interrupt the child, 10 seconds at most, then a kill"| W
@@ -99,7 +99,7 @@ flowchart TD
   again every 10 seconds.
   stdout and stderr are those of the server, so the lines go to its log.
 - **The exit status** decides. 0: the extension ended by its own choice, and is not started again. 78 (`EX_CONFIG` of
-  sysexits) or 3: the owner must act first (for example pair a device); it is not started again until `serve` starts
+  sysexits): the owner must act first (for example pair a device); it is not started again until `serve` starts
   again. Any other end (1; 2, which the Go runtime gives a program that panics; a signal): `serve` starts it again after
   10 seconds. `serve` logs each start and each end.
 - **The stop.** On an interrupt or SIGTERM, `serve` interrupts the child first and waits for it, 10 seconds at most,
@@ -131,7 +131,7 @@ flowchart TD
   P -->|"another answer, the exit of the app, or no answer in 30 seconds"| N["serves no catalog: one line in the log; the app stays a plain child"]
   R -->|"the app ends"| U["unregistered: the actions leave GET /actions; /with/NAME is 503 unavailable"]
   N -->|"the app ends"| U
-  U -->|"the exit rule: 0, 78 and 3 end it; any other end starts it again"| S
+  U -->|"the exit rule: 0 and 78 end it; any other end starts it again"| S
 ```
 
 - **The address is new at each start.** A restart never meets the address of the app that ended. The server chooses the
@@ -322,5 +322,5 @@ agent, and `lifelog-whatsapp` is the transport.
 | `extensions/mcp` | `lifelog-mcp` | `lifelog mcp [--agent NAME]` | `agent:NAME`, default `agent:mcp` | yes: `LIFELOG_URL`, else `--url`, else it refuses; `--source` is refused as today |
 | `extensions/ticktick` | `lifelog-ticktick` | `lifelog ticktick login`, `lifelog ticktick sync [--url U]`, and `lifelog serve --with ticktick` (the always-on way, as the task service) | `import:ticktick` | yes: `LIFELOG_URL`, else `--url`, else it refuses; `login` needs none |
 | `extensions/agent` | `lifelog-agent` | `lifelog serve --with agent` (the always-on way) and `lifelog agent` (a try on a `life.db` that exists) | `agent:lifelog` (the read of the settings is the owner's) | yes: `LIFELOG_URL`, else `--url`, else it refuses; `LIFELOG_TOKEN` is its bearer token |
-| `extensions/whatsapp` | `lifelog-whatsapp` | `lifelog serve --with whatsapp` (the always-on way), `lifelog whatsapp login` and `lifelog whatsapp [--url U] [--token-file F]` (the number is the setting `owner_number`) | the owner, with `via=whatsapp`: it only carries the words ([`say`](../API.md#conversation)); it calls no model | yes: `LIFELOG_URL`, else `--url`, else it refuses; `login` needs none |
+| `extensions/whatsapp` | `lifelog-whatsapp` | `lifelog serve --with whatsapp` (the always-on way), `lifelog whatsapp login` and `lifelog whatsapp [--url U]` (the number is the setting `owner_number`) | the owner, with `via=whatsapp`: it only carries the words ([`say`](../API.md#conversation)); it calls no model | yes: `LIFELOG_URL`, else `--url`, else it refuses; `login` needs none |
 | `extensions/web` | `lifelog-web` | `lifelog serve --token-file F --with web` (the always-on way) and `lifelog web` (a trial on a `life.db` that exists) | `ui` (the writer of the browser) | yes: `LIFELOG_URL` and `LIFELOG_TOKEN` (the login of the browser), else it refuses; `LIFELOG_WEB_LISTEN` is its door (`127.0.0.1:7780`, a loopback address only); `LIFELOG_LISTEN` is its catalog (the settings of the browser) |

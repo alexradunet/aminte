@@ -470,19 +470,22 @@ func TestTwoMessagesInARowGetTheirTwoRepliesOnThePhone(t *testing.T) {
 }
 
 // TestTheTransportRefusesWhatItCannotRun: each missing piece is refused with its name or the line that says what to run.
+// A flag that the program does not take is a plain error (1). A missing address of lifelog is the owner's to mend (78).
 func TestTheTransportRefusesWhatItCannotRun(t *testing.T) {
 	b := build(t)
 	missing := filepath.Join(b.dir, "missing", "life.db")
 	for _, tc := range []struct {
-		name string
-		line []string
-		want string
+		name   string
+		line   []string
+		status int
+		want   string
 	}{
-		{"the owner flag is gone", []string{b.lifelog, "whatsapp", "--owner", "123", "--db", b.db}, "flag provided but not defined: -owner"},
-		{"the terminal flag is gone", []string{b.lifelog, "whatsapp", "--terminal", "--db", b.db}, "flag provided but not defined: -terminal"},
-		{"no server", []string{b.ext}, "no LIFELOG_URL and no --url"},
-		{"no file", []string{b.lifelog, "whatsapp", "--db", missing}, "no LIFELOG_URL and no --url"},
-		{"a source flag", []string{b.lifelog, "whatsapp", "--source", "x", "--db", b.db}, "flag provided but not defined: -source"},
+		{"the owner flag is gone", []string{b.lifelog, "whatsapp", "--owner", "123", "--db", b.db}, 1, "flag provided but not defined: -owner"},
+		{"the terminal flag is gone", []string{b.lifelog, "whatsapp", "--terminal", "--db", b.db}, 1, "flag provided but not defined: -terminal"},
+		{"the token file flag is gone", []string{b.lifelog, "whatsapp", "--token-file", "token", "--db", b.db}, 1, "flag provided but not defined: -token-file"},
+		{"no server", []string{b.ext}, app.ExitOwnerActs, "no LIFELOG_URL and no --url"},
+		{"no file", []string{b.lifelog, "whatsapp", "--db", missing}, app.ExitOwnerActs, "no LIFELOG_URL and no --url"},
+		{"a source flag", []string{b.lifelog, "whatsapp", "--source", "x", "--db", b.db}, 1, "flag provided but not defined: -source"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			cmd := exec.Command(tc.line[0], tc.line[1:]...)
@@ -491,8 +494,8 @@ func TestTheTransportRefusesWhatItCannotRun(t *testing.T) {
 			cmd.Stderr = &stderr
 			err := cmd.Run()
 			var ee *exec.ExitError
-			if !errors.As(err, &ee) || ee.ExitCode() == 0 {
-				t.Fatalf("%v: %v, want a non-zero status", tc.line[1:], err)
+			if !errors.As(err, &ee) || ee.ExitCode() != tc.status {
+				t.Fatalf("%v: %v, want exit status %d", tc.line[1:], err, tc.status)
 			}
 			if !strings.Contains(stderr.String(), tc.want) {
 				t.Errorf("stderr %q, want %q", stderr.String(), tc.want)

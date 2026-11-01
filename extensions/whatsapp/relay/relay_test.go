@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"lifelog/app"
 	"lifelog/client"
 	"lifelog/siren"
 )
@@ -559,13 +560,13 @@ func TestACatalogWithoutSayIsRefusedAsAnActionTheOwnerMustAddButACatalogThatFail
 	}
 	noSay := &fakeAPI{}
 	noSay.dropAction("say")
-	if err := run(noSay); !errors.Is(err, ErrNoAction) {
-		t.Errorf("a catalog with no say: %v, want ErrNoAction", err)
+	if err := run(noSay); app.ExitCode(err) != app.ExitOwnerActs || !strings.Contains(err.Error(), "say") {
+		t.Errorf("a catalog with no say: %v, want an error that names say, and exit status %d", err, app.ExitOwnerActs)
 	}
 	down := &fakeAPI{}
 	down.setCatalogFails(true)
-	if err := run(down); err == nil || errors.Is(err, ErrNoAction) {
-		t.Errorf("a catalog that fails: %v, want an error that is not ErrNoAction", err)
+	if err := run(down); err == nil || app.ExitCode(err) != 1 {
+		t.Errorf("a catalog that fails: %v, want an error with exit status 1", err)
 	}
 }
 

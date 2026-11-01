@@ -22,6 +22,7 @@ import (
 	"lifelog-googlephotos/google"
 	"lifelog-googlephotos/lifelog"
 	"lifelog-googlephotos/review"
+	"lifelog/client"
 )
 
 // jpegOf makes a small synthetic JPEG. Two seeds give two different files.
@@ -198,7 +199,7 @@ func newStack(t *testing.T, g *fakeGoogle, lifelogURL string, connected bool) *s
 	rev := review.New(review.Config{
 		Auth:    auth,
 		Picker:  &google.Picker{Base: g.URL + "/v1", HTTP: hc, Tokens: auth},
-		Lifelog: lifelog.New(lifelogURL, ""),
+		Lifelog: lifelog.New(client.Remote(lifelogURL, lifelog.Source, "")),
 		Zone:    time.UTC,
 		Log:     log.New(io.Discard, "", 0),
 	})
