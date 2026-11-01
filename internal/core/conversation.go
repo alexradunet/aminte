@@ -1,6 +1,8 @@
 package core
 
 import (
+	"database/sql"
+	"errors"
 	"net/http"
 	"regexp"
 	"strings"
@@ -39,6 +41,43 @@ func reservedTitle(title string) error {
 		return nil
 	}
 	return Conflict("%q is a conversation title: only say makes that page, and a conversation page keeps its title: its day names it", title)
+}
+
+// ConversationCategory is the title of the category page that say files every conversation page in. The schema holds a
+// part-of link only between plain pages (links_endpoint_types), so a page of another type under this title would make
+// every first say of a day fail. The page stays a plain page, for every writer: categoryMustBePlain is the one
+// refusal. A plain page under the title is allowed: create-page, the category of a filing, a wikilink that makes its
+// target, a rename and the filing of say make it.
+const ConversationCategory = "Conversations"
+
+var categoryKey = text.TitleKey(ConversationCategory)
+
+// IsConversationCategory says that a title is the title of the category of the conversation pages. It compares the
+// keys of the titles, so the case of the letters does not matter.
+func IsConversationCategory(title string) bool { return text.TitleKey(title) == categoryKey }
+
+// categoryMustBePlain refuses (409) a page of the type typ under the title of the category of the conversation pages.
+// The writes that give a title or a type call it: insertPage (a new page), rename (the page gets the title) and
+// keepCategoryPlain (a new type for a page).
+func categoryMustBePlain(typ, title string) error {
+	if typ == "page" || !IsConversationCategory(title) {
+		return nil
+	}
+	return Conflict("%q is the category of the conversation pages: a page under that title stays a plain page", ConversationCategory)
+}
+
+// keepCategoryPlain is categoryMustBePlain for the page id that gets the type typ. The page holds the title as its
+// preferred name, or as a name it had before a rename: say finds the category by the key, so both count.
+func (t *Tx) keepCategoryPlain(id int64, typ string) error {
+	var title string
+	err := t.tx.QueryRowContext(t.ctx, `SELECT title FROM entity_names WHERE entity_id = ? AND name_key = ?`, id, categoryKey).Scan(&title)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	return categoryMustBePlain(typ, title)
 }
 
 // The body of a conversation page holds the turns of the owner, and a line that reads as one would be a turn that the

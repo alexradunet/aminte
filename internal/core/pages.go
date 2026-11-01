@@ -110,14 +110,16 @@ func (t *Tx) createNamed(typ, title, body string, day any, extra func(int64) err
 }
 
 // promotable says whether a page may be offered to become a person or a metric: a live plain page that is
-// not a day page or a period page (entities_day_page_plain, entities_period_page) and that nothing is filed in (a
-// category: its part-of links need a plain page, entities_endpoint_types). It reads the stored columns. It is an
-// offer, not a rule: a promotion that the schema refuses for another reason is still the schema's 422.
+// not a day page or a period page (entities_day_page_plain, entities_period_page), that nothing is filed in (a
+// category: its part-of links need a plain page, entities_endpoint_types) and that does not hold the title of the
+// category of the conversations (categoryMustBePlain). It reads the stored columns. It is an offer, not a rule: a
+// promotion that the schema refuses for another reason is still the schema's 422.
 func (t *Tx) promotable(id int64) (bool, error) {
 	var ok bool
 	err := t.tx.QueryRowContext(t.ctx, `SELECT e.entity_type = 'page' AND e.deleted_at IS NULL AND NOT e.is_journal AND e.period IS NULL
 		   AND NOT EXISTS (SELECT 1 FROM links l WHERE l.to_id = e.id AND l.kind = 'part-of')
-		  FROM entities e WHERE e.id = ?`, id).Scan(&ok)
+		   AND NOT EXISTS (SELECT 1 FROM entity_names n WHERE n.entity_id = e.id AND n.name_key = ?)
+		  FROM entities e WHERE e.id = ?`, categoryKey, id).Scan(&ok)
 	return ok, err
 }
 

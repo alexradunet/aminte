@@ -10,20 +10,28 @@ import (
 	"lifelog/text"
 )
 
-// insertPage makes the page of a write that the caller chose to make: it refuses a conversation title (reservedTitle),
-// then inserts the row.
+// insertPage makes the page of a write that the caller chose to make: it refuses a conversation title (reservedTitle)
+// and a type other than page under the title of the category of the conversations (categoryMustBePlain), then inserts
+// the row.
 func (t *Tx) insertPage(typ, title, key string, day any, body string) (int64, error) {
 	if err := reservedTitle(title); err != nil {
+		return 0, err
+	}
+	if err := categoryMustBePlain(typ, title); err != nil {
 		return 0, err
 	}
 	return t.insertRow(typ, title, key, day, body)
 }
 
 // retype changes the type of the page p to typ and revives it. The page keeps its id and its links. A page that holds a
-// conversation title keeps its type (reservedTitle). The schema refuses the other changes that it cannot allow
+// conversation title keeps its type (reservedTitle), and so does the page that holds the title of the category of the
+// conversations (keepCategoryPlain). The schema refuses the other changes that it cannot allow
 // (entities_promote_from_page).
 func (t *Tx) retype(p *pageRef, typ string) error {
 	if err := reservedTitle(p.Title); err != nil {
+		return err
+	}
+	if err := t.keepCategoryPlain(p.ID, typ); err != nil {
 		return err
 	}
 	_, err := t.tx.ExecContext(t.ctx, `UPDATE entities SET entity_type = ?, deleted_at = NULL WHERE id = ?`, typ, p.ID)
@@ -164,6 +172,11 @@ func (t *Tx) rename(id int64, newTitle string) (int64, error) {
 		if err := reservedTitle(title); err != nil {
 			return 0, err
 		}
+	}
+	// The title of the category goes to a plain page alone. The plain page that holds it may be renamed: it keeps the
+	// title as a name it had, so say still finds it, and keepCategoryPlain keeps it plain.
+	if err := categoryMustBePlain(p.Type, newTitle); err != nil {
+		return 0, err
 	}
 	key := text.TitleKey(newTitle)
 	target, err := t.lookupKey(key)

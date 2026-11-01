@@ -101,7 +101,8 @@ not a position, because the core puts a reply right after the turn that it answe
 turn. So each turn is sent once, wherever it stands on the page, also after an edit above it or after a delete and a
 revive of the page. After each look, the keys of a day are the keys of the turns that the page has: the key of a turn
 that the owner removed is dropped, so it cannot hide a new turn that gets the same key (the same words, in the same
-minute, from the same relay). A page with no turns (a deleted page) keeps its keys, because its turns come back when the
+minute, from the same relay). When an edit removes the first of two equal turns (the same minute and words), the later
+one takes its key, so a new equal turn that the owner says in that window (before the next look) can be counted as sent. A page with no turns (a deleted page) keeps its keys, because its turns come back when the
 page is revived. To pair again, delete `session.db`. A `state.json` of an earlier version
 is a first run: the program adopts the page as it is and sends no earlier turn. Its `saved_at`, when it has one (the
 file of the agent that lived in this program), is read as the time of the last message that was said, so a message that

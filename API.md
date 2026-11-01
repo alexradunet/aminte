@@ -965,6 +965,14 @@ the one other write that makes such a page: the save contract makes an empty pla
 That page has no turns, so it is no conversation yet, and the first `say` of its day adopts it: it writes the first
 line, files the page in `Conversations` and gives it its day, as for a page that it makes itself.
 
+**The category of the conversation pages.** The title `Conversations`, in any case, belongs to a plain page, because a
+part-of link needs a plain page and `say` files every conversation page in that category. A write that would make the
+page under that title a person, a metric or a file, or change its type, is 409 for every writer, and writes nothing:
+`create-person`, `register-metric`, `add-file`, `promote`, and `rename` of a page that is not a plain page to the title.
+The message says that the page stays a plain page. A plain page under the title is allowed (`create-page`, a wikilink,
+the `category` of a filing, `rename` of a plain page, and `say`). The plain page may be renamed: it keeps the title as
+a name that it had, `say` still files in it, and `promote` of it is 409 as well.
+
 `POST /days/{day}/reply` (the action `reply`; no owner action: the agent's writer `agent:lifelog` runs it, and so may
 any writer): the agent's turn, written in one transaction on the conversation page of `day` (a local day or the word
 `today`, any day that has a page).

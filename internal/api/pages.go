@@ -82,8 +82,9 @@ func (h *server) pageEntity(ctx context.Context, id int64) (*siren.Entity, error
 		e.Links = append(e.Links, link("conversation", conversationHref(day), "Conversation"))
 	}
 	e.Links = append(e.Links, coverLinks(p)...)
-	// register-metric turns a plain page into the metric; not a period page or a category (core's promotable)
-	if p.Type == "page" && day == "" && !p.IsDayPage && p.Period == "" && p.DeletedAt == "" && !slices.ContainsFunc(p.In, func(l core.Edge) bool { return l.Kind == "part-of" }) {
+	// register-metric turns a plain page into the metric; not a period page, a category or the category of the
+	// conversations (core's promotable)
+	if p.Type == "page" && day == "" && !core.IsConversationCategory(p.Title) && !p.IsDayPage && p.Period == "" && p.DeletedAt == "" && !slices.ContainsFunc(p.In, func(l core.Edge) bool { return l.Kind == "part-of" }) {
 		e.Links = append(e.Links, link("make-metric", siren.NewMetricHref(p.Title), "Make it a metric"))
 	}
 	for _, l := range p.Out {
@@ -132,7 +133,8 @@ func pageActions(p *core.Page, kinds []string, cats []core.Category) []siren.Act
 	out = append(out, saveBodyAction(p.ID, p.Body, p.Version))
 	if !p.IsDayPage {
 		keeps := core.ConversationDay(p.Title) != "" // its day names it: no write changes its title or its type
-		if p.Type == "page" && !keeps {
+		// the category of the conversations keeps its type, but not its title: rename stays
+		if p.Type == "page" && !keeps && !core.IsConversationCategory(p.Title) {
 			out = append(out, action("promote", ids, nil))
 		}
 		if !keeps {

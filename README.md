@@ -243,7 +243,9 @@ These are this application's own engineering decisions ([D14](docs/decisions/D14
   equal turn, and a key that is no more on the page is 409. An agent or an import cannot write the body of a conversation
   page (403): not with `save-body`, not with `set-cover`, and not with an action that is added later, because the core
   refuses it in its one write of a body. No write makes a page under a conversation title or changes the type of its
-  page (409). So only `say` writes a turn of the owner for a surface, and an edit of the owner that types a marker line is
+  page (409). The category `Conversations` stays a plain page in the same way: no write makes it a person, a metric
+  or a file (409), for every writer, because `say` files each conversation page in it; a plain page under that title
+  is allowed, also after a rename. So only `say` writes a turn of the owner for a surface, and an edit of the owner that types a marker line is
   a turn of the owner too. A wikilink may still make an empty page
   with that title, and the first `say` adopts it. The core escapes a line of a `say` or a `reply` that reads as a
   marker or as a tool line, and closes a code fence that the text or an edit leaves open, so the page stays readable as

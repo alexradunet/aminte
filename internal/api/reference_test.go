@@ -87,7 +87,7 @@ func TestAPIReferenceMatchesTheCode(t *testing.T) {
 
 	// Live: every route's top-level keys are documented for its section.
 	h, c, ids := fixture(t)
-	if _, _, err := c.AppendParagraph(t.Context(), "cli", core.ConversationTitle("2031-05-01"), "2031-05-01", conversationCategory, conversationFirstLine("2031-05-01"),
+	if _, _, err := c.AppendParagraph(t.Context(), "cli", core.ConversationTitle("2031-05-01"), "2031-05-01", core.ConversationCategory, conversationFirstLine("2031-05-01"),
 		func(body string) string { return body + "\n\n**Owner** (09.07): Hello" }); err != nil {
 		t.Fatal(err)
 	}

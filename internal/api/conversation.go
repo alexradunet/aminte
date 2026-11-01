@@ -1,8 +1,8 @@
 package api
 
 // The conversation of a day: a plain page, as API.md describes it. This file is the one home of its convention in
-// the program: the category, the first line, the owner's paragraph, the parse of the turns and their keys. Its title,
-// and the rule that only say makes a page under that title, are in internal/core (conversation.go). The core calls no
+// the program: the first line, the owner's paragraph, the parse of the turns and their keys. The title of the page and
+// the title of its category, and the rules that keep them, are in internal/core (conversation.go). The core calls no
 // model. An agent (an extension) reads the page and writes its own paragraphs in the same format.
 
 import (
@@ -22,9 +22,6 @@ import (
 	"lifelog/siren"
 	"lifelog/text"
 )
-
-// conversationCategory is the category page that every conversation page is filed in.
-const conversationCategory = "Conversations"
 
 // conversationFirstLine is the first line of the page: a link to the day it is about.
 func conversationFirstLine(day string) string { return "[[" + day + "]]" }
@@ -359,7 +356,7 @@ func (h *server) say(r *http.Request, a admitted) (*siren.Entity, error) {
 		return nil, core.Invalid("via %q: a name of letters, digits, _ : . -", via)
 	}
 	block := paragraph("Owner", h.stamp(via), entry)
-	_, sync, err := h.s.AppendParagraph(r.Context(), a.src, core.ConversationTitle(day), day, conversationCategory,
+	_, sync, err := h.s.AppendParagraph(r.Context(), a.src, core.ConversationTitle(day), day, core.ConversationCategory,
 		conversationFirstLine(day), func(body string) string {
 			lines, _ := bodyLines(day, body)
 			return joinBlock(settled(lines), block)
