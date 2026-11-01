@@ -24,7 +24,7 @@
 {{template "menu-dialogs" $menu}}
 </header>
 <section class="thread" aria-label="Conversation of {{$.Date $p.day}}">
-{{if $turns}}{{template "thread" (dict "v" $ "turns" $turns "day" $p.day)}}{{else if .Action "say"}}<div class="turns"><p class="empty">Nothing is said on this day yet. Write to the agent below. It answers here when it runs: start it with <code>lifelog whatsapp</code>.</p></div>{{else}}<div class="turns"><p class="empty">Nothing was said on this day.</p></div>{{end}}
+{{if $turns}}{{template "thread" (dict "v" $ "turns" $turns "day" $p.day)}}{{else if .Action "say"}}<div class="turns"><p class="empty">Nothing is said on this day yet. Write to the agent below. It answers here when it runs: start it with <code>lifelog serve --with agent</code>.</p></div>{{else}}<div class="turns"><p class="empty">Nothing was said on this day.</p></div>{{end}}
 </section>
 {{with .Action "say"}}<footer class="composer">{{template "form" (form . "button" "Say" "class" "chat-form" "plain" "1" "send" "1" "back" $.ReturnHere)}}
 <p class="hint"><kbd>Enter</kbd> sends · <kbd>Shift</kbd>+<kbd>Enter</kbd> a new line</p></footer>{{end}}

@@ -160,6 +160,8 @@ things:
   the error. A page of the shell takes `Speculation-Rules`, so Chromium draws the previous and the next page on hover
   before the click. A 503 keeps the `Retry-After` of the core. A page that carries the receipt of a toast
   (`?feedback=`) draws the toast once, with `Cache-Control: no-store` and `Referrer-Policy: no-referrer`.
+  Siren says that `properties` is an object. An answer whose `properties` is a list, a string or a number is no entity:
+  it is a fault of the core or of an app. The browser gets the 502 `upstream` page, and the log has one line.
 - **Any other answer** (a picture, a file, a snapshot). The body streams to the browser, with the status and the
   headers that describe it (`Content-Type`, `Content-Length`, `Content-Disposition`, `Cache-Control`, `ETag`,
   `Last-Modified`, `Accept-Ranges`, `Content-Range`, `Allow`). The `Range` and the conditional headers of the browser go

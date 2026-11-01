@@ -160,7 +160,8 @@ func (l *life) do(t *testing.T, from, action string, values map[string]string) *
 	return must(t)(l.api.Do(t.Context(), act(t, e, action), values))
 }
 
-// toolLines are the tool lines that name each address, as an agent writes them.
+// toolLines are the tool lines that name each address, as an agent writes them (the field tools of reply, or the lines of
+// a turn that a test writes into the page).
 func toolLines(refs ...string) string {
 	var b strings.Builder
 	for i, ref := range refs {

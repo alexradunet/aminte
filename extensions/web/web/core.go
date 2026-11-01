@@ -153,11 +153,15 @@ func (c *core) readEntity(res *http.Response) (*siren.Entity, error) {
 	return entityOf(res, body)
 }
 
-// entityOf decodes body, the body of res, as one Siren entity.
+// entityOf decodes body, the body of res, as one Siren entity. Siren says that properties is an object, so a list, a string
+// or a number there is no entity: it is a fault of the core or of an app, and web never draws it.
 func entityOf(res *http.Response, body []byte) (*siren.Entity, error) {
 	e := &siren.Entity{}
 	if err := json.Unmarshal(body, e); err != nil {
 		return nil, fmt.Errorf("HTTP %d, not a Siren entity (%s)", res.StatusCode, res.Header.Get("Content-Type")) // never the body: it may be a picture or a page
+	}
+	if _, isObject := e.Properties.(map[string]any); e.Properties != nil && !isObject {
+		return nil, fmt.Errorf("HTTP %d, not a Siren entity (the properties are not an object)", res.StatusCode) // never the value: it may be private
 	}
 	return e, nil
 }

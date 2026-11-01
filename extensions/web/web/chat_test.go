@@ -2,7 +2,8 @@ package web_test
 
 // The chat of the shell as web draws it over the real core: the column on every page, the chat screen that is the
 // conversation view, and the cards of the things that the agent touched. The file is made through the API, as an owner
-// and an agent make it: the owner says, and the agent writes its turns into the page of the conversation with save-body.
+// and an agent make it: the owner says, and the agent answers with reply. A test that needs a turn with a stamp of its own
+// writes it into the page as the owner's edit (chatAppend), because the core stamps a reply with its own clock.
 
 import (
 	"net/http"
@@ -63,7 +64,8 @@ func chatPageOf(t *testing.T, l *life) (*siren.Entity, string) {
 	return page, body
 }
 
-// chatAppend writes more at the end of the page of the conversation of today, as an agent does with save-body.
+// chatAppend writes more at the end of the page of the conversation of today, as the owner does with save-body. The core
+// refuses save-body on a conversation page to an agent: the agent writes its turn with reply.
 func chatAppend(t *testing.T, l *life, more string) {
 	t.Helper()
 	page, body := chatPageOf(t, l)
@@ -159,10 +161,14 @@ func TestTheConversationViewIsTheChatScreen(t *testing.T) {
 func TestADayWithNoTurnsSaysWhereTheAgentAnswers(t *testing.T) {
 	l := emptyLife(t)
 	view := pageAt(t, l.web, "/days/"+today+"/conversation")
-	for _, want := range []string{`class="empty"`, "It answers here when it runs", "lifelog whatsapp", `<textarea name="text"`} {
+	for _, want := range []string{`class="empty"`, "It answers here when it runs", "<code>lifelog serve --with agent</code>", `<textarea name="text"`} {
 		if !strings.Contains(view, want) {
 			t.Errorf("the empty conversation lacks %q", want)
 		}
+	}
+	// The transport of WhatsApp answers nothing: the agent is an extension of its own (plan 162).
+	if strings.Contains(view, "lifelog whatsapp") {
+		t.Error("the empty conversation tells the owner to start the transport of WhatsApp, which answers nothing")
 	}
 	if strings.Contains(view, `class="turn `) || strings.Contains(view, `aria-label="Facts"`) || strings.Contains(view, "<summary>Edit</summary>") {
 		t.Error("a day with no page draws a turn, the margin of a page or the editor of one")

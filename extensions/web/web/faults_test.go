@@ -141,3 +141,65 @@ func TestAPageThatCannotBeSentIsLoggedOnceUnderTheRouteAndNotThePath(t *testing.
 		})
 	}
 }
+
+// TestPropertiesThatAreNotAnObjectAreAFaultOfTheCore: Siren says that properties is an object. A core or an app that sends a
+// list, a string or a number sends an answer that is not an entity: the browser gets the 502 upstream page, whatever the
+// status of the answer, for a read and for a write. The log has the fault once, under the pattern of the route, and holds
+// none of the data. Properties that are absent or null, and an object, are drawn as before.
+func TestPropertiesThatAreNotAnObjectAreAFaultOfTheCore(t *testing.T) {
+	const secret = "secret-row"
+	for name, c := range map[string]struct {
+		status int
+		body   string
+		fault  bool // the answer is a fault of the core, not a page
+	}{
+		"a list":                      {http.StatusOK, `{"class":["thing"],"title":"A thing","properties":[{"name":"` + secret + `"}]}`, true},
+		"a string":                    {http.StatusOK, `{"class":["thing"],"title":"A thing","properties":"` + secret + `"}`, true},
+		"a number":                    {http.StatusOK, `{"class":["thing"],"title":"A thing","properties":5}`, true},
+		"an error with a string":      {http.StatusNotFound, `{"class":["error"],"title":"Error","properties":"` + secret + `"}`, true},
+		"an error with a list":        {http.StatusUnprocessableEntity, `{"class":["error"],"title":"Error","properties":["` + secret + `"]}`, true},
+		"null properties":             {http.StatusOK, `{"class":["thing"],"title":"A thing","properties":null}`, false},
+		"no properties":               {http.StatusOK, `{"class":["thing"],"title":"A thing"}`, false},
+		"an object with a list in it": {http.StatusOK, `{"class":["thing"],"title":"A thing","properties":{"rows":[{"name":"` + secret + `"}]}}`, false},
+	} {
+		t.Run(name, func(t *testing.T) {
+			mux := http.NewServeMux()
+			mux.HandleFunc("GET /actions", func(w http.ResponseWriter, r *http.Request) {
+				sirenAnswer(w, http.StatusOK, `{"class":["actions"],"actions":[]}`)
+			})
+			answer := func(w http.ResponseWriter, r *http.Request) { sirenAnswer(w, c.status, c.body) }
+			mux.HandleFunc("GET /things/{name}", answer)
+			mux.HandleFunc("POST /things/{name}", answer)
+			h := webOver(t, mux)
+			for how, send := range map[string]func() *httptest.ResponseRecorder{
+				"a read": func() *httptest.ResponseRecorder { return ask(h, http.MethodGet, "/things/secret-name") },
+				"a write": func() *httptest.ResponseRecorder {
+					return postForm(h, "/things/secret-name", url.Values{"text": {"words"}})
+				},
+			} {
+				logged := captureLog(t)
+				rec := send()
+				page, log := rec.Body.String(), logged.String()
+				// The fake core has no root, so web also logs that it cannot read the shell: the fault is the line that names the answer.
+				n := strings.Count(log, "/: the answer of the core cannot be read: ")
+				if !c.fault {
+					if rec.Code != c.status || !strings.Contains(page, "A thing") || n != 0 {
+						t.Errorf("%s: status %d, log %q, want the page of the thing with %d and no fault in the log", how, rec.Code, log, c.status)
+					}
+					continue
+				}
+				if rec.Code != http.StatusBadGateway || !strings.Contains(page, "not an entity") || !strings.Contains(page, "upstream") {
+					t.Errorf("%s: status %d, want the 502 page with the code upstream: %.400s", how, rec.Code, mainPartOf(page))
+				}
+				if n != 1 {
+					t.Errorf("%s: the log has %q, want the fault once, under the pattern of the route", how, log)
+				}
+				for _, leak := range []string{secret, "secret-name"} {
+					if strings.Contains(page, leak) || strings.Contains(log, leak) {
+						t.Errorf("%s: the page or the log holds %q", how, leak)
+					}
+				}
+			}
+		})
+	}
+}

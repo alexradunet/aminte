@@ -268,7 +268,8 @@ type Facts struct {
 }
 
 // pageView is the view of a page: the entity and the facts of the page. It reads nothing, so the same arguments give
-// the same view. Properties that are not an object give a view with none.
+// the same view. An entity with no properties gives a view with none. Web refuses properties that are not an object
+// before it draws (entityOf in web/core.go), so they never reach this call.
 func pageView(e *siren.Entity, f Facts) *view {
 	props, _ := e.Properties.(map[string]any)
 	return &view{Entity: e, Props: props, Path: f.URL.Path, Here: hereOf(f.URL), Submitted: f.Submitted, Back: f.Back,

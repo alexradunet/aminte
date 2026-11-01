@@ -207,7 +207,7 @@ var backOfCases = []struct{ back, want string }{
 // backOf keeps a path on this server and drops every other value (docs/plans/091-the-browser-for-daily-use.md).
 func TestBackOfKeepsAPathOnThisServerAndDropsEveryOtherValue(t *testing.T) {
 	if len(backOfCases) != 26 {
-		t.Fatalf("%d cases, want the 26 of the core", len(backOfCases))
+		t.Fatalf("%d cases, want 26", len(backOfCases))
 	}
 	for _, tc := range backOfCases {
 		if got := backOf(tc.back); got != tc.want {
