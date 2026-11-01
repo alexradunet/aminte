@@ -64,7 +64,7 @@ type fakeAPI struct {
 	without                   []string         // actions that the catalog lacks
 	catalogFails              bool             // GET /actions answers 503
 	replyFails                bool             // reply answers 500
-	replyFaults               []int            // the statuses of the next reply requests, one for each; then reply works
+	replyFaults               []replyFault     // the next reply requests, one fault for each; then reply works
 	loseAnswers               int              // the next replies are written, and the connection ends before the answer
 	day                       string           // the local day of the server; "" is today
 	now                       func() time.Time // the clock of the server; nil is fixedNow
@@ -197,11 +197,29 @@ func (f *fakeAPI) setReplyFails(on bool) {
 	f.replyFails = on
 }
 
-// failReplies makes the next reply requests answer these statuses, one for each. Nothing is written for them.
+// replyFault is a reply request that fails: the status that it answers, and an edit that the owner makes right after it.
+// Nothing is written for the request itself.
+type replyFault struct {
+	status int
+	edit   [3]string // title of the page, words to replace, new words; "" for no edit
+}
+
+// failReplies makes the next reply requests answer these statuses, one for each. Nothing is written for them. A 503 is
+// the busy file of the real core (code busy).
 func (f *fakeAPI) failReplies(statuses ...int) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.replyFaults = append(f.replyFaults, statuses...)
+	for _, s := range statuses {
+		f.replyFaults = append(f.replyFaults, replyFault{status: s})
+	}
+}
+
+// failReplyThenEdit makes the next reply request answer the status, and the owner then edits the page: the words from
+// become the words to. The edit comes before the next request of the agent, so the key of the turn is another one.
+func (f *fakeAPI) failReplyThenEdit(status int, title, from, to string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.replyFaults = append(f.replyFaults, replyFault{status: status, edit: [3]string{title, from, to}})
 }
 
 // loseNextAnswer makes the next reply be written, and then ends the connection before the answer: the agent cannot tell
@@ -320,9 +338,16 @@ var markerLine = regexp.MustCompile(`(?m)^\*\*(Owner|lifelog)\*\* \(`)
 // for the real API: the page changed. The caller holds the lock.
 func (f *fakeAPI) reply(day string, form url.Values) (int, string) {
 	if len(f.replyFaults) > 0 {
-		status := f.replyFaults[0]
+		fault := f.replyFaults[0]
 		f.replyFaults = f.replyFaults[1:]
-		return status, "unavailable"
+		if title := fault.edit[0]; title != "" {
+			p := f.find(title)
+			p.body, p.version = strings.Replace(p.body, fault.edit[1], fault.edit[2], 1), p.version+1
+		}
+		if fault.status == 503 { // the busy file of the real core: nothing was written, and a retry is safe
+			return fault.status, siren.CodeBusy
+		}
+		return fault.status, "unavailable"
 	}
 	if f.replyFails {
 		return 500, "internal"

@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"maps"
 	"strings"
 	"time"
 	"unicode"
@@ -71,13 +72,16 @@ type Agent struct {
 	// tools and actions come from one read of the catalog. Only Run uses them, from one goroutine: they need no lock.
 	tools   []tools.Tool
 	actions map[string]siren.Action
-	// checked is the day of the server for which the day before was looked at: on the first look, and on each new day.
+	// checked is the day of the server for which no turn waits on the day before. Until then, each look reads the day
+	// before. So a turn that waits there, and whose reply was refused, is read again.
 	checked string
-	// done is the key of the page that the agent read when its reply was refused or failed. The agent does not answer
-	// that page again: a new run of the model would repeat the tool calls of the first run. It answers again when the
-	// page changes. A 409 for the key of a turn means that the page changed (the owner edited the turn, or removed
-	// it): the next look reads the new page, and the agent answers the turns that wait on it.
-	done    string
+	// done holds, for each day, the key of the page that the agent read when its reply was refused or failed. The agent
+	// does not answer that page again: a new run of the model would repeat the tool calls of the first run. It answers
+	// again when the page changes. A 409 for the key of a turn means that the page changed (the owner edited the turn,
+	// or removed it): the next look reads the new page, and the agent answers the turns that wait on it. The agent looks
+	// at two pages, today's and the day before, and each has its own entry, so a refusal on one page does not make the
+	// agent run the model on the other page again.
+	done    map[string]string
 	lookErr string
 }
 
@@ -88,6 +92,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	if a.logger == nil {
 		a.logger = log.Default()
 	}
+	a.done = map[string]string{}
 	if a.Now == nil {
 		a.Now = time.Now
 	}
@@ -169,8 +174,10 @@ func (a *Agent) look(ctx context.Context) {
 	}
 }
 
-// lookAt answers the turn of the owner that waits on today's page. On the first look and on a new day it answers a
-// turn that waits on the page of the day before first: a turn said before midnight is answered on its own page.
+// lookAt answers the turn of the owner that waits on today's page. While a turn waits on the page of the day before, it
+// answers that turn first: a turn said before midnight is answered on its own page. It reads the day before at each
+// look until no turn waits there, because the owner can edit the turn while the model works, and the core then refuses
+// the reply (409): the next look reads the page again.
 func (a *Agent) lookAt(ctx context.Context) error {
 	today, err := a.read(ctx, "today")
 	if err != nil {
@@ -181,22 +188,28 @@ func (a *Agent) lookAt(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
+		maps.DeleteFunc(a.done, func(day, _ string) bool { return day != today.Day && day != before })
 		yesterday, err := a.read(ctx, before)
 		if err != nil {
 			return err
 		}
-		a.checked = today.Day
-		if yesterday.pending() {
+		switch {
+		case !yesterday.pending():
+			a.checked = today.Day
+		case !a.refused(yesterday):
 			a.logger.Printf("answering a turn that waited on the page of %s", yesterday.Day)
 			a.turn(ctx, yesterday)
 			return nil // the page of today is read again at the next look: the turn took time
 		}
 	}
-	if today.pending() {
+	if today.pending() && !a.refused(today) {
 		a.turn(ctx, today)
 	}
 	return nil
 }
+
+// refused says whether the agent has run the model on this page, as it is now, and its reply was refused or failed.
+func (a *Agent) refused(p *page) bool { return a.done[p.Day] == p.key() }
 
 // dayBefore is the day before a day (YYYY-MM-DD).
 func dayBefore(day string) (string, error) {
@@ -214,9 +227,6 @@ func dayBefore(day string) (string, error) {
 // and waits for its own run. If the owner edits the answered turn meanwhile, its key is not on the page any more and the
 // core refuses the reply (409): the agent reads the page again at the next look.
 func (a *Agent) turn(ctx context.Context, p *page) {
-	if p.key() == a.done {
-		return
-	}
 	tctx, cancel := context.WithTimeout(ctx, turnTimeout)
 	defer cancel()
 	at := a.Now() // one time for the turn: the model reads the same day through the turn, also across midnight
@@ -235,7 +245,7 @@ func (a *Agent) turn(ctx context.Context, p *page) {
 	if err != nil {
 		if ctx.Err() == nil {
 			a.logger.Printf("reply was refused or failed (turn %s of %s): %v", p.lastOwner(), p.Day, err)
-			a.done = p.key()
+			a.done[p.Day] = p.key()
 		}
 		return
 	}
@@ -246,14 +256,19 @@ func (a *Agent) turn(ctx context.Context, p *page) {
 // core refuses a reply to a turn that has one (409). So a failure that a second send can mend is sent again, up to
 // replyAttempts sends in all, with a wait that doubles before each, and all within the time of ctx. Such a failure is a
 // 5xx (the file is busy) or an error with no status (the request or its answer was lost). A 4xx is the answer of the
-// core about this reply, and the same reply gets the same answer, so it is not sent again. A 409 after the first send
-// says that an earlier send was written and only its answer was lost: the reply is on the page. If the page changed
-// instead (the owner edited the turn between two sends), the next look reads it again and answers the turn that waits.
+// core about this reply, and the same reply gets the same answer, so it is not sent again.
+//
+// A 409 on a second or later send says that an earlier send was written and only its answer was lost, but only when an
+// earlier send may have been written: it had no status, or a 5xx other than the busy file. The core writes nothing for
+// a busy file (code busy). After only such sends, a 409 means that the page changed (the owner edited the turn between
+// two sends), and it is a refusal like any other. The next look then reads the page again and answers the turn that
+// waits.
 func (a *Agent) send(ctx context.Context, form map[string]string) error {
 	wait := a.backoff
 	if wait == 0 {
 		wait = time.Second
 	}
+	mayBeWritten := false // an earlier send may have been written
 	for try := 1; ; try++ {
 		_, err := a.Client.Do(ctx, a.actions["reply"], form)
 		var ce *client.Error
@@ -261,11 +276,13 @@ func (a *Agent) send(ctx context.Context, form map[string]string) error {
 		switch {
 		case err == nil:
 			return nil
-		case try > 1 && refused && ce.Code() == siren.CodeConflict:
+		case mayBeWritten && refused && ce.Code() == siren.CodeConflict:
 			return nil
 		case try == replyAttempts || ctx.Err() != nil || (refused && ce.Status < 500):
 			return err
 		}
+		// Here the error has no status, or the status is 5xx.
+		mayBeWritten = mayBeWritten || !refused || ce.Code() != siren.CodeBusy
 		select {
 		case <-time.After(wait):
 			wait *= 2
@@ -354,9 +371,11 @@ func (a *Agent) answer(ctx context.Context, m *model.Client, p *page, at time.Ti
 
 // call runs one tool call. It returns the text for the model (the Siren entity as JSON, cut at maxResult, or the
 // sentence of an error; an error of the API is its error entity, which has the status) and the line for the page. The
-// line is one line: the name comes from the model, and the code and the href from the server, and none is trusted.
+// line is one line: the name comes from the model, and the code and the href from the server, and none is trusted. The
+// name stands in a code span, and a backtick in it would close the span: the rest of the name would read as the words of
+// a call that went well, and as its address. So a backtick of the name becomes an apostrophe.
 func (a *Agent) call(ctx context.Context, name, rawArgs string) (result, line string) {
-	label := oneLine(name)
+	label := strings.ReplaceAll(oneLine(name), "`", "'")
 	var t *tools.Tool
 	for i := range a.tools {
 		if a.tools[i].Name == name {

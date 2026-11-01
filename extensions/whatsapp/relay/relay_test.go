@@ -170,6 +170,31 @@ func TestAnEditAboveTheTurnsSendsNothingAgain(t *testing.T) {
 	}
 }
 
+// TestAParagraphAddedAboveATurnIsPartOfTheTurnBeforeItAndThatTurnIsSentAgain: a paragraph with no marker line belongs to
+// the turn before it. That turn has new words, so it has a new key, and the chat gets it again with the paragraph. The
+// turn below the paragraph keeps its key, and it is not sent again.
+func TestAParagraphAddedAboveATurnIsPartOfTheTurnBeforeItAndThatTurnIsSentAgain(t *testing.T) {
+	r := start(t)
+	r.settle(t)
+	r.api.ownerSaysElsewhere(today, "one")
+	r.api.agentReplies(today, "answer one")
+	r.api.ownerSaysElsewhere(today, "two")
+	r.poll(t)
+	for _, want := range []string{"You wrote in lifelog: one", "answer one", "You wrote in lifelog: two"} {
+		if got := r.chat.next(t); got != want {
+			t.Errorf("sent %q, want %q", got, want)
+		}
+	}
+	body := r.api.body(today)
+	r.api.edit(today, strings.Replace(body, "\n\n**Owner** (09:30): two", "\n\nA paragraph above two.\n\n**Owner** (09:30): two", 1))
+	r.poll(t)
+	if got := r.chat.next(t); got != "answer one\n\nA paragraph above two." {
+		t.Errorf("sent %q, want the turn before the paragraph, with the paragraph", got)
+	}
+	r.settle(t)
+	r.chat.none(t)
+}
+
 // TestADeletedPageThatIsRevivedSendsNoEarlierTurnAgain: a deleted page has no turns, and a revive brings them back with the
 // new turn. The relay keeps what it dealt with, so only the new turn is sent.
 func TestADeletedPageThatIsRevivedSendsNoEarlierTurnAgain(t *testing.T) {

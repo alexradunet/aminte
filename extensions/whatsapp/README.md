@@ -30,8 +30,9 @@ flowchart LR
 - **An edit of a turn sends that turn again.** The core makes the key of a turn from its words, its minute and its relay.
   When the owner edits the words of a turn on the page (a typo in the first line, a note added below a reply), the turn
   has a new key. The program has not sent that key, so it sends the turn again with its new words. A turn of the owner
-  that came from WhatsApp is never sent back, also after an edit. An edit that moves a turn (a paragraph added above it,
-  a turn removed above it) changes no key, and nothing is sent again.
+  that came from WhatsApp is never sent back, also after an edit. An edit that only moves a turn (a turn removed
+  above it) changes no key of that turn, and nothing is sent again. A paragraph with no marker line, added above a turn,
+  is part of the turn before it. That turn gets a new key, and the program sends it again with the paragraph.
 - **A reply after midnight arrives.** A turn said before midnight is answered on its own page, and the answer may come
   after midnight. The program reads the day before while its last turn is the owner's, and it sends the answer when it
   comes. A day older than yesterday is dropped.

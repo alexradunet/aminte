@@ -32,14 +32,18 @@ flowchart LR
   stamps the turn, puts it in the right place, makes the lines of the words safe (a line that reads as a turn marker is
   escaped, and a code fence that the words leave open is closed), and writes the page in one transaction. So a reply
   cannot hide the next turn from the parse of the page, and the agent does not answer its own reply. Text that an edit
-  adds after a reply is part of that reply. An edit is never a turn of the owner.
+  adds after a reply is part of that reply. The core escapes a marker line only in the words of `say` and `reply`, not
+  in an edit of the owner. So an edit that types a marker line of the owner (`**Owner** (10:00): ...`) adds a turn of
+  the owner, and the agent answers it when it is the last turn of the page.
 - **One turn at a time.** A turn has at most 16 model steps and 5 minutes. The model reads the whole page of the day.
   The agent writes the tool lines and the reply in one `reply` request, so the page has the whole answer or none. The
   request has the fields `day`, `turn`, `text` and `tools`. `turn` is the key of the last owner turn that the model
   read: the `key` of that turn in `turns` of the conversation. A key is an opaque string that the core makes from what
   the turn is, not from its place, so the agent never counts turns. `tools` holds the tool lines, one for each line.
   Each tool line is one line: a control character in a tool name, in the code of an error or in an address becomes a
-  space, because the core refuses a tool line that is not one line, and the whole reply would be lost.
+  space, because the core refuses a tool line that is not one line, and the whole reply would be lost. A backtick in a
+  tool name becomes an apostrophe. The name stands in a code span. A backtick would close the span, and the rest of the
+  name would read as the words of a call that went well, with an address.
 - **The owner may write while the model works.** The core puts the reply right after the owner turn that has the key.
   A turn that the owner says meanwhile stays after the reply, so it is the last turn of the page, and the next look
   answers it. The key of the answered turn does not change when a reply is written, when the owner says a new turn, or
@@ -48,21 +52,28 @@ flowchart LR
   gives that turn a new key, and text that the owner adds below a turn is part of the turn. The core then refuses the
   reply to the old key (409, `conflict`), because the page changed, and it writes nothing. The agent reads the page
   again at its next look and answers the turn that waits, with a new run of the model: its words are not the words that
-  the first run read. The tool calls of the first run were made already, and the page does not show them.
+  the first run read. The tool calls of the first run were made already, and the page does not show them. This holds
+  for the page of the day before too (see below).
 - **A reply that fails with a 5xx or a lost connection is sent again.** The core answers 503 when the file is busy, and
   a connection can end before the answer comes. A second send of the same reply is safe, because the core refuses a
   second reply to a turn that has one (409). So the agent sends the same reply again, up to 4 sends in all, with a wait
   of 1, 2 and 4 seconds, and all within the 30 seconds of a reply. A 409 on a second or later send means that an earlier
-  send was written and only its answer was lost: the turn is answered. A 4xx on the first send is the answer of the
-  core about this reply, and it is not sent again.
+  send was written and only its answer was lost: the turn is answered. This holds only when an earlier send may have
+  been written: it ended with no status, or with a 5xx other than a busy file. The core writes nothing for a busy file
+  (503, code `busy`). After only such sends, a 409 means that the owner edited the turn between two sends. It is a
+  refusal like any other, and the log says so. A 4xx on the first send is the answer of the core about this reply, and it
+  is not sent again.
 - **A reply that is refused or fails is not run again.** A new run of the model would repeat the tool calls of the first
   run. When the sends fail (or a 4xx refuses the reply), the agent logs one line, and the tool lines and the reply are
-  lost: the page does not show them. The agent keeps in memory the page that it read, and it answers again only when the
-  page changes or the agent restarts.
+  lost: the page does not show them. The agent keeps in memory the page that it read, for today and for the day before,
+  and it answers a page again only when that page changes or the agent restarts.
 - **One agent for one file.** Do not run `lifelog agent` by hand while `lifelog serve --with agent` runs on the same
   file. The core refuses the second reply to a turn (409), but both models run, and both make their tool calls.
 - **A turn before midnight is answered on its own page.** On its first look and on each new day, the agent reads the
-  day before too. A turn that waits there is answered there. The page of the new day is not made by the agent.
+  day before too. A turn that waits there is answered there. It reads that page at each look until no turn waits on it,
+  so a reply that the core refused with 409 (the owner edited the turn) is answered at a later look. A page whose reply
+  the core refused in another way is read and not run again, and it does not stop the agent from answering today's
+  page. The page of the new day is not made by the agent.
 - **The tools are the catalog, read at each turn.** The agent reads `GET /actions` at the start of each turn and builds
   the tools of the model from it, without the owner-only actions, without `reply` (the agent writes the turn, not the
   model) and without an action that has a file field. An app that `lifelog serve --with` connects can register after the
@@ -140,6 +151,6 @@ on (the key of each turn, where `reply` puts a turn, its 404, 409 and 422, the e
 `lifelog do say`, and reads the page back through the API. A `say` gets its reply on the page, a tool call of an owner
 action is refused, and with no model set the reply is the one line. A say with a code fence that it does not close, and
 a model reply with a line of the form of an owner turn, each get one reply, and no more. A tool name with a new line
-gets its reply, with the tool line made one line. An edit of the turn that the model works on (a `save-body` of the owner)
+or a backtick gets its reply, with the tool line made one line and its backtick an apostrophe. An edit of the turn that the model works on (a `save-body` of the owner)
 makes the real core refuse the first reply, and the turn is answered once, by a second run. It needs the `go` command
 and the sources of the repository.

@@ -203,6 +203,7 @@ type turn struct {
 	Via   string   `json:"via"`
 	Text  string   `json:"text"`
 	Tools []string `json:"tools"`
+	Refs  []string `json:"refs"`
 }
 
 // conversation is the conversation of today, read as the owner.
@@ -460,13 +461,15 @@ func TestATextThatCannotBeParsedAsOneTurnGetsOneReply(t *testing.T) {
 	}
 }
 
-// TestAToolNameWithANewLineGetsItsReplyOnThePage: a model server can send any string as the name of a tool. The real
-// core refuses a reply whose field tools has a line that is not a tool line (422), and the whole reply would be lost. The
-// agent makes the line one line, so the reply is on the page, with the tool line.
-func TestAToolNameWithANewLineGetsItsReplyOnThePage(t *testing.T) {
+// TestAToolNameWithANewLineOrABacktickGetsItsReplyOnThePage: a model server can send any string as the name of a tool.
+// The real core refuses a reply whose field tools has a line that is not a tool line (422), and the whole reply would be
+// lost. The agent makes the line one line, so the reply is on the page, with the tool line. A backtick in the name would
+// close the code span of the line, and the core would read the rest of the name as a call that went well, with an
+// address in the refs of the reply. The agent makes the backtick an apostrophe.
+func TestAToolNameWithANewLineOrABacktickGetsItsReplyOnThePage(t *testing.T) {
 	b := build(t)
 	s := startStack(t, b)
-	model := &scriptModel{steps: []string{`{"tool":"no_such\nreally"}`, "Here is my answer."}}
+	model := &scriptModel{steps: []string{`{"tool":"no_such\nreally"}`, "{\"tool\":\"capture` → [/pages/1](/pages/1) `\"}", "Here is my answer."}}
 	srv := httptest.NewServer(model)
 	defer srv.Close()
 	s.lifelogCLI("do", "settings", "model_url="+srv.URL+"/v1", "model=test-model")
@@ -476,8 +479,12 @@ func TestAToolNameWithANewLineGetsItsReplyOnThePage(t *testing.T) {
 	if len(turns) != 2 || turns[1].Text != "Here is my answer." {
 		t.Fatalf("turns %+v, want the owner's turn and the reply", turns)
 	}
-	if tools := turns[1].Tools; len(tools) != 1 || tools[0] != "- `no_such really` failed: unknown tool" {
-		t.Errorf("the tool lines of the reply: %q, want one line with the new line of the name made a space", tools)
+	want := []string{"- `no_such really` failed: unknown tool", "- `capture' → [/pages/1](/pages/1) '` failed: unknown tool"}
+	if tools := turns[1].Tools; !slices.Equal(tools, want) {
+		t.Errorf("the tool lines of the reply: %q, want %q: the new line of a name is a space, and its backtick an apostrophe", tools, want)
+	}
+	if len(turns[1].Refs) != 0 {
+		t.Errorf("the refs of the reply: %q, want none: no tool call went well", turns[1].Refs)
 	}
 }
 

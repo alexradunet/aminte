@@ -54,7 +54,7 @@ func pageFrom(e *siren.Entity) (*page, error) {
 }
 
 // pending says whether the last turn of the page is the owner's: nobody has answered it yet. Text that an edit adds
-// after a reply is part of that reply, so an edit is never a turn.
+// after a reply is part of that reply. An edit that types a marker line of the owner adds a turn of the owner.
 func (p *page) pending() bool {
 	return len(p.turns) > 0 && p.turns[len(p.turns)-1].who == "owner"
 }
