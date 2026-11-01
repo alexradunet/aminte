@@ -125,3 +125,75 @@ func TestAWikilinkMakesAnEmptyConversationPageAndSayAdoptsIt(t *testing.T) {
 		t.Errorf("the second paragraph: %q", p.Body)
 	}
 }
+
+// TestOnlyTheOwnerWritesTheBodyOfAConversationPage: a writer that is not the owner's (an agent, an import, a name that
+// is no writer name) is refused (403) in every write of a body of a conversation page that is not a turn: the save of a
+// body and the plain write of a body, which set-cover and every other caller uses. Nothing is written. The two writes
+// of turns, AppendParagraph (say) and EditBody (reply), pass for any writer. The owner's save passes, and so does the
+// save of any writer on a page that is no conversation.
+func TestOnlyTheOwnerWritesTheBodyOfAConversationPage(t *testing.T) {
+	s := fresh(t)
+	const title = "Conversation 2031-05-14"
+	turn := func(b string) string { return b + "\n\n**Owner** (09:00): Hello" }
+	id, _, err := s.AppendParagraph(ctx, "cli", title, "2031-05-14", "Conversations", "[[2031-05-14]]", turn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	notes, _, err := s.CreatePage(ctx, "cli", "Notes", "plain", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := s.CreatePage(ctx, "cli", "Stub", "see [[Conversation 2031-05-15]]", ""); err != nil {
+		t.Fatal(err)
+	}
+	stubID, _ := s.PageID(ctx, "Conversation 2031-05-15")
+	if stubID == 0 {
+		t.Fatal("the wikilink made no stub")
+	}
+	page := func(id int64) *Page {
+		p, err := s.PageByID(ctx, id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return p
+	}
+	for _, source := range []string{"agent:mcp", "import:x.y", "Agent:mcp", ""} {
+		for _, target := range []struct {
+			name string
+			id   int64
+		}{{"the page of a conversation", id}, {"the empty page that a wikilink made", stubID}} {
+			before := page(target.id)
+			if _, err := s.SaveBody(ctx, source, target.id, "forged", before.Version); status(err) != 403 || !strings.Contains(err.Error(), "reply") {
+				t.Errorf("SaveBody of %s as %q: %v, want 403 that names reply", target.name, source, err)
+			}
+			err := s.Do(ctx, source, func(tx *Tx) error { _, err := tx.SetBody(target.id, "forged"); return err })
+			if status(err) != 403 || !strings.Contains(err.Error(), "reply") {
+				t.Errorf("SetBody of %s as %q: %v, want 403 that names reply", target.name, source, err)
+			}
+			if got := page(target.id); got.Body != before.Body {
+				t.Errorf("a refusal wrote the body of %s as %q: %q, want %q", target.name, source, got.Body, before.Body)
+			}
+		}
+		if _, err := s.SaveBody(ctx, source, notes, "plain "+source, page(notes).Version); err != nil {
+			t.Errorf("SaveBody of a plain page as %q: %v, want it allowed", source, err)
+		}
+	}
+	// The two writes of turns pass for an agent.
+	if _, _, err := s.EditBody(ctx, "agent:lifelog", title, func(b string) (string, error) { return b + "\n\n**lifelog** (09:01): Hi", nil }); err != nil {
+		t.Errorf("EditBody (reply) as agent:lifelog: %v, want it allowed", err)
+	}
+	if _, _, err := s.AppendParagraph(ctx, "agent:mcp", title, "2031-05-14", "Conversations", "[[2031-05-14]]", turn); err != nil {
+		t.Errorf("AppendParagraph (say) as agent:mcp: %v, want it allowed", err)
+	}
+	// The owner saves the body, and the first AppendParagraph still adopts the empty page that a wikilink made.
+	p := page(id)
+	if _, err := s.SaveBody(ctx, "cli", id, p.Body+"\n\nan edit", p.Version); err != nil {
+		t.Errorf("SaveBody of the conversation as the owner: %v, want it allowed", err)
+	}
+	if _, _, err := s.AppendParagraph(ctx, "agent:mcp", "Conversation 2031-05-15", "2031-05-15", "Conversations", "[[2031-05-15]]", turn); err != nil {
+		t.Fatal(err)
+	}
+	if p := page(stubID); p.Day != "2031-05-15" || !strings.HasPrefix(p.Body, "[[2031-05-15]]") {
+		t.Errorf("the stub after the first turn: body %q, day %q, want it adopted", p.Body, p.Day)
+	}
+}

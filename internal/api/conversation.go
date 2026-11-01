@@ -16,6 +16,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	"lifelog/internal/core"
 	"lifelog/siren"
@@ -65,9 +66,9 @@ const toolMark = "- `"
 //   - a line outside a fence that reads as a marker is escaped (`\*\*Owner\*\* (09:31): ...`): it shows the same
 //     in a Markdown view, and it is text and not a turn;
 //   - a line outside a fence that starts with a dash, a space and a backtick (toolMark) has a backslash before the
-//     dash: it shows the same in a Markdown view, and it is no tool line. ParseTurns gives the tool lines right
-//     before a marker of lifelog to that marker, so a turn of the owner that ends in such lines would lose them to the
-//     reply that follows;
+//     dash, and it is no tool line. ParseTurns gives the tool lines right before a marker of lifelog to that
+//     marker, so a turn of the owner that ends in such lines would lose them to the reply that follows. ParseTurns
+//     takes the backslash off again (turnWords), so the turn has the words that were said;
 //   - a fence that the words open and do not close is closed by a line of three backticks at the end, so the next
 //     marker is not hidden inside it;
 //   - the words start on a line of their own when their first line is a fence line: after the marker, on its line, it
@@ -119,7 +120,9 @@ var turnStart = regexp.MustCompile(`^\*\*(Owner|lifelog)\*\* \((\d\d[:.]\d\d)(?:
 
 // withKeys gives each turn its key and gives the turns back. A key is 16 hex digits of a SHA-256 hash of the who, the
 // time, the relay and the words of the turn, and of the number of turns before it that have the same four: so no two
-// turns of a page have one key, and a key does not move when a reply is written or an earlier turn is removed. A key
+// turns of a page have one key, and a key does not move when a reply or a say is written, or when an earlier turn
+// that is different is removed. When the owner removes an earlier turn that is equal (the same four), the later equal
+// turn has the key that the removed turn had, and a reply with the key that the agent read for it is 409. A key
 // changes when the owner edits the words, the time or the relay of the turn; reply then refuses it (409) and the
 // agent reads the page again. A turn is named by what it is, not by its place, because the page changes while an agent
 // works on a turn.
@@ -225,20 +228,39 @@ func scanLines(lines []string) (marks []int, fenced bool) {
 	return marks, fenced
 }
 
-// attach is the lines of a page and then block, a paragraph, after a blank line: the end of the page for say, and the
-// place after the answered turn for a reply. The blank edge of the lines goes. Where the lines end inside a fence that
-// an edit of the owner left open, a line of three backticks closes it first, so the marker of the block is read as a
-// marker and the block is not text in the fence. This is the one rule that a paragraph starts outside a fence, which
-// paragraph assumes.
-func attach(lines []string, block string) string {
-	head := strings.TrimRight(strings.Join(lines, "\n"), " \t\r\n")
+// settled is the text of lines with its blank edge dropped, and a line of three backticks added when the lines end
+// inside a fence that an edit of the owner left open. It is the head that a block follows (joinBlock): the end of the
+// page for say, and the place after the answered turn for a reply. The marker of the block is then read as a marker
+// and the block is not text in the fence. This is the one rule that a paragraph starts outside a fence, which
+// paragraph assumes. ParseTurns reads the last turn of an open page as closed already, so the closing line changes
+// neither the words nor the key of a turn.
+func settled(lines []string) string {
+	head := strings.TrimRightFunc(strings.Join(lines, "\n"), unicode.IsSpace) // the blank edge that ParseTurns drops
 	if _, fenced := scanLines(lines); fenced {
 		head += "\n```"
 	}
+	return head
+}
+
+// joinBlock is head and then block, after a blank line.
+func joinBlock(head, block string) string {
 	if head == "" {
 		return block
 	}
 	return head + "\n\n" + block
+}
+
+// escapeToolTail puts a backslash before each line of the tool-line block that ends head: the lines that start with
+// toolMark right before its end. A reply with no tool lines of its own follows head after one blank line, and
+// ParseTurns gives such a block to the marker of the reply. With the backslash the lines stay in the turn that was
+// answered, and ParseTurns gives their words back (turnWords), so the turn keeps its key. A head that ends in a fence
+// line ends in no such block, so a line inside a fence is never changed.
+func escapeToolTail(head string) string {
+	lines := strings.Split(head, "\n")
+	for i := len(lines); i > 0 && strings.HasPrefix(lines[i-1], toolMark); i-- {
+		lines[i-1] = `\` + lines[i-1]
+	}
+	return strings.Join(lines, "\n")
 }
 
 // ParseTurns reads the turns of the body of the conversation page of day (CRLF is read as LF). A marker line starts
@@ -249,11 +271,14 @@ func attach(lines []string, block string) string {
 // or to the end of the page; it keeps its inner blank lines and loses its blank edge. The tool lines of a lifelog
 // turn are the lines that start with "- `" right before its marker: one block, with at most one blank line between
 // it and the marker. They are not part of the turn before. The text before the first marker, after the first line
-// [[day]], is one turn of Who text when it is not blank.
+// [[day]], is one turn of Who text when it is not blank. The words of a turn are the words that were said: a
+// backslash that paragraph put before a tool-like line is taken off (turnWords), and a fence that the page leaves open
+// at its end is read as closed, as the next write closes it (settled). So a write that adds a turn, or a reply that
+// closes the fence, changes neither the words nor the key of a turn that was there.
 func ParseTurns(day, body string) []Turn {
 	all, skip := bodyLines(day, body)
 	lines := all[skip:]
-	marks, _ := scanLines(lines)
+	marks, fenced := scanLines(lines)
 	turns := []Turn{}
 	// segment is lines[from:to]; it ends where the next marker begins, and the tool lines of that marker leave it.
 	segment := func(from, to int) (seg []string, tools []string) {
@@ -289,11 +314,31 @@ func ParseTurns(day, body string) []Turn {
 		}
 		m := turnStart.FindStringSubmatch(lines[at])
 		seg, next := segment(at+1, to)
-		words := strings.TrimSpace(lines[at][len(m[0]):] + "\n" + strings.Join(seg, "\n"))
-		turns = append(turns, Turn{Who: strings.ToLower(m[1]), At: strings.Replace(m[2], ".", ":", 1), Via: m[3], Text: words, Tools: tools, Refs: toolRefs(tools)})
+		turns = append(turns, Turn{Who: strings.ToLower(m[1]), At: strings.Replace(m[2], ".", ":", 1), Via: m[3], Text: turnWords(lines[at][len(m[0]):], seg), Tools: tools, Refs: toolRefs(tools)})
 		tools = next
 	}
+	if fenced && len(turns) > 0 { // the page ends in a fence: the last turn is read as the next write closes it (settled)
+		turns[len(turns)-1].Text += "\n```"
+	}
 	return turns
+}
+
+// turnWords are the words of a turn that a marker line starts: first, the rest of that line, and then the lines after
+// it, with the blank edge dropped. paragraph put a backslash before each line outside a fence that starts with
+// toolMark; it is taken off here, in the rest of the marker line too, and a line inside a fenced block keeps its
+// backslash. The rest of the marker line opens no fence.
+func turnWords(first string, rest []string) string {
+	lines := append([]string{first}, rest...)
+	fenced := false
+	for i, l := range lines {
+		switch {
+		case i > 0 && fenceLine(l):
+			fenced = !fenced
+		case !fenced && strings.HasPrefix(l, `\`+toolMark):
+			lines[i] = l[1:]
+		}
+	}
+	return strings.TrimSpace(strings.Join(lines, "\n"))
 }
 
 // say is the owner's turn: it adds the paragraph to the conversation page of the day, made on the first turn.
@@ -310,14 +355,14 @@ func (h *server) say(r *http.Request, a admitted) (*siren.Entity, error) {
 		return nil, core.Invalid("missing field text")
 	}
 	via := a.v.Get("via")
-	if via != "" && !writerRE.MatchString(via) {
+	if via != "" && !core.WriterName(via) {
 		return nil, core.Invalid("via %q: a name of letters, digits, _ : . -", via)
 	}
 	block := paragraph("Owner", h.stamp(via), entry)
 	_, sync, err := h.s.AppendParagraph(r.Context(), a.src, core.ConversationTitle(day), day, conversationCategory,
 		conversationFirstLine(day), func(body string) string {
 			lines, _ := bodyLines(day, body)
-			return attach(lines, block)
+			return joinBlock(settled(lines), block)
 		})
 	if err != nil {
 		return nil, err
@@ -410,7 +455,7 @@ func insertReply(day, body, key, block string) (string, error) {
 			return "", core.Conflict("the owner turn %q of the conversation of %s has a reply already", key, day)
 		}
 	}
-	out := attach(all[:skip+end], block)
+	out := joinBlock(escapeToolTail(settled(all[:skip+end])), block)
 	if tail := strings.TrimLeft(strings.Join(all[skip+end:], "\n"), "\n"); tail != "" {
 		out += "\n\n" + tail
 	}

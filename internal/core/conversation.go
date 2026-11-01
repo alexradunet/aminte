@@ -1,8 +1,11 @@
 package core
 
 import (
+	"net/http"
+	"regexp"
 	"strings"
 
+	"lifelog/siren"
 	"lifelog/text"
 )
 
@@ -36,4 +39,39 @@ func reservedTitle(title string) error {
 		return nil
 	}
 	return Conflict("%q is a conversation title: only say makes that page, and a conversation page keeps its title: its day names it", title)
+}
+
+// The body of a conversation page holds the turns of the owner, and a line that reads as one would be a turn that the
+// owner never said. So a writer that is not the owner's does not write that body: only the two writes of turns do
+// (AppendParagraph for say, EditBody for reply), and they make the lines safe. SetBody is the one write of a body
+// for every other caller (the save of a body, set-cover), and it calls keepTurns. This is the one home of the rule.
+
+// writerRE is the grammar of a writer name: the CHECKs entities_source, measurements_source and links_source.
+var writerRE = regexp.MustCompile(`^[a-z0-9_:.-]{1,64}$`)
+
+// WriterName says that name is a writer name. A surface that reads a writer name and meets no CHECK of it (an
+// owner-only action, a write that only changes a body) asks it here.
+func WriterName(name string) bool { return writerRE.MatchString(name) }
+
+// AgentWriter says that a writer is an agent (agent:*) or an import (import:*): the writers that the owner's rules bind.
+func AgentWriter(source string) bool {
+	return strings.HasPrefix(source, siren.AgentPrefix) || strings.HasPrefix(source, siren.ImportPrefix)
+}
+
+// ownerWriter says that a writer may speak as the owner: its name is a writer name, and it is not an agent or an
+// import. A name that is no writer name ("Agent:x") is not the owner's: the prefix tests of AgentWriter would pass
+// it, and a write that only changes a body meets no CHECK of the name.
+func ownerWriter(source string) bool { return WriterName(source) && !AgentWriter(source) }
+
+// keepTurns refuses (403) the write of the body of the page id when the page is a conversation page and the writer of
+// the transaction is not the owner's. A page that does not exist is no conversation page: the write finds it.
+func (t *Tx) keepTurns(id int64) error {
+	if ownerWriter(t.source) {
+		return nil
+	}
+	p, err := t.findPage(false, `e.id = ?`, id)
+	if err != nil || p == nil || ConversationDay(p.Title) == "" {
+		return err
+	}
+	return &Error{Status: http.StatusForbidden, Msg: "an agent or an import may not write a conversation page: the agent writes its turn with reply"}
 }

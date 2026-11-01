@@ -73,3 +73,52 @@ func TestParseTurnsReadsAHandWrittenBody(t *testing.T) {
 		})
 	}
 }
+
+// TestParseTurnsGivesTheWordsAsTheyWereSaid: the vectors are written by hand. The page keeps a backslash before a line
+// outside a fenced block that starts with a dash, a space and a backtick (paragraph put it there, so the line is no
+// tool line), and ParseTurns takes it off again: the words of a turn are the words that were said, and a client that
+// draws or sends them shows a list. A block keeps what it holds, and the text before the first marker is not a turn
+// that paragraph wrote. A code fence that the last turn leaves open is read as closed, so the words and the key of
+// the turn are the same before and after the line of three backticks that closes it.
+func TestParseTurnsGivesTheWordsAsTheyWereSaid(t *testing.T) {
+	const day = "2031-05-14"
+	for _, tc := range []struct {
+		name, body string
+		want       []Turn
+	}{
+		{"the escape of a tool line is taken off", "[[2031-05-14]]\n\n**Owner** (09:07): Files:\n\\- `main.go`\n\\- `util.go`\n\n**lifelog** (09:08): Ok",
+			[]Turn{{Who: "owner", At: "09:07", Text: "Files:\n- `main.go`\n- `util.go`"}, {Who: "lifelog", At: "09:08", Text: "Ok"}}},
+		{"also on the line of the marker", "**Owner** (09:07): \\- `ls`\n\\- `rm`",
+			[]Turn{{Who: "owner", At: "09:07", Text: "- `ls`\n- `rm`"}}},
+		{"an escaped line is no tool line of the reply that follows", "**Owner** (09:07): Run:\n\\- `ls`\n\n**lifelog** (09:08): Done",
+			[]Turn{{Who: "owner", At: "09:07", Text: "Run:\n- `ls`"}, {Who: "lifelog", At: "09:08", Text: "Done"}}},
+		{"the reply keeps its list too, and the tool lines stay tool lines", "**Owner** (09:07): Q\n\n- `get`\n\n**lifelog** (09:08): Files:\n\\- `a.go`",
+			[]Turn{{Who: "owner", At: "09:07", Text: "Q"}, {Who: "lifelog", At: "09:08", Text: "Files:\n- `a.go`", Tools: []string{"- `get`"}}}},
+		{"a block keeps what it holds, a line after it is read", "**Owner** (09:07): a\n```\n\\- `x`\n```\n\\- `y`",
+			[]Turn{{Who: "owner", At: "09:07", Text: "a\n```\n\\- `x`\n```\n- `y`"}}},
+		{"the text before the first marker is kept as it is", "\\- `x`\n\n**Owner** (09:07): a",
+			[]Turn{{Who: "text", Text: "\\- `x`"}, {Who: "owner", At: "09:07", Text: "a"}}},
+		{"a backslash that is not before a tool line stays", "**Owner** (09:07): \\- one\n\\-`two`\n \\- `three`\n\\\\- `four`",
+			[]Turn{{Who: "owner", At: "09:07", Text: "\\- one\n\\-`two`\n \\- `three`\n\\\\- `four`"}}},
+		{"a fence that the last turn leaves open is read as closed", "**Owner** (09:07): a\n```\nx",
+			[]Turn{{Who: "owner", At: "09:07", Text: "a\n```\nx\n```"}}},
+		{"the same turn with its fence closed", "**Owner** (09:07): a\n```\nx\n```",
+			[]Turn{{Who: "owner", At: "09:07", Text: "a\n```\nx\n```"}}},
+		{"an open fence after a blank line, and the turn before it", "**Owner** (09:07): a\n\n**lifelog** (09:08): b\n```\n- `x`\n\n",
+			[]Turn{{Who: "owner", At: "09:07", Text: "a"}, {Who: "lifelog", At: "09:08", Text: "b\n```\n- `x`\n```"}}},
+		{"text with a fence left open", "```\nx", []Turn{{Who: "text", Text: "```\nx\n```"}}},
+		{"a block that opens and closes is not changed", "**Owner** (09:07): a\n```\nx\n```\n\n**lifelog** (09:08): b",
+			[]Turn{{Who: "owner", At: "09:07", Text: "a\n```\nx\n```"}, {Who: "lifelog", At: "09:08", Text: "b"}}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := ParseTurns(day, tc.body); !reflect.DeepEqual(got, tc.want) {
+				t.Errorf("got %#v\nwant %#v", got, tc.want)
+			}
+		})
+	}
+	open := withKeys(ParseTurns(day, "**Owner** (09:07): a\n```\nx"))
+	closed := withKeys(ParseTurns(day, "**Owner** (09:07): a\n```\nx\n```"))
+	if open[0].Key != closed[0].Key {
+		t.Errorf("the key of a turn with its fence open: %s, closed: %s, want the same key", open[0].Key, closed[0].Key)
+	}
+}

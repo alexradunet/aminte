@@ -572,7 +572,9 @@ keeps each picture once. It takes a new photo as `original` (and
 `preview` when the photo is not a JPEG, PNG or GIF), kept as a file with no day and titled
 `<page> <today>.jpg`, a day page's `<day>.jpg` (` 2`, ` 3`… when taken) unless `title` names it; its `result` is the kept shape. Or it takes
 the `title` of a kept file with a preview, and its `result` is the sync shape. A photo with no picture, a title
-that is not a kept picture, or a file page, is refused (422).
+that is not a kept picture, or a file page, is refused (422). It writes the body of the page, so on a
+[conversation page](#conversation) it is the owner's: an `agent:*` or `import:*` writer is refused (403) when the
+write would change the body, as `save-body` is.
 
 | property | type | meaning |
 |---|---|---|
@@ -935,18 +937,24 @@ A line of the `text` outside a fenced code block that reads as a marker of a tur
 (`\*\*Owner\*\* (09:31): ...`), so it is text and not a turn. A code fence that the `text` opens and does not close is
 closed by a line of three backticks at the end of the turn. A balanced block stays as it is. A line of the `text` outside
 a fenced block that starts with ``- ` `` (a dash, a space and a backtick) is written with a backslash before the dash: it
-shows the same in a Markdown view, and it is not a tool line, so a reply with no tool lines takes no line of the owner's
-turn. A code fence that an edit of the owner left open at the end of the page is closed before the turn, so the turn is
-read as a turn.
+is not a tool line, so a reply with no tool lines takes no line of the owner's turn. The page keeps the backslash, and
+`turns[].text` does not: it gives the words as they were said (a line outside a fenced block that starts with a
+backslash, a dash, a space and a backtick is read without the backslash), so a client that draws the words shows a list,
+and a relay that sends them sends ``- `x` ``. A code fence that an edit of the owner left open at the end of the page is
+closed before the turn, so the turn is read as a turn.
 `say` is for today: a `day` that is not the server's local today is 422 `say is for today: the agent answers today's
 conversation`, and writes nothing. A `text` that is empty or only blanks is 422 and writes nothing. The optional field
 `via` names the relay, the program that carries the owner's words (`[a-z0-9_:.-]{1,64}`); another value is 422.
 `say` answers at once and calls no model. When the agent runs (`lifelog-agent`, started by `serve --with agent`), it reads
 the page, finds the turn of the owner that nobody has answered (the last turn is the owner's), and writes its reply on the
-page as `agent:lifelog`, with `reply`. A client reads the page to see the reply. Only `say` writes a turn of the owner,
-and the owner's edits are no turns: text that the owner adds with `save-body` is an edit. An `agent:*` or `import:*`
-writer that runs `save-body` on a conversation page is refused (403 `forbidden`: `an agent or an import may not write a
-conversation page: the agent writes its turn with reply`).
+page as `agent:lifelog`, with `reply`. A client reads the page to see the reply. `say` writes the turn of the owner. The owner may also edit the page with
+`save-body`, and the page reads the edit as it reads any text: text that the owner adds after a turn is part of that
+turn, and a marker line that the owner types outside a fenced block (`**Owner** (HH:MM): ...`) is a turn of the owner,
+as `say` would write it. An
+`agent:*` or `import:*` writer, or a name that is no writer name, is refused (403 `forbidden`: `an agent or an import
+may not write a conversation page: the agent writes its turn with reply`) in every write of the body of a conversation
+page except `say` and `reply`: `save-body`, and `set-cover` when it would change the body. The refusal is in the one
+write of a body in the core, so an action added later meets it too.
 
 **The title of a conversation page.** The title `Conversation YYYY-MM-DD`, in any case, belongs to the plain page that
 `say` makes. A write that would make a page under that title, give a page that title, take it from the page, or change
@@ -972,15 +980,22 @@ A key names a turn by what it is and not by its place on the page, because the p
 turn. It is a string of 16 hex digits that the server makes from the `who`, the `at`, the `via` and the `text` of the turn,
 and from the number of turns before it that have the same four: so two turns of one page never have the same key. An agent
 treats it as an opaque string and compares it whole. A reply that is written, a turn that the owner says, and an edit that
-removes an earlier turn move no key. A key changes when the owner edits the words, the time or the relay of the turn: the
+removes an earlier turn that is different move no key. An edit that removes an earlier turn with the same `who`, the
+same minute, the same relay and the same words gives the key of that turn to the later equal turn, because the later one
+is then the first of its kind: a `reply` with the key that the agent read for the later turn is 409, and the agent reads
+the page again. A key changes when the owner edits the words, the time or the relay of the turn: the
 agent then reads the page again, and answers the key that it finds.
 
 The reply is the paragraph `**lifelog** (HH:MM): text`, with the time of the server's clock in its zone, written right
 after the owner turn that it answers: before the marker line of the next turn, or at the end of the page. A turn that the
 owner said while the agent worked stays after the reply and waits for its own. The page keeps LF line ends. A code fence
-that an edit left open before the reply is closed by a line of three backticks, so the reply is a turn. A line of the `text`
+that an edit left open before the reply is closed by a line of three backticks, so the reply is a turn. A turn is
+read with such a fence closed already, so the closing does not change the words or the key of the turn that the reply
+answers. A line of the `text`
 that starts with ``- ` `` outside a fenced block is written with a backslash before the dash, so it is no tool line of this
-or of the next reply. The answer is
+or of the next reply; `turns[].text` gives it back without the backslash. The same holds for the last lines of the turn that
+the reply answers, when an edit left a block of such lines at its end: they get the backslash, so the reply does not take
+them as its tool lines, and the turn keeps its words and its key. The answer is
 the conversation of the day, and `result` is the [save result](#result-of-capture-create-page-save-body).
 
 | status | `code` | when |
@@ -1002,7 +1017,10 @@ turn of the owner with `say`. The page:
   it when the request names `via`, and writes no such part without it;
 - runs a turn from its marker line to the line before the next marker line, or to the end of the page. The words of
   the turn are the rest of the marker line and the lines after it, with their inner blank lines (a turn may have many
-  paragraphs, and a note that the owner adds after a reply is part of that reply). The blank edge is dropped;
+  paragraphs, and a note that the owner adds after a reply is part of that reply). The blank edge is dropped. A line
+  of the words outside a fenced block that starts with a backslash, a dash, a space and a backtick is read without the
+  backslash (the writer of the page put it there), also on the line of the marker. A fence that the last turn of the
+  page leaves open is read as closed, with a line of three backticks at the end of its words;
 - has the tool lines of a `lifelog` turn right before its marker: one block of lines that each start with ``- ` ``, for
   example ``- `search`: no hits``, with at most one blank line between the block and the marker. They are not part of
   the turn before. Tool lines before an `Owner` marker are part of the text before it. A tool line names the address

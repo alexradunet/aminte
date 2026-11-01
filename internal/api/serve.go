@@ -9,10 +9,8 @@ import (
 	"log"
 	"net/http"
 	"net/url"
-	"regexp"
 	"runtime/debug"
 	"slices"
-	"strings"
 	"time"
 
 	"lifelog/internal/core"
@@ -439,34 +437,19 @@ func source(r *http.Request) string {
 	return "api"
 }
 
-// writerRE is the grammar of a writer name: entities_source, measurements_source and links_source.
-var writerRE = regexp.MustCompile(`^[a-z0-9_:.-]{1,64}$`)
-
 // requireOwner refuses a writer that is not the owner: an agent (agent:*) or an import (import:*). The owner-only
 // actions (the catalog's Owner mark) are refused to any other writer, on every surface.
 // It checks the grammar of the name too, which repeats the CHECKs on purpose. An owner-only action can read and meet
-// no CHECK, and the prefix tests below would pass "Agent:x" as the owner. Any other write leaves the name to the
+// no CHECK, and the prefix tests of core.AgentWriter would pass "Agent:x" as the owner. Any other write leaves the name to the
 // schema.
 func requireOwner(source string) error {
-	if !writerRE.MatchString(source) {
+	if !core.WriterName(source) {
 		return core.Invalid("source %q: 1-64 characters of a-z 0-9 _ : . -", source)
 	}
-	if agentWriter(source) {
+	if core.AgentWriter(source) {
 		return &core.Error{Status: http.StatusForbidden, Msg: "this action is the owner's: an agent or an import may not run it"}
 	}
 	return nil
-}
-
-// agentWriter says that a writer is an agent (agent:*) or an import (import:*): the writers that the owner's rules bind.
-func agentWriter(source string) bool {
-	return strings.HasPrefix(source, siren.AgentPrefix) || strings.HasPrefix(source, siren.ImportPrefix)
-}
-
-// ownerWriter says that a writer may speak as the owner: its name is a writer name, and it is not an agent or an
-// import. A name that is no writer name ("Agent:x") is not the owner's: the prefix tests of agentWriter would pass it,
-// and a write that only changes a body meets no CHECK of the name.
-func ownerWriter(source string) bool {
-	return writerRE.MatchString(source) && !agentWriter(source)
 }
 
 // actions is the catalog: every action with its templated href. The action that new names is filled in instead,

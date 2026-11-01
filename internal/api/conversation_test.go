@@ -203,13 +203,14 @@ func TestTheConversationOfADay(t *testing.T) {
 	if _, err := say(t, c, convDay, "Hello"); err != nil {
 		t.Fatal(err)
 	}
-	// An agent's turn, as an extension writes it: the tool lines, then the paragraph.
+	// A turn of the agent in the format of the page: the tool lines, then the paragraph. The owner saves it by hand,
+	// because a writer that is not the owner's cannot save a conversation page (the agent writes its turn with reply).
 	id, _ := s.PageID(t.Context(), "Conversation "+convDay)
 	p, err := s.PageByID(t.Context(), id)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.SaveBody(t.Context(), "agent:test", id, p.Body+"\n\n- `search`\n- `get`: no hits\n\n**lifelog** (11:08): Hello.", p.Version); err != nil {
+	if _, err := s.SaveBody(t.Context(), "cli", id, p.Body+"\n\n- `search`\n- `get`: no hits\n\n**lifelog** (11:08): Hello.", p.Version); err != nil {
 		t.Fatal(err)
 	}
 	e = get()

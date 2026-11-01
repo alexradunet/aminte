@@ -238,11 +238,16 @@ These are this application's own engineering decisions ([D14](docs/decisions/D14
   `agent:*` or `import:*` writer is refused (403), and it is never an MCP tool, so no agent speaks as the owner. The
   agent's turn is written by `reply` (`POST /days/{day}/reply`), which is no owner action: the core puts the reply right
   after the owner's turn that it answers, in one write. Each turn of the conversation has a `key`, and `reply` names the
-  turn by it: the key does not move when the page changes, and a key that is no more on the page is 409. An agent or an
-  import cannot save the body of a conversation page (403), and no write makes a page under a conversation title or
-  changes the type of its page (409), so only `say` writes a turn of the owner. A wikilink may still make an empty page
+  turn by it: the key does not move when a reply or a say is written, or when an edit removes an earlier turn that is
+  different; an edit that removes an earlier equal turn (the same who, minute, relay and words) gives its key to the later
+  equal turn, and a key that is no more on the page is 409. An agent or an import cannot write the body of a conversation
+  page (403): not with `save-body`, not with `set-cover`, and not with an action that is added later, because the core
+  refuses it in its one write of a body. No write makes a page under a conversation title or changes the type of its
+  page (409). So only `say` writes a turn of the owner for a surface, and an edit of the owner that types a marker line is
+  a turn of the owner too. A wikilink may still make an empty page
   with that title, and the first `say` adopts it. The core escapes a line of a `say` or a `reply` that reads as a
-  marker or as a tool line, and closes a code fence that the text or an edit leaves open, so the page stays readable as turns. The WhatsApp extension relays the owner's words as the owner, with `via=whatsapp`; the paragraph then reads `**Owner** (HH:MM, via whatsapp): `. `GET /days/{day}/conversation` gives the turns, parsed from
+  marker or as a tool line, and closes a code fence that the text or an edit leaves open, so the page stays readable as
+  turns; the turns give the words back without the backslash of a tool line, and the last turn is read with its fence closed. The WhatsApp extension relays the owner's words as the owner, with `via=whatsapp`; the paragraph then reads `**Owner** (HH:MM, via whatsapp): `. `GET /days/{day}/conversation` gives the turns, parsed from
   the body, with the page's properties, links and actions when the page exists (as a series carries a metric's page,
   [plan 144](docs/plans/144-one-view-for-a-metric.md)), and `say`. The page of a live conversation links to it (rel
   `conversation`). A conversation page keeps its title: it offers no

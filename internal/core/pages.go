@@ -32,8 +32,18 @@ func (t *Tx) saveBody(id int64, body, version string) (Sync, error) {
 }
 
 // SetBody is SaveBody without the version check, for a write that has the body it sets: SaveBody after its check,
-// the note of a new metric on an empty body, and the picture mark of a page.
+// the note of a new metric on an empty body, and the picture mark of a page. A writer that is not the owner's does
+// not write the body of a conversation page (keepTurns): 403.
 func (t *Tx) SetBody(id int64, body string) (Sync, error) {
+	if err := t.keepTurns(id); err != nil {
+		return Sync{}, err
+	}
+	return t.writeBody(id, body)
+}
+
+// writeBody sets the body of the page id with no check of the writer: SetBody after its check, and the two writes of
+// turns, which are the only writes that may put a turn in a conversation page.
+func (t *Tx) writeBody(id int64, body string) (Sync, error) {
 	if _, err := t.tx.ExecContext(t.ctx, `UPDATE entities SET body = ? WHERE id = ? AND body IS NOT ?`, body, id, body); err != nil {
 		return Sync{}, err
 	}
@@ -550,7 +560,8 @@ func (s *Store) searchNewest(ctx context.Context, q, omit string, args []any, li
 
 // AppendParagraph adds a paragraph to the page titled title, in one write: add makes the new body from the body that the
 // page has. It runs inside the transaction, so it must be quick and do no I/O. This is say, the one write that makes a
-// conversation page (conversation.go).
+// conversation page (conversation.go). It is a write of turns, so it writes the body for any writer (writeBody): the
+// caller makes the lines of the turn safe.
 //
 // The page is made on the first call, written on day, from head, its first line, and filed in category when that is not
 // empty. A plain page that has no words (a wikilink made it before the first call) is adopted the same way: it gets
@@ -575,7 +586,7 @@ func (s *Store) AppendParagraph(ctx context.Context, source, title, day, categor
 			}
 		}
 		if p != nil && strings.TrimSpace(p.Body) != "" {
-			r, err := t.SetBody(p.ID, add(p.Body))
+			r, err := t.writeBody(p.ID, add(p.Body))
 			return made{p.ID, r}, err
 		}
 		body := add(head)
@@ -592,7 +603,7 @@ func (s *Store) AppendParagraph(ctx context.Context, source, title, day, categor
 		} else {
 			id = p.ID
 			if _, err = t.tx.ExecContext(t.ctx, `UPDATE entities SET day = ? WHERE id = ? AND day IS NULL`, day, id); err == nil {
-				r, err = t.SetBody(id, body)
+				r, err = t.writeBody(id, body)
 			}
 		}
 		if err != nil {
@@ -617,7 +628,8 @@ func (s *Store) AppendParagraph(ctx context.Context, source, title, day, categor
 // needed. edit runs inside the transaction: it must be quick and do no I/O. Its error ends the write, and the caller
 // gets it as it is. A missing page is a 404, and a page of another type or a deleted one a 409 (a write to a deleted
 // page does not revive it, as a save of a body does not). It returns the page's id and what the save did to the
-// wikilinks of the body.
+// wikilinks of the body. This is reply, the write of the agent's turn: it writes the body for any writer (writeBody),
+// and the caller makes the lines of the turn safe.
 func (s *Store) EditBody(ctx context.Context, source, title string, edit func(body string) (string, error)) (int64, Sync, error) {
 	m, err := alone(s, ctx, source, func(t *Tx) (made, error) {
 		p, err := t.lookupWithBody(title)
@@ -635,7 +647,7 @@ func (s *Store) EditBody(ctx context.Context, source, title string, edit func(bo
 		if err != nil {
 			return made{}, err
 		}
-		r, err := t.SetBody(p.ID, body)
+		r, err := t.writeBody(p.ID, body)
 		return made{p.ID, r}, err
 	})
 	return m.id, m.sync, err

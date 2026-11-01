@@ -118,7 +118,7 @@ var catalog = []spec{
 			flagField("dry_run", "Dry run: write nothing, say what keeping it would do")},
 	},
 	{Name: "set-cover", Title: "Set cover photo", Class: []string{"edit"},
-		Description: "Make a photo this page's cover: the first picture its body embeds, drawn beside the page, in the lists and in the calendar. Its embed goes first in the body, or trades places with the cover's when the body embeds it already. Send a new photo as original (kept as a file with no day, titled with the page's title and today, a day page's with its day alone, unless title names it), or name a kept picture by title (GET /pages/{id}/cover lists them). A file page takes none: its own picture is its cover.",
+		Description: "Make a photo this page's cover: the first picture its body embeds, drawn beside the page, in the lists and in the calendar. Its embed goes first in the body, or trades places with the cover's when the body embeds it already. Send a new photo as original (kept as a file with no day, titled with the page's title and today, a day page's with its day alone, unless title names it), or name a kept picture by title (GET /pages/{id}/cover lists them). A file page takes none: its own picture is its cover. An agent or an import may not change the body of a conversation page (403): the cover of one is the owner's to set.",
 		Hint:        "Choose the photo that shows beside this page. Add a new photo, or pick one that is already kept.",
 		Method:      "POST", Path: "/pages/{id}/cover",
 		Fields: []siren.Field{path("id", "number", "Page id"), {Name: "original", Type: "file", Title: "A new photo (read, never stored)", Accept: "image/*"},

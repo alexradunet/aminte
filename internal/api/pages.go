@@ -294,18 +294,6 @@ func (h *server) createPage(r *http.Request, a admitted) (*siren.Entity, error) 
 }
 
 func (h *server) saveBody(r *http.Request, a admitted) (*siren.Entity, error) {
-	// The page of a conversation holds the turns of the owner, and a line that reads as one would be a turn that the
-	// owner never said. So the owner edits it, and an agent, an import or a name that is no writer name is refused
-	// (403): the agent writes its turn with reply, which makes the line safe.
-	if !ownerWriter(a.src) {
-		p, err := h.s.PageByID(r.Context(), a.id)
-		if err != nil {
-			return nil, err
-		}
-		if core.ConversationDay(p.Title) != "" {
-			return nil, &core.Error{Status: http.StatusForbidden, Msg: "an agent or an import may not write a conversation page: the agent writes its turn with reply"}
-		}
-	}
 	sync, err := h.s.SaveBody(r.Context(), a.src, a.id, a.v.Get("body"), a.v.Get("version"))
 	if err != nil {
 		return nil, err

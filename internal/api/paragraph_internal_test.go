@@ -46,6 +46,7 @@ func FuzzAParagraphIsOneTurn(f *testing.F) {
 		"Hello", "a\n```\nb", "```\n```\n```", "**Owner** (09:31): x", "a\n**lifelog** (09:31): x", "a\n```x```\n**Owner** (09:31, via y): z",
 		"\n\n- `get`\n- `put`", "```", "a\r\n**Owner** (09:31): b", "~~~\n**Owner** (09:31): b", " **Owner** (09:31): b", "a\n````\n**Owner** (09:31): b",
 		"Run:\n- `ls -la`\n- `rm` \u2192 /pages/1", "- `x`", "a\n```\n- `x`\n```\n- `y`", "a\r\r\n- `x`",
+		"- `\r\r\n0", "a\n- `x`\n```\n- `y`", "- `a`\n\n- `b`\n```go\n- `c`",
 	} {
 		f.Add(seed)
 	}
@@ -60,12 +61,29 @@ func FuzzAParagraphIsOneTurn(f *testing.F) {
 		if len(turns) != 2 || turns[0].Who != "owner" || turns[1].Who != "lifelog" {
 			t.Fatalf("the turns of %q: %+v, want owner lifelog", body, turns)
 		}
-		stored := strings.TrimSpace(strings.ReplaceAll(strings.TrimPrefix(owner, "**Owner** (09:07):"), "\r\n", "\n"))
-		if turns[0].Text != stored {
-			t.Errorf("the owner's turn of %q reads back as %q, want %q", body, turns[0].Text, stored)
+		// The owner's turn reads back line by line as the paragraph wrote it, but for a tool line outside a fence: it
+		// reads back as it was said, with no backslash. The turn has at most one line more (the fence that closes a block).
+		stored := strings.Split(strings.TrimSpace(strings.ReplaceAll(strings.TrimPrefix(owner, "**Owner** (09:07):"), "\r\n", "\n")), "\n")
+		said := strings.Split(strings.ReplaceAll(words(text), "\r\n", "\n"), "\n") // the page is read with CRLF as LF
+		got := strings.Split(turns[0].Text, "\n")
+		if len(got) != len(said) && len(got) != len(said)+1 {
+			t.Fatalf("the owner's turn of %q has %d lines, want %d or one more", body, len(got), len(said))
 		}
-		if n, want := strings.Count(turns[0].Text, "\n"), strings.Count(strings.ReplaceAll(words(text), "\r\n", "\n"), "\n"); n != want && n != want+1 {
-			t.Errorf("the owner's turn of %q has %d lines, want %d or one more", body, n+1, want+1)
+		if len(got) == len(said)+1 && got[len(said)] != "```" {
+			t.Errorf("the owner's turn of %q ends in the extra line %q, want the line that closes a block", body, got[len(said)])
+		}
+		fenced := false
+		for i, l := range said {
+			want := stored[i]
+			switch {
+			case fenceLine(l):
+				fenced = !fenced
+			case !fenced && strings.HasPrefix(l, "- `"):
+				want = l
+			}
+			if got[i] != want {
+				t.Errorf("line %d of the owner's turn of %q reads back as %q, want %q", i+1, body, got[i], want)
+			}
 		}
 		if turns[1].Text != "Ok." {
 			t.Errorf("the reply of %q reads back as %q", body, turns[1].Text)

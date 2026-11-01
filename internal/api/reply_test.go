@@ -316,18 +316,21 @@ func TestASayClosesAFenceThatAnEditLeftOpen(t *testing.T) {
 }
 
 // TestAReplyWithNoToolsKeepsTheLinesOfTheOwner: the owner says a list of lines that start with - ` and the agent
-// replies with no tool line. The lines stay in the owner's turn (a line that looks like a tool line is escaped), so the
-// reply has no tool line and no ref.
+// replies with no tool line. The lines stay in the owner's turn (a line that looks like a tool line is escaped on the
+// page, and the turn gives the words back as they were said), so the reply has no tool line and no ref.
 func TestAReplyWithNoToolsKeepsTheLinesOfTheOwner(t *testing.T) {
-	c, h, _ := conversationStore(t)
+	c, h, s := conversationStore(t)
 	if _, err := say(t, c, convDay, "Run these:\n- `ls -la`\n- `rm -rf build` \u2192 /pages/1"); err != nil {
 		t.Fatal(err)
+	}
+	if got, want := bodyOf(t, s, "Conversation "+convDay), "[[2031-05-14]]\n\n**Owner** (11:07): Run these:\n\\- `ls -la`\n\\- `rm -rf build` \u2192 /pages/1"; got != want {
+		t.Errorf("the page keeps the escape:\n%q\nwant:\n%q", got, want)
 	}
 	e, err := reply(t, h, "agent:lifelog", map[string]string{"day": "today", "turn": ownerKeyOf(t, c, 1), "text": "Done."})
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := "owner: Run these:\n\\- `ls -la`\n\\- `rm -rf build` \u2192 /pages/1 | lifelog: Done."
+	want := "owner: Run these:\n- `ls -la`\n- `rm -rf build` \u2192 /pages/1 | lifelog: Done."
 	if got := strings.Join(turnsOf(t, e), " | "); got != want {
 		t.Errorf("the turns:\n%q\nwant:\n%q", got, want)
 	}
