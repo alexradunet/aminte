@@ -8,12 +8,11 @@ import (
 	"lifelog/siren"
 )
 
-// page is the conversation of a day as the agent read it: the answer of GET /days/{day}/conversation. The agent
-// keeps no page between two looks. The page of the API says what is answered.
+// page is the conversation of a day as the agent read it: the answer of GET /days/{day}/conversation. The page of the
+// API says what is answered.
 type page struct {
 	Day     string
-	ID      string // "" when the day has no page yet
-	Version string
+	Version string // "" when the day has no page yet
 	Body    string // the body with LF line ends: a browser submits a textarea with CRLF, and the API keeps it as sent
 	turns   []turn
 }
@@ -36,7 +35,7 @@ func pageFrom(e *siren.Entity) (*page, error) {
 	if props["version"] == nil || !ok {
 		return nil, errors.New("the answer is not a page with an id, a version and a body")
 	}
-	p.ID, p.Version, p.Body = fmt.Sprint(props["id"]), fmt.Sprint(props["version"]), strings.ReplaceAll(body, "\r\n", "\n")
+	p.Version, p.Body = fmt.Sprint(props["version"]), strings.ReplaceAll(body, "\r\n", "\n")
 	turns, _ := props["turns"].([]any)
 	for _, t := range turns {
 		m, _ := t.(map[string]any)
@@ -53,7 +52,7 @@ func (p *page) pending() bool {
 	return len(p.turns) > 0 && p.turns[len(p.turns)-1].who == "owner"
 }
 
-// owners is the number of turns of the owner.
+// owners is the number of turns of the owner. It is the number of the last one, which the field turn of reply names.
 func (p *page) owners() int {
 	n := 0
 	for _, t := range p.turns {
@@ -64,11 +63,5 @@ func (p *page) owners() int {
 	return n
 }
 
-// key names the last turn: the day, the number of turns and the words of the last one. The key of a page changes when
-// the owner says more, or edits the words of the turn.
-func (p *page) key() string {
-	if len(p.turns) == 0 {
-		return p.Day
-	}
-	return fmt.Sprintf("%s/%d/%s", p.Day, len(p.turns), p.turns[len(p.turns)-1].text)
-}
+// key names the state of the page: its day and its version. The version changes with each write to the page.
+func (p *page) key() string { return p.Day + "/" + p.Version }

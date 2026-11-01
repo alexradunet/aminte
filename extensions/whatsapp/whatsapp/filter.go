@@ -11,7 +11,8 @@ import (
 
 // Filter turns an event into a message of the chat, or says that the relay must not see it. A message is passed
 // on when it is not from this device, not from a history sync, not an edit, not a group message and newer than
-// after (the newest turn of the transcript, so that a restart does not answer again what it answered). A reaction
+// after (the earlier of the start of the program and the last message that the relay said, so that a message that
+// came while the program was off is said once, and a restart does not say it again). A reaction
 // and a protocol message (a delete, a read marker) are not messages. A message that is not text is passed on with
 // its kind, so that the relay can refuse it with a line.
 func Filter(evt *events.Message, after time.Time) (relay.Message, bool) {

@@ -1,9 +1,9 @@
 # lifelog-agent
 
-`lifelog-agent` answers the owner in the conversation of lifelog. The owner says something on any surface: the
-browser, WhatsApp, `lifelog do say` or an MCP tool. The agent reads the conversation page, calls a model, and writes
-the answer on the page. The model reads and writes `life.db` through the action catalog of the API, as the
-[MCP server](../mcp/README.md) offers it.
+`lifelog-agent` answers the owner in the conversation of lifelog. The owner says something on a surface that has the
+action `say`: the browser, WhatsApp or `lifelog do say`. (`say` is an owner action, so it is not an MCP tool.) The agent
+reads the conversation page, calls a model, and writes the answer with the action `reply`. The model reads and writes
+`life.db` through the action catalog of the API, as the [MCP server](../mcp/README.md) offers it.
 
 It is a client of the lifelog HTTP API ([API.md](../../API.md)). It is a separate Go module, `lifelog-agent`. It
 imports `lifelog/siren`, `lifelog/client` and `lifelog/client/tools` of the root module (a `replace` directive), and
@@ -12,38 +12,47 @@ nothing of `lifelog/internal`. The core calls no model: this program is the only
 
 ```mermaid
 flowchart LR
-  S["a say: the browser, WhatsApp, lifelog do say, an MCP tool"] --> L["lifelog serve: the owner's turn on today's conversation page"]
+  S["a say: the browser, WhatsApp, lifelog do say"] --> L["lifelog serve: the owner's turn on today's conversation page"]
   L -->|"GET /days/today/conversation every 3 seconds"| A["lifelog-agent: one turn at a time"]
   A -->|"GET /settings at each turn: owner token, no source"| L
   A <-->|"chat completions with tools, net/http"| M["the model named in Settings"]
-  A -->|"the tools, and save-body: Lifelog-Source agent:lifelog, bearer token"| L
+  A -->|"the tools, and reply: Lifelog-Source agent:lifelog, bearer token"| L
   L -->|"the browser polls the page; lifelog-whatsapp sends each new turn"| C["the chat of the owner"]
 ```
 
 ## How it works
 
-- **The page is the state.** The agent keeps no file. Every 3 seconds it reads today's conversation. When the last turn
+- **The page is the truth.** The agent keeps no file. Every 3 seconds it reads today's conversation. When the last turn
   of the page is the owner's, nobody has answered it: that is a turn of the agent. After a restart the agent answers a
   page that waits, and it does not answer a page that it answered. The core owns the convention of the page (the
   title, the category, the first line, the paragraph of a turn: see the conversation class in
   [API.md](../../API.md#conversation)). The agent holds no title and no category.
-- **Only `say` writes a turn of the owner.** Text that `save-body` adds to a page is an edit. It is never a turn. Text
-  that an edit adds after a reply is part of that reply, and an edit of an old turn changes nothing. So the agent
-  answers a message once, whatever surface sent it.
+- **The core writes both turns.** `say` writes the turn of the owner. `reply` writes the turn of the agent. An agent
+  cannot save the body of a conversation page: the core refuses it (403), and the agent writes with `reply`. The core
+  stamps the turn, puts it in the right place, makes the lines of the words safe (a line that reads as a turn marker is
+  escaped, and a code fence that the words leave open is closed), and writes the page in one transaction. So a reply
+  cannot hide the next turn from the parse of the page, and the agent does not answer its own reply. Text that an edit
+  adds after a reply is part of that reply, and an edit of an old turn changes nothing.
 - **One turn at a time.** A turn has at most 16 model steps and 5 minutes. The model reads the whole page of the day.
-  The agent writes the tool lines and the reply in one `save-body`, so the page has the whole answer or none. The
-  reply is `**lifelog** (HH:MM): text`, with the tool lines before it.
-- **The owner may write while the model works.** When the owner adds text with an edit, the reply goes after that text.
-  When the owner says a new turn, the reply goes before it, so the new turn is the last one on the page, and the next
-  look answers it. A page that changes during each of three saves keeps the reply off the page.
-- **A reply that cannot be saved is not run again.** A new run of the model would repeat the tool calls of the first
-  run. The agent logs the failure, and it answers that turn again only when the page changes or the agent restarts.
+  The agent writes the tool lines and the reply in one `reply` request, so the page has the whole answer or none. The
+  request has the fields `day`, `turn`, `text` and `tools`. `turn` is the number of the last owner turn that the model
+  read, counted from 1 over the owner turns of the page. `tools` holds the tool lines, one for each line.
+- **The owner may write while the model works.** The core puts the reply right after the owner turn that it answers. A
+  turn that the owner says meanwhile stays after the reply, so it is the last turn of the page, and the next look
+  answers it. An edit of an earlier turn, or text that an edit adds, moves nothing.
+- **A reply that is refused or fails is not run again.** A new run of the model would repeat the tool calls of the first
+  run. The core refuses a reply to a turn that has a reply already (409): the turn is answered, so the agent logs one
+  line and does not run the model for it again. A reply that fails in another way is logged once. In both cases the
+  agent keeps in memory the page that it read, and it answers again only when the page changes or the agent restarts.
+- **One agent for one file.** Do not run `lifelog agent` by hand while `lifelog serve --with agent` runs on the same
+  file. The core refuses the second reply to a turn (409), but both models run, and both make their tool calls.
 - **A turn before midnight is answered on its own page.** On its first look and on each new day, the agent reads the
   day before too. A turn that waits there is answered there. The page of the new day is not made by the agent.
 - **The tools are the catalog, read at each turn.** The agent reads `GET /actions` at the start of each turn and builds
-  the tools of the model from it, without the owner-only actions and without an action that has a file field. An app
-  that `lifelog serve --with` connects can register after the agent started. Its tools are there at the next turn. A read
-  that fails keeps the tools of the last read and writes one line in the log.
+  the tools of the model from it, without the owner-only actions, without `reply` (the agent writes the turn, not the
+  model) and without an action that has a file field. An app that `lifelog serve --with` connects can register after the
+  agent started. Its tools are there at the next turn. A read that fails keeps the tools of the last read and writes one
+  line in the log.
 - **No file.** An action with a file field (`add-file`, `set-cover`) is not a tool of the model. Its value would be the
   path of any file the process can read, and the model acts on text that any surface wrote to the page.
 - **The model is set in lifelog.** The agent reads `GET /settings` at the start of each turn, through a second client:
@@ -92,7 +101,7 @@ The agent needs no state folder. It makes no file.
 | 0 | An interrupt or SIGTERM. `serve` does not start it again. |
 | 1 | An error, for example a catalog that cannot be read. `serve` starts it again after 10 seconds. |
 | 2 | A crash (the Go runtime ends a program that panics with 2). `serve` starts it again after 10 seconds. |
-| 78 | The catalog has no `say` or no `save-body`: the server is too old, or it is not a lifelog server. The owner acts first. `serve` does not start it again. |
+| 78 | The catalog has no `say` or no `reply`: the server is too old, or it is not a lifelog server. The owner acts first. `serve` does not start it again. |
 
 ## No unit of its own
 
@@ -109,8 +118,11 @@ The agent has no service unit. The unit of `lifelog serve` carries `--with agent
 ## Tests
 
 `go vet ./... && go test ./...` in this folder. The tests of `agent/` run on a fake catalog and a fake model: they
-hold the turns, the page, the saves and the days. `e2e_test.go` builds the real `lifelog` and `lifelog-agent` into one
-folder and runs `lifelog serve --token-file F --with agent` on a new file, with a fake model server. It says as the
-owner with `lifelog do say`, and reads the page back through the API. A `say` gets its reply on the page, a tool call
-of an owner action is refused, and with no model set the reply is the one line. It needs the `go` command and the
-sources of the repository.
+hold the turns, the page, the replies and the days. The fake API keeps the rules of the real one that the agent depends
+on (where `reply` puts a turn, its 404, 409 and 422, the escape of a marker line, and the 403 of `save-body` on a
+conversation page). `e2e_test.go` builds the real `lifelog` and `lifelog-agent` into one folder and runs
+`lifelog serve --token-file F --with agent` on a new file, with a fake model server. It says as the owner with
+`lifelog do say`, and reads the page back through the API. A `say` gets its reply on the page, a tool call of an owner
+action is refused, and with no model set the reply is the one line. A say with a code fence that it does not close, and
+a model reply with a line of the form of an owner turn, each get one reply, and no more. It needs the `go` command and
+the sources of the repository.

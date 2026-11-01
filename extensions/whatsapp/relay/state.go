@@ -11,18 +11,25 @@ import (
 )
 
 // state is what the relay keeps between two runs, in state.json of its state folder. The page is the truth about
-// the talk. The state says only how far the relay has sent it to the chat.
+// the talk. The state says only which turns of it the relay has dealt with.
 type state struct {
-	// Days is the number of turns of a conversation page that the relay has dealt with, for each day that it watches:
-	// today, and the day before while its last turn is the owner's. nil is a first run: the relay adopts the page as it
-	// is, and sends no earlier turn. The file of an earlier version (a page, with no days) is a first run too.
-	Days map[string]int `json:"days"`
+	// Seen holds the keys of the turns of a conversation page that the relay has dealt with (turn.key), for each day
+	// that it watches: today, and the day before while its last turn is the owner's. It is a set and not a position,
+	// because the core puts a reply right after the turn that it answers, and that can be before a newer turn. A turn
+	// that moves (an insert above it, a delete and a revive of the page) is still a turn that was dealt with. nil is a
+	// first run: the relay adopts the page as it is, and sends no earlier turn. The file of an earlier version is a
+	// first run too: it has no seen.
+	Seen map[string][]string `json:"seen"`
 	// Said is the time of the last message of the owner that the relay said to lifelog. The chat gives a message
 	// that came while the relay was off, and the relay says it when it is newer than Said.
 	Said time.Time `json:"said"`
+	// SavedAt is a field of the state file of the agent that lived in this program: the time of its last save of the
+	// page. Every message of the owner before it was answered. loadState moves it to Said when the file has no Said,
+	// so that a message that came during the switch is said. It is never written.
+	SavedAt *time.Time `json:"saved_at,omitempty"`
 }
 
-// loadState reads the state file. A file that does not exist is a state with no days.
+// loadState reads the state file. A file that does not exist is a first run: a state with no seen.
 func loadState(path string) (*state, error) {
 	data, err := os.ReadFile(path)
 	if errors.Is(err, fs.ErrNotExist) {
@@ -35,6 +42,10 @@ func loadState(path string) (*state, error) {
 	if err := json.Unmarshal(data, &s); err != nil {
 		return nil, fmt.Errorf("state file %s is not JSON: %w (delete it to start again)", path, err)
 	}
+	if s.Said.IsZero() && s.SavedAt != nil {
+		s.Said = *s.SavedAt
+	}
+	s.SavedAt = nil
 	return &s, nil
 }
 

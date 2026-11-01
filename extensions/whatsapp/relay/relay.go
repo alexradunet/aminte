@@ -163,20 +163,21 @@ func (r *Relay) sync(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	if r.st.Days == nil { // the first run: what the page holds now is not sent
-		r.st.Days = map[string]int{today.Day: len(today.turns)}
+	if r.st.Seen == nil { // the first run: what the page holds now is not sent
+		r.st.Seen = map[string][]string{today.Day: today.keys()}
 		return r.st.save(r.State)
 	}
 	before, err := dayBefore(today.Day)
 	if err != nil {
 		return err
 	}
-	if _, ok := r.st.Days[today.Day]; !ok { // a new day: all its turns are new
-		if err := r.mark(today.Day, 0); err != nil {
+	if _, ok := r.st.Seen[today.Day]; !ok { // a new day: all its turns are new
+		r.st.Seen[today.Day] = []string{}
+		if err := r.st.save(r.State); err != nil {
 			return err
 		}
 	}
-	for _, day := range slices.Sorted(maps.Keys(r.st.Days)) {
+	for _, day := range slices.Sorted(maps.Keys(r.st.Seen)) {
 		p := today
 		if day < before { // too old: the page has the answer, and the chat does not get it late
 			p = nil
@@ -191,7 +192,7 @@ func (r *Relay) sync(ctx context.Context) error {
 			}
 		}
 		if day != today.Day && (p == nil || !p.pending()) {
-			delete(r.st.Days, day)
+			delete(r.st.Seen, day)
 			if err := r.st.save(r.State); err != nil {
 				return err
 			}
@@ -202,22 +203,31 @@ func (r *Relay) sync(ctx context.Context) error {
 
 // forward sends the turns of the page that the chat has not got. A reply of the agent goes as it is. A turn of the owner
 // from another surface goes marked, so the chat shows the same thread as the page. A turn that came from this relay
-// is not sent back. The state moves after each send: a crash between the send and the save sends one turn twice,
+// is not sent back. A turn is new when the state does not hold its key as many times as the page shows it, wherever it
+// stands on the page. The state moves after each send: a crash between the send and the save sends one turn twice,
 // and never loses one.
 func (r *Relay) forward(ctx context.Context, p *page) error {
-	sent := min(r.st.Days[p.Day], len(p.turns)) // an edit may have taken turns away
-	for sent < len(p.turns) {
-		if text := forwarded(p.turns[sent]); text != "" {
+	dealt := map[string]int{} // the keys that the state holds, counted
+	for _, k := range r.st.Seen[p.Day] {
+		dealt[k]++
+	}
+	for _, t := range p.turns {
+		k := t.key()
+		if dealt[k] > 0 {
+			dealt[k]--
+			continue
+		}
+		if text := forwarded(t); text != "" {
 			if err := r.Chat.Send(ctx, cut(text)); err != nil {
 				return fmt.Errorf("send: %w", err)
 			}
 		}
-		sent++
-		if err := r.mark(p.Day, sent); err != nil {
+		r.st.Seen[p.Day] = append(r.st.Seen[p.Day], k)
+		if err := r.st.save(r.State); err != nil {
 			return err
 		}
 	}
-	return r.mark(p.Day, sent)
+	return nil
 }
 
 // forwarded is the text that the chat gets for a turn, and "" when it gets none.
@@ -229,15 +239,6 @@ func forwarded(t turn) string {
 		return "You wrote in lifelog: " + t.text
 	}
 	return ""
-}
-
-// mark sets the number of turns that the relay has dealt with on a day, and saves the state when it changed.
-func (r *Relay) mark(day string, n int) error {
-	if cur, ok := r.st.Days[day]; ok && cur == n {
-		return nil
-	}
-	r.st.Days[day] = n
-	return r.st.save(r.State)
 }
 
 // cut shortens s to maxSend bytes at a character boundary and says so.

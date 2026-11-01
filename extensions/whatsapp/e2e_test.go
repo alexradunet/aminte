@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -25,12 +27,13 @@ import (
 	"lifelog/siren"
 )
 
-// The end-to-end test builds the real lifelog and lifelog-whatsapp into one folder. The connection to WhatsApp needs a real
-// number, so it has no test. The relay is the part of the program that carries the words, and this test runs it in the
-// process with a fake chat against the real `lifelog serve`: a message of the chat becomes a say, and a reply that an
-// agent writes on the page reaches the chat. The tests of ./relay hold the rules on a fake catalog; this test holds the
-// relay against the real writer. The program itself is run for what it refuses, for the pairing and for the start by
-// `serve --with whatsapp`.
+// The end-to-end test builds the real lifelog, lifelog-whatsapp and lifelog-agent into one folder. The connection to
+// WhatsApp needs a real number, so it has no test. The relay is the part of the program that carries the words, and these
+// tests run it in the process with a fake chat against the real `lifelog serve`: a message of the chat becomes a say, and
+// a reply that an agent writes on the page reaches the chat. One test runs the real agent (`serve --with agent`) with a
+// fake model server, and two messages in a row. The tests of ./relay hold the rules on a fake catalog; these tests hold
+// the relay against the real writer. The program itself is run for what it refuses, for the pairing and for the start
+// by `serve --with whatsapp`.
 
 // wait is a guard against a deadlock.
 const wait = 2 * time.Minute
@@ -41,8 +44,8 @@ const ownerToken = "e2e-token-e2e-token-e2e-token-e2e-token"
 // ownerNumber is the number of the owner in the fake chat.
 const ownerNumber = "40712345678"
 
-// built is the folder with lifelog, lifelog-whatsapp and a new life.db.
-type built struct{ dir, lifelog, ext, db string }
+// built is the folder with lifelog, lifelog-whatsapp, lifelog-agent and a new life.db.
+type built struct{ dir, lifelog, ext, agent, db string }
 
 func build(t *testing.T) built {
 	t.Helper()
@@ -62,10 +65,12 @@ func build(t *testing.T) built {
 	if runtime.GOOS == "windows" {
 		exe = ".exe"
 	}
-	b.lifelog, b.ext, b.db = filepath.Join(b.dir, "lifelog"+exe), filepath.Join(b.dir, "lifelog-whatsapp"+exe), filepath.Join(b.dir, "life.db")
+	b.lifelog, b.ext, b.agent, b.db = filepath.Join(b.dir, "lifelog"+exe), filepath.Join(b.dir, "lifelog-whatsapp"+exe),
+		filepath.Join(b.dir, "lifelog-agent"+exe), filepath.Join(b.dir, "life.db")
 	for _, args := range [][]string{
 		{"build", "-C", root, "-o", b.lifelog, "./cmd/lifelog"},
 		{"build", "-o", b.ext, "./cmd/lifelog-whatsapp"},
+		{"build", "-C", filepath.Join(root, "extensions", "agent"), "-o", b.agent, "./cmd/lifelog-agent"},
 	} {
 		if out, err := exec.Command(goBin, args...).CombinedOutput(); err != nil {
 			t.Fatalf("go %v: %v\n%s", args, err, out)
@@ -163,8 +168,8 @@ type turn struct {
 	Text string `json:"text"`
 }
 
-// conversation is the conversation of today, as the owner reads it, with the id and the version of the page when it exists.
-func conversation(t *testing.T, c *client.Client) (turns []turn, id, version, body string) {
+// conversation is the turns of the conversation of today, as the owner reads them.
+func conversation(t *testing.T, c *client.Client) []turn {
 	t.Helper()
 	e, err := c.Get(t.Context(), "/days/today/conversation")
 	if err != nil {
@@ -172,21 +177,11 @@ func conversation(t *testing.T, c *client.Client) (turns []turn, id, version, bo
 	}
 	props, _ := e.Properties.(map[string]any)
 	raw, _ := json.Marshal(props["turns"])
+	var turns []turn
 	if err := json.Unmarshal(raw, &turns); err != nil {
 		t.Fatal(err)
 	}
-	if props["id"] != nil {
-		id, version, body = jsonString(props["id"]), jsonString(props["version"]), jsonString(props["body"])
-	}
-	return turns, id, version, body
-}
-
-// jsonString is the text of a string or of a number that the API sent.
-func jsonString(v any) string {
-	if s, ok := v.(string); ok {
-		return s
-	}
-	return fmt.Sprint(v)
+	return turns
 }
 
 // waitTurns waits until the conversation holds n turns, and returns them.
@@ -194,7 +189,7 @@ func waitTurns(t *testing.T, c *client.Client, n int) []turn {
 	t.Helper()
 	deadline := time.Now().Add(wait)
 	for time.Now().Before(deadline) {
-		if turns, _, _, _ := conversation(t, c); len(turns) >= n {
+		if turns := conversation(t, c); len(turns) >= n {
 			return turns
 		}
 		<-time.After(20 * time.Millisecond)
@@ -203,16 +198,19 @@ func waitTurns(t *testing.T, c *client.Client, n int) []turn {
 	return nil
 }
 
-// TestAMessageOfTheChatBecomesASayAndAReplyOnThePageReachesTheChat runs the real `lifelog serve --token-file F` on a new
-// life.db and the relay in the process, with a fake chat. The reply is written as lifelog-agent writes it: with
-// save-body, as agent:lifelog.
-func TestAMessageOfTheChatBecomesASayAndAReplyOnThePageReachesTheChat(t *testing.T) {
-	b := build(t)
+// serveCore runs the real `lifelog serve --token-file F` on the new life.db, with the programs named by with beside it, and
+// gives the address. The server ends with the test.
+func serveCore(t *testing.T, b built, with ...string) string {
+	t.Helper()
 	tokenFile := filepath.Join(b.dir, "token")
 	if err := os.WriteFile(tokenFile, []byte(ownerToken+"\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	serve := exec.Command(b.lifelog, "--db", b.db, "serve", "--addr", "127.0.0.1:0", "--token-file", tokenFile)
+	args := []string{"--db", b.db, "serve", "--addr", "127.0.0.1:0", "--token-file", tokenFile}
+	for _, w := range with {
+		args = append(args, "--with", w)
+	}
+	serve := exec.Command(b.lifelog, args...)
 	serve.Env = env(t)
 	stderr := &lockedBuffer{}
 	serve.Stderr = stderr
@@ -238,16 +236,41 @@ func TestAMessageOfTheChatBecomesASayAndAReplyOnThePageReachesTheChat(t *testing
 	line := waitLog(t, stderr, done, "lifelog: serving ")
 	_, rest, _ := strings.Cut(line, " on http://")
 	addr, _, _ := strings.Cut(rest, " ")
-	core := "http://" + addr
+	for _, w := range with {
+		waitLog(t, stderr, done, "lifelog: with "+w+": started (pid ")
+	}
+	return "http://" + addr
+}
 
-	asOwner := client.Remote(core, "", ownerToken)
-	asAgent := client.Remote(core, siren.AgentPrefix+"lifelog", ownerToken)
+// action finds an action of the catalog by its name.
+func action(t *testing.T, c *client.Client, name string) siren.Action {
+	t.Helper()
+	list, err := c.Catalog(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, a := range list {
+		if a.Name == name {
+			return a
+		}
+	}
+	t.Fatalf("the catalog has no action %s", name)
+	return siren.Action{}
+}
+
+// startRelay runs the relay in the process, with a fake chat, and stops it with the test. Tick nil is a tick every 50
+// ms; a test that wants to say when the relay looks gives a channel.
+func startRelay(t *testing.T, core string, tick <-chan time.Time) *fakeChat {
+	t.Helper()
 	chat := &fakeChat{in: make(chan relay.Message), sent: make(chan string, 10)}
-	ticker := time.NewTicker(50 * time.Millisecond)
-	t.Cleanup(ticker.Stop)
+	if tick == nil {
+		ticker := time.NewTicker(50 * time.Millisecond)
+		t.Cleanup(ticker.Stop)
+		tick = ticker.C
+	}
 	r := &relay.Relay{
-		Chat: chat, API: asOwner, Owner: ownerNumber, State: filepath.Join(t.TempDir(), "state.json"),
-		Log: log.New(io.Discard, "", 0), Tick: ticker.C,
+		Chat: chat, API: client.Remote(core, "", ownerToken), Owner: ownerNumber, State: filepath.Join(t.TempDir(), "state.json"),
+		Log: log.New(io.Discard, "", 0), Tick: tick,
 	}
 	ctx, cancel := context.WithCancel(t.Context())
 	ran := make(chan error, 1)
@@ -260,6 +283,18 @@ func TestAMessageOfTheChatBecomesASayAndAReplyOnThePageReachesTheChat(t *testing
 			t.Error("the relay did not stop")
 		}
 	})
+	return chat
+}
+
+// TestAMessageOfTheChatBecomesASayAndAReplyOnThePageReachesTheChat runs the real `lifelog serve --token-file F` on a new
+// life.db and the relay in the process, with a fake chat. The reply is written as lifelog-agent writes it: with reply,
+// as agent:lifelog.
+func TestAMessageOfTheChatBecomesASayAndAReplyOnThePageReachesTheChat(t *testing.T) {
+	b := build(t)
+	core := serveCore(t, b)
+	asOwner := client.Remote(core, "", ownerToken)
+	asAgent := client.Remote(core, siren.AgentPrefix+"lifelog", ownerToken)
+	chat := startRelay(t, core, nil)
 
 	// A message of the chat becomes a say as the owner, and the page names the relay.
 	chat.in <- relay.Message{Sender: ownerNumber, Text: "I walked by the river", Kind: relay.KindText, At: time.Now()}
@@ -269,19 +304,7 @@ func TestAMessageOfTheChatBecomesASayAndAReplyOnThePageReachesTheChat(t *testing
 	}
 
 	// An agent writes its reply on the page. The relay sends it to the chat, and only it: the turn of the chat is not echoed.
-	_, id, version, body := conversation(t, asOwner)
-	actions, err := asAgent.Catalog(t.Context())
-	if err != nil {
-		t.Fatal(err)
-	}
-	var save siren.Action
-	for _, a := range actions {
-		if a.Name == "save-body" {
-			save = a
-		}
-	}
-	reply := body + "\n\n**lifelog** (" + time.Now().Format("15:04") + "): Written to today."
-	if _, err := asAgent.Do(t.Context(), save, map[string]string{"id": id, "body": reply, "version": version}); err != nil {
+	if _, err := asAgent.Do(t.Context(), action(t, asAgent, "reply"), map[string]string{"day": "today", "turn": "1", "text": "Written to today."}); err != nil {
 		t.Fatal(err)
 	}
 	if got := chat.next(t); got != "Written to today." {
@@ -289,22 +312,130 @@ func TestAMessageOfTheChatBecomesASayAndAReplyOnThePageReachesTheChat(t *testing
 	}
 
 	// The owner says something on another surface: the chat gets it marked.
-	actions, err = asOwner.Catalog(t.Context())
-	if err != nil {
+	if _, err := asOwner.Do(t.Context(), action(t, asOwner, "say"), map[string]string{"day": "today", "text": "from the browser"}); err != nil {
 		t.Fatal(err)
-	}
-	for _, a := range actions {
-		if a.Name == "say" {
-			if _, err := asOwner.Do(t.Context(), a, map[string]string{"day": "today", "text": "from the browser"}); err != nil {
-				t.Fatal(err)
-			}
-		}
 	}
 	if got := chat.next(t); got != "You wrote in lifelog: from the browser" {
 		t.Errorf("the chat got %q, want the turn of the other surface, marked", got)
 	}
 	// The texts came in the order of the page, and each came once: the turn of the chat, which the page names with via, was
 	// not echoed before the reply, and the reply was not sent again before the turn of the other surface.
+}
+
+// feedTicks gives the relay a tick every 50 ms, and returns the function that stops it and waits for it. The function can
+// be called more than once.
+func feedTicks(tick chan<- time.Time) (stop func()) {
+	quit, done := make(chan struct{}), make(chan struct{})
+	go func() {
+		defer close(done)
+		every := time.NewTicker(50 * time.Millisecond)
+		defer every.Stop()
+		for {
+			select {
+			case <-every.C:
+				select {
+				case tick <- time.Now():
+				case <-quit:
+					return
+				}
+			case <-quit:
+				return
+			}
+		}
+	}()
+	var once sync.Once
+	return func() {
+		once.Do(func() { close(quit) })
+		<-done
+	}
+}
+
+// gatedModel is a model server that holds its first answer until the test opens the gate, and tells the test when the
+// first request came. The later answers come at once. The n-th answer is "answer n".
+type gatedModel struct {
+	mu      sync.Mutex
+	n       int
+	first   chan struct{} // closed when the first request came
+	gate    chan struct{} // the first answer waits for it to close
+	started sync.Once
+}
+
+func (m *gatedModel) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	m.mu.Lock()
+	m.n++
+	n := m.n
+	m.mu.Unlock()
+	if n == 1 {
+		m.started.Do(func() { close(m.first) })
+		select {
+		case <-m.gate:
+		case <-r.Context().Done():
+			return
+		}
+	}
+	b, _ := json.Marshal(fmt.Sprintf("answer %d", n))
+	io.WriteString(w, `{"choices":[{"message":{"role":"assistant","content":`+string(b)+`},"finish_reason":"stop"}]}`)
+}
+
+// TestTwoMessagesInARowGetTheirTwoRepliesOnThePhone runs the real server with the real agent and the relay in the
+// process. The owner sends a second message while the model works on the first. The core puts the first reply before the
+// second turn, and the agent answers the second turn next. The relay has dealt with the second turn before the first
+// reply lands, and the phone must still get both replies, once each and in the order of the page.
+func TestTwoMessagesInARowGetTheirTwoRepliesOnThePhone(t *testing.T) {
+	b := build(t)
+	core := serveCore(t, b, "agent")
+	asOwner := client.Remote(core, "", ownerToken)
+	model := &gatedModel{first: make(chan struct{}), gate: make(chan struct{})}
+	srv := httptest.NewServer(model)
+	defer srv.Close()
+	if _, err := asOwner.Do(t.Context(), action(t, asOwner, "settings"), map[string]string{"model_url": srv.URL + "/v1", "model": "test-model"}); err != nil {
+		t.Fatal(err)
+	}
+	tick := make(chan time.Time)
+	chat := startRelay(t, core, tick)
+	look := func() { // the relay takes the third tick only after the look of the second is done
+		for range 3 {
+			select {
+			case tick <- time.Now():
+			case <-time.After(wait):
+				t.Fatal("the relay did not take the tick")
+			}
+		}
+	}
+
+	chat.in <- relay.Message{Sender: ownerNumber, Text: "first", Kind: relay.KindText, At: time.Now()}
+	select {
+	case <-model.first:
+	case <-time.After(wait):
+		t.Fatal("the agent did not ask the model")
+	}
+	chat.in <- relay.Message{Sender: ownerNumber, Text: "second", Kind: relay.KindText, At: time.Now()}
+	waitTurns(t, asOwner, 2)
+	look() // the relay has dealt with both turns of the owner, and the reply to the first is not on the page yet
+	close(model.gate)
+	stopFeed := feedTicks(tick) // the relay looks every 50 ms until the test has both replies
+	t.Cleanup(stopFeed)
+
+	if got := chat.next(t); got != "answer 1" {
+		t.Errorf("the phone got %q first, want the reply to the first message", got)
+	}
+	if got := chat.next(t); got != "answer 2" {
+		t.Errorf("the phone got %q second, want the reply to the second message", got)
+	}
+	stopFeed()
+	look() // one more full look at the page as it is now
+	select {
+	case extra := <-chat.sent:
+		t.Errorf("an extra text went to the phone: %q", extra)
+	default:
+	}
+	var order []string
+	for _, tr := range conversation(t, asOwner) {
+		order = append(order, tr.Who+": "+tr.Text)
+	}
+	if want := []string{"owner: first", "lifelog: answer 1", "owner: second", "lifelog: answer 2"}; !slices.Equal(order, want) {
+		t.Errorf("the page holds %q, want %q", order, want)
+	}
 }
 
 // TestTheTransportRefusesWhatItCannotRun: each missing piece is refused with its name or the line that says what to run.

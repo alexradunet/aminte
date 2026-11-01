@@ -9,7 +9,10 @@ import (
 	"log"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -47,23 +50,22 @@ type seen struct{ Method, Path, Source, Auth, Body string }
 
 // fakeAPI serves the catalog and a few pages, and answers every other path with an entity. A path that ends in /big
 // answers a title that is longer than the bound of a result. A page title is redirected to its page, as the real
-// API does.
+// API does. It keeps the rules of the real API that the agent depends on: reply writes the paragraph of lifelog right
+// after the owner turn that it answers (404, 409 and 422 as the real API gives them), a line of the text that reads as
+// a marker is escaped, and an agent may not save the body of a conversation page (403).
 type fakeAPI struct {
 	mu    sync.Mutex
 	reqs  []seen
 	pages []*fakePage
-	// sneak, when it is not empty, is added to the body of the page by someone else just before the next save
-	// (the version changes, so the save is stale). alwaysStale does it before every save.
-	sneak       string
-	alwaysStale bool
 	// the settings of the model, as GET /settings answers them (an empty value is absent)
 	modelURL, model, modelKey string
-	extra                     []siren.Action // actions that a connected app added to the catalog
-	without                   []string       // actions that the catalog lacks
-	catalogFails              bool           // GET /actions answers 503
-	saveFails                 bool           // save-body answers 500
-	day                       string         // the local day of the server; "" is today
-	change                    chan struct{}  // closed at each change of a page
+	extra                     []siren.Action   // actions that a connected app added to the catalog
+	without                   []string         // actions that the catalog lacks
+	catalogFails              bool             // GET /actions answers 503
+	replyFails                bool             // reply answers 500
+	day                       string           // the local day of the server; "" is today
+	now                       func() time.Time // the clock of the server; nil is fixedNow
+	change                    chan struct{}    // closed at each change of a page
 }
 
 // notify tells the waiters that a page changed. The caller holds the lock.
@@ -157,11 +159,20 @@ func (f *fakeAPI) failCatalog(on bool) {
 	f.catalogFails = on
 }
 
-// setSaveFails makes the save of a page fail (or work again).
-func (f *fakeAPI) setSaveFails(on bool) {
+// setReplyFails makes the action reply fail (or work again).
+func (f *fakeAPI) setReplyFails(on bool) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.saveFails = on
+	f.replyFails = on
+}
+
+// otherReplies adds a reply to the end of a page, as another writer of lifelog turns would.
+func (f *fakeAPI) otherReplies(title, text string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	p := f.find(title)
+	p.body, p.version = p.body+"\n\n**lifelog** (09:30): "+text, p.version+1
+	f.notify()
 }
 
 // setModel changes the settings, as the owner would in lifelog.
@@ -215,6 +226,73 @@ func (f *fakeAPI) conversation(day string) siren.Entity {
 	}
 	props["turns"] = out
 	return siren.Entity{Class: []string{"conversation"}, Properties: props}
+}
+
+// markerLine is a line that the real API reads as the start of a turn.
+var markerLine = regexp.MustCompile(`(?m)^\*\*(Owner|lifelog)\*\* \(`)
+
+// reply is the action reply of the real API: the paragraph of lifelog, with the tool lines before it, goes right
+// before the marker of the turn that follows the answered owner turn, or at the end of the page. It gives the status
+// and the code of a refusal, and 0 when the reply is written. The caller holds the lock.
+func (f *fakeAPI) reply(day string, form url.Values) (int, string) {
+	if f.replyFails {
+		return 500, "internal"
+	}
+	turn, err := strconv.Atoi(form.Get("turn"))
+	text := strings.TrimSpace(strings.ReplaceAll(form.Get("text"), "\r\n", "\n"))
+	if err != nil || turn < 1 || text == "" {
+		return 422, "invalid"
+	}
+	var tools []string
+	for l := range strings.SplitSeq(strings.ReplaceAll(form.Get("tools"), "\r\n", "\n"), "\n") {
+		if l = strings.TrimSpace(l); l == "" {
+			continue
+		}
+		if !strings.HasPrefix(l, "- `") {
+			return 422, "invalid"
+		}
+		tools = append(tools, l)
+	}
+	p := f.find("Conversation " + day)
+	if p == nil {
+		return 404, "not_found"
+	}
+	paras := strings.Split(strings.ReplaceAll(p.body, "\r\n", "\n"), "\n\n") // the core writes the page with LF line ends
+	isMarker := func(para string, who string) bool { return strings.HasPrefix(para, "**"+who+"**") }
+	at, owners := -1, 0
+	for i, para := range paras {
+		if isMarker(para, "Owner") {
+			if owners++; owners == turn {
+				at = i
+			}
+		}
+	}
+	if at < 0 {
+		return 404, "not_found"
+	}
+	end := len(paras)
+	for i := at + 1; i < len(paras); i++ {
+		if isMarker(paras[i], "Owner") || isMarker(paras[i], "lifelog") {
+			end = i
+			break
+		}
+	}
+	if end < len(paras) && isMarker(paras[end], "lifelog") {
+		return 409, "conflict"
+	}
+	text = markerLine.ReplaceAllString(text, `\*\*$1\*\* (`)
+	clock := fixedNow
+	if f.now != nil {
+		clock = f.now()
+	}
+	block := "**lifelog** (" + clock.Format("15:04") + "): " + text
+	if len(tools) > 0 {
+		block = strings.Join(tools, "\n") + "\n\n" + block
+	}
+	out := append(slices.Clone(paras[:end]), block)
+	p.body, p.version = strings.Join(append(out, paras[end:]...), "\n\n"), p.version+1
+	f.notify()
+	return 0, ""
 }
 
 func (f *fakeAPI) find(title string) *fakePage {
@@ -307,16 +385,11 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			fail(422, "invalid")
 			break
 		}
-		if f.saveFails {
-			fail(500, "internal")
-			break
-		}
 		fmt.Sscanf(r.URL.Path, "/pages/%d/body", &id)
 		p := f.pages[id-1]
-		if f.sneak != "" || f.alwaysStale {
-			p.body, p.version = p.body+"\n\n"+f.sneak+"x", p.version+1
-			f.sneak = ""
-			f.notify()
+		if notOwner && strings.HasPrefix(p.title, "Conversation ") { // the core refuses an agent: it writes with reply
+			fail(403, "forbidden")
+			break
 		}
 		if r.PostForm.Get("version") != fmt.Sprint(p.version) {
 			fail(409, "stale_version")
@@ -325,6 +398,20 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		p.body, p.version = r.PostForm.Get("body"), p.version+1
 		f.notify()
 		e = p.entity()
+	case strings.HasSuffix(r.URL.Path, "/reply") && r.Method == "POST":
+		day := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/days/"), "/reply")
+		if day == "today" {
+			day = f.localDay()
+		}
+		if refuseUnknown(r, "reply") {
+			fail(422, "invalid")
+			break
+		}
+		if status, code := f.reply(day, r.PostForm); status != 0 {
+			fail(status, code)
+			break
+		}
+		e = f.conversation(day)
 	case strings.HasSuffix(r.URL.Path, "/big"):
 		e.Title = strings.Repeat("é", maxResult)
 	case strings.HasSuffix(r.URL.Path, "/gone"):
@@ -339,14 +426,34 @@ func (f *fakeAPI) requests() []seen {
 	return append([]seen(nil), f.reqs...)
 }
 
-// writes are the requests that are not a GET and not a write of a page (save-body).
+// writes are the requests that are not a GET and not a write of the conversation (reply, save-body).
 func (f *fakeAPI) writes() []seen {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	var out []seen
 	for _, r := range f.reqs {
-		if r.Method != "GET" && !strings.HasPrefix(r.Path, "/pages") {
+		if r.Method != "GET" && !strings.HasPrefix(r.Path, "/pages") && !strings.HasSuffix(r.Path, "/reply") {
 			out = append(out, r)
+		}
+	}
+	return out
+}
+
+// replyReq is one request of the action reply: its path, its source and its form.
+type replyReq struct {
+	Path, Source string
+	Form         url.Values
+}
+
+// replies are the requests of the action reply.
+func (f *fakeAPI) replies() []replyReq {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	var out []replyReq
+	for _, r := range f.reqs {
+		if r.Method == "POST" && strings.HasSuffix(r.Path, "/reply") {
+			form, _ := url.ParseQuery(r.Body)
+			out = append(out, replyReq{r.Path, r.Source, form})
 		}
 	}
 	return out
@@ -375,6 +482,9 @@ func catalog() []siren.Action {
 			{Name: "day", Type: "date", In: "path", Required: true}, {Name: "text", Type: "textarea", Title: "Text"}}},
 		{Name: "say", Owner: true, Method: "POST", Href: "/days/{day}/say", Fields: []siren.Field{
 			{Name: "day", Type: "date", In: "path", Required: true}, {Name: "text", Type: "textarea", Required: true}, {Name: "via", Type: "hidden"}}},
+		{Name: "reply", Method: "POST", Href: "/days/{day}/reply", Fields: []siren.Field{
+			{Name: "day", Type: "date", In: "path", Required: true}, {Name: "turn", Type: "number", Required: true},
+			{Name: "text", Type: "textarea", Required: true}, {Name: "tools", Type: "text"}}},
 		{Name: "save-body", Method: "POST", Href: "/pages/{id}/body", Fields: []siren.Field{
 			{Name: "id", Type: "number", In: "path", Required: true}, {Name: "body", Type: "textarea", Required: true}, {Name: "version", Type: "hidden", Required: true}}},
 		{Name: "snapshot", Owner: true, Method: "POST", Href: "/snapshot"},
@@ -432,10 +542,36 @@ func toolCall(name, args string) (int, string) {
 		name + `","arguments":` + string(a) + `}}]},"finish_reason":"tool_calls"}]}`
 }
 
+// logBuffer is the log of the agent: the agent writes it and a test reads it.
+type logBuffer struct {
+	mu sync.Mutex
+	b  bytes.Buffer
+}
+
+func (l *logBuffer) Write(p []byte) (int, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.b.Write(p)
+}
+
+// lines are the lines of the log that hold text.
+func (l *logBuffer) lines(text string) []string {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	var out []string
+	for line := range strings.SplitSeq(l.b.String(), "\n") {
+		if strings.Contains(line, text) {
+			out = append(out, line)
+		}
+	}
+	return out
+}
+
 // rig is an agent on fakes, started.
 type rig struct {
 	api    *fakeAPI
 	mod    *fakeModel
+	log    *logBuffer
 	tick   chan time.Time
 	cancel context.CancelFunc
 	done   chan error
@@ -464,15 +600,18 @@ func start(t *testing.T, script func(n int, r chatReq) (int, string)) *rig {
 // startOn starts an agent on an API that may have been used before, with its clock at now.
 func startOn(t *testing.T, script func(n int, r chatReq) (int, string), api *fakeAPI, now time.Time) *rig {
 	t.Helper()
-	r := &rig{api: api, mod: &fakeModel{script: script}, tick: make(chan time.Time), done: make(chan error, 1), now: now}
+	r := &rig{api: api, mod: &fakeModel{script: script}, log: new(logBuffer), tick: make(chan time.Time), done: make(chan error, 1), now: now}
 	modSrv := httptest.NewServer(r.mod)
 	t.Cleanup(modSrv.Close)
 	r.api.setModel(modSrv.URL, "test-model", "")
+	r.api.mu.Lock()
+	r.api.now = r.clock // the server stamps a reply with the clock of the test
+	r.api.mu.Unlock()
 	apiSrv := httptest.NewServer(r.api)
 	t.Cleanup(apiSrv.Close)
 	a := &Agent{
 		Client: client.Remote(apiSrv.URL, siren.AgentPrefix+Source, token), AsOwner: client.Remote(apiSrv.URL, "", token),
-		Now: r.clock, Log: log.New(io.Discard, "", 0), Tick: r.tick,
+		Now: r.clock, Log: log.New(r.log, "", 0), Tick: r.tick,
 	}
 	ctx, cancel := context.WithCancel(t.Context())
 	r.cancel = cancel

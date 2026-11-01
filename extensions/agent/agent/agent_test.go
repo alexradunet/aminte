@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"maps"
 	"net/http/httptest"
+	"net/url"
 	"slices"
 	"strings"
 	"testing"
@@ -46,7 +48,16 @@ func pathsOf(f *fakeAPI, method string) []string {
 	return out
 }
 
-func TestATurnOfTheOwnerGetsItsToolLinesAndItsReplyOnThePageInOneSave(t *testing.T) {
+// turnsReplied are the values of the field turn of the reply requests, in order.
+func turnsReplied(f *fakeAPI) []string {
+	var out []string
+	for _, q := range f.replies() {
+		out = append(out, q.Form.Get("turn"))
+	}
+	return out
+}
+
+func TestATurnOfTheOwnerGetsItsToolLinesAndItsReplyOnThePageInOneReply(t *testing.T) {
 	r := start(t, func(n int, _ chatReq) (int, string) {
 		if n == 1 {
 			return toolCall("capture", `{"day":"2031-05-20","text":"Walked by the river."}`)
@@ -61,19 +72,23 @@ func TestATurnOfTheOwnerGetsItsToolLinesAndItsReplyOnThePageInOneSave(t *testing
 		t.Errorf("page body\n%q\nwant\n%q", got, want)
 	}
 	if p := r.api.find(todayTitle); p.category != "Conversations" || p.version != 3 {
-		t.Errorf("page %+v, want the version after one say and one save", p)
+		t.Errorf("page %+v, want the version after one say and one reply", p)
 	}
-	saves := 0
 	for _, q := range r.api.requests() {
-		switch {
-		case strings.HasSuffix(q.Path, "/say"):
-			t.Errorf("the agent sent the request %+v: only a surface of the owner says", q)
-		case strings.HasSuffix(q.Path, "/body"):
-			saves++
+		if strings.HasSuffix(q.Path, "/say") || (q.Method == "POST" && strings.HasPrefix(q.Path, "/pages")) {
+			t.Errorf("the agent sent the request %+v: only a surface of the owner says, and the core refuses an agent that saves the conversation", q)
 		}
 	}
-	if saves != 1 {
-		t.Errorf("%d saves, want one: the page has the whole answer or none", saves)
+	// One request writes the whole answer: the turn it answers, the words, the tool lines. The core stamps the turn and
+	// keeps the page, so the request has no body, no version, no via and no time.
+	replies := r.api.replies()
+	if len(replies) != 1 {
+		t.Fatalf("%d reply requests, want one: the page has the whole answer or none", len(replies))
+	}
+	q := replies[0]
+	wantForm := url.Values{"turn": {"1"}, "text": {"Written to today."}, "tools": {"- `capture` → [/days/2031-05-20/capture](/days/2031-05-20/capture)"}}
+	if q.Path != "/days/2031-05-20/reply" || q.Source != "agent:lifelog" || !maps.EqualFunc(q.Form, wantForm, slices.Equal) {
+		t.Errorf("reply request %+v, want the path /days/2031-05-20/reply, the source agent:lifelog and the form %v", q, wantForm)
 	}
 	w := r.api.writes()
 	if len(w) != 1 || w[0].Path != "/days/2031-05-20/capture" || w[0].Source != "agent:lifelog" || !strings.Contains(w[0].Body, "text=Walked+by+the+river.") {
@@ -161,6 +176,9 @@ func TestAnOwnerActionIsNeverATool(t *testing.T) {
 	for _, x := range list {
 		if x.Name == "snapshot" || x.Name == "say" || x.Name == "settings" {
 			t.Errorf("the owner's action %s is a tool", x.Name)
+		}
+		if x.Name == "reply" {
+			t.Error("reply is a tool: the agent writes the turn, and a model that called it would write a second one")
 		}
 	}
 }
@@ -278,6 +296,9 @@ func TestTwoTurnsBeforeALookAreAnsweredByOneReplyThatSeesBoth(t *testing.T) {
 	if reqs := r.mod.requests(); len(reqs) != 1 || !strings.HasSuffix(userOf(reqs[0]), "second") || !strings.Contains(userOf(reqs[0]), "first") {
 		t.Errorf("model requests %d: one run reads both turns", len(reqs))
 	}
+	if got := turnsReplied(api); !slices.Equal(got, []string{"2"}) {
+		t.Errorf("the reply answers the turns %v, want 2: the last owner turn that the model read", got)
+	}
 }
 
 func TestTheSecondTurnSeesTheFirstReplyOnThePage(t *testing.T) {
@@ -369,9 +390,9 @@ func TestAPageWithAWaitingTurnIsAnsweredAtTheStartAndAnAnsweredPageIsNot(t *test
 	}
 }
 
-// TestABodyThatABrowserSavedWithCRLFIsReadAndSavedWithLF: a browser submits a textarea with CRLF line ends, and the API
-// keeps the body as it was sent. The model reads LF, and the next save writes LF.
-func TestABodyThatABrowserSavedWithCRLFIsReadAndSavedWithLF(t *testing.T) {
+// TestABodyThatABrowserSavedWithCRLFIsReadWithLFAndTheReplyGoesAfterIt: a browser submits a textarea with CRLF line ends,
+// and the API keeps the body as it was sent. The model reads LF, and the core writes the page with LF.
+func TestABodyThatABrowserSavedWithCRLFIsReadWithLFAndTheReplyGoesAfterIt(t *testing.T) {
 	api := &fakeAPI{}
 	api.add(todayTitle, "[[2031-05-20]]\r\n\r\n**Owner** (08:15): said in the browser\r\n\r\nand more")
 	r := startOn(t, func(n int, _ chatReq) (int, string) { return text("answer") }, api, fixedNow)
@@ -385,13 +406,17 @@ func TestABodyThatABrowserSavedWithCRLFIsReadAndSavedWithLF(t *testing.T) {
 	}
 }
 
-func TestAStaleVersionReadsThePageAgainAndAddsTheReplyOnceAfterTheNewText(t *testing.T) {
-	api := &fakeAPI{sneak: "Added on the web."}
-	api.add(todayTitle, "[[2031-05-20]]") // the page exists, so the first save meets the sneak
+// TestTextThatTheOwnerAddsWhileTheModelRunsStaysAboveTheReply: an edit is part of the turn before it, so the reply goes
+// after it. The agent sends no body, so it cannot lose the edit.
+func TestTextThatTheOwnerAddsWhileTheModelRunsStaysAboveTheReply(t *testing.T) {
+	api := &fakeAPI{}
 	api.say("hello")
-	startOn(t, func(int, chatReq) (int, string) { return text("noted") }, api, fixedNow)
+	startOn(t, func(n int, _ chatReq) (int, string) {
+		api.edit(todayTitle, api.body(todayTitle)+"\n\nAdded on the web.")
+		return text("noted")
+	}, api, fixedNow)
 	body := api.waitReplies(t, todayTitle, 1)
-	want := "[[2031-05-20]]\n\n**Owner** (09:30): hello\n\nAdded on the web.x\n\n**lifelog** (09:30): noted"
+	want := "[[2031-05-20]]\n\n**Owner** (09:30): hello\n\nAdded on the web.\n\n**lifelog** (09:30): noted"
 	if body != want {
 		t.Errorf("page body\n%q\nwant\n%q", body, want)
 	}
@@ -419,12 +444,86 @@ func TestTheOwnerSaysMoreWhileTheModelRunsAndTheReplyGoesBeforeThatTurn(t *testi
 	if len(reqs) != 2 || !strings.Contains(userOf(reqs[1]), "answer 1") || !strings.HasSuffix(userOf(reqs[1]), "second") {
 		t.Errorf("model requests %d: the second run reads the page with both turns", len(reqs))
 	}
+	if got := turnsReplied(api); !slices.Equal(got, []string{"1", "2"}) {
+		t.Errorf("the replies answer the turns %v, want 1 and then 2", got)
+	}
 }
 
-// TestAReplyThatCannotBeSavedIsNotRunAgainUntilThePageChanges: a new run of the model would repeat the tool calls of
+// TestAnEditOfAnEarlierTurnAndANewTurnWhileTheModelRunsAreBothAnswered: the core finds the place of the reply by the
+// number of the turn, not by the bytes of the page that the model read. So an edit of old words does not move the reply
+// behind the new turn, and the new turn waits for its own reply.
+func TestAnEditOfAnEarlierTurnAndANewTurnWhileTheModelRunsAreBothAnswered(t *testing.T) {
+	api := &fakeAPI{}
+	api.say("frist")
+	r := startOn(t, func(n int, _ chatReq) (int, string) {
+		if n == 1 {
+			api.edit(todayTitle, strings.Replace(api.body(todayTitle), "frist", "first", 1))
+			api.say("second")
+		}
+		return text(fmt.Sprintf("answer %d", n))
+	}, api, fixedNow)
+	api.waitBody(t, todayTitle, func(body string) bool { return strings.Contains(body, "answer 1") })
+	r.poll(t)
+	body := api.waitReplies(t, todayTitle, 2)
+	want := "[[2031-05-20]]\n\n**Owner** (09:30): first\n\n**lifelog** (09:30): answer 1\n\n**Owner** (09:30): second\n\n**lifelog** (09:30): answer 2"
+	if body != want {
+		t.Errorf("page body\n%q\nwant\n%q", body, want)
+	}
+	if n := len(r.mod.requests()); n != 2 {
+		t.Errorf("%d model requests, want 2: one for each turn", n)
+	}
+}
+
+// TestAReplyToATurnThatHasAReplyAlreadyEndsTheTurnWithOneLogLine: the core refuses a second reply to a turn (409) and
+// writes nothing. The agent does not run the model again for that turn. The refusal is not an error of the agent.
+func TestAReplyToATurnThatHasAReplyAlreadyEndsTheTurnWithOneLogLine(t *testing.T) {
+	api := &fakeAPI{}
+	api.say("hello")
+	r := startOn(t, func(n int, _ chatReq) (int, string) {
+		api.otherReplies(todayTitle, "the answer of another writer")
+		return text(fmt.Sprintf("answer %d", n))
+	}, api, fixedNow)
+	api.waitReplies(t, todayTitle, 1)
+	r.settle(t)
+	r.settle(t)
+	if n := len(r.mod.requests()); n != 1 {
+		t.Errorf("%d model requests, want 1: the turn is not run again", n)
+	}
+	if want := "[[2031-05-20]]\n\n**Owner** (09:30): hello\n\n**lifelog** (09:30): the answer of another writer"; api.body(todayTitle) != want {
+		t.Errorf("page body %q, want %q: the refused reply wrote nothing", api.body(todayTitle), want)
+	}
+	if got := turnsReplied(api); !slices.Equal(got, []string{"1"}) {
+		t.Errorf("reply requests for the turns %v, want one for the turn 1", got)
+	}
+	if lines := r.log.lines("reply was refused"); len(lines) != 1 {
+		t.Errorf("%d log lines about the refusal %q, want 1", len(lines), lines)
+	}
+}
+
+// TestAModelReplyThatHoldsAnOwnerMarkerLineGivesOneModelRequest: a model that copies the format of the page writes a line
+// that reads as a turn of the owner. The core escapes it, so the page ends with the turn of lifelog, and the agent does
+// not answer its own reply.
+func TestAModelReplyThatHoldsAnOwnerMarkerLineGivesOneModelRequest(t *testing.T) {
+	r := start(t, func(n int, _ chatReq) (int, string) {
+		return text(fmt.Sprintf("Sure %d.\n\n**Owner** (09:31): and then?", n))
+	})
+	r.api.say("hello")
+	r.poll(t)
+	body := r.api.waitReplies(t, todayTitle, 1)
+	r.settle(t)
+	r.settle(t)
+	if n := len(r.mod.requests()); n != 1 {
+		t.Errorf("%d model requests for one say, want 1; page %q", n, r.api.body(todayTitle))
+	}
+	if want := `\*\*Owner\*\* (09:31): and then?`; !strings.HasSuffix(body, want) {
+		t.Errorf("page body %q, want it to end with the escaped line %q", body, want)
+	}
+}
+
+// TestAReplyThatCannotBeWrittenIsNotRunAgainUntilThePageChanges: a new run of the model would repeat the tool calls of
 // the first run.
-func TestAReplyThatCannotBeSavedIsNotRunAgainUntilThePageChanges(t *testing.T) {
-	api := &fakeAPI{saveFails: true}
+func TestAReplyThatCannotBeWrittenIsNotRunAgainUntilThePageChanges(t *testing.T) {
+	api := &fakeAPI{replyFails: true}
 	api.say("hello")
 	r := startOn(t, func(n int, _ chatReq) (int, string) { return text(fmt.Sprintf("answer %d", n)) }, api, fixedNow)
 	r.settle(t)
@@ -435,26 +534,12 @@ func TestAReplyThatCannotBeSavedIsNotRunAgainUntilThePageChanges(t *testing.T) {
 	if body := api.body(todayTitle); strings.Contains(body, "**lifelog**") {
 		t.Errorf("a reply that could not be saved is on the page: %q", body)
 	}
-	api.setSaveFails(false)
+	api.setReplyFails(false)
 	api.say("hello again")
 	r.poll(t)
 	body := api.waitReplies(t, todayTitle, 1)
 	if n := len(r.mod.requests()); n != 2 || !strings.HasSuffix(body, "answer 2") {
 		t.Errorf("%d model requests, page %q: a new turn is answered", n, body)
-	}
-}
-
-func TestAPageThatChangesDuringEachSaveKeepsTheReplyOffThePage(t *testing.T) {
-	api := &fakeAPI{alwaysStale: true}
-	api.add(todayTitle, "[[2031-05-20]]")
-	api.say("hello")
-	r := startOn(t, func(int, chatReq) (int, string) { return text("answer") }, api, fixedNow)
-	r.settle(t)
-	if body := api.body(todayTitle); strings.Contains(body, "**lifelog**") {
-		t.Errorf("a reply that could not be saved is on the page: %q", body)
-	}
-	if n := len(r.mod.requests()); n < 1 {
-		t.Errorf("%d model requests, want at least 1", n)
 	}
 }
 
@@ -469,6 +554,9 @@ func TestATurnSaidBeforeMidnightIsAnsweredOnItsOwnPageAtTheFirstLookOfTheNewDay(
 	body := api.waitReplies(t, todayTitle, 1)
 	if !strings.HasSuffix(body, "**Owner** (23:59): good night\n\n**lifelog** (00:00): answer 1") {
 		t.Errorf("yesterday's page %q", body)
+	}
+	if q := api.replies(); len(q) != 1 || q[0].Path != "/days/2031-05-20/reply" || q[0].Form.Get("turn") != "1" {
+		t.Errorf("reply requests %+v, want one to the day of the page, for its turn 1", q)
 	}
 	sys := r.mod.requests()[0].Messages[0].Content
 	if !strings.Contains(sys, "Today is 2031-05-21") || !strings.Contains(sys, "Conversation 2031-05-20") {
@@ -631,10 +719,10 @@ func runOnce(t *testing.T, api *fakeAPI) error {
 	return a.Run(ctx)
 }
 
-// TestACatalogWithoutSayOrSaveBodyIsRefusedAsAnActionTheOwnerMustAdd: the program exits 78 for it (the owner acts
+// TestACatalogWithoutSayOrReplyIsRefusedAsAnActionTheOwnerMustAdd: the program exits 78 for it (the owner acts
 // first). A catalog that cannot be read is another error: the program exits 1, and serve starts it again.
-func TestACatalogWithoutSayOrSaveBodyIsRefusedButACatalogThatFailsIsNot(t *testing.T) {
-	for _, name := range []string{"say", "save-body"} {
+func TestACatalogWithoutSayOrReplyIsRefusedButACatalogThatFailsIsNot(t *testing.T) {
+	for _, name := range []string{"say", "reply"} {
 		api := &fakeAPI{}
 		api.dropAction(name)
 		if err := runOnce(t, api); !errors.Is(err, ErrNoAction) || !strings.Contains(err.Error(), name) {

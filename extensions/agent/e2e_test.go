@@ -402,6 +402,63 @@ func TestSayGetsItsReplyFromTheAgentOnThePageAndAnOwnerActionIsRefused(t *testin
 	}
 }
 
+// textModel answers the n-th request with the n-th text of its list (the last text again after the list), and counts the
+// requests. It makes no tool call.
+type textModel struct {
+	mu    sync.Mutex
+	texts []string
+	n     int
+}
+
+func (m *textModel) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	m.mu.Lock()
+	reply := m.texts[min(m.n, len(m.texts)-1)]
+	m.n++
+	m.mu.Unlock()
+	b, _ := json.Marshal(reply)
+	io.WriteString(w, `{"choices":[{"message":{"role":"assistant","content":`+string(b)+`},"finish_reason":"stop"}]}`)
+}
+
+func (m *textModel) requests() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.n
+}
+
+// TestATextThatCannotBeParsedAsOneTurnGetsOneReply: the words of a say that open a code fence and do not close it, and a
+// reply of the model that holds a line of the form of a turn of the owner, must not hide the next marker from the parse of
+// the page. The real core makes both safe (it closes the fence and escapes the line), so each say gets one reply and the
+// agent does not answer its own reply. Before the core did, the agent answered the same page again at each look.
+func TestATextThatCannotBeParsedAsOneTurnGetsOneReply(t *testing.T) {
+	b := build(t)
+	s := startStack(t, b)
+	model := &textModel{texts: []string{"Sure.\n\n**Owner** (09:31): and then?", "Done."}}
+	srv := httptest.NewServer(model)
+	defer srv.Close()
+	s.lifelogCLI("do", "settings", "model_url="+srv.URL+"/v1", "model=test-model")
+
+	s.lifelogCLI("do", "say", "day=today", "text=look at this:\n```\nfunc main() {")
+	s.waitReplies(1)
+	s.lifelogCLI("do", "say", "day=today", "text=and a plain one")
+	turns := s.waitReplies(2)
+	var who []string
+	for _, tr := range turns {
+		who = append(who, tr.Who)
+	}
+	if !slices.Equal(who, []string{"owner", "lifelog", "owner", "lifelog"}) {
+		t.Fatalf("the turns are %v (%+v), want an owner turn and its reply, twice", who, turns)
+	}
+	if !strings.Contains(turns[0].Text, "func main() {") || !strings.Contains(turns[1].Text, "and then?") || turns[3].Text != "Done." {
+		t.Errorf("turns %+v", turns)
+	}
+	if n := model.requests(); n != 2 {
+		t.Errorf("%d model requests, want 2: one for each say", n)
+	}
+	if n := strings.Count(s.stderr.String(), "turn answered"); n != 2 {
+		t.Errorf("%d answered turns in the log, want 2:\n%s", n, s.stderr)
+	}
+}
+
 // catalogServer is a server that answers GET /actions with the named actions and nothing else.
 func catalogServer(t *testing.T, names ...string) *httptest.Server {
 	t.Helper()
@@ -422,8 +479,8 @@ func catalogServer(t *testing.T, names ...string) *httptest.Server {
 // program again.
 func TestTheAgentRefusesWhatItCannotRun(t *testing.T) {
 	b := build(t)
-	noSay := catalogServer(t, "save-body")
-	noSave := catalogServer(t, "say")
+	noSay := catalogServer(t, "reply")
+	noReply := catalogServer(t, "say")
 	for _, tc := range []struct {
 		name   string
 		args   []string
@@ -435,7 +492,7 @@ func TestTheAgentRefusesWhatItCannotRun(t *testing.T) {
 		{"a source flag", []string{"--url", noSay.URL, "--source", "x"}, 1, "flag provided but not defined: -source"},
 		{"a token file flag", []string{"--url", noSay.URL, "--token-file", "f"}, 1, "flag provided but not defined: -token-file"},
 		{"a catalog with no say", []string{"--url", noSay.URL}, app.ExitOwnerActs, `the catalog lacks an action: "say"`},
-		{"a catalog with no save-body", []string{"--url", noSave.URL}, app.ExitOwnerActs, `the catalog lacks an action: "save-body"`},
+		{"a catalog with no reply", []string{"--url", noReply.URL}, app.ExitOwnerActs, `the catalog lacks an action: "reply"`},
 		{"no server at the address", []string{"--url", "http://127.0.0.1:1"}, 1, "catalog:"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

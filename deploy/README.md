@@ -52,9 +52,12 @@ The service runs the installed program, not the one in the repo folder.
    `lifelog-mcp`, `lifelog-agentic-init`, `lifelog-gphotos`, `lifelog-agent`, `lifelog-whatsapp` and `lifelog-ticktick`
    ([extensions](../extensions/README.md)). A unit with `--with web`, `--with agent` or `--with whatsapp` needs the program
    (`lifelog-web`, `lifelog-agent`, `lifelog-whatsapp`) beside `lifelog`: `serve` refuses to start without it, before the
-   file opens. Ship `lifelog-agent` and `lifelog-whatsapp` together. The old `lifelog-whatsapp` answered by itself, so
-   it beside the new `lifelog-agent` gives two replies to one message. The new `lifelog-whatsapp` without `lifelog-agent`
-   gives none. The local proxy points to `LIFELOG_WEB_LISTEN` (`127.0.0.1:7780`), and not to the core
+   file opens. Ship `lifelog`, `lifelog-agent` and `lifelog-whatsapp` together. The agent writes its turn with the
+   action `reply`, so a `lifelog` that lacks it makes `lifelog-agent` exit 78 and write nothing. The old
+   `lifelog-whatsapp` answered by itself, so it beside the new `lifelog-agent` gives two replies to one message. The new
+   `lifelog-whatsapp` without `lifelog-agent` gives none. The `state.json` of the old `lifelog-whatsapp` is a first run
+   for the new one: it adopts the page as it is, and it reads the old `saved_at` as the time of the last message that
+   was said, so a message that came during the switch is said. The local proxy points to `LIFELOG_WEB_LISTEN` (`127.0.0.1:7780`), and not to the core
    ([install](../extensions/web/README.md#install)).
 2. `systemctl daemon-reload` after a change to a unit file.
 3. `systemctl restart lifelog.service`.

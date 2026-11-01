@@ -88,9 +88,14 @@ The model is not set here, and this program does not use it. See [`lifelog-agent
 `LIFELOG_URL` and `LIFELOG_TOKEN` are set by `lifelog whatsapp` and by `lifelog serve --with whatsapp`, or by the owner.
 
 The state folder is `os.UserConfigDir()/lifelog-whatsapp/` (mode 0700). It holds `session.db` (mode 0600), the
-store of the keys of the account, and `state.json`: for each day that the program watches, the number of turns that it
-has dealt with, and the time of the last message that it said. To pair again, delete `session.db`. A `state.json` of an
-earlier version is a first run: the program adopts the page as it is and sends no earlier turn.
+store of the keys of the account, and `state.json`: for each day that the program watches, a key for each turn that it
+has dealt with (who said it, the minute, and a hash of the first line of its words), and the time of the last message
+that it said. The keys are a set and not a position, because the core puts a reply right after the turn that it answers,
+and that can be before a newer turn. So each turn is sent once, wherever it stands on the page, also after an edit above
+it or after a delete and a revive of the page. To pair again, delete `session.db`. A `state.json` of an earlier version
+is a first run: the program adopts the page as it is and sends no earlier turn. Its `saved_at`, when it has one (the
+file of the agent that lived in this program), is read as the time of the last message that was said, so a message that
+came during the switch is said.
 
 ## Exit codes
 
@@ -117,11 +122,14 @@ The program has no service unit. The unit of `lifelog serve` carries `--with wha
 ## Tests
 
 `go vet ./... && go test ./...` in this folder. The tests of `relay/` run on a fake catalog and a fake chat. `e2e_test.go`
-builds the real `lifelog` and `lifelog-whatsapp` into one folder. It runs the relay in the process, with a fake chat,
-against the real `lifelog serve --token-file F`: a message of the chat becomes a `say` with `via` whatsapp, a reply that an
-agent writes on the page reaches the chat, and a turn that the owner said on another surface reaches it marked. It runs
-the program for what it refuses, for the exit 78 of an unpaired device, and for `lifelog serve --with whatsapp`, which
-starts the child once and does not start it again. It needs the `go` command and the sources of the repository.
+builds the real `lifelog`, `lifelog-whatsapp` and `lifelog-agent` into one folder. It runs the relay in the process, with
+a fake chat, against the real `lifelog serve --token-file F`: a message of the chat becomes a `say` with `via` whatsapp,
+a reply that an agent writes on the page with `reply` reaches the chat, and a turn that the owner said on another surface
+reaches it marked. One test runs the real agent (`serve --with agent`) with a fake model server that holds its first
+answer: the owner sends two messages in a row, the core puts the first reply before the second turn, and the phone gets
+both replies, once each and in the order of the page. It runs the program for what it refuses, for the exit 78 of an
+unpaired device, and for `lifelog serve --with whatsapp`, which starts the child once and does not start it again. It
+needs the `go` command and the sources of the repository.
 
 **What has no test:** the connection to WhatsApp (`login`, the connection, `Send`, `MarkRead`, the `LoggedOut` event).
 It needs a real number. The filter, the QR renderer and the state folder have tests.

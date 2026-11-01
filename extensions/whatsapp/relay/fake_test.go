@@ -153,13 +153,24 @@ func (f *fakeAPI) edit(day, body string) {
 	f.notify()
 }
 
+// remove takes the page of a day away, as a delete does: the conversation of the day has no turns. It gives the body, so
+// that a test can bring the page back.
+func (f *fakeAPI) remove(day string) string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	body := f.bodies[day]
+	delete(f.bodies, day)
+	f.notify()
+	return body
+}
+
 func (f *fakeAPI) body(day string) string {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return f.bodies[day]
 }
 
-var marker = regexp.MustCompile(`^\*\*(Owner|lifelog)\*\* \(\d\d:\d\d(?:, via ([a-z0-9_:.-]+))?\): ?`)
+var marker = regexp.MustCompile(`^\*\*(Owner|lifelog)\*\* \((\d\d:\d\d)(?:, via ([a-z0-9_:.-]+))?\): ?`)
 
 // conversation is the entity of GET /days/{day}/conversation: the day, and the turns when the page exists. The turns
 // are the paragraphs of the body, as the real API reads them: a marker starts a turn, a block of tool lines belongs to
@@ -173,7 +184,7 @@ func (f *fakeAPI) conversation(day string) siren.Entity {
 	if !ok {
 		return siren.Entity{Class: []string{"conversation"}, Properties: props}
 	}
-	type turn struct{ who, via, text string }
+	type turn struct{ who, at, via, text string }
 	var turns []*turn
 	for _, para := range strings.Split(body, "\n\n") {
 		m := marker.FindStringSubmatch(para)
@@ -183,11 +194,11 @@ func (f *fakeAPI) conversation(day string) siren.Entity {
 			if m[1] == "lifelog" {
 				who = "lifelog"
 			}
-			turns = append(turns, &turn{who, m[2], para[len(m[0]):]})
+			turns = append(turns, &turn{who, m[2], m[3], para[len(m[0]):]})
 		case strings.HasPrefix(para, "[["+day+"]]"), strings.HasPrefix(para, "- `"):
 			// the first line, or the tool lines of the marker that follows
 		case len(turns) == 0:
-			turns = append(turns, &turn{"text", "", para})
+			turns = append(turns, &turn{"text", "", "", para})
 		default:
 			turns[len(turns)-1].text += "\n\n" + para
 		}
@@ -195,6 +206,9 @@ func (f *fakeAPI) conversation(day string) siren.Entity {
 	out := []any{}
 	for _, t := range turns {
 		m := map[string]any{"who": t.who, "text": t.text}
+		if t.at != "" {
+			m["at"] = t.at
+		}
 		if t.via != "" {
 			m["via"] = t.via
 		}

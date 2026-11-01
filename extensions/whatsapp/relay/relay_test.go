@@ -15,18 +15,22 @@ import (
 	"lifelog/client"
 )
 
-// stateDays reads the days of the state file.
-func stateDays(t *testing.T, path string) map[string]int {
+// stateSeen reads the turns that the state file holds for each day: the number of turns that the relay has dealt with.
+func stateSeen(t *testing.T, path string) map[string]int {
 	t.Helper()
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	var s struct{ Days map[string]int }
+	var s struct{ Seen map[string][]string }
 	if err := json.Unmarshal(data, &s); err != nil {
 		t.Fatal(err)
 	}
-	return s.Days
+	out := map[string]int{}
+	for day, keys := range s.Seen {
+		out[day] = len(keys)
+	}
+	return out
 }
 
 func TestAMessageOfTheOwnerIsSaidToTheConversationAsTheOwnerWithViaWhatsapp(t *testing.T) {
@@ -96,6 +100,122 @@ func TestATurnOfTheOwnerFromAnotherSurfaceGoesToTheChatMarked(t *testing.T) {
 	r.chat.none(t)
 }
 
+// TestAReplyPlacedBeforeANewerTurnOfTheOwnerReachesTheChat: the owner sends two messages in a row, and the core puts the
+// reply to the first one before the second turn. The relay has dealt with the second turn already. A relay that keeps a
+// position in the turns would take the reply for a turn it had sent, and the chat would never get it.
+func TestAReplyPlacedBeforeANewerTurnOfTheOwnerReachesTheChat(t *testing.T) {
+	r := start(t)
+	r.chat.say(t, "first")
+	r.api.waitBody(t, today, func(b string) bool { return strings.Contains(b, "first") })
+	r.settle(t)
+	r.chat.say(t, "second")
+	r.api.waitBody(t, today, func(b string) bool { return strings.Contains(b, "second") })
+	r.settle(t) // the relay has dealt with the second turn
+	r.api.edit(today, "[[2031-05-20]]\n\n**Owner** (09:30, via whatsapp): first\n\n**lifelog** (09:31): reply to first\n\n**Owner** (09:30, via whatsapp): second")
+	r.poll(t)
+	if got := r.chat.next(t); got != "reply to first" {
+		t.Errorf("sent %q, want the reply that came before the newer turn", got)
+	}
+	r.api.agentReplies(today, "reply to second")
+	r.poll(t)
+	if got := r.chat.next(t); got != "reply to second" {
+		t.Errorf("sent %q", got)
+	}
+	r.settle(t)
+	r.chat.none(t)
+}
+
+// TestATurnOfAnotherSurfaceAndTheReplyBeforeItAreEachSentOnce: the owner says T2 in the browser while the model works on
+// the first turn. The relay sends T2 marked. The reply to the first turn then lands before T2: it is sent once, and T2 is
+// not sent again.
+func TestATurnOfAnotherSurfaceAndTheReplyBeforeItAreEachSentOnce(t *testing.T) {
+	r := start(t)
+	r.chat.say(t, "first")
+	r.api.waitBody(t, today, func(b string) bool { return strings.Contains(b, "first") })
+	r.settle(t)
+	r.api.ownerSaysElsewhere(today, "from the browser")
+	r.poll(t)
+	if got := r.chat.next(t); got != "You wrote in lifelog: from the browser" {
+		t.Errorf("sent %q", got)
+	}
+	r.api.edit(today, "[[2031-05-20]]\n\n**Owner** (09:30, via whatsapp): first\n\n**lifelog** (09:31): reply to first\n\n**Owner** (09:30): from the browser")
+	r.poll(t)
+	if got := r.chat.next(t); got != "reply to first" {
+		t.Errorf("sent %q", got)
+	}
+	r.settle(t)
+	r.chat.none(t)
+}
+
+// TestAnEditAboveTheTurnsSendsNothingAgain: a paragraph that an edit adds before the first marker is a turn of its own in
+// the parse of the page, and every other turn moves by one place. No turn is new.
+func TestAnEditAboveTheTurnsSendsNothingAgain(t *testing.T) {
+	r := start(t)
+	r.settle(t)
+	r.api.ownerSaysElsewhere(today, "one")
+	r.api.agentReplies(today, "answer one")
+	r.poll(t)
+	r.chat.next(t)
+	r.chat.next(t)
+	body := r.api.body(today)
+	r.api.edit(today, strings.Replace(body, "[[2031-05-20]]", "[[2031-05-20]]\n\nNotes that the owner wrote above the talk.", 1))
+	r.settle(t)
+	r.chat.none(t)
+	r.api.agentReplies(today, "answer two")
+	r.poll(t)
+	if got := r.chat.next(t); got != "answer two" {
+		t.Errorf("sent %q", got)
+	}
+}
+
+// TestADeletedPageThatIsRevivedSendsNoEarlierTurnAgain: a deleted page has no turns, and a revive brings them back with the
+// new turn. The relay keeps what it dealt with, so only the new turn is sent.
+func TestADeletedPageThatIsRevivedSendsNoEarlierTurnAgain(t *testing.T) {
+	r := start(t)
+	r.settle(t)
+	r.api.ownerSaysElsewhere(today, "one")
+	r.api.agentReplies(today, "answer one")
+	r.poll(t)
+	r.chat.next(t)
+	r.chat.next(t)
+	body := r.api.remove(today)
+	r.settle(t)
+	r.chat.none(t)
+	r.api.edit(today, body)
+	r.api.ownerSaysElsewhere(today, "back again")
+	r.poll(t)
+	if got := r.chat.next(t); got != "You wrote in lifelog: back again" {
+		t.Errorf("sent %q", got)
+	}
+	r.settle(t)
+	r.chat.none(t)
+}
+
+// TestTwoTurnsOfTheSameMinuteAndTheSameWordsAreBothSentAndNoneAgain: the key of a turn does not tell two such turns apart,
+// so the relay counts them.
+func TestTwoTurnsOfTheSameMinuteAndTheSameWordsAreBothSentAndNoneAgain(t *testing.T) {
+	api := &fakeAPI{}
+	state := t.TempDir() + "/state.json"
+	r := startOn(t, api, state)
+	r.settle(t)
+	api.agentReplies(today, "Done.")
+	r.poll(t)
+	if got := r.chat.next(t); got != "Done." {
+		t.Errorf("sent %q", got)
+	}
+	api.agentReplies(today, "Done.")
+	r.poll(t)
+	if got := r.chat.next(t); got != "Done." {
+		t.Errorf("sent %q for the second turn", got)
+	}
+	r.settle(t)
+	r.chat.none(t)
+	r.stop(t)
+	r2 := startOn(t, api, state)
+	r2.settle(t)
+	r2.chat.none(t)
+}
+
 func TestAFirstRunSendsNothingThatThePageHoldsAlready(t *testing.T) {
 	api := &fakeAPI{}
 	api.ownerSaysElsewhere(today, "earlier")
@@ -103,8 +223,8 @@ func TestAFirstRunSendsNothingThatThePageHoldsAlready(t *testing.T) {
 	r := startOn(t, api, t.TempDir()+"/state.json")
 	r.settle(t)
 	r.chat.none(t)
-	if days := stateDays(t, r.state); len(days) != 1 || days[today] != 2 {
-		t.Errorf("state days %v, want {%s: 2}", days, today)
+	if days := stateSeen(t, r.state); len(days) != 1 || days[today] != 2 {
+		t.Errorf("state seen %v, want {%s: 2}", days, today)
 	}
 	api.agentReplies(today, "a new answer")
 	r.poll(t)
@@ -144,8 +264,8 @@ func TestAReplyAfterMidnightOnTheOldPageIsSentAndTheOldDayIsDropped(t *testing.T
 	r.settle(t)
 	api.setToday("2031-05-21")
 	r.settle(t)
-	if days := stateDays(t, r.state); len(days) != 2 || days[today] != 1 || days["2031-05-21"] != 0 {
-		t.Errorf("state days %v, want yesterday kept while its last turn is the owner's", days)
+	if days := stateSeen(t, r.state); len(days) != 2 || days[today] != 1 || days["2031-05-21"] != 0 {
+		t.Errorf("state seen %v, want yesterday kept while its last turn is the owner's", days)
 	}
 	api.agentReplies(today, "Good night.") // the agent answered the turn of yesterday on its own page
 	r.poll(t)
@@ -153,8 +273,8 @@ func TestAReplyAfterMidnightOnTheOldPageIsSentAndTheOldDayIsDropped(t *testing.T
 		t.Errorf("sent %q", got)
 	}
 	r.settle(t)
-	if days := stateDays(t, r.state); len(days) != 1 || days["2031-05-21"] != 0 {
-		t.Errorf("state days %v, want the answered day dropped", days)
+	if days := stateSeen(t, r.state); len(days) != 1 || days["2031-05-21"] != 0 {
+		t.Errorf("state seen %v, want the answered day dropped", days)
 	}
 	api.ownerSaysElsewhere("2031-05-21", "good morning")
 	r.poll(t)
@@ -175,14 +295,14 @@ func TestADayOlderThanYesterdayIsDroppedAndNeverRead(t *testing.T) {
 	api.ownerSaysElsewhere("2031-05-17", "old")
 	api.agentReplies("2031-05-17", "an answer that the chat never got")
 	state := t.TempDir() + "/state.json"
-	if err := os.WriteFile(state, []byte(`{"days":{"2031-05-17":0,"2031-05-20":0}}`), 0o600); err != nil {
+	if err := os.WriteFile(state, []byte(`{"seen":{"2031-05-17":[],"2031-05-20":[]}}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	r := startOn(t, api, state)
 	r.settle(t)
 	r.chat.none(t)
-	if days := stateDays(t, state); len(days) != 1 || days[today] != 0 {
-		t.Errorf("state days %v, want only today", days)
+	if days := stateSeen(t, state); len(days) != 1 || days[today] != 0 {
+		t.Errorf("state seen %v, want only today", days)
 	}
 	for _, q := range api.requests() {
 		if strings.Contains(q.Path, "2031-05-17") {
@@ -221,8 +341,8 @@ func TestATextThatCannotBeSentIsTriedAgainAtTheNextLook(t *testing.T) {
 	api.agentReplies(today, "the answer")
 	r.settle(t)
 	r.chat.none(t)
-	if days := stateDays(t, r.state); days[today] != 0 {
-		t.Errorf("state days %v: a turn that was not sent is not marked", days)
+	if days := stateSeen(t, r.state); days[today] != 0 {
+		t.Errorf("state seen %v: a turn that was not sent is not marked", days)
 	}
 	r.chat.setFailSend(false)
 	r.poll(t)
@@ -263,22 +383,55 @@ func TestTheTimeOfTheLastSaidMessageIsKeptForTheNextRun(t *testing.T) {
 	}
 }
 
+// TestAnEarlierVersionOfTheStateFileIsAFirstRun: the file of the agent that lived in this program (a page, no turns), and
+// the file of the relay that counted turns (days), are read as a first run. The time of the last save of the first one is
+// the time of the last message that was said, so a message that came during the switch is said.
 func TestAnEarlierVersionOfTheStateFileIsAFirstRun(t *testing.T) {
-	api := &fakeAPI{}
-	api.agentReplies(today, "an old answer")
+	for name, old := range map[string]string{
+		"the agent":       `{"day":"2031-05-20","id":"1","version":"3","body":"[[2031-05-20]]","saved_at":"2031-05-20T08:00:00Z"}`,
+		"the counting":    `{"days":{"2031-05-20":3},"said":"2031-05-20T08:00:00Z"}`,
+		"the empty relay": `{"days":{},"said":"0001-01-01T00:00:00Z"}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			api := &fakeAPI{}
+			api.agentReplies(today, "an old answer")
+			state := t.TempDir() + "/state.json"
+			if err := os.WriteFile(state, []byte(old), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			r := startOn(t, api, state)
+			r.settle(t)
+			r.chat.none(t)
+			if seen := stateSeen(t, state); seen[today] != 1 {
+				t.Errorf("state seen %v, want the page adopted", seen)
+			}
+		})
+	}
+}
+
+func TestTheSavedAtOfTheAgentStateFileIsTheTimeOfTheLastSaidMessage(t *testing.T) {
 	state := t.TempDir() + "/state.json"
 	old := `{"day":"2031-05-20","id":"1","version":"3","body":"[[2031-05-20]]","saved_at":"2031-05-20T08:00:00Z"}`
 	if err := os.WriteFile(state, []byte(old), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if _, ok, err := LastSaid(state); ok || err != nil {
-		t.Errorf("LastSaid of the earlier file: %v %v, want none", ok, err)
+	want := time.Date(2031, 5, 20, 8, 0, 0, 0, time.UTC)
+	if got, ok, err := LastSaid(state); err != nil || !ok || !got.Equal(want) {
+		t.Errorf("LastSaid %v %v %v, want %v", got, ok, err, want)
 	}
-	r := startOn(t, api, state)
+	// The relay keeps that time through its first save, and a newer message moves it.
+	r := startOn(t, &fakeAPI{}, state)
 	r.settle(t)
-	r.chat.none(t)
-	if days := stateDays(t, state); days[today] != 1 {
-		t.Errorf("state days %v, want the page adopted", days)
+	if got, ok, err := LastSaid(state); err != nil || !ok || !got.Equal(want) {
+		t.Errorf("LastSaid after the first run %v %v %v, want %v", got, ok, err, want)
+	}
+	r.chat.say(t, "hello")
+	r.settle(t) // the relay takes a tick only after it has said the message and saved the state
+	if got, _, _ := LastSaid(state); !got.Equal(fixedNow) {
+		t.Errorf("LastSaid after a say %v, want %v", got, fixedNow)
+	}
+	if file, err := os.ReadFile(state); err != nil || strings.Contains(string(file), "saved_at") {
+		t.Errorf("state file %q (%v): the old key must not stay", file, err)
 	}
 }
 

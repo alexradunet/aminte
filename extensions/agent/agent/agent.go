@@ -1,6 +1,7 @@
 // Package agent answers the owner's turns of the conversation page with a model that calls the actions of the
-// lifelog API. The page is the only state: the agent reads it, and a turn of the owner after its last reply is a turn
-// to answer. Only the action say writes a turn of the owner. A chat (the browser, WhatsApp) shows the page.
+// lifelog API. The page is the truth: the agent reads it, and a turn of the owner after its last reply is a turn to
+// answer. The core writes both kinds of turn: the action say writes the owner's, and the action reply writes the
+// agent's, right after the owner turn that it answers. A chat (the browser, WhatsApp) shows the page.
 package agent
 
 import (
@@ -9,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -24,11 +26,9 @@ const (
 	maxSteps = 16
 	// turnTimeout is the longest time of one turn. One model step has its own limit (package model).
 	turnTimeout = 5 * time.Minute
-	// saveTimeout is the longest time of the save of a reply. It has its own limit: the timeout of the turn may be
+	// replyTimeout is the longest time of the write of a reply. It has its own limit: the timeout of the turn may be
 	// spent, and the reply must reach the page.
-	saveTimeout = 30 * time.Second
-	// saveAttempts is the number of saves of one reply. A save is stale when someone else wrote the page meanwhile.
-	saveAttempts = 3
+	replyTimeout = 30 * time.Second
 	// maxResult is the largest tool result that goes to the model.
 	maxResult = 64 << 10
 	// maxBody is the largest part of the conversation that goes to the model. The end is kept.
@@ -67,9 +67,10 @@ type Agent struct {
 	actions map[string]siren.Action
 	// checked is the day of the server for which the day before was looked at: on the first look, and on each new day.
 	checked string
-	// failed is the key of the turn whose reply could not be saved. The agent does not answer that turn again until
-	// the page changes: a new run of the model would repeat the tool calls of the first run.
-	failed  string
+	// done is the key of the page that the agent read when its reply was refused or failed. The agent does not answer
+	// that page again: a new run of the model would repeat the tool calls of the first run. It answers again when the
+	// page changes.
+	done    string
 	lookErr string
 }
 
@@ -103,9 +104,9 @@ func (a *Agent) Run(ctx context.Context) error {
 }
 
 // readCatalog reads the catalog and replaces the tools and the actions with it. The tools and the actions come from
-// the same read, so a tool and its action agree. A catalog with no say or no save-body is ErrNoAction: say is the
-// only way to write a turn of the owner, so with no say there is nothing to answer. On an error the tools and the
-// actions stay as they were.
+// the same read, so a tool and its action agree. A catalog with no say or no reply is ErrNoAction: say is the only
+// way to write a turn of the owner, so with no say there is nothing to answer, and reply is the only way that the
+// core takes the agent's turn. On an error the tools and the actions stay as they were.
 func (a *Agent) readCatalog(ctx context.Context) error {
 	list, err := a.Client.Catalog(ctx)
 	if err != nil {
@@ -115,7 +116,7 @@ func (a *Agent) readCatalog(ctx context.Context) error {
 	for _, x := range list {
 		actions[x.Name] = x
 	}
-	for _, name := range []string{"say", "save-body"} {
+	for _, name := range []string{"say", "reply"} {
 		if _, ok := actions[name]; !ok {
 			return fmt.Errorf("%w: %q", ErrNoAction, name)
 		}
@@ -199,15 +200,17 @@ func dayBefore(day string) (string, error) {
 	return t.AddDate(0, 0, -1).Format(time.DateOnly), nil
 }
 
-// turn answers the last turn of the owner on the page p: it runs the model on the page, and it adds the tool lines
-// and the reply to the page in one save, so the page has the whole answer or none.
+// turn answers the owner turns that wait on the page p: it runs the model once on the page, and it writes the tool
+// lines and the reply with the action reply in one request, so the page has the whole answer or none. The reply
+// answers the last owner turn that the model read. The core puts it right after that turn, so a turn that the owner
+// says meanwhile stays after the reply and waits for its own run.
 func (a *Agent) turn(ctx context.Context, p *page) {
-	if p.key() == a.failed {
+	if p.key() == a.done {
 		return
 	}
 	tctx, cancel := context.WithTimeout(ctx, turnTimeout)
 	defer cancel()
-	at := a.Now() // one time for the turn: its stamp does not change at midnight
+	at := a.Now() // one time for the turn: the model reads the same day through the turn, also across midnight
 	reply, lines, err := a.reply(tctx, p, at)
 	if ctx.Err() != nil {
 		return
@@ -215,22 +218,18 @@ func (a *Agent) turn(ctx context.Context, p *page) {
 	if err != nil { // only the timeout of the turn reaches here
 		reply = "I stopped: the turn took more than 5 minutes."
 	}
-	extra := "\n\n"
-	if len(lines) > 0 {
-		extra += strings.Join(lines, "\n") + "\n\n"
-	}
-	extra += fmt.Sprintf("**lifelog** (%s): %s", at.Format("15:04"), reply)
-	sctx, scancel := context.WithTimeout(ctx, saveTimeout)
-	defer scancel()
-	last, err := a.save(sctx, p, extra)
+	wctx, wcancel := context.WithTimeout(ctx, replyTimeout)
+	defer wcancel()
+	_, err = a.Client.Do(wctx, a.actions["reply"], map[string]string{
+		"day": p.Day, "turn": strconv.Itoa(p.owners()), "text": reply, "tools": strings.Join(lines, "\n"),
+	})
 	if err != nil {
 		if ctx.Err() == nil {
-			a.logger.Printf("conversation page: %v", err)
-			a.failed = last.key()
+			a.logger.Printf("reply was refused or failed (turn %d of %s): %v", p.owners(), p.Day, err)
+			a.done = p.key()
 		}
 		return
 	}
-	a.failed = ""
 	a.logger.Printf("turn answered: %d bytes out, %d tool calls", len(reply), len(lines))
 }
 
@@ -263,45 +262,6 @@ func (a *Agent) read(ctx context.Context, day string) (*page, error) {
 		return nil, err
 	}
 	return pageFrom(e)
-}
-
-// save adds extra, the tool lines and the reply, to the page p. A stale version (someone wrote the page while the
-// model worked) reads the page again and adds the reply to that page, at most saveAttempts times. It returns the last
-// page that it read, and the error of a reply that could not be saved.
-func (a *Agent) save(ctx context.Context, p *page, extra string) (*page, error) {
-	cur := p
-	for range saveAttempts {
-		_, err := a.Client.Do(ctx, a.actions["save-body"], map[string]string{"id": cur.ID, "body": placed(p, cur, extra), "version": cur.Version})
-		var ce *client.Error
-		switch {
-		case err == nil:
-			return cur, nil
-		case errors.As(err, &ce) && ce.Code() == "stale_version":
-			fresh, rerr := a.read(ctx, p.Day)
-			if rerr != nil {
-				return cur, fmt.Errorf("the page cannot be read again: %w", rerr)
-			}
-			if fresh.ID == "" {
-				return cur, errors.New("the page is gone")
-			}
-			cur = fresh
-		default:
-			return cur, err
-		}
-	}
-	return cur, fmt.Errorf("the page changed during each of %d saves", saveAttempts)
-}
-
-// placed is the body that a save sends. The reply goes at the end of the page, after what the owner saved while the
-// model worked. But when the owner said a new turn meanwhile, the reply goes before that turn: the new turn is then
-// the last one, and the next look answers it. read is the page that the model read, and cur is the page now.
-func placed(read, cur *page, extra string) string {
-	if cur != read && cur.owners() > read.owners() {
-		if rest, ok := strings.CutPrefix(cur.Body, read.Body); ok && strings.HasPrefix(rest, "\n") {
-			return strings.TrimRight(read.Body, "\n") + extra + "\n\n" + strings.TrimLeft(rest, "\n")
-		}
-	}
-	return strings.TrimRight(cur.Body, "\n") + extra
 }
 
 // answer runs the steps of one turn on the body of the page p, at the time at. It returns the reply and one line for
