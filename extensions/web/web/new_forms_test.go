@@ -40,8 +40,9 @@ func TestAnOpenedActionWritesFromTheBrowser(t *testing.T) {
 
 // TestTheFormOfReplyIsOnTheCatalogPageAndWritesTheAgentsTurn: reply is the agent's action. No page of a conversation draws
 // it, because the entity of a conversation does not offer it (the README names /actions alone). The form on /actions
-// posts to the day, takes the number of the turn that it answers, and the core writes the reply right after that turn.
-// A second reply to the same turn is 409, and web draws that refusal with its status.
+// posts to the day, takes the key of the owner turn that it answers (a text, from turns[].key of the conversation), and the
+// core writes the reply right after that turn. A second reply to the same turn is 409, and web draws that refusal with
+// its status.
 func TestTheFormOfReplyIsOnTheCatalogPageAndWritesTheAgentsTurn(t *testing.T) {
 	l := emptyLife(t)
 	l.do(t, "/days/"+today+"/conversation", "say", map[string]string{"text": "How did I sleep?"})
@@ -55,13 +56,23 @@ func TestTheFormOfReplyIsOnTheCatalogPageAndWritesTheAgentsTurn(t *testing.T) {
 	}
 	form := pageAt(t, l.web, "/actions?new=reply&day="+today)
 	for _, want := range []string{`<details class="action" open>`, `action="` + post + `"`,
-		`<input type="number" name="turn"`, `<textarea name="text"`, `name="tools"`} {
+		`<input type="text" name="turn"`, `<textarea name="text"`, `name="tools"`} {
 		if !strings.Contains(form, want) {
 			t.Errorf("/actions?new=reply draws no %s:\n%.1500s", want, mainPartOf(form))
 		}
 	}
 
-	sent := url.Values{"turn": {"1"}, "text": {"You slept 7 hours."}, "tools": {"- `search`: no hits"}}
+	// The key is the one that the core says for the question: web sends what the form carries and makes no key.
+	asked, _ := must(t)(l.api.Get(t.Context(), "/days/"+today+"/conversation")).Properties.(map[string]any)["turns"].([]any)
+	if len(asked) != 1 {
+		t.Fatalf("the conversation has %d turns before the reply, want the question alone: %v", len(asked), asked)
+	}
+	question, _ := asked[0].(map[string]any)
+	key, _ := question["key"].(string)
+	if question["who"] != "owner" || key == "" {
+		t.Fatalf("the first turn is %v, want the turn of the owner with a key", question)
+	}
+	sent := url.Values{"turn": {key}, "text": {"You slept 7 hours."}, "tools": {"- `search`: no hits"}}
 	if rec := postForm(l.web, post, sent); rec.Code != http.StatusSeeOther {
 		t.Fatalf("POST %s: %d %.300s", post, rec.Code, rec.Body)
 	}

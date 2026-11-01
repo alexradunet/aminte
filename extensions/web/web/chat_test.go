@@ -88,9 +88,7 @@ func chatVersionOf(t *testing.T, l *life) string {
 // say and returns to the screen. Three dots wait while the last turn is the owner's. The column is not drawn.
 func TestTheConversationViewIsTheChatScreen(t *testing.T) {
 	l := emptyLife(t)
-	for _, day := range []string{"2031-05-01", "2031-05-10", "2031-05-12", "2031-05-13"} { // the oldest is not one of the last three
-		l.do(t, "/", "create-page", map[string]string{"title": "Conversation " + day, "body": "[[" + day + "]]\n"})
-	}
+	l.earlierConversations(t, "2031-05-01", "2031-05-10", "2031-05-12", "2031-05-13") // the oldest is not one of the last three
 	l.do(t, "/days/"+today+"/conversation", "say", map[string]string{"text": "How did I **sleep**? See [[Sleep notes]]."})
 	chatAppend(t, l, "\n\n- `search_pages` words=sleep\n- `read_day` failed: not_found\n\n**lifelog** (09:30): You slept *well*.\n")
 	l.do(t, "/days/today/conversation", "say", map[string]string{"text": "And last night?", "via": "whatsapp"})
