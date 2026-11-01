@@ -253,6 +253,9 @@ func startServer(t *testing.T, b bins, fake *httptest.Server) *server {
 	config := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", config)
 	t.Setenv("LIFELOG_TOKEN", "")
+	// The children read the day of a completion in UTC, the zone of the tasks of the fake, so dayOf names the same
+	// day on a machine in any zone. Without it the test fails where the local day is not the day in UTC.
+	t.Setenv("TZ", "UTC")
 	state := filepath.Join(config, "lifelog-ticktick")
 	if err := os.MkdirAll(state, 0o700); err != nil {
 		t.Fatal(err)
