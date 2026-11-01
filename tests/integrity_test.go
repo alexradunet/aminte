@@ -286,6 +286,23 @@ func integrity(s *S) {
 	}
 	r = f.checks(p)
 	s.K("missing preferred ownership is detected by FK and semantic checks, not structure", r.ic == "ok" && r.fk != "" && r.orph == ids(oid), r)
+
+	// The preferred key is a name that another entity owns. The name exists, so the orphan query must test who owns it
+	// (n.entity_id=e.id), not only that some entity owns it.
+	p = f.copy("name-of-another")
+	w = s.connect(p)
+	w.must("PRAGMA foreign_keys=OFF")
+	owned := w.str("SELECT n.name_key FROM entity_names n JOIN entities o ON o.id=n.entity_id WHERE o.entity_type='page' ORDER BY n.entity_id LIMIT 1")
+	claimant := w.rows("INSERT INTO entities(entity_type,preferred_name_key,created_at,updated_at,source) VALUES ('page',?,"+NOW+","+NOW+",'ui') RETURNING id", owned)
+	if len(claimant) != 1 {
+		stop("the entity that prefers a name of another: %d rows", len(claimant))
+	}
+	tid, _ := claimant[0][0].(int64)
+	if err := w.Close(); err != nil {
+		stop("close preferred-owner damage: %v", err)
+	}
+	r = f.checks(p)
+	s.K("a preferred key that another entity owns is an orphan: the orphan query asks who owns the name", r.ic == "ok" && r.fk != "" && r.orph == ids(tid) && tid != 0 && owned != "None", r, owned)
 	for _, typ := range []string{"person", "metric", "file"} {
 		p = f.copy("half-" + typ)
 		w = s.connect(p)

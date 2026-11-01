@@ -88,6 +88,7 @@ var taskCatalog = []spec{
 		Fields:      []siren.Field{req("title", "text", "Title"), opt("list", "text", "List"), opt("due", "date", "Due day"), area("notes", "Notes", 4)}},
 	{Name: "edit-task", Title: "Edit a task", Class: []string{"edit"}, Method: "POST", Path: "/tasks/items/{id}", Service: "/tasks/{id}",
 		Description: "Change the title, the notes or the due day of a task. A field that is not sent stays as it is. An empty due or notes clears it.",
+		Hint:        "Change the title, the notes or the due day of this task. Leave the notes or the due day empty to remove it.",
 		Fields: []siren.Field{path("id", "text", "Task"), opt("title", "text", "Title"), area("notes", "Notes", 4),
 			opt("due", "date", "Due day")}},
 	{Name: "complete-task", Title: "Complete a task", Class: []string{"toggle"}, Method: "POST", Path: "/tasks/items/{id}/complete", Service: "/tasks/{id}/complete",

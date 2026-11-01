@@ -74,11 +74,16 @@ func TestTheCatalogUsesOnlyKnownClassesAndOneToAnAction(t *testing.T) {
 //     with two options.
 //   - A POST on {id} that asks for a field is an edit, unless it has the shape of a toggle. An edit asks for a field.
 //   - A danger row has no class: its danger mark draws it.
+//   - A POST row that acts on no {id} and asks for nothing has no class (rebuild-search, resync-links, sync-tasks),
+//     except the rows that are pinned below.
 //
-// The rules leave two things open, because a row cannot show them: a class that is taken away from settings (an edit
-// that acts on no {id}), and an edit, or a toggle that asks for nothing, that is given to a row with no {id}, such as
-// file-pages, say or rebuild-search.
+// Three rows have the shape of another class, so no rule can tell their class from the shape. Each is pinned by name
+// in pinnedClass, and the test fails when a pinned row is gone, so a rename does not drop a pin silently.
+//
+// The rules leave one thing open, because a row cannot show it: the class edit given to a row that has fields and acts
+// on no {id}, such as file-pages, say or reply. Only settings has that shape with a class, and it is pinned.
 func TestTheClassOfARowIsWhatTheRowDoes(t *testing.T) {
+	seen := map[string]bool{}
 	for _, s := range append(slices.Clone(catalog), taskCatalog...) {
 		var class string
 		if len(s.Class) > 0 {
@@ -96,7 +101,13 @@ func TestTheClassOfARowIsWhatTheRowDoes(t *testing.T) {
 		}
 		aToggle := len(asked) == 0 || len(asked) == 1 && len(asked[0].Options) == 2
 		newOrAdd := strings.HasPrefix(s.Title, "New ") || strings.HasPrefix(s.Title, "Add ")
+		want, pinned := pinnedClass[s.Name]
+		seen[s.Name] = true
 		switch {
+		case pinned && class != want:
+			t.Errorf("%s has the class %q, want %q: the class is pinned in pinnedClass", s.Name, class, want)
+		case !pinned && s.Method == "POST" && !onID && len(asked) == 0 && class != "":
+			t.Errorf("%s acts on no {id} and asks for nothing: the class is %q, want none", s.Name, class)
 		case class != "" && s.Method != "POST":
 			t.Errorf("%s has the class %q and the method %s, want POST", s.Name, class, s.Method)
 		case newOrAdd && class != "create":
@@ -115,6 +126,25 @@ func TestTheClassOfARowIsWhatTheRowDoes(t *testing.T) {
 			t.Errorf("%s is a toggle and asks for %d fields, want none or one with two options", s.Name, len(asked))
 		}
 	}
+	for name := range pinnedClass {
+		if !seen[name] {
+			t.Errorf("pinnedClass names %s, which is in no catalog", name)
+		}
+	}
+}
+
+// pinnedClass are the classes that the shape of a row cannot show. A client places an action by its class (plan 159),
+// so a lost or a changed class moves a control on a page.
+//
+//   - edit-metric asks for one field with two options (daily), which is the shape of a toggle. It is an edit, because
+//     it sets a value of the metric.
+//   - settings is an edit that acts on no {id}, so the rule of an edit on {id} does not reach it.
+//   - snapshot is the one row that acts on no {id}, asks for nothing, and has a class: it makes a file, so it is a
+//     create. Its title has a plain verb, not New or Add, because no field of it names a new thing.
+var pinnedClass = map[string]string{
+	"edit-metric": "edit",
+	"settings":    "edit",
+	"snapshot":    "create",
 }
 
 // TestAnAppActionKeepsAKnownClassAndLosesAnUnknownOne: inNamespace passes the classes that this server lists, on the

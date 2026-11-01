@@ -332,6 +332,37 @@ func TestExistingTitleLinksToThePage(t *testing.T) {
 	}
 }
 
+// TestARefusedDuplicateCreateLeavesThePageAsItWas: a second create-page with a title that is in use is 409 exists, and
+// the first page keeps its body and its version. The title is in use under another case, because the title key decides.
+// The CLI sends create-page through the same generic path (do, client.Do) to the same handler, so this test holds that
+// line too. The owner and an agent write the same way.
+func TestARefusedDuplicateCreateLeavesThePageAsItWas(t *testing.T) {
+	for _, source := range []string{"cli", "agent:probe"} {
+		t.Run(source, func(t *testing.T) {
+			c, _, _ := apitest.Fresh(t, source)
+			ctx := t.Context()
+			create := apitest.Action(t, apitest.Must(t)(c.Get(ctx, "/")), "create-page")
+			first := apitest.Must(t)(c.Do(ctx, create, map[string]string{"title": "Trip notes", "body": "Packed light."}))
+			self := apitest.Href(first, "self")
+			before := props(apitest.Must(t)(c.Get(ctx, self)))
+			if before["body"] != "Packed light." {
+				t.Fatalf("the first page has the body %v, want Packed light.", before["body"])
+			}
+
+			_, err := c.Do(ctx, create, map[string]string{"title": "TRIP NOTES", "body": "Another text."})
+			if code, status := codeOf(t, err); code != "exists" || status != http.StatusConflict {
+				t.Errorf("a duplicate title: code=%q status=%d, want exists/409 (%v)", code, status, err)
+			}
+
+			after := props(apitest.Must(t)(c.Get(ctx, self)))
+			if after["body"] != before["body"] || after["version"] != before["version"] {
+				t.Errorf("after the refusal: body=%v version=%v, want body=%v version=%v",
+					after["body"], after["version"], before["body"], before["version"])
+			}
+		})
+	}
+}
+
 func TestCorrectionDomainActions(t *testing.T) {
 	c, _, _ := apitest.Fresh(t, "cli")
 	catalog, err := c.Catalog(t.Context())
