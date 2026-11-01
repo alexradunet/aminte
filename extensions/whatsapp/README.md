@@ -25,7 +25,13 @@ flowchart LR
 - **Each new turn goes to the phone.** Every 3 seconds the program reads today's conversation. It sends to the phone
   each turn that it has not sent, except a turn that came from WhatsApp (the page names it with `via`). A reply of the
   agent goes as it is. The words that the owner said on another surface go marked "You wrote in lifelog:", so the phone
-  shows the same thread as the page. Text that an edit adds to a turn is not a new turn, and it is not sent.
+  shows the same thread as the page. A turn is named by the `key` that the core gives it. An edit of a turn gives it a
+  new key (see below), so a changed turn is a new turn and is sent again.
+- **An edit of a turn sends that turn again.** The core makes the key of a turn from its words, its minute and its relay.
+  When the owner edits the words of a turn on the page (a typo in the first line, a note added below a reply), the turn
+  has a new key. The program has not sent that key, so it sends the turn again with its new words. A turn of the owner
+  that came from WhatsApp is never sent back, also after an edit. An edit that moves a turn (a paragraph added above it,
+  a turn removed above it) changes no key, and nothing is sent again.
 - **A reply after midnight arrives.** A turn said before midnight is answered on its own page, and the answer may come
   after midnight. The program reads the day before while its last turn is the owner's, and it sends the answer when it
   comes. A day older than yesterday is dropped.
@@ -88,11 +94,14 @@ The model is not set here, and this program does not use it. See [`lifelog-agent
 `LIFELOG_URL` and `LIFELOG_TOKEN` are set by `lifelog whatsapp` and by `lifelog serve --with whatsapp`, or by the owner.
 
 The state folder is `os.UserConfigDir()/lifelog-whatsapp/` (mode 0700). It holds `session.db` (mode 0600), the
-store of the keys of the account, and `state.json`: for each day that the program watches, a key for each turn that it
-has dealt with (who said it, the minute, and a hash of the first line of its words), and the time of the last message
-that it said. The keys are a set and not a position, because the core puts a reply right after the turn that it answers,
-and that can be before a newer turn. So each turn is sent once, wherever it stands on the page, also after an edit above
-it or after a delete and a revive of the page. To pair again, delete `session.db`. A `state.json` of an earlier version
+store of the keys of the account, and `state.json`: for each day that the program watches, the key (the `key` that the
+core gives it) of each turn that it has dealt with, and the time of the last message that it said. The keys are a set and
+not a position, because the core puts a reply right after the turn that it answers, and that can be before a newer
+turn. So each turn is sent once, wherever it stands on the page, also after an edit above it or after a delete and a
+revive of the page. After each look, the keys of a day are the keys of the turns that the page has: the key of a turn
+that the owner removed is dropped, so it cannot hide a new turn that gets the same key (the same words, in the same
+minute, from the same relay). A page with no turns (a deleted page) keeps its keys, because its turns come back when the
+page is revived. To pair again, delete `session.db`. A `state.json` of an earlier version
 is a first run: the program adopts the page as it is and sends no earlier turn. Its `saved_at`, when it has one (the
 file of the agent that lived in this program), is read as the time of the last message that was said, so a message that
 came during the switch is said.
@@ -121,7 +130,8 @@ The program has no service unit. The unit of `lifelog serve` carries `--with wha
 
 ## Tests
 
-`go vet ./... && go test ./...` in this folder. The tests of `relay/` run on a fake catalog and a fake chat. `e2e_test.go`
+`go vet ./... && go test ./...` in this folder. The tests of `relay/` run on a fake catalog and a fake chat. The fake API gives each turn a key, as the core does (the
+same key after a reply or a removal above, a new key after an edit of the words). `e2e_test.go`
 builds the real `lifelog`, `lifelog-whatsapp` and `lifelog-agent` into one folder. It runs the relay in the process, with
 a fake chat, against the real `lifelog serve --token-file F`: a message of the chat becomes a `say` with `via` whatsapp,
 a reply that an agent writes on the page with `reply` reaches the chat, and a turn that the owner said on another surface

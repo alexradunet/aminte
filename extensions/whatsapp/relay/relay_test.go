@@ -8,11 +8,13 @@ import (
 	"log"
 	"net/http/httptest"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
 	"lifelog/client"
+	"lifelog/siren"
 )
 
 // stateSeen reads the turns that the state file holds for each day: the number of turns that the relay has dealt with.
@@ -191,8 +193,8 @@ func TestADeletedPageThatIsRevivedSendsNoEarlierTurnAgain(t *testing.T) {
 	r.chat.none(t)
 }
 
-// TestTwoTurnsOfTheSameMinuteAndTheSameWordsAreBothSentAndNoneAgain: the key of a turn does not tell two such turns apart,
-// so the relay counts them.
+// TestTwoTurnsOfTheSameMinuteAndTheSameWordsAreBothSentAndNoneAgain: the core gives two such turns two keys, so the
+// relay sends both and sends none again.
 func TestTwoTurnsOfTheSameMinuteAndTheSameWordsAreBothSentAndNoneAgain(t *testing.T) {
 	api := &fakeAPI{}
 	state := t.TempDir() + "/state.json"
@@ -311,7 +313,67 @@ func TestADayOlderThanYesterdayIsDroppedAndNeverRead(t *testing.T) {
 	}
 }
 
-func TestTextThatAnEditAddsToAReplyIsNotSentAndAnEditThatTakesTurnsAwayDoesNotHideTheNextReply(t *testing.T) {
+// TestAnEditOfTheWordsOfATurnGivesItANewKeyAndSendsItAgain: the key of a turn is made from its words. A turn that the
+// owner edits is a changed turn, and the chat gets it again. A turn that the edit leaves as it is, is not sent again.
+func TestAnEditOfTheWordsOfATurnGivesItANewKeyAndSendsItAgain(t *testing.T) {
+	api := &fakeAPI{}
+	r := startWith(t, api)
+	r.settle(t)
+	api.ownerSaysElsewhere(today, "one")
+	api.agentReplies(today, "Teh answer.")
+	r.poll(t)
+	if got := r.chat.next(t); got != "You wrote in lifelog: one" {
+		t.Errorf("sent %q", got)
+	}
+	if got := r.chat.next(t); got != "Teh answer." {
+		t.Errorf("sent %q", got)
+	}
+	api.edit(today, strings.Replace(api.body(today), "Teh answer.", "The answer.", 1))
+	r.poll(t)
+	if got := r.chat.next(t); got != "The answer." {
+		t.Errorf("sent %q, want the changed turn", got)
+	}
+	api.edit(today, api.body(today)+"\n\nA note that the owner added.")
+	r.poll(t)
+	if got := r.chat.next(t); got != "The answer.\n\nA note that the owner added." {
+		t.Errorf("sent %q, want the turn with the added text: it is a changed turn", got)
+	}
+	r.settle(t)
+	r.chat.none(t)
+}
+
+// TestAnEditThatTakesTurnsAwayDoesNotHideTheNextTurnOfTheSameWords: a reply that the owner removed leaves no key in the
+// state. A later reply of the same minute with the same words has the same key, and it is a new turn.
+func TestAnEditThatTakesTurnsAwayDoesNotHideTheNextTurnOfTheSameWords(t *testing.T) {
+	api := &fakeAPI{}
+	r := startWith(t, api)
+	r.settle(t)
+	api.ownerSaysElsewhere(today, "one")
+	api.agentReplies(today, "Noted.")
+	r.poll(t)
+	r.chat.next(t)
+	r.chat.next(t)
+	api.edit(today, "[[2031-05-20]]\n\n**Owner** (09:30): one")
+	r.settle(t)
+	if days := stateSeen(t, r.state); days[today] != 1 {
+		t.Errorf("state seen %v, want the one turn that the page holds", days)
+	}
+	api.ownerSaysElsewhere(today, "two")
+	api.agentReplies(today, "Noted.")
+	r.poll(t)
+	if got := r.chat.next(t); got != "You wrote in lifelog: two" {
+		t.Errorf("sent %q", got)
+	}
+	if got := r.chat.next(t); got != "Noted." {
+		t.Errorf("sent %q, want the new reply: its key is the key of the reply that was removed", got)
+	}
+	r.settle(t)
+	r.chat.none(t)
+}
+
+// TestAPageWithNoTurnsKeepsTheStateOfItsDay: a deleted page has no turns, and a revive brings them back. The keys stay,
+// so the turns that come back are not sent again (see also TestADeletedPageThatIsRevivedSendsNoEarlierTurnAgain).
+func TestAPageWithNoTurnsKeepsTheStateOfItsDay(t *testing.T) {
 	api := &fakeAPI{}
 	r := startWith(t, api)
 	r.settle(t)
@@ -320,16 +382,31 @@ func TestTextThatAnEditAddsToAReplyIsNotSentAndAnEditThatTakesTurnsAwayDoesNotHi
 	r.poll(t)
 	r.chat.next(t)
 	r.chat.next(t)
-	api.edit(today, api.body(today)+"\n\nA note that the owner added.")
+	api.remove(today)
 	r.settle(t)
-	r.chat.none(t)
-	// The owner takes the last turn away. The next reply is a new turn and is sent.
-	api.edit(today, "[[2031-05-20]]\n\n**Owner** (09:30): one")
-	r.settle(t)
-	api.agentReplies(today, "answer two")
-	r.poll(t)
-	if got := r.chat.next(t); got != "answer two" {
-		t.Errorf("sent %q", got)
+	if days := stateSeen(t, r.state); days[today] != 2 {
+		t.Errorf("state seen %v, want the two keys kept", days)
+	}
+}
+
+func TestAnAnswerWithATurnThatHasNoKeyIsAnErrorAndAnAnswerWithKeysHasTheKeysOfItsTurns(t *testing.T) {
+	good := &siren.Entity{Properties: map[string]any{"day": today, "turns": []any{
+		map[string]any{"who": "owner", "key": "0123456789abcdef", "at": "09:30", "text": "hi"},
+		map[string]any{"who": "lifelog", "key": "fedcba9876543210", "at": "09:31", "text": "hello"},
+	}}}
+	p, err := pageFrom(good)
+	if err != nil || !slices.Equal(p.keys(), []string{"0123456789abcdef", "fedcba9876543210"}) || p.pending() {
+		t.Fatalf("page %+v, error %v, want the two keys of the turns, and a page that does not wait", p, err)
+	}
+	for name, turn := range map[string]map[string]any{
+		"no key":    {"who": "owner", "text": "hi"},
+		"empty key": {"who": "owner", "key": "", "text": "hi"},
+		"a number":  {"who": "owner", "key": 1, "text": "hi"},
+	} {
+		bad := &siren.Entity{Properties: map[string]any{"day": today, "turns": []any{turn}}}
+		if _, err := pageFrom(bad); err == nil || !strings.Contains(err.Error(), "key") {
+			t.Errorf("%s: error %v, want one that names the key", name, err)
+		}
 	}
 }
 

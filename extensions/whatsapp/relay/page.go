@@ -2,11 +2,8 @@ package relay
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"lifelog/siren"
@@ -19,18 +16,12 @@ type page struct {
 	turns []turn
 }
 
-// turn is one turn of the page, as the API parsed it: who is owner, lifelog or text, at is its minute (HH:MM, empty for
-// text), and via names the relay that carried the turn of the owner.
-type turn struct{ who, at, via, text string }
-
-// key tells a turn again at the next look, wherever it stands on the page: who said it, in which minute, and a hash of
-// the first line of its words. Only the first line counts: text that an edit adds below it is not a new turn. Two turns
-// can share a key (the same words in the same minute), so a state counts the keys.
-func (t turn) key() string {
-	first, _, _ := strings.Cut(t.text, "\n")
-	sum := sha256.Sum256([]byte(first))
-	return t.who + "|" + t.at + "|" + hex.EncodeToString(sum[:6])
-}
+// turn is one turn of the page, as the API parsed it: who is owner, lifelog or text, and via names the relay that
+// carried the turn of the owner. The key is the name that the API gives the turn. It tells the turn again at the next
+// look, wherever it stands on the page: it does not move when a reply is written, when the owner says a new turn or when
+// an earlier turn is removed, and no two turns of one page have the same key. It changes when the owner edits the
+// words, the minute or the relay of the turn: a changed turn is a new turn.
+type turn struct{ who, key, via, text string }
 
 // read is the conversation of a day (a local day, or the word today): GET /days/{day}/conversation. A day with no page
 // has no turns.
@@ -42,7 +33,8 @@ func (r *Relay) read(ctx context.Context, day string) (*page, error) {
 	return pageFrom(e)
 }
 
-// pageFrom reads a conversation entity. The day is its property day.
+// pageFrom reads a conversation entity. The day is its property day. A turn with no key is an error: the server is too
+// old, and the relay cannot tell its turns again.
 func pageFrom(e *siren.Entity) (*page, error) {
 	props, _ := e.Properties.(map[string]any)
 	day, _ := props["day"].(string)
@@ -54,10 +46,13 @@ func pageFrom(e *siren.Entity) (*page, error) {
 	for _, t := range turns {
 		m, _ := t.(map[string]any)
 		who, _ := m["who"].(string)
-		at, _ := m["at"].(string)
+		key, _ := m["key"].(string)
 		via, _ := m["via"].(string)
 		text, _ := m["text"].(string)
-		p.turns = append(p.turns, turn{who, at, via, text})
+		if key == "" {
+			return nil, fmt.Errorf("the answer is not a conversation with keys: the turn %d has no key", len(p.turns)+1)
+		}
+		p.turns = append(p.turns, turn{who, key, via, text})
 	}
 	return p, nil
 }
@@ -66,7 +61,7 @@ func pageFrom(e *siren.Entity) (*page, error) {
 func (p *page) keys() []string {
 	keys := make([]string, len(p.turns))
 	for i, t := range p.turns {
-		keys[i] = t.key()
+		keys[i] = t.key
 	}
 	return keys
 }

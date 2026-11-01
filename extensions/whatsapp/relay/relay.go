@@ -203,18 +203,17 @@ func (r *Relay) sync(ctx context.Context) error {
 
 // forward sends the turns of the page that the chat has not got. A reply of the agent goes as it is. A turn of the owner
 // from another surface goes marked, so the chat shows the same thread as the page. A turn that came from this relay
-// is not sent back. A turn is new when the state does not hold its key as many times as the page shows it, wherever it
-// stands on the page. The state moves after each send: a crash between the send and the save sends one turn twice,
-// and never loses one.
+// is not sent back. A turn is new when the state does not hold its key, wherever it stands on the page. The state moves
+// after each send: a crash between the send and the save sends one turn twice, and never loses one. At the end the
+// state of the day is the keys of the turns that the page has now: the key of a turn that was removed is dropped, so it
+// cannot hide a new turn that gets the same key (the same words, in the same minute, from the same relay).
 func (r *Relay) forward(ctx context.Context, p *page) error {
-	dealt := map[string]int{} // the keys that the state holds, counted
+	dealt := map[string]bool{}
 	for _, k := range r.st.Seen[p.Day] {
-		dealt[k]++
+		dealt[k] = true
 	}
 	for _, t := range p.turns {
-		k := t.key()
-		if dealt[k] > 0 {
-			dealt[k]--
+		if dealt[t.key] {
 			continue
 		}
 		if text := forwarded(t); text != "" {
@@ -222,10 +221,17 @@ func (r *Relay) forward(ctx context.Context, p *page) error {
 				return fmt.Errorf("send: %w", err)
 			}
 		}
-		r.st.Seen[p.Day] = append(r.st.Seen[p.Day], k)
+		r.st.Seen[p.Day] = append(r.st.Seen[p.Day], t.key)
 		if err := r.st.save(r.State); err != nil {
 			return err
 		}
+	}
+	// Every key of the page is in the state now, and no key is twice in the page: the state has the same keys as the
+	// page when it has as many. A page with no turns is a deleted page, or a day with no page: its turns come back when
+	// say makes the page live again, and they are not new. So its state stays.
+	if keys := p.keys(); len(keys) > 0 && len(keys) != len(r.st.Seen[p.Day]) {
+		r.st.Seen[p.Day] = keys
+		return r.st.save(r.State)
 	}
 	return nil
 }

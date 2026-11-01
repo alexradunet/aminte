@@ -164,6 +164,7 @@ func (c *fakeChat) next(t *testing.T) string {
 // turn is a turn of the conversation, as the API parsed it.
 type turn struct {
 	Who  string `json:"who"`
+	Key  string `json:"key"`
 	Via  string `json:"via"`
 	Text string `json:"text"`
 }
@@ -303,8 +304,12 @@ func TestAMessageOfTheChatBecomesASayAndAReplyOnThePageReachesTheChat(t *testing
 		t.Fatalf("turns %+v, want the owner's turn via whatsapp", turns)
 	}
 
-	// An agent writes its reply on the page. The relay sends it to the chat, and only it: the turn of the chat is not echoed.
-	if _, err := asAgent.Do(t.Context(), action(t, asAgent, "reply"), map[string]string{"day": "today", "turn": "1", "text": "Written to today."}); err != nil {
+	// An agent writes its reply on the page, to the turn that it names by its key. The relay sends the reply to the chat,
+	// and only it: the turn of the chat is not echoed.
+	if turns[0].Key == "" {
+		t.Fatalf("turns %+v, want a key on the turn: reply names the turn by it", turns)
+	}
+	if _, err := asAgent.Do(t.Context(), action(t, asAgent, "reply"), map[string]string{"day": "today", "turn": turns[0].Key, "text": "Written to today."}); err != nil {
 		t.Fatal(err)
 	}
 	if got := chat.next(t); got != "Written to today." {
@@ -320,6 +325,32 @@ func TestAMessageOfTheChatBecomesASayAndAReplyOnThePageReachesTheChat(t *testing
 	}
 	// The texts came in the order of the page, and each came once: the turn of the chat, which the page names with via, was
 	// not echoed before the reply, and the reply was not sent again before the turn of the other surface.
+
+	// The owner edits the reply on the page: it is a changed turn with a new key, so the chat gets it again with its new
+	// words. The turns around it are not sent again.
+	e, err := asOwner.Get(t.Context(), "/days/today/conversation")
+	if err != nil {
+		t.Fatal(err)
+	}
+	props, _ := e.Properties.(map[string]any)
+	body, _ := props["body"].(string)
+	edited := strings.Replace(body, "Written to today.", "Written to today, and checked.", 1)
+	if edited == body {
+		t.Fatalf("the page %q has no reply to edit", body)
+	}
+	if _, err := asOwner.Do(t.Context(), action(t, asOwner, "save-body"), map[string]string{"id": fmt.Sprint(props["id"]), "version": fmt.Sprint(props["version"]), "body": edited}); err != nil {
+		t.Fatal(err)
+	}
+	if got := chat.next(t); got != "Written to today, and checked." {
+		t.Errorf("the chat got %q, want the reply with its new words", got)
+	}
+	// No other turn changed: the next text is the next turn of the page. A turn that was sent again would come before it.
+	if _, err := asOwner.Do(t.Context(), action(t, asOwner, "say"), map[string]string{"day": "today", "text": "after the edit"}); err != nil {
+		t.Fatal(err)
+	}
+	if got := chat.next(t); got != "You wrote in lifelog: after the edit" {
+		t.Errorf("the chat got %q, want the next turn only", got)
+	}
 }
 
 // feedTicks gives the relay a tick every 50 ms, and returns the function that stops it and waits for it. The function can

@@ -5,6 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"hash/fnv"
 	"io"
 	"log"
 	"net/http"
@@ -172,9 +174,44 @@ func (f *fakeAPI) body(day string) string {
 
 var marker = regexp.MustCompile(`^\*\*(Owner|lifelog)\*\* \((\d\d:\d\d)(?:, via ([a-z0-9_:.-]+))?\): ?`)
 
-// conversation is the entity of GET /days/{day}/conversation: the day, and the turns when the page exists. The turns
-// are the paragraphs of the body, as the real API reads them: a marker starts a turn, a block of tool lines belongs to
-// the marker after it, and any other paragraph is part of the turn before.
+// fakeTurn is a turn of a page as the fake API reads it.
+type fakeTurn struct{ who, at, via, text, key string }
+
+// turnsOf reads the turns of a body, as the real API reads them: a marker starts a turn, a block of tool lines belongs to
+// the marker after it, and any other paragraph is part of the turn before. Each turn gets a key from what it is and not
+// from its place: the same key after a reply, after a new turn and after the removal of an earlier turn, and a new key
+// after an edit of its words, its minute or its relay. Two turns that are the same get different keys.
+func turnsOf(day, body string) []*fakeTurn {
+	var turns []*fakeTurn
+	for _, para := range strings.Split(body, "\n\n") {
+		m := marker.FindStringSubmatch(para)
+		switch {
+		case m != nil:
+			who := "owner"
+			if m[1] == "lifelog" {
+				who = "lifelog"
+			}
+			turns = append(turns, &fakeTurn{who: who, at: m[2], via: m[3], text: para[len(m[0]):]})
+		case strings.HasPrefix(para, "[["+day+"]]"), strings.HasPrefix(para, "- `"):
+			// the first line, or the tool lines of the marker that follows
+		case len(turns) == 0:
+			turns = append(turns, &fakeTurn{who: "text", text: para})
+		default:
+			turns[len(turns)-1].text += "\n\n" + para
+		}
+	}
+	before := map[string]int{}
+	for _, t := range turns {
+		same := fmt.Sprintf("%q %q %q %q", t.who, t.at, t.via, t.text)
+		h := fnv.New64a()
+		fmt.Fprintf(h, "%s %d", same, before[same])
+		before[same]++
+		t.key = fmt.Sprintf("%016x", h.Sum64())
+	}
+	return turns
+}
+
+// conversation is the entity of GET /days/{day}/conversation: the day, and the turns when the page exists.
 func (f *fakeAPI) conversation(day string) siren.Entity {
 	if day == "today" {
 		day = f.localDay()
@@ -184,28 +221,9 @@ func (f *fakeAPI) conversation(day string) siren.Entity {
 	if !ok {
 		return siren.Entity{Class: []string{"conversation"}, Properties: props}
 	}
-	type turn struct{ who, at, via, text string }
-	var turns []*turn
-	for _, para := range strings.Split(body, "\n\n") {
-		m := marker.FindStringSubmatch(para)
-		switch {
-		case m != nil:
-			who := "owner"
-			if m[1] == "lifelog" {
-				who = "lifelog"
-			}
-			turns = append(turns, &turn{who, m[2], m[3], para[len(m[0]):]})
-		case strings.HasPrefix(para, "[["+day+"]]"), strings.HasPrefix(para, "- `"):
-			// the first line, or the tool lines of the marker that follows
-		case len(turns) == 0:
-			turns = append(turns, &turn{"text", "", "", para})
-		default:
-			turns[len(turns)-1].text += "\n\n" + para
-		}
-	}
 	out := []any{}
-	for _, t := range turns {
-		m := map[string]any{"who": t.who, "text": t.text}
+	for _, t := range turnsOf(day, body) {
+		m := map[string]any{"who": t.who, "key": t.key, "text": t.text}
 		if t.at != "" {
 			m["at"] = t.at
 		}

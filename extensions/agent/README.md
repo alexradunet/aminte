@@ -32,18 +32,33 @@ flowchart LR
   stamps the turn, puts it in the right place, makes the lines of the words safe (a line that reads as a turn marker is
   escaped, and a code fence that the words leave open is closed), and writes the page in one transaction. So a reply
   cannot hide the next turn from the parse of the page, and the agent does not answer its own reply. Text that an edit
-  adds after a reply is part of that reply, and an edit of an old turn changes nothing.
+  adds after a reply is part of that reply. An edit is never a turn of the owner.
 - **One turn at a time.** A turn has at most 16 model steps and 5 minutes. The model reads the whole page of the day.
   The agent writes the tool lines and the reply in one `reply` request, so the page has the whole answer or none. The
-  request has the fields `day`, `turn`, `text` and `tools`. `turn` is the number of the last owner turn that the model
-  read, counted from 1 over the owner turns of the page. `tools` holds the tool lines, one for each line.
-- **The owner may write while the model works.** The core puts the reply right after the owner turn that it answers. A
-  turn that the owner says meanwhile stays after the reply, so it is the last turn of the page, and the next look
-  answers it. An edit of an earlier turn, or text that an edit adds, moves nothing.
+  request has the fields `day`, `turn`, `text` and `tools`. `turn` is the key of the last owner turn that the model
+  read: the `key` of that turn in `turns` of the conversation. A key is an opaque string that the core makes from what
+  the turn is, not from its place, so the agent never counts turns. `tools` holds the tool lines, one for each line.
+  Each tool line is one line: a control character in a tool name, in the code of an error or in an address becomes a
+  space, because the core refuses a tool line that is not one line, and the whole reply would be lost.
+- **The owner may write while the model works.** The core puts the reply right after the owner turn that has the key.
+  A turn that the owner says meanwhile stays after the reply, so it is the last turn of the page, and the next look
+  answers it. The key of the answered turn does not change when a reply is written, when the owner says a new turn, or
+  when the owner edits or removes an earlier turn. So the reply stays right after the turn that it answers.
+- **The owner may edit the turn that the model answers.** An edit of the words (or of the time or the relay) of a turn
+  gives that turn a new key, and text that the owner adds below a turn is part of the turn. The core then refuses the
+  reply to the old key (409, `conflict`), because the page changed, and it writes nothing. The agent reads the page
+  again at its next look and answers the turn that waits, with a new run of the model: its words are not the words that
+  the first run read. The tool calls of the first run were made already, and the page does not show them.
+- **A reply that fails with a 5xx or a lost connection is sent again.** The core answers 503 when the file is busy, and
+  a connection can end before the answer comes. A second send of the same reply is safe, because the core refuses a
+  second reply to a turn that has one (409). So the agent sends the same reply again, up to 4 sends in all, with a wait
+  of 1, 2 and 4 seconds, and all within the 30 seconds of a reply. A 409 on a second or later send means that an earlier
+  send was written and only its answer was lost: the turn is answered. A 4xx on the first send is the answer of the
+  core about this reply, and it is not sent again.
 - **A reply that is refused or fails is not run again.** A new run of the model would repeat the tool calls of the first
-  run. The core refuses a reply to a turn that has a reply already (409): the turn is answered, so the agent logs one
-  line and does not run the model for it again. A reply that fails in another way is logged once. In both cases the
-  agent keeps in memory the page that it read, and it answers again only when the page changes or the agent restarts.
+  run. When the sends fail (or a 4xx refuses the reply), the agent logs one line, and the tool lines and the reply are
+  lost: the page does not show them. The agent keeps in memory the page that it read, and it answers again only when the
+  page changes or the agent restarts.
 - **One agent for one file.** Do not run `lifelog agent` by hand while `lifelog serve --with agent` runs on the same
   file. The core refuses the second reply to a turn (409), but both models run, and both make their tool calls.
 - **A turn before midnight is answered on its own page.** On its first look and on each new day, the agent reads the
@@ -119,10 +134,12 @@ The agent has no service unit. The unit of `lifelog serve` carries `--with agent
 
 `go vet ./... && go test ./...` in this folder. The tests of `agent/` run on a fake catalog and a fake model: they
 hold the turns, the page, the replies and the days. The fake API keeps the rules of the real one that the agent depends
-on (where `reply` puts a turn, its 404, 409 and 422, the escape of a marker line, and the 403 of `save-body` on a
-conversation page). `e2e_test.go` builds the real `lifelog` and `lifelog-agent` into one folder and runs
+on (the key of each turn, where `reply` puts a turn, its 404, 409 and 422, the escape of a marker line, and the 403 of
+`save-body` on a conversation page). `e2e_test.go` builds the real `lifelog` and `lifelog-agent` into one folder and runs
 `lifelog serve --token-file F --with agent` on a new file, with a fake model server. It says as the owner with
 `lifelog do say`, and reads the page back through the API. A `say` gets its reply on the page, a tool call of an owner
 action is refused, and with no model set the reply is the one line. A say with a code fence that it does not close, and
-a model reply with a line of the form of an owner turn, each get one reply, and no more. It needs the `go` command and
-the sources of the repository.
+a model reply with a line of the form of an owner turn, each get one reply, and no more. A tool name with a new line
+gets its reply, with the tool line made one line. An edit of the turn that the model works on (a `save-body` of the owner)
+makes the real core refuse the first reply, and the turn is answered once, by a second run. It needs the `go` command
+and the sources of the repository.

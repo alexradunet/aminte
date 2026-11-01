@@ -10,9 +10,9 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"strconv"
 	"strings"
 	"time"
+	"unicode"
 	"unicode/utf8"
 
 	"lifelog-agent/model"
@@ -29,6 +29,9 @@ const (
 	// replyTimeout is the longest time of the write of a reply. It has its own limit: the timeout of the turn may be
 	// spent, and the reply must reach the page.
 	replyTimeout = 30 * time.Second
+	// replyAttempts is the number of sends of one reply at most: the first, and the sends after a failure that a send
+	// can mend (see send). They all fit in replyTimeout.
+	replyAttempts = 4
 	// maxResult is the largest tool result that goes to the model.
 	maxResult = 64 << 10
 	// maxBody is the largest part of the conversation that goes to the model. The end is kept.
@@ -62,6 +65,9 @@ type Agent struct {
 	Tick <-chan time.Time
 
 	logger *log.Logger
+	// backoff is the wait before the second send of a reply. The wait doubles for each send after it. 0: one second. A
+	// test sets it short.
+	backoff time.Duration
 	// tools and actions come from one read of the catalog. Only Run uses them, from one goroutine: they need no lock.
 	tools   []tools.Tool
 	actions map[string]siren.Action
@@ -69,7 +75,8 @@ type Agent struct {
 	checked string
 	// done is the key of the page that the agent read when its reply was refused or failed. The agent does not answer
 	// that page again: a new run of the model would repeat the tool calls of the first run. It answers again when the
-	// page changes.
+	// page changes. A 409 for the key of a turn means that the page changed (the owner edited the turn, or removed
+	// it): the next look reads the new page, and the agent answers the turns that wait on it.
 	done    string
 	lookErr string
 }
@@ -202,8 +209,10 @@ func dayBefore(day string) (string, error) {
 
 // turn answers the owner turns that wait on the page p: it runs the model once on the page, and it writes the tool
 // lines and the reply with the action reply in one request, so the page has the whole answer or none. The reply
-// answers the last owner turn that the model read. The core puts it right after that turn, so a turn that the owner
-// says meanwhile stays after the reply and waits for its own run.
+// answers the last owner turn that the model read, and the field turn is the key of that turn. The core puts the reply
+// right after that turn, wherever the turn stands then, so a turn that the owner says meanwhile stays after the reply
+// and waits for its own run. If the owner edits the answered turn meanwhile, its key is not on the page any more and the
+// core refuses the reply (409): the agent reads the page again at the next look.
 func (a *Agent) turn(ctx context.Context, p *page) {
 	if p.key() == a.done {
 		return
@@ -220,17 +229,50 @@ func (a *Agent) turn(ctx context.Context, p *page) {
 	}
 	wctx, wcancel := context.WithTimeout(ctx, replyTimeout)
 	defer wcancel()
-	_, err = a.Client.Do(wctx, a.actions["reply"], map[string]string{
-		"day": p.Day, "turn": strconv.Itoa(p.owners()), "text": reply, "tools": strings.Join(lines, "\n"),
+	err = a.send(wctx, map[string]string{
+		"day": p.Day, "turn": p.lastOwner(), "text": reply, "tools": strings.Join(lines, "\n"),
 	})
 	if err != nil {
 		if ctx.Err() == nil {
-			a.logger.Printf("reply was refused or failed (turn %d of %s): %v", p.owners(), p.Day, err)
+			a.logger.Printf("reply was refused or failed (turn %s of %s): %v", p.lastOwner(), p.Day, err)
 			a.done = p.key()
 		}
 		return
 	}
 	a.logger.Printf("turn answered: %d bytes out, %d tool calls", len(reply), len(lines))
+}
+
+// send writes a reply with the action reply. A second send of the same reply cannot answer a turn twice, because the
+// core refuses a reply to a turn that has one (409). So a failure that a second send can mend is sent again, up to
+// replyAttempts sends in all, with a wait that doubles before each, and all within the time of ctx. Such a failure is a
+// 5xx (the file is busy) or an error with no status (the request or its answer was lost). A 4xx is the answer of the
+// core about this reply, and the same reply gets the same answer, so it is not sent again. A 409 after the first send
+// says that an earlier send was written and only its answer was lost: the reply is on the page. If the page changed
+// instead (the owner edited the turn between two sends), the next look reads it again and answers the turn that waits.
+func (a *Agent) send(ctx context.Context, form map[string]string) error {
+	wait := a.backoff
+	if wait == 0 {
+		wait = time.Second
+	}
+	for try := 1; ; try++ {
+		_, err := a.Client.Do(ctx, a.actions["reply"], form)
+		var ce *client.Error
+		refused := errors.As(err, &ce)
+		switch {
+		case err == nil:
+			return nil
+		case try > 1 && refused && ce.Code() == siren.CodeConflict:
+			return nil
+		case try == replyAttempts || ctx.Err() != nil || (refused && ce.Status < 500):
+			return err
+		}
+		select {
+		case <-time.After(wait):
+			wait *= 2
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
 }
 
 // reply makes the reply of a turn on the page p. The error is the error of ctx.
@@ -255,7 +297,7 @@ func (a *Agent) reply(ctx context.Context, p *page, at time.Time) (string, []str
 }
 
 // read is the conversation of a day (a local day, or the word today): GET /days/{day}/conversation. The page has no
-// ID when the day has no page yet.
+// version and no turns when the day has no page yet.
 func (a *Agent) read(ctx context.Context, day string) (*page, error) {
 	e, err := a.Client.Get(ctx, "/days/"+day+"/conversation")
 	if err != nil {
@@ -311,8 +353,10 @@ func (a *Agent) answer(ctx context.Context, m *model.Client, p *page, at time.Ti
 }
 
 // call runs one tool call. It returns the text for the model (the Siren entity as JSON, cut at maxResult, or the
-// sentence of an error; an error of the API is its error entity, which has the status) and the line for the page.
+// sentence of an error; an error of the API is its error entity, which has the status) and the line for the page. The
+// line is one line: the name comes from the model, and the code and the href from the server, and none is trusted.
 func (a *Agent) call(ctx context.Context, name, rawArgs string) (result, line string) {
+	label := oneLine(name)
 	var t *tools.Tool
 	for i := range a.tools {
 		if a.tools[i].Name == name {
@@ -320,11 +364,11 @@ func (a *Agent) call(ctx context.Context, name, rawArgs string) (result, line st
 		}
 	}
 	if t == nil {
-		return fmt.Sprintf("error: there is no tool %q", name), fmt.Sprintf("- `%s` failed: unknown tool", name)
+		return fmt.Sprintf("error: there is no tool %q", name), fmt.Sprintf("- `%s` failed: unknown tool", label)
 	}
 	args, err := tools.Arguments([]byte(rawArgs))
 	if err != nil {
-		return "error: " + err.Error(), fmt.Sprintf("- `%s` failed: bad arguments", name)
+		return "error: " + err.Error(), fmt.Sprintf("- `%s` failed: bad arguments", label)
 	}
 	e, err := tools.Run(ctx, a.Client, *t, args)
 	if err != nil {
@@ -333,11 +377,12 @@ func (a *Agent) call(ctx context.Context, name, rawArgs string) (result, line st
 		if errors.As(err, &ce) && ce.Code() != "" {
 			code = ce.Code()
 		}
-		line = fmt.Sprintf("- `%s` failed: %s", name, code)
+		line = fmt.Sprintf("- `%s` failed: %s", label, oneLine(code))
 	} else {
-		line = fmt.Sprintf("- `%s`", name)
+		line = fmt.Sprintf("- `%s`", label)
 		if self := e.LinkByRel("self"); self != nil {
-			line += fmt.Sprintf(" → [%s](%s)", self.Href, self.Href)
+			href := oneLine(self.Href)
+			line += fmt.Sprintf(" → [%s](%s)", href, href)
 		}
 	}
 	if e == nil {
@@ -348,6 +393,18 @@ func (a *Agent) call(ctx context.Context, name, rawArgs string) (result, line st
 		return "error: " + werr.Error(), line
 	}
 	return cut(strings.TrimSuffix(b.String(), "\n")), line
+}
+
+// oneLine is s with each character that ends or breaks a line (a control character, a line separator or a paragraph
+// separator) replaced by a space. The core refuses a reply (422) whose field tools has a line that does not start with
+// the mark of a tool line, and the whole reply would be lost.
+func oneLine(s string) string {
+	return strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) || r == '\u2028' || r == '\u2029' {
+			return ' '
+		}
+		return r
+	}, s)
 }
 
 // cut shortens s to maxResult bytes at a character boundary and says so.

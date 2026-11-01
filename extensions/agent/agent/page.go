@@ -17,10 +17,13 @@ type page struct {
 	turns   []turn
 }
 
-// turn is one turn of the page, as the API parsed it: who is owner, lifelog or text.
-type turn struct{ who, text string }
+// turn is one turn of the page, as the API parsed it: who is owner, lifelog or text. The key names the turn for the
+// action reply. The API makes it from what the turn is, not from its place, so it does not move when a reply is written,
+// when the owner says a new turn or when an earlier turn is removed. It changes when the owner edits the turn.
+type turn struct{ who, key, text string }
 
-// pageFrom reads a conversation entity. The day is its property day. A day with no page has no ID and no turns.
+// pageFrom reads a conversation entity. The day is its property day. A day with no page has no version and no turns.
+// A turn with no key is an error: the server is too old to take a reply.
 func pageFrom(e *siren.Entity) (*page, error) {
 	props, _ := e.Properties.(map[string]any)
 	day, _ := props["day"].(string)
@@ -40,8 +43,12 @@ func pageFrom(e *siren.Entity) (*page, error) {
 	for _, t := range turns {
 		m, _ := t.(map[string]any)
 		who, _ := m["who"].(string)
+		key, _ := m["key"].(string)
 		text, _ := m["text"].(string)
-		p.turns = append(p.turns, turn{who, text})
+		if key == "" {
+			return nil, fmt.Errorf("the answer is not a conversation that reply can answer: the turn %d has no key", len(p.turns)+1)
+		}
+		p.turns = append(p.turns, turn{who, key, text})
 	}
 	return p, nil
 }
@@ -52,15 +59,15 @@ func (p *page) pending() bool {
 	return len(p.turns) > 0 && p.turns[len(p.turns)-1].who == "owner"
 }
 
-// owners is the number of turns of the owner. It is the number of the last one, which the field turn of reply names.
-func (p *page) owners() int {
-	n := 0
-	for _, t := range p.turns {
-		if t.who == "owner" {
-			n++
+// lastOwner is the key of the last turn of the owner. When the page waits, it is the last turn of the page, and the
+// field turn of reply names it: the core puts the reply right after that turn.
+func (p *page) lastOwner() string {
+	for i := len(p.turns) - 1; i >= 0; i-- {
+		if p.turns[i].who == "owner" {
+			return p.turns[i].key
 		}
 	}
-	return n
+	return ""
 }
 
 // key names the state of the page: its day and its version. The version changes with each write to the page.

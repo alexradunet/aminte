@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -456,6 +457,123 @@ func TestATextThatCannotBeParsedAsOneTurnGetsOneReply(t *testing.T) {
 	}
 	if n := strings.Count(s.stderr.String(), "turn answered"); n != 2 {
 		t.Errorf("%d answered turns in the log, want 2:\n%s", n, s.stderr)
+	}
+}
+
+// TestAToolNameWithANewLineGetsItsReplyOnThePage: a model server can send any string as the name of a tool. The real
+// core refuses a reply whose field tools has a line that is not a tool line (422), and the whole reply would be lost. The
+// agent makes the line one line, so the reply is on the page, with the tool line.
+func TestAToolNameWithANewLineGetsItsReplyOnThePage(t *testing.T) {
+	b := build(t)
+	s := startStack(t, b)
+	model := &scriptModel{steps: []string{`{"tool":"no_such\nreally"}`, "Here is my answer."}}
+	srv := httptest.NewServer(model)
+	defer srv.Close()
+	s.lifelogCLI("do", "settings", "model_url="+srv.URL+"/v1", "model=test-model")
+
+	s.lifelogCLI("do", "say", "day=today", "text=hello")
+	turns := s.waitReplies(1)
+	if len(turns) != 2 || turns[1].Text != "Here is my answer." {
+		t.Fatalf("turns %+v, want the owner's turn and the reply", turns)
+	}
+	if tools := turns[1].Tools; len(tools) != 1 || tools[0] != "- `no_such really` failed: unknown tool" {
+		t.Errorf("the tool lines of the reply: %q, want one line with the new line of the name made a space", tools)
+	}
+}
+
+// scriptModel answers the n-th request with the n-th step: a text, or a tool call when the step is {"tool":NAME} (NAME as
+// the JSON text of a name, with no arguments).
+type scriptModel struct {
+	mu    sync.Mutex
+	steps []string
+	n     int
+}
+
+func (m *scriptModel) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	m.mu.Lock()
+	step := m.steps[min(m.n, len(m.steps)-1)]
+	m.n++
+	m.mu.Unlock()
+	if name, ok := strings.CutPrefix(step, `{"tool":"`); ok {
+		name = strings.TrimSuffix(name, `"}`)
+		io.WriteString(w, `{"choices":[{"message":{"role":"assistant","content":null,"tool_calls":[{"id":"c1","type":"function","function":{"name":"`+name+`","arguments":"{}"}}]},"finish_reason":"tool_calls"}]}`)
+		return
+	}
+	b, _ := json.Marshal(step)
+	io.WriteString(w, `{"choices":[{"message":{"role":"assistant","content":`+string(b)+`},"finish_reason":"stop"}]}`)
+}
+
+// gatedModel holds its first answer until the test lets it go, and says when the first request has come.
+type gatedModel struct {
+	mu      sync.Mutex
+	n       int
+	arrived chan struct{} // gets a value when the first request has come
+	release chan struct{} // closed by the test to let the first answer go
+}
+
+func (m *gatedModel) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	m.mu.Lock()
+	m.n++
+	n := m.n
+	m.mu.Unlock()
+	if n == 1 {
+		m.arrived <- struct{}{}
+		select {
+		case <-m.release:
+		case <-r.Context().Done():
+			return
+		}
+	}
+	b, _ := json.Marshal("answer " + string(rune('0'+n)))
+	io.WriteString(w, `{"choices":[{"message":{"role":"assistant","content":`+string(b)+`},"finish_reason":"stop"}]}`)
+}
+
+func (m *gatedModel) requests() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.n
+}
+
+// TestAnEditOfTheTurnWhileTheModelRunsIsRefusedByTheCoreAndTheChangedTurnIsAnsweredOnce: the owner edits the words of
+// the turn that the model works on. The real core gives the turn a new key, so the reply to the old key is refused
+// (409) and writes nothing. The agent reads the page again at its next look and answers the turn as it is now. The page
+// has one reply, and it answers the edited turn.
+func TestAnEditOfTheTurnWhileTheModelRunsIsRefusedByTheCoreAndTheChangedTurnIsAnsweredOnce(t *testing.T) {
+	b := build(t)
+	s := startStack(t, b)
+	model := &gatedModel{arrived: make(chan struct{}, 1), release: make(chan struct{})}
+	srv := httptest.NewServer(model)
+	defer srv.Close()
+	s.lifelogCLI("do", "settings", "model_url="+srv.URL+"/v1", "model=test-model")
+
+	s.lifelogCLI("do", "say", "day=today", "text=hello")
+	select {
+	case <-model.arrived:
+	case <-time.After(wait):
+		t.Fatalf("the model got no request; log:\n%s", s.stderr)
+	}
+	// The model works on the turn. The owner edits its words in the browser: a save-body of the page.
+	e, err := client.Remote(s.core, "", ownerToken).Get(t.Context(), "/days/today/conversation")
+	if err != nil {
+		t.Fatal(err)
+	}
+	props, _ := e.Properties.(map[string]any)
+	body, _ := props["body"].(string)
+	if !strings.Contains(body, "hello") {
+		t.Fatalf("the page %q has no hello", body)
+	}
+	s.lifelogCLI("do", "save-body", "id="+fmt.Sprint(props["id"]), "version="+fmt.Sprint(props["version"]), "body="+strings.Replace(body, "hello", "hello there", 1))
+	close(model.release)
+
+	turns := s.waitReplies(1)
+	if len(turns) != 2 || turns[0].Text != "hello there" || turns[1].Who != "lifelog" || turns[1].Text != "answer 2" {
+		t.Fatalf("turns %+v, want the edited turn and one reply, from the second run of the model", turns)
+	}
+	if n := model.requests(); n != 2 {
+		t.Errorf("%d model requests, want 2", n)
+	}
+	if n := strings.Count(s.stderr.String(), "reply was refused or failed"); n != 1 {
+		t.Errorf("%d refused replies in the log, want 1:\n%s", n, s.stderr)
 	}
 }
 
