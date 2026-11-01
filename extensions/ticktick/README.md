@@ -6,9 +6,9 @@ tasks, and `lifelog-web` draws them as the section Tasks. `lifelog` adds, edits,
 tasks through this program.
 
 It is an extension that `lifelog serve --with ticktick` runs. It serves the task protocol of
-[a task service](../README.md#a-task-service) and no page: `lifelog` builds the pages. It is a separate Go module,
-`lifelog-ticktick`. It imports `lifelog/siren`, `lifelog/client` and `lifelog/app` of the root module (a `replace`
-directive), and uses the standard library for TickTick and for OAuth2. `lifelog` does not change.
+[a task service](../README.md#a-task-service) and no page: `lifelog` builds the pages. It is a Go module of its own,
+`lifelog-ticktick`, as [the contract of an extension](../README.md#what-an-extension-is) says, and it uses the standard
+library for TickTick and for OAuth2. `lifelog` does not change.
 
 ```mermaid
 flowchart LR
@@ -74,11 +74,11 @@ lifelog serve --with ticktick                          # the task service beside
 | command | what it does |
 |---|---|
 | `lifelog ticktick login [--client-id ID] [--client-secret SECRET] [--port N]` | the login above |
-| `lifelog ticktick sync [--url URL]` | one poll. The address is `--url`, else `$LIFELOG_URL`. With neither, it refuses. When `$LIFELOG_TOKEN` is set, it is sent as a bearer token. |
-| `lifelog serve --with ticktick` | the program with no argument and with `LIFELOG_LISTEN` set: it serves the task protocol, polls once at the start, then every `poll`. Without `LIFELOG_LISTEN` it prints the usage and exits 2. |
+| `lifelog ticktick sync [--url URL]` | one poll. The address is `--url`, else `$LIFELOG_URL`. With neither, it refuses and exits 78. When `$LIFELOG_TOKEN` is set, it is sent as a bearer token. |
+| `lifelog serve --with ticktick` | the program with no argument and with `LIFELOG_LISTEN` set: it serves the task protocol, polls once at the start, then every `poll`. Without `LIFELOG_LISTEN` it prints the usage and exits 78. |
 
 An unknown argument or flag is refused. Exit status 1 is an error (`serve` starts the program again after 10 seconds).
-Exit status 78 means that you act first: the login is missing or refused, or the usage is wrong.
+Exit status 78 means that you act first: the login is missing or refused, there is no address, or the usage is wrong.
 
 ## What comes back
 

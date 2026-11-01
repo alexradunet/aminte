@@ -1,79 +1,163 @@
 package main
 
 import (
-	"os"
+	"encoding/json"
 	"path/filepath"
-	"regexp"
+	"slices"
 	"strings"
 	"testing"
 
-	"lifelog/internal/api/apitest"
+	"lifelog/siren"
 )
 
-// TestTheTableOfTheSurfacesIsTheCatalog keeps the README's table "Every action on every surface" equal to the catalog
-// (AGENTS.md, "Every capability on every surface"): one row an action, in the order of GET /actions; its route; the
-// CLI's do of it, and each shortcut a command of the program; its MCP tool, or none for an owner's action; and the
-// place of its form in the browser.
-func TestTheTableOfTheSurfacesIsTheCatalog(t *testing.T) {
-	b, err := os.ReadFile(filepath.Join("..", "..", "README.md"))
-	if err != nil {
+// actionsOfTheCatalog runs `lifelog actions` on a fresh file and gives the catalog in JSON and the text of
+// `lifelog actions --human`.
+func actionsOfTheCatalog(t *testing.T) (catalog []siren.Action, human string) {
+	t.Helper()
+	live := filepath.Join(t.TempDir(), "life.db")
+	e, _, _ := testEnv(t)
+	if err := runArgs(t.Context(), e, []string{"init", live}); err != nil {
 		t.Fatal(err)
 	}
-	_, section, ok := strings.Cut(string(b), "\n## Every action on every surface\n")
-	if !ok {
-		t.Fatal("README.md has no section Every action on every surface")
+	e, stdout, _ := testEnv(t)
+	if err := runArgs(t.Context(), e, []string{"actions", "--db", live}); err != nil {
+		t.Fatal(err)
 	}
-	section, _, _ = strings.Cut(section, "\n## ")
-	row := regexp.MustCompile("(?m)^\\| `([a-z-]+)` \\| (.*) \\| (.*) \\| (.*) \\| (.*) \\|$")
-	rows := row.FindAllStringSubmatch(section, -1)
+	if err := json.Unmarshal(stdout.Bytes(), &catalog); err != nil {
+		t.Fatalf("lifelog actions did not write the catalog as JSON: %v", err)
+	}
+	e, stdout, _ = testEnv(t)
+	if err := runArgs(t.Context(), e, []string{"actions", "--db", live, "--human"}); err != nil {
+		t.Fatal(err)
+	}
+	return catalog, stdout.String()
+}
 
-	c, _, _ := apitest.Fresh(t, "cli")
-	catalog := apitest.Must(t)(c.Get(t.Context(), "/actions")).Actions
-	if len(rows) != len(catalog) {
-		t.Errorf("the table has %d rows, the catalog %d actions", len(rows), len(catalog))
-	}
-	backticked := regexp.MustCompile("`([^`]+)`")
-	shown := map[string]string{} // the shortcuts that the table shows, each with the action of its row
-	for i, a := range catalog {
-		if i >= len(rows) {
-			break
+// blocksOf splits the text of `lifelog actions --human` into one block for each action: the lines from the line
+// that starts at the margin to the next one. The key is the name of the action.
+func blocksOf(t *testing.T, text string) map[string][]string {
+	t.Helper()
+	blocks := map[string][]string{}
+	var name string
+	for _, line := range strings.Split(strings.TrimSuffix(text, "\n"), "\n") {
+		if !strings.HasPrefix(line, " ") {
+			name = strings.Fields(line)[0]
+			if _, twice := blocks[name]; twice {
+				t.Fatalf("the action %s is printed twice", name)
+			}
 		}
-		r := rows[i]
-		if r[1] != a.Name {
-			t.Errorf("row %d is %s, want %s: the rows follow the catalog", i+1, r[1], a.Name)
+		blocks[name] = append(blocks[name], line)
+	}
+	return blocks
+}
+
+// TestActionsHumanShowsTheSurfacesOfEachAction: `lifelog actions --human` prints, for each action of the catalog, the
+// route, the CLI line, the MCP tool, the owner mark and the shortcut (README, "Every action on every surface"). The
+// rows below are written by hand; the loop holds every action to the rule of the README.
+func TestActionsHumanShowsTheSurfacesOfEachAction(t *testing.T) {
+	catalog, text := actionsOfTheCatalog(t)
+	blocks := blocksOf(t, text)
+	if len(blocks) != len(catalog) {
+		t.Errorf("the text has %d actions, the catalog %d", len(blocks), len(catalog))
+	}
+
+	for _, tc := range []struct {
+		action string
+		has    []string // lines, in this order, among the lines of the block
+		hasNot []string // line starts that the block does not hold
+	}{
+		{"capture",
+			[]string{"capture        POST /days/{day}/capture", "  cli: do capture", "  shortcut: capture", "  mcp: capture"},
+			[]string{"  owner:"}},
+		{"open-day",
+			[]string{"open-day       GET /days/go", "  cli: do open-day", "  shortcut: day", "  mcp: open_day"},
+			[]string{"  owner:"}},
+		{"create-page",
+			[]string{"create-page    POST /pages", "  cli: do create-page", "  mcp: create_page"},
+			[]string{"  owner:", "  shortcut:"}},
+		{"snapshot",
+			[]string{"snapshot       POST /snapshots", "  cli: do snapshot", "  shortcut: snapshot", "  mcp: none", "  owner: yes"},
+			nil},
+		{"settings",
+			[]string{"settings       POST /settings", "  cli: do settings", "  mcp: none", "  owner: yes"},
+			[]string{"  shortcut:"}},
+	} {
+		t.Run(tc.action, func(t *testing.T) {
+			block, ok := blocks[tc.action]
+			if !ok {
+				t.Fatalf("the text has no action %s", tc.action)
+			}
+			from := 0
+			for _, line := range tc.has {
+				i := slices.Index(block[from:], line)
+				if i < 0 {
+					t.Errorf("the block has no line %q after line %d:\n%s", line, from, strings.Join(block, "\n"))
+					continue
+				}
+				from += i + 1
+			}
+			for _, start := range tc.hasNot {
+				for _, line := range block {
+					if strings.HasPrefix(line, start) {
+						t.Errorf("the block holds the line %q, and must hold none that starts %q", line, start)
+					}
+				}
+			}
+		})
+	}
+
+	for _, a := range catalog {
+		block := blocks[a.Name]
+		mcp := "  mcp: " + strings.ReplaceAll(a.Name, "-", "_")
+		if a.Owner {
+			mcp = "  mcp: none"
+		}
+		var shortcuts []string
+		for _, c := range commands {
+			if c.wraps == a.Name {
+				shortcuts = append(shortcuts, c.name)
+			}
+		}
+		want := []string{"  cli: do " + a.Name, mcp}
+		if len(shortcuts) > 0 {
+			want = append(want, "  shortcut: "+strings.Join(shortcuts, ", "))
+		}
+		if a.Owner {
+			want = append(want, "  owner: yes")
+		}
+		if first := strings.Fields(block[0]); len(first) != 3 || first[1] != a.Method || first[2] != a.Href {
+			t.Errorf("%s: the first line is %q, want the name, then %s %s", a.Name, block[0], a.Method, a.Href)
+		}
+		for _, line := range want {
+			if !slices.Contains(block, line) {
+				t.Errorf("%s: the block has no line %q", a.Name, line)
+			}
+		}
+		if !a.Owner && slices.Contains(block, "  owner: yes") {
+			t.Errorf("%s: it is not an owner action, and the block marks it", a.Name)
+		}
+	}
+}
+
+// TestEachShortcutNamesAnActionOfTheCatalog: a shortcut of the CLI wraps an action of the catalog, never replaces or
+// extends it (AGENTS.md, "Every capability on every surface"). The table of commands says which one it wraps.
+func TestEachShortcutNamesAnActionOfTheCatalog(t *testing.T) {
+	catalog, _ := actionsOfTheCatalog(t)
+	names := map[string]bool{}
+	for _, a := range catalog {
+		names[a.Name] = true
+	}
+	shortcuts := 0
+	for _, c := range commands {
+		if c.wraps == "" {
 			continue
 		}
-		if want := "`" + a.Method + " " + a.Href + "`"; r[2] != want {
-			t.Errorf("%s: the API is %s, want %s", a.Name, r[2], want)
-		}
-		cli := backticked.FindAllStringSubmatch(r[3], -1)
-		if len(cli) == 0 || cli[0][1] != "do "+a.Name {
-			t.Errorf("%s: the CLI is %s, want do %s first", a.Name, r[3], a.Name)
-		}
-		for _, s := range cli[min(1, len(cli)):] {
-			if commandNamed(s[1]) == nil {
-				t.Errorf("%s: the CLI names %s, which is no command of the program", a.Name, s[1])
-				continue
-			}
-			shown[s[1]] = a.Name
-			if w := commandNamed(s[1]).wraps; w != a.Name {
-				t.Errorf("%s: the CLI names %s, which wraps %q", a.Name, s[1], w)
-			}
-		}
-		want := "`" + strings.ReplaceAll(a.Name, "-", "_") + "`"
-		if a.Owner {
-			want = "none, the owner's"
-		}
-		if r[4] != want {
-			t.Errorf("%s: the MCP tool is %s, want %s", a.Name, r[4], want)
-		}
-		if strings.TrimSpace(r[5]) == "" {
-			t.Errorf("%s: the table names no place in the browser", a.Name)
+		shortcuts++
+		if !names[c.wraps] {
+			t.Errorf("the command %s wraps %q, which is no action of the catalog", c.name, c.wraps)
 		}
 	}
-	for _, c := range commands {
-		if c.wraps != "" && shown[c.name] != c.wraps {
-			t.Errorf("%s wraps %s, and the row of %s does not name it", c.name, c.wraps, c.wraps)
-		}
+	if shortcuts < 2 {
+		t.Errorf("the table of commands has %d shortcuts: the check reads nothing", shortcuts)
 	}
 }

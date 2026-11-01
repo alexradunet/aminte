@@ -5,9 +5,9 @@ and the message goes to the conversation page. The answer of [`lifelog-agent`](.
 phone. The program calls no model. If `lifelog-agent` does not run, the messages still reach the page, and the
 chat of the browser works as before.
 
-It is a client of the lifelog HTTP API ([API.md](../../API.md)). It is a separate Go module, `lifelog-whatsapp`. It
-imports `lifelog/client` and `lifelog/siren` of the root module (a `replace` directive), and nothing of
-`lifelog/internal`. It writes as the owner (`say` is the owner's action), with `via=whatsapp`.
+It is a client of the lifelog HTTP API ([API.md](../../API.md)) and a Go module of its own, `lifelog-whatsapp`, as
+[the contract of an extension](../README.md#what-an-extension-is) says. It writes as the owner (`say` is the owner's
+action), with `via=whatsapp`.
 
 ```mermaid
 flowchart LR
@@ -27,7 +27,7 @@ flowchart LR
   agent goes as it is. The words that the owner said on another surface go marked "You wrote in lifelog:", so the phone
   shows the same thread as the page. A turn is named by the `key` that the core gives it. An edit of a turn gives it a
   new key (see below), so a changed turn is a new turn and is sent again.
-- **An edit of a turn sends that turn again.** The core makes the key of a turn from its words, its minute and its relay.
+- **An edit of a turn sends that turn again.** The key of a turn comes from its words, its minute and its relay ([API.md](../../API.md#conversation)).
   When the owner edits the words of a turn on the page (a typo in the first line, a note added below a reply), the turn
   has a new key. The program has not sent that key, so it sends the turn again with its new words. A turn of the owner
   that came from WhatsApp is never sent back, also after an edit. An edit that only moves a turn (a turn removed
@@ -114,8 +114,7 @@ came during the switch is said.
 | 0 | An interrupt or SIGTERM. `serve` does not start it again. |
 | 1 | An error, or a failure of the connection that a new process may try again. `serve` starts it again after 10 seconds. |
 | 2 | A crash (the Go runtime ends a program that panics with 2). `serve` starts it again after 10 seconds. |
-| 3 | The connection ended for good: logged out (the owner unlinked the device on the phone), the session taken over by another client, the number banned for a time, or the client refused as outdated. `serve` does not start it again: act first (the line on stderr says what), then restart `serve`. |
-| 78 | Not paired: run `lifelog whatsapp login`. Or the catalog has no `say`. `serve` does not start it again: restart `serve` after the pairing. |
+| 78 | The owner acts first. Not paired: run `lifelog whatsapp login`. Or no `LIFELOG_URL` and no `--url`. Or the catalog has no `say`. Or the connection ended for good: logged out (the owner unlinked the device on the phone), the session taken over by another client, the number banned for a time, or the client refused as outdated. The line on stderr says which. `serve` does not start it again: restart `serve` after the owner acted. |
 
 ## No unit of its own
 

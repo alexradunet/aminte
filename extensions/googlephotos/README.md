@@ -3,9 +3,9 @@
 `lifelog-gphotos` is a small local web page. You pick photos in Google Photos. The page shows each day that has no
 cover, with the photos of that day. One click keeps a photo as the cover of the day.
 
-It is a client of the lifelog HTTP API ([API.md](../../API.md)). It is a separate Go module, `lifelog-googlephotos`. It
-imports `lifelog/siren` and `lifelog/client` of the root module (a `replace` directive) and writes through the
-`add-file` action of the catalog. `lifelog` does not change.
+It is a client of the lifelog HTTP API ([API.md](../../API.md)) and a Go module of its own, `lifelog-googlephotos`, as
+[the contract of an extension](../README.md#what-an-extension-is) says. It writes through the `add-file` action of the
+catalog. `lifelog` does not change.
 
 ```mermaid
 flowchart TD
@@ -45,7 +45,7 @@ Open `http://127.0.0.1:7790`.
 | flag | meaning |
 |---|---|
 | `--addr` | where the page listens. Default `127.0.0.1:7790`. Only a loopback address is allowed. |
-| `--url` | the address of lifelog. Default `$LIFELOG_URL`, which `lifelog gphotos` sets. With neither, it refuses. When `$LIFELOG_TOKEN` is set, it is sent as a bearer token. |
+| `--url` | the address of lifelog. Default `$LIFELOG_URL`, which `lifelog gphotos` sets. With neither, it refuses and exits 78. When `$LIFELOG_TOKEN` is set, it is sent as a bearer token. |
 | `--credentials` | the JSON of the Desktop OAuth client. Default: `credentials.json` beside the token file. |
 | `--zone` | the IANA zone that gives the day of a photo. Default: the local zone. |
 

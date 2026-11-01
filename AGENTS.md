@@ -115,15 +115,17 @@ not external services or private files.
 - **Never run `git clean -x` here.** It deletes gitignored files, and `life.db` is one of them. A nightly
   `lifelog snapshot` keeps checked copies outside the folder ([D25](docs/decisions/D25-snapshots.md)), so the worst
   loss is one night.
-- A system service runs the installed `lifelog` against this file and, with `--with web`, the installed `lifelog-web`
-  beside it. A local proxy exposes the door of `lifelog-web` (`LIFELOG_WEB_LISTEN`) on the owner's private network, and
+- A system service runs the installed `lifelog` against this file and, for each `--with NAME`, the installed
+  `lifelog-NAME` beside it (the reference unit has `web`, `agent` and `whatsapp`). A
+  local proxy exposes the door of `lifelog-web` (`LIFELOG_WEB_LISTEN`) on the owner's private network, and
   it does not point to the core. The CLI in this folder and that service are the same writer on one file, which
   [connections](docs/contract/connections.md) allows; so is the temporary server that `lifelog NAME` opens for an
   extension. Do not start a second writer stack on it, and do not point a reader at it while the service writes.
 - The service runs the installed binary, not `./lifelog`. A change is live only after `go build -o <install path>
-  ./cmd/lifelog` and a service restart. Ship a change to `extensions/web` with `go build -C extensions/web -o
-  <install folder>/lifelog-web ./cmd/lifelog-web` and a restart. Report the install paths, the restart and the
-  service's own log lines (those of `with web` too) when you ship a change.
+  ./cmd/lifelog` and a service restart. Ship a change to an extension with the one
+  build line of [deploy/README.md](deploy/README.md#ship-a-change) and a restart. Ship `lifelog`, `lifelog-agent` and
+  `lifelog-whatsapp` together. Report the install paths, the restart and the service's own log lines (those of each
+  `--with` child too) when you ship a change.
 
 ## The one hard rule: no migrations until the schema freeze
 
@@ -192,7 +194,7 @@ no presentation** (no `.html`, `.css`, `.js` or picture file under `internal/` o
 `html/template` in the Go sources of the core and its public packages). Go enforces the fourth: an extension never
 imports `lifelog/internal`. The core dials its own server and the children that `serve --with`
 started, and only in the files that `remoteAllowed` names (`cmd/lifelog/with.go`, `internal/api/with.go`). The list of
-third parties has `ticktick`, so the core never says it: the first connector lives in another repo. The browser is an
+third parties has `ticktick`, so the core never says it: the connector `extensions/ticktick` names it. The browser is an
 extension, by the owner's word (2026-10-31, [plan 161](docs/plans/161-the-browser-as-an-extension.md)): ring 3 holds
 `extensions/web`, which draws the answers of the API.
 
@@ -233,13 +235,13 @@ extension, by the owner's word (2026-10-31, [plan 161](docs/plans/161-the-browse
   `do`, the MCP tools and the forms of `lifelog-web` carry it without further work; a shortcut on one surface
   (`lifelog capture`, a dedicated view) wraps an action, never
   replaces or extends it. A feature that exists on one surface only is a defect, not a convenience. The only
-  differences allowed are the ones the README names and tests assert: owner-only actions (the ones the
-  catalog marks `owner`, shown by `lifelog actions`) are refused to an `agent:*` or `import:*` writer
-  and are never MCP tools. The README's table [every action on every surface](README.md#every-action-on-every-surface)
-  names each action's route, CLI line, MCP tool and form; a new action adds its row in the same change, and
-  `TestTheTableOfTheSurfacesIsTheCatalog` fails until it does. Each surface holds its own parity
-  ([plan 161](docs/plans/161-the-browser-as-an-extension.md)): the browser column of that table is held by
-  `extensions/web/web/parity_test.go`, which shows that each action has its form in `lifelog-web`.
+  differences allowed are the ones [API.md](API.md#reaching-a-server) names and tests assert: the owner-only actions
+  (the ones the catalog marks `owner`), which an agent cannot use.
+  `lifelog actions --human` prints each action with its route, its CLI line, its MCP tool, its owner mark and its
+  shortcut, so no page keeps a copy of the list and a new action adds no row. `TestActionsHumanShowsTheSurfacesOfEachAction`
+  holds that listing, and `TestEachShortcutNamesAnActionOfTheCatalog` holds that a shortcut wraps a real action. Each
+  surface holds its own parity ([plan 161](docs/plans/161-the-browser-as-an-extension.md)): the parity of the browser
+  is held by `extensions/web/web/parity_test.go`, which shows that each action has its form in `lifelog-web`.
 - **One way to do a thing.** The owner's rule (2026-10-18, [plan 131](docs/plans/131-the-pareto-pass.md)): each thing
   has one action, one route, one MCP tool and one form, drawn where its resource is (a page's actions on the page, a
   day's on the day, a list's on the list). A link may lead to that form; nothing draws it a second time. Do not add an

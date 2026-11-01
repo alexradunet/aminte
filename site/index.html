@@ -234,11 +234,7 @@
 git clone https://github.com/alexradunet/lifelogdb
 cd lifelogdb
 go build -o lifelog ./cmd/lifelog
-go build -C extensions/web -o ../../lifelog-web ./cmd/lifelog-web
-go build -C extensions/mcp -o ../../lifelog-mcp ./cmd/lifelog-mcp
-go build -C extensions/agentic -o ../../lifelog-agentic-init ./cmd/lifelog-agentic-init
-go build -C extensions/whatsapp -o ../../lifelog-whatsapp ./cmd/lifelog-whatsapp
-go build -C extensions/ticktick -o ../../lifelog-ticktick ./cmd/lifelog-ticktick
+for d in extensions/*/; do go build -C "$d" -o "$PWD/" ./cmd/...; done
 
 <span class="c"># make life.db beside the program</span>
 lifelog init

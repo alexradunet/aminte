@@ -8,21 +8,45 @@ and this page disagree, so a property here is a property on the wire.
 
 ## Reaching a server
 
-- **Local:** `lifelog serve` listens on `http://127.0.0.1:7777` for this machine only ([README](README.md#decisions)).
-- **A token:** `lifelog serve --token-file PATH` (or `$LIFELOG_TOKEN`) turns on the check. Every request then carries
-  `Authorization: Bearer <token>`, else the answer is 401 `token_required`. With no token there is no check.
-- **Other devices:** the server listens on the loopback only. It answers no CORS preflight, and it trusts no browser
-  origin: a write that a browser sends from another origin is 403 `cross_origin`. Another device, or a browser, reaches
-  the API through a program on this machine, such as `lifelog-web` ([extensions/web](extensions/web/README.md)).
+- **Local:** `lifelog serve` listens on the loopback only, because `life.db` holds health data
+  ([README](README.md#decisions)). The default is `127.0.0.1:7777`. `--addr` takes a numeric loopback IP, or `localhost`,
+  with a numeric port, and nothing else; `localhost` binds to `127.0.0.1` with no DNS lookup, and the port 0 picks a free
+  port, which the start line prints. A request must name a loopback IP, or `localhost` in any ASCII case, at the actual
+  port of the listener, with brackets for IPv6. An omitted HTTP port means 80, not the port of the listener. Any other
+  `Host` is 403. A forwarded header gives no trust, and a request target in absolute form is refused. A custom host
+  name, a service-name port and a proxy are not supported. The guard covers reads, previews and writes. The CLI in
+  process does not pass through it.
+- **A token:** `lifelog serve --token-file PATH` (one line of 32 characters or more; the command line never carries the
+  secret) or `$LIFELOG_TOKEN` turns on the check. A token that is shorter, has more than one line, or starts or ends
+  with a space or a tab, and an empty `--token-file`, refuse the command before the listener opens. Every request then
+  carries `Authorization: Bearer <token>`, else the answer is 401 `token_required`, with nothing of the database. The
+  compare takes the same time for every value, and no route is exempt: there is no install file and no login page. The
+  check of the `Host` comes first, so a wrong `Host` is 403 before a missing token is 401. With no token there is no
+  check, as on the temporary server of `lifelog NAME`. A token holder is the owner. The CLI and the MCP server with
+  `--url` send `$LIFELOG_TOKEN` as the bearer token. The start line says `(token required)`.
+- **Other devices:** the server answers no CORS preflight, and it trusts no browser origin: a write that a browser sends
+  from another origin is 403 `cross_origin`, while a form of the same origin and a client that sends no browser origin
+  header work. The core has no login, no cookie and no TLS. Another device, or a browser, reaches the API through a
+  program on this machine, such as `lifelog-web` ([extensions/web](extensions/web/README.md)).
 - **Provenance:** `Lifelog-Source: <name>` names the writer on every row the request writes (`[a-z0-9_:.-]{1,64}`,
-  e.g. `app:phone`). Without it a request writes as `api`. A writer named `agent:…`
-  or `import:…` is refused the owner-only actions (`owner: true` in the catalog)
-  and the owner-only reads `GET /settings` and `GET /snapshots/{name}` (403 `forbidden`).
+  e.g. `app:phone`). Without it a request writes as `api`.
+- **Owner-only:** an action with `owner: true` in the catalog, and the reads `GET /settings` and `GET /snapshots/{name}`,
+  are the owner's alone. A writer named `agent:…` or `import:…` is refused them (403 `forbidden`), whatever the token.
+  The rule is held in the server, once, for the core and for every connected app. An owner action is never an MCP tool.
+  `lifelog actions --human` marks each one.
+- **Limits:** a JSON or URL-encoded body of an action is 20 MiB of encoded data at most, and a JSON body is exactly one
+  object. A multipart body has 64 parts at most, 16 MiB for each text field and 16 MiB of text in all (repeated fields
+  count; an unknown name is refused (422) before its bytes are read), and at most one original and one preview part. A
+  supplied preview is 64 MiB at most. A request over a limit is 413 and writes nothing. After a JSON or URL-encoded
+  body over the limit, the server also closes an HTTP/1.1 connection (over HTTP/2 it resets the stream, and the
+  connection stays open). An original is hashed as a stream with no total size limit; an original above the 64 MiB
+  picture budget is kept with no automatic preview.
 - **Representation:** every answer is Siren JSON (the entity below), or the bytes of a picture, a file or a snapshot. A
   redirect (303, with a short body from `net/http`), a route that does not exist (404) and a method that a route does not
   take (405) are the plain answers of `net/http`, not Siren. A client sends an action as
   `application/x-www-form-urlencoded`, `application/json` (one object; a non-string value is sent as its JSON text) or,
-  for `add-file` and `set-cover`, `multipart/form-data`.
+  for `add-file` and `set-cover`, `multipart/form-data`. The CLI's `do` and the MCP tools take the path of a local file
+  in a `file` field and stream it; a browser sends the file that it picked.
 - **Writes answer with the resource they changed** (200, with `Location`), and `result` says what the write did.
 
 ## The entity
@@ -137,14 +161,14 @@ flowchart LR
   L -->|"the entity with its hrefs and action names prefixed"| C
 ```
 
-- **The merged `GET /actions`.** The static catalog is the table in the [README](README.md#every-action-on-every-surface).
-  An action of an app is dynamic: it is there while the app runs. Its `name` is `NAME-action`, and its `href` starts
+- **The merged `GET /actions`.** The static catalog is the one that `lifelog actions --human` prints
+  ([README](README.md#every-action-on-every-surface)). An action of an app is dynamic: it is there while the app runs. Its `name` is `NAME-action`, and its `href` starts
   with `/with/NAME`. It has the `owner`, `danger` and `fields` that the app gave. An app that does not run has no
   action in the list.
 - **The routes** are `/with/NAME` and `/with/NAME/...`, for every method. A request that matches an action of the app
   is checked as every action is: a field that the action does not name, a missing required field or a value outside
-  `options` is 422 `invalid`, and an `owner` action is 403 `forbidden` for an `agent:*` or `import:*` writer. In both
-  cases the app is not called. A `GET` that matches no action goes to the app as it is, without `new`. Any other method that matches no action is 404.
+  `options` is 422 `invalid`, and an `owner` action is refused to an `agent:*` or `import:*` writer
+  ([owner-only](#reaching-a-server)). In both cases the app is not called. A `GET` that matches no action goes to the app as it is, without `new`. Any other method that matches no action is 404.
 - **The writer** of the app's request is the writer of yours (`Lifelog-Source`). The app gets no cookie and no token.
 - **The answer** is the entity of the app, with `/with/NAME` before each `href` and `NAME-` before each action name.
   The actions of an embedded link get the same prefixes.
@@ -162,7 +186,7 @@ The server sends a request to the app once. There is no retry on any method.
 
 **Limits.** A running `serve` has the apps. The in-process CLI and the temporary server of `lifelog NAME` have none, so
 `lifelog do NAME-action` needs `--url`, and an agent reaches the apps with `lifelog mcp --url`. The MCP tool of
-`NAME-action` is `NAME_action`, and an `owner` action is no tool. An action with a field of the type `file` is refused
+`NAME-action` is `NAME_action`. An action with a field of the type `file` is refused
 when the catalog of the app is read; a multipart body is not forwarded.
 
 ## Tasks
@@ -193,11 +217,10 @@ on a done row). `lifelog-web` draws the pages by the [rules of the generic view]
 | `delete-task` | `POST /tasks/items/{id}/delete` | `id` | `owner`, `danger` |
 | `sync-tasks` | `POST /tasks/sync` | none | |
 
-The actions are in `GET /actions` while a task service runs, so the table of the [README](README.md#every-action-on-every-surface)
-(the core alone) does not list them. They are checked as every action is: a field that the action does not name, a
-missing `title`, a `list` that is not a name, a `due` that is not a day (`YYYY-MM-DD`) or a blank `title` is 422
-`invalid`, and `delete-task` is 403 `forbidden` for an `agent:*` or `import:*` writer. In these cases the service is not
-called. The service is called as the writer of the request, once, with a limit of 30 seconds. An error of the service
+The actions are in `GET /actions` while a task service runs, and `lifelog actions --human` lists them then. They are
+checked as every action is: a field that the action does not name, a missing `title`, a `list` that is not a name, a
+`due` that is not a day (`YYYY-MM-DD`) or a blank `title` is 422 `invalid`, and `delete-task` is owner-only
+([owner-only](#reaching-a-server)). In these cases the service is not called. The service is called as the writer of the request, once, with a limit of 30 seconds. An error of the service
 passes with its status and code.
 
 | status | `code` | when |
@@ -759,8 +782,8 @@ with a `result` sentence; `file-pages` files a metric in a category.
 
 ### integrity
 
-`GET /integrity`: the four integrity checks of the contract, and this writer's own. It is an owner-only action
-(`integrity-check`). The full-text check holds the write lock while it runs, so other writes wait. The whole run has a deadline of 90 seconds, below the deadline of two minutes of every request; a run that passes it is answered 504 `timeout`. Actions: the owner's `rebuild-search` and `resync-links`.
+`GET /integrity`: the four integrity checks of the contract, and this writer's own. It is the owner's
+action `integrity-check`. The full-text check holds the write lock while it runs, so other writes wait. The whole run has a deadline of 90 seconds, below the deadline of two minutes of every request; a run that passes it is answered 504 `timeout`. Actions: the owner's `rebuild-search` and `resync-links`.
 
 | property | type | meaning |
 |---|---|---|
@@ -795,7 +818,7 @@ The class of an answer that is not a resource: the `record` of a reading whose `
 
 ### snapshot
 
-`POST /snapshots` (the owner's action `snapshot`, refused to an `agent:*` writer): a dated copy of the database into
+`POST /snapshots` (the owner's action `snapshot`): a dated copy of the database into
 the server's snapshot folder, then its restore check. The same values are in `result`; `self` is `/`. A refusal (no folder, a folder inside a git work tree, a name in
 use) is 422 `snapshot_refused`. A copy that fails its restore check is kept as `life-YYYY-MM-DD.failed.db` and answered 500 `restore_check_failed`.
 A timeout is 504 `timeout`, and any other failure is 500 `internal`. Links: `self`, `index`, `download` (the
@@ -822,7 +845,7 @@ address of the file, below).
 | `restore_check.full_text_index_ok` | boolean | |
 | `restore_check.full_text_error` | string | |
 
-`GET /snapshots/{name}` (owner-only: 403 `forbidden` to an `agent:*` or `import:*` writer) sends a snapshot that the
+`GET /snapshots/{name}` (owner-only) sends a snapshot that the
 action wrote, as `application/vnd.sqlite3` with `Content-Disposition: attachment`, so a browser saves it on its own
 device. It is the file as written, never the live `life.db`. `name` is a name that the action gives
 (`life-YYYY-MM-DD.db` or `life-YYYY-MM-DDTHHMMSS.db`) of a file in the server's snapshot folder; any other name, a
@@ -830,7 +853,7 @@ device. It is the file as written, never the live `life.db`. `name` is a name th
 
 ### rebuilt
 
-`POST /search/rebuild` (the owner's action `rebuild-search`, refused to an `agent:*` or `import:*` writer): the repair of a
+`POST /search/rebuild` (the owner's action `rebuild-search`): the repair of a
 full-text index that `integrity-check` found not ok. It rebuilds the index from the pages in one write, so a failure
 keeps the old index. It reads every page and holds the write lock while it runs. The same value is in `result`;
 `self` is `/`.
@@ -841,7 +864,7 @@ keeps the old index. It reads every page and holds the write lock while it runs.
 
 ### resynced
 
-`POST /links/resync` (the owner's action `resync-links`, refused to an `agent:*` or `import:*` writer): the repair of the
+`POST /links/resync` (the owner's action `resync-links`): the repair of the
 pages whose `link_drift` `integrity-check` lists. It rewrites the `wikilink` rows of each such live page from its body,
 by the code of a body save, in one write. A page whose links are right is not written. The same value is in `result`;
 `self` is `/`.
@@ -894,8 +917,8 @@ category is 422 (`links_endpoint_types`). The answer embeds an `item` link to ea
 
 ### settings
 
-`GET /settings` (owner-only: 403 `forbidden` to an `agent:*` or `import:*` writer) and `POST /settings` (the owner's
-action `settings`, refused the same way; the answer is this entity, with `result` the sentence `Settings saved.`). The
+`GET /settings` (owner-only) and `POST /settings` (the owner's
+action `settings`; the answer is this entity, with `result` the sentence `Settings saved.`). The
 settings are the application's, in a file beside the database (`life.db` gives `life.settings.json`, mode 0600), and
 not rows of `life.db`. Links: `self`, `index`. Actions: `settings`, with the values filled in, the key included, so
 the owner's form sends the key back as it is. `GET /actions` offers `settings` with no value filled in. A field of
@@ -929,7 +952,7 @@ deleted is no conversation: the answer has no turns, and `say` makes it live aga
 title (a file, a person or a metric) is no conversation either: the answer has no turns and no `page`, and `say` and `reply`
 are 409. The page of a live conversation links to this resource (rel `conversation`); the JSON of the page is the page's own.
 
-`POST /days/{day}/say` (the action `say`, the owner's: 403 `forbidden` to an `agent:*` or `import:*` writer): the field `text` is added to the page of the day as the
+`POST /days/{day}/say` (the action `say`, the owner's): the field `text` is added to the page of the day as the
 owner's turn, with the time of the server's clock in its zone. The page is made on the first turn of the day, in
 the same write; a deleted page of the conversation, or a deleted category `Conversations`, is revived by it. The
 answer is this entity, and `result` is the [save result](#result-of-capture-create-page-save-body).

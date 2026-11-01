@@ -70,7 +70,8 @@ Global flags, anywhere on the line:
 // gives the process's own; a test gives buffers, its own variables and its own clock.
 type env struct {
 	o          opts
-	cmd        *command // the command of the line, set by runContext: its synopsis is the text of an error of use
+	cmd        *command  // the command of the line, set by runContext: its synopsis is the text of an error of use
+	table      []command // the table commands, set by runContext, for the command that lists the shortcuts: a closure in the table cannot name it (an initialization cycle)
 	c          *client.Client
 	store      *core.Store
 	stdin      io.ReadCloser
@@ -144,7 +145,7 @@ var commands = []command{
 			return doAction(ctx, e, args[0], vals)
 		}},
 	{name: "actions",
-		usage: "  lifelog actions                     list the actions and their fields",
+		usage: "  lifelog actions                     list the actions: route, CLI line, MCP tool, owner mark, shortcut, fields",
 		run: func(ctx context.Context, e env, args []string) error {
 			if len(args) != 0 {
 				return errors.New(e.cmd.synopsis())
@@ -417,7 +418,7 @@ func runContext(ctx context.Context, e env) (err error) {
 	if cmd == nil {
 		return extension(ctx, e, o.args[0], o.args[1:])
 	}
-	e.cmd = cmd
+	e.cmd, e.table = cmd, commands
 	args := o.args[1:]
 	if cmd.prepare != nil {
 		if o, err = cmd.prepare(e, o); err != nil {

@@ -8,9 +8,14 @@ import (
 	"sort"
 	"strings"
 
+	"lifelog/client/tools"
 	"lifelog/siren"
 )
 
+// listActions prints the catalog. With --human it prints, for each action, the route, the CLI line (do NAME), the
+// shortcuts of the program that wrap it, the MCP tool (the name with _ for -, none for an owner action: the rule of
+// client/tools) and the owner mark. This listing is the one place that shows the surfaces of an action: no page keeps
+// a copy (README, "Every action on every surface").
 func listActions(ctx context.Context, e env) error {
 	actions, err := e.c.Catalog(ctx)
 	if err != nil {
@@ -32,7 +37,22 @@ func listActions(ctx context.Context, e env) error {
 			}
 			fs = append(fs, s)
 		}
-		fmt.Fprintf(out, "%-14s %s %s\n  %s\n  fields: %s\n", a.Name, a.Method, a.Href, a.Description, strings.Join(fs, " "))
+		fmt.Fprintf(out, "%-14s %s %s\n  %s\n  cli: do %s\n", a.Name, a.Method, a.Href, a.Description, a.Name)
+		var shortcuts []string
+		for _, c := range e.table {
+			if c.wraps == a.Name {
+				shortcuts = append(shortcuts, c.name)
+			}
+		}
+		if len(shortcuts) > 0 {
+			fmt.Fprintf(out, "  shortcut: %s\n", strings.Join(shortcuts, ", "))
+		}
+		if a.Owner {
+			fmt.Fprint(out, "  mcp: none\n  owner: yes\n")
+		} else {
+			fmt.Fprintf(out, "  mcp: %s\n", tools.Name(a.Name))
+		}
+		fmt.Fprintf(out, "  fields: %s\n", strings.Join(fs, " "))
 	}
 	return out.err
 }

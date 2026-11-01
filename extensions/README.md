@@ -11,9 +11,9 @@ third party: an extension does.
 
 - It lives in its own folder under `extensions/`, with its own module and its own `README.md` that gives its build line.
 - It never imports `lifelog/internal`: Go refuses it. In Go it requires `lifelog v0.0.0` with `replace lifelog => ../..`
-  and imports `lifelog/siren`, `lifelog/client`, `lifelog/app` (a catalog of its own) and, for the tools of a model,
-  `lifelog/client/tools`. An extension that draws pages also imports `lifelog/text`, the Go reference of the grammar of
-  titles and wikilinks ([titles and wikilinks](../docs/contract/titles-and-wikilinks.md)). A test file of an extension
+  and imports `lifelog/siren`, `lifelog/client`, `lifelog/app` (the shell of a program, and a catalog of its own) and,
+  for the tools of a model, `lifelog/client/tools`. An extension that draws pages also imports `lifelog/text`, the Go
+  reference of the grammar of titles and wikilinks ([titles and wikilinks](../docs/contract/titles-and-wikilinks.md)). A test file of an extension
   may import `lifelog/lifelogtest`: a real core handler over a fresh synthetic file, in the process. No program imports it.
   `go mod verify` reports `lifelog v0.0.0: missing ziphash`: a directory replace has no zip, and this is not a fault; `go mod tidy -diff` is the check that the module files are in order.
 - It never opens `life.db`. There is one writer per file. The extension reads and writes through the HTTP API.
@@ -64,7 +64,8 @@ flowchart LR
 
 The temporary server is the same writer as the CLI. [Connections](../docs/contract/connections.md) allows it beside
 the service. A setup extension needs no server, and a client extension that has no `LIFELOG_URL` and no `--url` must refuse with a
-line that says what to run. It never guesses an address: `127.0.0.1:7777` may be the server of another file.
+line that says what to run, and exit with 78 ([the exit status](#run-by-serve)). It never guesses an address:
+`127.0.0.1:7777` may be the server of another file. `app.API` does both ([in Go](#in-go-the-package-lifelogapp)).
 
 ## Exit and signals
 
@@ -90,7 +91,8 @@ flowchart TD
 
 - **The environment** is the one above. `LIFELOG_URL` is the address of the listener on the loopback
   (`http://127.0.0.1:PORT`). `LIFELOG_TOKEN` is the token of the server, when it has one (`--token-file` or
-  `$LIFELOG_TOKEN`). `LIFELOG_EXE` and `LIFELOG_DB` are as for any extension. `LIFELOG_LISTEN` is a loopback address
+  `$LIFELOG_TOKEN`), and none when the server has none: a value that `serve` inherited is removed first. `LIFELOG_EXE`
+  and `LIFELOG_DB` are as for any extension. `LIFELOG_LISTEN` is a loopback address
   (`127.0.0.1:PORT`), new at each start, on which the extension may serve a catalog
   ([a catalog of its own](#a-catalog-of-its-own)).
 - **No arguments, and an empty stdin** (`/dev/null`). The extension configures itself from the settings of the API.
@@ -98,10 +100,12 @@ flowchart TD
   `os.UserConfigDir()/lifelog-NAME` in `ReadWritePaths`, else the extension fails at its start and `serve` starts it
   again every 10 seconds.
   stdout and stderr are those of the server, so the lines go to its log.
-- **The exit status** decides. 0: the extension ended by its own choice, and is not started again. 78 (`EX_CONFIG` of
-  sysexits): the owner must act first (for example pair a device); it is not started again until `serve` starts
-  again. Any other end (1; 2, which the Go runtime gives a program that panics; a signal): `serve` starts it again after
-  10 seconds. `serve` logs each start and each end.
+- **The exit status** decides. 0: the extension ended by its own choice (an interrupt or SIGTERM is the owner's word),
+  and is not started again. 78 (`EX_CONFIG` of sysexits): the owner must act first (for example pair a device, log in,
+  or mend a wrong value of the configuration); it is not started again until `serve` starts again. Any other end (1; 2,
+  which the Go runtime gives a program that panics; any other number; a signal): `serve` starts it again after
+  10 seconds. `serve` logs each start and each end. On any end but 0 a Go program prints one line,
+  `lifelog-NAME: err`, to stderr.
 - **The stop.** On an interrupt or SIGTERM, `serve` interrupts the child first and waits for it, 10 seconds at most,
   then kills it. Then it drains its own requests and closes the file, so the child may still write while it ends.
 - **A catalog of its own.** A child may serve a Siren catalog on `LIFELOG_LISTEN`: see [a catalog of its own](#a-catalog-of-its-own).
@@ -162,8 +166,8 @@ An `href` is templated: `/items/{id}` has a path field `id`. A field has `name`,
 `options`, `in` and `value`, as in [API.md](../API.md#the-entity). `in: "path"` marks a field of the `href`. Two marks
 of an action have an effect on the server:
 
-- `owner: true`: the server refuses the action to an `agent:*` or `import:*` writer (403 `forbidden`) and never calls the
-  app. The server holds this rule. The app does not check the writer.
+- `owner: true`: the action is the owner's alone ([owner-only](../API.md#reaching-a-server)). The server holds this
+  rule and never calls the app for another writer. The app does not check the writer.
 - `danger: true`: a client warns before it sends the action.
 
 An error is an entity of class `error` with the properties `status`, `code` and `message`, and the HTTP status of
@@ -185,15 +189,15 @@ action, with the path fields filled.
 |---|---|
 | the writer | The server calls the app with the header `Lifelog-Source` of the request. The app sees no cookie and no token of the server. |
 | the fields | The server sends the fields that the action names. A field that the action does not name, a missing required field or a value outside `options` is refused by the server (422 `invalid`), as for every action of the catalog. The field `new` of a read never reaches the app. |
-| the owner | An `owner: true` action is refused to an `agent:*` or `import:*` writer (403). The app is not called. |
+| the owner | The server refuses an `owner: true` action to an `agent:*` or `import:*` writer. The app is not called. |
 | the answer | The `href` of each link, embedded entity and action gets the prefix `/with/NAME`. Each action name gets the prefix `NAME-`. A link or action whose `href` has a scheme or a host is dropped: nothing the app says leads off the server. |
 | no retry | The server sends a request once. A write that was sent may be done, and the caller decides. |
 | the time | The server waits 30 seconds for the app. A slow app is 504 `timeout`. |
 | the errors | An app that does not run is 503 `unavailable` with `Retry-After`. An unknown app is 404. An answer that is not an entity is 502 `upstream`. The error entity of the app passes with its status. |
 
-`lifelog do NAME-action field=value` and the MCP tool `NAME_action` follow from the merged catalog. An owner-only
-action is no MCP tool. Both need the address of a running `serve` (`--url`): the in-process CLI and the temporary
-server of `lifelog NAME` run no child, so they have no app.
+`lifelog do NAME-action field=value` and the MCP tool `NAME_action` follow from the merged catalog. Both need the
+address of a running `serve` (`--url`): the in-process CLI and the temporary server of `lifelog NAME` run no child, so
+they have no app.
 
 ### What the app writes back
 
@@ -211,13 +215,21 @@ owner acts (the login is missing) ends with status 78, so `serve` does not start
 
 ### In Go: the package `lifelog/app`
 
-The package `lifelog/app` serves a catalog and never dials. `Listen(ctx, handler)` serves on `LIFELOG_LISTEN`, refuses an
-unset value or an address that is not a loopback address, and drains on the end of `ctx`. `Catalog(title, home, actions,
-handlers)` is the handler (`CatalogOf(role, ...)` adds a role to the class of `GET /actions`; the role `tasks` marks the [task service](#a-task-service)): it serves `GET /actions`, `GET /` and one route for each action, and it panics at the start
-when an action has no handler. `Fail` writes an error entity. `StateDir(name)` makes the state folder. `ExitOwnerActs`
-is 78. [`cmd/lifelog/testdata/withapp/main.go`](../cmd/lifelog/testdata/withapp/main.go) is the whole example, and
-`cmd/lifelog/with_app_test.go` runs it on the real `lifelog serve --with`. An app in another language serves the same
-routes with any HTTP library.
+The package `lifelog/app` holds what the program of a Go extension needs. It serves, and it dials only in `API`.
+
+| helper | what it does |
+|---|---|
+| `Main(name, run)` | The `main` of the program. It runs `run` with a context that ends on an interrupt or SIGTERM. When `run` fails, it prints the line `lifelog-NAME: err` and ends with the status of [the exit rule](#run-by-serve): 0 for no error and for `context.Canceled`, 78 for an error that `OwnerActs` marked (also one that a layer wrapped or joined), else 1. |
+| `OwnerActs(err)`, `ExitCode(err)`, `ExitOwnerActs` | `OwnerActs` marks an error that only the owner can mend; its text does not change. `ExitCode` gives the status that `Main` would use, for a test. `ExitOwnerActs` is 78. |
+| `API(url, source)` | The client of the server at `url`, which writes as `source` (`""` is the owner). It sends `$LIFELOG_TOKEN` as the bearer token when it is set. An empty `url` is an `OwnerActs` error with one sentence. |
+| `Listen(ctx, handler)` | Serves on `LIFELOG_LISTEN`, refuses an unset value or an address that is not a loopback address, and drains on the end of `ctx`. |
+| `Catalog(title, home, actions, handlers)`, `CatalogOf(role, ...)` | The handler of a catalog: it serves `GET /actions`, `GET /` and one route for each action, and it panics at the start when an action has no handler. `CatalogOf` adds a role to the class of `GET /actions`; the role `tasks` marks the [task service](#a-task-service). |
+| `Entity(f)`, `Fail(w, status, code, msg)`, `Error` | `Entity` turns a function that returns an entity into a handler; an `*Error` that it returns (also wrapped) gives its status and code, and any other error is 500 `internal`. `Fail` writes an error entity. |
+| `StateDir(name)` | Makes the state folder `os.UserConfigDir()/lifelog-NAME` with mode `0700`. |
+
+[`cmd/lifelog/testdata/withapp/main.go`](../cmd/lifelog/testdata/withapp/main.go) is the whole example, and
+`cmd/lifelog/with_app_test.go` runs it on the real `lifelog serve --with`. A program in another language implements the
+same environment and the same exit rule, and serves the same routes with any HTTP library.
 
 ## A task service
 
@@ -297,8 +309,8 @@ does ([what the app writes back](#what-the-app-writes-back)).
 ## Who writes
 
 An extension writes as `import:NAME` (an importer) or `agent:NAME` (a model), with the header
-`Lifelog-Source: import:NAME` or `Lifelog-Source: agent:NAME`. The owner-only actions are refused to such a writer by
-the rule that exists already ([API.md](../API.md)). `GET /actions` of the server is the catalog of the actions.
+`Lifelog-Source: import:NAME` or `Lifelog-Source: agent:NAME`. Such a writer meets the
+[owner-only](../API.md#reaching-a-server) rule. `GET /actions` of the server is the catalog of the actions.
 
 One kind of extension writes as the owner: a transport that carries the words of the owner from a chat. It sends the
 action `say` with the owner's token and no source, and with `via` set to its own name. `say` is the owner's action, so an

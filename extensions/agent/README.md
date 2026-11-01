@@ -1,14 +1,14 @@
 # lifelog-agent
 
 `lifelog-agent` answers the owner in the conversation of lifelog. The owner says something on a surface that has the
-action `say`: the browser, WhatsApp or `lifelog do say`. (`say` is an owner action, so it is not an MCP tool.) The agent
+action `say`: the browser, WhatsApp or `lifelog do say`. (`say` is an owner action.) The agent
 reads the conversation page, calls a model, and writes the answer with the action `reply`. The model reads and writes
 `life.db` through the action catalog of the API, as the [MCP server](../mcp/README.md) offers it.
 
-It is a client of the lifelog HTTP API ([API.md](../../API.md)). It is a separate Go module, `lifelog-agent`. It
-imports `lifelog/siren`, `lifelog/client` and `lifelog/client/tools` of the root module (a `replace` directive), and
-nothing of `lifelog/internal`. The core calls no model: this program is the only one that does. It writes as
-`agent:lifelog`. The API refuses the owner-only actions to such a writer.
+It is a client of the lifelog HTTP API ([API.md](../../API.md)) and a Go module of its own, `lifelog-agent`, as
+[the contract of an extension](../README.md#what-an-extension-is) says. The core calls no model: this program is the
+only one that does. It writes as `agent:lifelog`, so the API refuses it the
+[owner-only](../../API.md#reaching-a-server) actions.
 
 ```mermaid
 flowchart LR
@@ -27,14 +27,11 @@ flowchart LR
   page that waits, and it does not answer a page that it answered. The core owns the convention of the page (the
   title, the category, the first line, the paragraph of a turn: see the conversation class in
   [API.md](../../API.md#conversation)). The agent holds no title and no category.
-- **The core writes both turns.** `say` writes the turn of the owner. `reply` writes the turn of the agent. An agent
-  cannot save the body of a conversation page: the core refuses it (403), and the agent writes with `reply`. The core
-  stamps the turn, puts it in the right place, makes the lines of the words safe (a line that reads as a turn marker is
-  escaped, and a code fence that the words leave open is closed), and writes the page in one transaction. So a reply
-  cannot hide the next turn from the parse of the page, and the agent does not answer its own reply. Text that an edit
-  adds after a reply is part of that reply. The core escapes a marker line only in the words of `say` and `reply`, not
-  in an edit of the owner. So an edit that types a marker line of the owner (`**Owner** (10:00): ...`) adds a turn of
-  the owner, and the agent answers it when it is the last turn of the page.
+- **The core writes both turns.** `say` writes the turn of the owner, and `reply` writes the turn of the agent. The
+  agent cannot save the body of a conversation page, so it writes with `reply`. The core puts the turn in its place,
+  makes its lines safe and writes the page in one transaction, so the agent does not answer its own reply. The format,
+  the escape of a marker line, the key of a turn and the refusals are in [API.md](../../API.md#conversation). An edit of
+  the owner that types a marker line adds a turn of the owner, and the agent answers it when it is the last turn.
 - **One turn at a time.** A turn has at most 16 model steps and 5 minutes. The model reads the whole page of the day.
   The agent writes the tool lines and the reply in one `reply` request, so the page has the whole answer or none. The
   request has the fields `day`, `turn`, `text` and `tools`. `turn` is the key of the last owner turn that the model
@@ -108,7 +105,7 @@ everything.
 | line | what happens |
 |---|---|
 | `lifelog agent [--db FILE]` | A try by hand. `lifelog` serves the file on a temporary loopback server for it ([extensions/README.md](../README.md)). |
-| `lifelog-agent --url URL` | The same against a running `lifelog serve` at `URL` (default `$LIFELOG_URL`). `$LIFELOG_TOKEN` is the bearer token. With no URL, it refuses: a guessed address could be the server of another file. |
+| `lifelog-agent --url URL` | The same against a running `lifelog serve` at `URL` (default `$LIFELOG_URL`). `$LIFELOG_TOKEN` is the bearer token. With no URL, it refuses and exits 78: a guessed address could be the server of another file. |
 
 `--source` is not a flag: the agent always writes as `agent:lifelog`.
 
@@ -127,7 +124,7 @@ The agent needs no state folder. It makes no file.
 | 0 | An interrupt or SIGTERM. `serve` does not start it again. |
 | 1 | An error, for example a catalog that cannot be read. `serve` starts it again after 10 seconds. |
 | 2 | A crash (the Go runtime ends a program that panics with 2). `serve` starts it again after 10 seconds. |
-| 78 | The catalog has no `say` or no `reply`: the server is too old, or it is not a lifelog server. The owner acts first. `serve` does not start it again. |
+| 78 | The owner acts first: there is no `LIFELOG_URL` and no `--url`, or the catalog has no `say` or no `reply` (the server is too old, or it is not a lifelog server). `serve` does not start it again. |
 
 ## No unit of its own
 

@@ -62,4 +62,6 @@ The service runs the installed program, not the one in the repo folder.
 2. `systemctl daemon-reload` after a change to a unit file.
 3. `systemctl restart lifelog.service`.
 4. Read the service's log lines (`journalctl -u lifelog.service -n 20`): the first names the version and the
-   `user_version`, and the lines of `with web` say that the browser started.
+   `user_version`, and a line `lifelog: with NAME: started (pid N)` for each `--with` child (`web`, `agent`,
+   `whatsapp`) says that the child started. A line `ended with status 78: not started again (the owner acts first)`
+   says that the owner must act ([the exit status](../extensions/README.md#run-by-serve)).
