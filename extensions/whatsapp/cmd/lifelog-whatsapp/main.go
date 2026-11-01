@@ -47,7 +47,7 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 	}
 	// The owner's words go to the page with say, and the owner's number is in the settings: both are the owner's, so
 	// the client has the owner's token and no source.
-	api, err := app.API(*base, "")
+	api, err := app.API("lifelog whatsapp", *base, "")
 	if err != nil {
 		return err
 	}

@@ -217,7 +217,8 @@ on a done row). `lifelog-web` draws the pages by the [rules of the generic view]
 | `delete-task` | `POST /tasks/items/{id}/delete` | `id` | `owner`, `danger` |
 | `sync-tasks` | `POST /tasks/sync` | none | |
 
-The actions are in `GET /actions` while a task service runs, and `lifelog actions --human` lists them then. They are
+The actions are in `GET /actions` while a task service runs, and `lifelog actions --human --url URL` of the running server
+lists them then (the CLI in process has no task service, as it has no app). They are
 checked as every action is: a field that the action does not name, a missing `title`, a `list` that is not a name, a
 `due` that is not a day (`YYYY-MM-DD`) or a blank `title` is 422 `invalid`, and `delete-task` is owner-only
 ([owner-only](#reaching-a-server)). In these cases the service is not called. The service is called as the writer of the request, once, with a limit of 30 seconds. An error of the service
@@ -640,6 +641,20 @@ write would change the body, as `save-body` is.
 | `backlinks[].entity_type` | string | |
 | `backlinks[].note` | string | |
 | `backlinks[].context` | string | for a `wikilink`: the words of the block of that page that names this one; absent when none |
+
+The picture of a file is not an entity. It is the bytes of a JPEG, with `Content-Type: image/jpeg`. Two routes answer
+with it:
+
+- `GET /pages/{id}/preview` takes the id of a file page, a tombstoned one too. It sends
+  `Cache-Control: private, max-age=31536000, immutable`, because a picture by id never changes.
+- `GET /previews?title=T` takes the title of a live file page, or an alias of it, as
+  [titles and wikilinks](docs/contract/titles-and-wikilinks.md) folds a title: case and spacing do not matter. It sends
+  no `Cache-Control`, because a title can name another file later. A client that draws an embed `![[T]]` uses this
+  route.
+
+Both routes answer 404 `not_found`, as an error entity ([errors](#errors)), when there is no picture to send: the id is
+not an integer, the page does not exist, the page is not a file, or the file keeps no picture. The title route also
+answers 404 when `title` is missing or names no live file page, and when the file page is tombstoned.
 
 ### cover-choice
 

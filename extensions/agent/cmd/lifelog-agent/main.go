@@ -34,7 +34,7 @@ func run(ctx context.Context, args []string, stderr io.Writer) error {
 	if fs.NArg() > 0 {
 		return fmt.Errorf("unexpected argument %q", fs.Arg(0))
 	}
-	api, err := app.API(*base, siren.AgentPrefix+agent.Source)
+	api, err := app.API("lifelog agent", *base, siren.AgentPrefix+agent.Source)
 	if err != nil {
 		return err
 	}

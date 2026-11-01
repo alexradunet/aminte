@@ -38,7 +38,7 @@ func run(ctx context.Context, args []string) error {
 	if fs.NArg() > 0 {
 		return fmt.Errorf("unexpected argument %q", fs.Arg(0))
 	}
-	api, err := app.API(*base, lifelog.Source)
+	api, err := app.API("lifelog gphotos", *base, lifelog.Source)
 	if err != nil {
 		return err
 	}

@@ -212,9 +212,10 @@ The catalog (`GET /actions`) is the one list of what `lifelog` can do, and each 
 is the name with `_` in place of `-`, and an owner action has no tool. The browser, `lifelog-web`, draws the form of the
 action where its resource is. An action of a connected app or of the task service follows the same rule while it runs
 (`NAME-action` and `NAME_action` for an app). No page keeps a copy of the list: `lifelog actions --human` prints each
-action with its route, its CLI line, its MCP tool, its owner mark and its shortcut. `TestParityOfTheSurfaces` runs the
-actions on the API and the CLI, and `extensions/web/web/parity_test.go` holds that `lifelog-web` has a form for each
-action. A route that is not an action is a read of a resource, which the CLI's `get` and the MCP tool `get` read.
+action with its route, its CLI line, its MCP tool, its owner mark and its shortcut. `TestParityOfTheSurfaces` runs one
+row for each thing that a surface adapts (a shortcut, the word `today`, a flag, the refusals, the owner and the agent)
+on the API and the CLI. The generic `do` is one path for every action, so no row repeats it for each action.
+`extensions/web/web/parity_test.go` holds that `lifelog-web` has a form for each action. A route that is not an action is a read of a resource, which the CLI's `get` and the MCP tool `get` read.
 
 ```
 lifelog actions --human
@@ -237,7 +238,7 @@ lifelog actions --human
 | `app` | the helpers of a Go extension: the shell of a program (`Main`, `API`, `OwnerActs`, `ExitCode`) and what a catalog needs (`Catalog`, `Listen`, `Entity`, `Fail`, `StateDir`); public; standard library, `siren` and `client`; it serves, and it dials only in `program.go`, through `API` | its tests |
 | `lifelogtest` | the test kit of the extensions: `lifelogtest.New(t, day)` makes a fresh synthetic file, the real handler over it with a fixed clock, and a server on a loopback socket; public, for `_test.go` files of an extension only | its own test |
 | `client/tools` | the catalog as the functions of a model: a tool for each action that is not the owner's, its JSON Schema from the fields, the arguments flattened to form values; public: the MCP server and the chat agent build their lists from it | its table tests |
-| `extensions/*` | one module each, the program `lifelog-NAME`: a client of [API.md](API.md) that imports the public packages of the root module (`siren`, `client`, `client/tools`, `app`, `text`) and nothing of `lifelog/internal` ([the contract of an extension](extensions/README.md#what-an-extension-is)); [the table of the extensions](extensions/README.md#the-extensions) names each one | the tests of its packages (`go vet ./... && go test ./...` in its folder); its `e2e_test.go` builds the real `lifelog` and the program and runs the real line; `extensions/web/web/parity_test.go` holds a form for each action |
+| `extensions/*` | one module each, the program `lifelog-NAME`: a client of [API.md](API.md) that imports the public packages of the root module (`siren`, `client`, `client/tools`, `app`, `text`) and nothing of `lifelog/internal` ([the contract of an extension](extensions/README.md#what-an-extension-is)); the exception is `extensions/agentic`, a setup extension that is no client and imports nothing from `lifelog`; [the table of the extensions](extensions/README.md#the-extensions) names each one | the tests of its packages (`go vet ./... && go test ./...` in its folder); the `e2e_test.go` of an extension builds the real `lifelog` and the program and runs the real line; the exception is `extensions/googlephotos`, whose `review/e2e_test.go` builds the real `lifelog` and serves it, and runs the review page over it; `extensions/web/web/parity_test.go` holds a form for each action |
 | `internal/scaletest` | the synthetic personas and the lifetime workload of `tools/lifescale`: generators, an oracle and the timed checks | `scaletest.Run` with the profile `small`, in the baseline |
 | `tools/lifescale` | the lifetime and stress runner over `internal/scaletest` ([tests/README.md](tests/README.md)) | `internal/scaletest`: the runner has no test of its own |
 | `tests` | the validation suites of the docs ([tests/README.md](tests/README.md)) | the contract suites `TestSuites` and the mutants `TestMutants`, on the DDL of `docs/` |

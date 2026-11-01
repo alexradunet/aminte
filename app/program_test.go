@@ -169,14 +169,21 @@ func TestMainEndsCleanlyOnAnInterrupt(t *testing.T) {
 	}
 }
 
+// TestAPIRefusesAnEmptyAddressWithOneSentence: the one line names the command that the owner types to run the program,
+// as the program gave it, and not a placeholder.
 func TestAPIRefusesAnEmptyAddressWithOneSentence(t *testing.T) {
 	t.Setenv("LIFELOG_TOKEN", "the-token")
-	c, err := API("", "agent:demo")
-	if c != nil || err == nil || !strings.Contains(err.Error(), "no LIFELOG_URL and no --url") || strings.Contains(err.Error(), "\n") {
-		t.Fatalf("API with no address = %v, %v, want no client and one sentence that names LIFELOG_URL and --url", c, err)
-	}
-	if got := ExitCode(err); got != ExitOwnerActs {
-		t.Errorf("exit status %d, want %d: a missing address is the owner's to mend", got, ExitOwnerActs)
+	for _, command := range []string{"lifelog demo", "lifelog demo sync"} {
+		c, err := API(command, "", "agent:demo")
+		if c != nil || err == nil || !strings.Contains(err.Error(), "no LIFELOG_URL and no --url") || strings.Contains(err.Error(), "\n") {
+			t.Fatalf("API with no address = %v, %v, want no client and one sentence that names LIFELOG_URL and --url", c, err)
+		}
+		if want := "run it as `" + command + "` on"; !strings.Contains(err.Error(), want) || strings.Contains(err.Error(), "NAME") {
+			t.Errorf("API(%q) with no address = %q, want it to hold %q and no placeholder", command, err, want)
+		}
+		if got := ExitCode(err); got != ExitOwnerActs {
+			t.Errorf("API(%q): exit status %d, want %d: a missing address is the owner's to mend", command, got, ExitOwnerActs)
+		}
 	}
 }
 
@@ -191,7 +198,7 @@ func TestAPISendsTheSourceAndTheTokenOfTheEnvironment(t *testing.T) {
 	defer srv.Close()
 	for _, tc := range []struct{ token, wantAuth string }{{"the-token", "Bearer the-token"}, {"", ""}} {
 		t.Setenv("LIFELOG_TOKEN", tc.token)
-		c, err := API(srv.URL, siren.ImportPrefix+"demo")
+		c, err := API("lifelog demo", srv.URL, siren.ImportPrefix+"demo")
 		if err != nil {
 			t.Fatal(err)
 		}

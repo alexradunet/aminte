@@ -483,8 +483,8 @@ func TestTheTransportRefusesWhatItCannotRun(t *testing.T) {
 		{"the owner flag is gone", []string{b.lifelog, "whatsapp", "--owner", "123", "--db", b.db}, 1, "flag provided but not defined: -owner"},
 		{"the terminal flag is gone", []string{b.lifelog, "whatsapp", "--terminal", "--db", b.db}, 1, "flag provided but not defined: -terminal"},
 		{"the token file flag is gone", []string{b.lifelog, "whatsapp", "--token-file", "token", "--db", b.db}, 1, "flag provided but not defined: -token-file"},
-		{"no server", []string{b.ext}, app.ExitOwnerActs, "no LIFELOG_URL and no --url"},
-		{"no file", []string{b.lifelog, "whatsapp", "--db", missing}, app.ExitOwnerActs, "no LIFELOG_URL and no --url"},
+		{"no server", []string{b.ext}, app.ExitOwnerActs, "no LIFELOG_URL and no --url: run it as `lifelog whatsapp` on"},
+		{"no file", []string{b.lifelog, "whatsapp", "--db", missing}, app.ExitOwnerActs, "no LIFELOG_URL and no --url: run it as `lifelog whatsapp` on"},
 		{"a source flag", []string{b.lifelog, "whatsapp", "--source", "x", "--db", b.db}, 1, "flag provided but not defined: -source"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

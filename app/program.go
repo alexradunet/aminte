@@ -69,10 +69,12 @@ func finish(name string, err error, stderr io.Writer) int {
 // API is the client of the lifelog server at url, for the program that writes as source (for example
 // siren.AgentPrefix+"agent", or siren.ImportPrefix+"sheets"; "" is the owner). It sends LIFELOG_TOKEN as the bearer
 // token when the variable is set. It refuses an empty url: a program never guesses an address, because
-// 127.0.0.1:7777 could be the server of another file (extensions/README.md). The refusal is OwnerActs.
-func API(url, source string) (*client.Client, error) {
+// 127.0.0.1:7777 could be the server of another file (extensions/README.md). The refusal is OwnerActs, in one line
+// that names command: the line that the owner types to run the program, for example "lifelog agent". A program that
+// has several commands names the one that needs the server. `lifelog` gives that run a url.
+func API(command, url, source string) (*client.Client, error) {
 	if url == "" {
-		return nil, OwnerActs(errors.New("no LIFELOG_URL and no --url: run it as `lifelog NAME` on a life.db that exists, or start `lifelog serve` and give --url"))
+		return nil, OwnerActs(fmt.Errorf("no LIFELOG_URL and no --url: run it as `%s` on a life.db that exists, or start `lifelog serve` and give --url", command))
 	}
 	return client.Remote(url, source, os.Getenv("LIFELOG_TOKEN")), nil
 }

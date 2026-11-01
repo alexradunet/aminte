@@ -612,7 +612,7 @@ func TestTheAgentRefusesWhatItCannotRun(t *testing.T) {
 		status int
 		want   string
 	}{
-		{"no server", nil, app.ExitOwnerActs, "no LIFELOG_URL and no --url"},
+		{"no server", nil, app.ExitOwnerActs, "no LIFELOG_URL and no --url: run it as `lifelog agent` on"},
 		{"an argument", []string{"--url", noSay.URL, "now"}, 1, `unexpected argument "now"`},
 		{"a source flag", []string{"--url", noSay.URL, "--source", "x"}, 1, "flag provided but not defined: -source"},
 		{"a token file flag", []string{"--url", noSay.URL, "--token-file", "f"}, 1, "flag provided but not defined: -token-file"},

@@ -145,7 +145,7 @@ var commands = []command{
 			return doAction(ctx, e, args[0], vals)
 		}},
 	{name: "actions",
-		usage: "  lifelog actions                     list the actions: route, CLI line, MCP tool, owner mark, shortcut, fields",
+		usage: "  lifelog actions                     list the actions (JSON); with --human: route, CLI line, MCP tool, owner mark, shortcut, fields",
 		run: func(ctx context.Context, e env, args []string) error {
 			if len(args) != 0 {
 				return errors.New(e.cmd.synopsis())

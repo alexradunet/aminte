@@ -32,8 +32,11 @@ const usage = `usage:
   lifelog serve --with ticktick     (the program serves its catalog and polls)`
 
 // usageError is a refusal of the line: the owner acts first (app.OwnerActs), so serve does not start the program again.
-func usageError(msg string) error {
-	return app.OwnerActs(errors.New(msg + "\n" + usage))
+// It prints the usage on stderr. The error holds the message only, because app.Main prints it as the one last line
+// "lifelog-ticktick: err", under the usage.
+func usageError(stderr io.Writer, msg string) error {
+	fmt.Fprintln(stderr, usage)
+	return app.OwnerActs(errors.New(msg))
 }
 
 // The exit status is the one of app.Main: 78 for a usage error and for a login that is missing (connector.ErrLoginAgain),
@@ -49,7 +52,7 @@ func main() {
 func run(ctx context.Context, args []string, getenv func(string) string, stdin io.Reader, stdout, stderr io.Writer) error {
 	if len(args) == 0 {
 		if getenv("LIFELOG_LISTEN") == "" {
-			return usageError("no command, and no LIFELOG_LISTEN")
+			return usageError(stderr, "no command, and no LIFELOG_LISTEN")
 		}
 		return serve(ctx, getenv)
 	}
@@ -60,7 +63,7 @@ func run(ctx context.Context, args []string, getenv func(string) string, stdin i
 	case "sync":
 		return syncOnce(ctx, rest, getenv, stdout, stderr)
 	}
-	return usageError(fmt.Sprintf("unknown argument %q", args[0]))
+	return usageError(stderr, fmt.Sprintf("unknown argument %q", args[0]))
 }
 
 // parse reads the flags of a command and refuses a word that is not a flag.
@@ -70,7 +73,7 @@ func parse(fs *flag.FlagSet, args []string, stderr io.Writer) error {
 		return app.OwnerActs(err)
 	}
 	if fs.NArg() > 0 {
-		return usageError(fmt.Sprintf("unexpected argument %q", fs.Arg(0)))
+		return usageError(stderr, fmt.Sprintf("unexpected argument %q", fs.Arg(0)))
 	}
 	return nil
 }
@@ -89,7 +92,7 @@ func connect(base string) (*connector.Poller, string, connector.Config, error) {
 	if err != nil {
 		return nil, "", cfg, err
 	}
-	ll, err := app.API(base, siren.ImportPrefix+connector.Name)
+	ll, err := app.API("lifelog ticktick sync", base, siren.ImportPrefix+connector.Name)
 	if err != nil {
 		return nil, "", cfg, err
 	}
@@ -144,7 +147,7 @@ func login(ctx context.Context, args []string, stdin io.Reader, stdout, stderr i
 		return err
 	}
 	if *port < 1 || *port > 65535 {
-		return usageError("--port must be a port number")
+		return usageError(stderr, "--port must be a port number")
 	}
 	in := bufio.NewReader(stdin)
 	for _, f := range []struct {

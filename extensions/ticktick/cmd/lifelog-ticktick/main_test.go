@@ -27,23 +27,32 @@ func noEnv(string) string { return "" }
 func TestUsageAndRefusals(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	tests := []struct {
-		name string
-		args []string
-		env  func(string) string
-		want string
+		name  string
+		args  []string
+		env   func(string) string
+		want  string
+		usage bool // the program prints its usage; else the flag package prints the usage of the command
 	}{
-		{"no command and no LIFELOG_LISTEN", nil, noEnv, "no command"},
-		{"an unknown command", []string{"frobnicate"}, noEnv, `unknown argument "frobnicate"`},
-		{"an unknown flag of sync", []string{"sync", "--nope"}, noEnv, "flag provided but not defined"},
-		{"a word after sync", []string{"sync", "extra"}, noEnv, `unexpected argument "extra"`},
-		{"a word after login", []string{"login", "extra"}, noEnv, `unexpected argument "extra"`},
-		{"a port that is not a port", []string{"login", "--port", "70000"}, noEnv, "--port"},
+		{"no command and no LIFELOG_LISTEN", nil, noEnv, "no command", true},
+		{"an unknown command", []string{"frobnicate"}, noEnv, `unknown argument "frobnicate"`, true},
+		{"an unknown flag of sync", []string{"sync", "--nope"}, noEnv, "flag provided but not defined", false},
+		{"a word after sync", []string{"sync", "extra"}, noEnv, `unexpected argument "extra"`, true},
+		{"a word after login", []string{"login", "extra"}, noEnv, `unexpected argument "extra"`, true},
+		{"a port that is not a port", []string{"login", "--port", "70000"}, noEnv, "--port", true},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			err := run(t.Context(), tc.args, tc.env, strings.NewReader(""), io.Discard, io.Discard)
+			var stderr bytes.Buffer
+			err := run(t.Context(), tc.args, tc.env, strings.NewReader(""), io.Discard, &stderr)
 			if app.ExitCode(err) != app.ExitOwnerActs || !strings.Contains(err.Error(), tc.want) {
-				t.Errorf("err = %v, want status %d and %q", err, app.ExitOwnerActs, tc.want)
+				t.Fatalf("err = %v, want status %d and %q", err, app.ExitOwnerActs, tc.want)
+			}
+			// app.Main prints the error as the one last line "lifelog-ticktick: err". The usage is above it, on stderr.
+			if strings.Contains(err.Error(), "\n") {
+				t.Errorf("the error has more than one line: %q", err)
+			}
+			if got := strings.Contains(stderr.String(), usage); got != tc.usage {
+				t.Errorf("stderr has the usage = %v, want %v:\n%s", got, tc.usage, &stderr)
 			}
 		})
 	}
@@ -80,7 +89,7 @@ func TestSyncWithoutAnAddressSaysWhatToRun(t *testing.T) {
 		t.Fatal(err)
 	}
 	err := run(t.Context(), []string{"sync"}, noEnv, strings.NewReader(""), io.Discard, io.Discard)
-	if err == nil || !strings.Contains(err.Error(), "no LIFELOG_URL and no --url") || app.ExitCode(err) != app.ExitOwnerActs {
+	if err == nil || !strings.Contains(err.Error(), "no LIFELOG_URL and no --url: run it as `lifelog ticktick sync` on") || app.ExitCode(err) != app.ExitOwnerActs {
 		t.Errorf("sync with no address: err = %v with status %d, want the refusal and status %d", err, app.ExitCode(err), app.ExitOwnerActs)
 	}
 }

@@ -104,8 +104,9 @@ flowchart TD
   and is not started again. 78 (`EX_CONFIG` of sysexits): the owner must act first (for example pair a device, log in,
   or mend a wrong value of the configuration); it is not started again until `serve` starts again. Any other end (1; 2,
   which the Go runtime gives a program that panics; any other number; a signal): `serve` starts it again after
-  10 seconds. `serve` logs each start and each end. On any end but 0 a Go program prints one line,
-  `lifelog-NAME: err`, to stderr.
+  10 seconds. `serve` logs each start and each end. On any end but 0 a Go program prints the line
+  `lifelog-NAME: err` to stderr as its last line, and the line holds the error only. A program may print the usage of
+  a refused command line above that line.
 - **The stop.** On an interrupt or SIGTERM, `serve` interrupts the child first and waits for it, 10 seconds at most,
   then kills it. Then it drains its own requests and closes the file, so the child may still write while it ends.
 - **A catalog of its own.** A child may serve a Siren catalog on `LIFELOG_LISTEN`: see [a catalog of its own](#a-catalog-of-its-own).
@@ -221,7 +222,7 @@ The package `lifelog/app` holds what the program of a Go extension needs. It ser
 |---|---|
 | `Main(name, run)` | The `main` of the program. It runs `run` with a context that ends on an interrupt or SIGTERM. When `run` fails, it prints the line `lifelog-NAME: err` and ends with the status of [the exit rule](#run-by-serve): 0 for no error and for `context.Canceled`, 78 for an error that `OwnerActs` marked (also one that a layer wrapped or joined), else 1. |
 | `OwnerActs(err)`, `ExitCode(err)`, `ExitOwnerActs` | `OwnerActs` marks an error that only the owner can mend; its text does not change. `ExitCode` gives the status that `Main` would use, for a test. `ExitOwnerActs` is 78. |
-| `API(url, source)` | The client of the server at `url`, which writes as `source` (`""` is the owner). It sends `$LIFELOG_TOKEN` as the bearer token when it is set. An empty `url` is an `OwnerActs` error with one sentence. |
+| `API(command, url, source)` | The client of the server at `url`, which writes as `source` (`""` is the owner). It sends `$LIFELOG_TOKEN` as the bearer token when it is set. An empty `url` is an `OwnerActs` error with one sentence, which names `command`: the line that the owner types to run the program (for example `lifelog agent`). |
 | `Listen(ctx, handler)` | Serves on `LIFELOG_LISTEN`, refuses an unset value or an address that is not a loopback address, and drains on the end of `ctx`. |
 | `Catalog(title, home, actions, handlers)`, `CatalogOf(role, ...)` | The handler of a catalog: it serves `GET /actions`, `GET /` and one route for each action, and it panics at the start when an action has no handler. `CatalogOf` adds a role to the class of `GET /actions`; the role `tasks` marks the [task service](#a-task-service). |
 | `Entity(f)`, `Fail(w, status, code, msg)`, `Error` | `Entity` turns a function that returns an entity into a handler; an `*Error` that it returns (also wrapped) gives its status and code, and any other error is 500 `internal`. `Fail` writes an error entity. |

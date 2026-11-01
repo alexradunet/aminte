@@ -41,7 +41,7 @@ func run(ctx context.Context, args []string, stdin io.ReadCloser, stdout, stderr
 	if named["source"] { // one way to name the writer of MCP: an agent's
 		return errors.New("mcp writes as agent:NAME: name the agent with --agent, not --source")
 	}
-	c, err := app.API(*base, siren.AgentPrefix+*agent)
+	c, err := app.API("lifelog mcp", *base, siren.AgentPrefix+*agent)
 	if err != nil {
 		return err
 	}

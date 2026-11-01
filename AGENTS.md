@@ -170,7 +170,7 @@ flowchart TB
     C["internal/core, db, photo, preview, and text (a public package: the read-only grammar of titles and wikilinks): transactions, and only what SQLite cannot say"]
   end
   subgraph R2["ring 2: the catalog and its surfaces"]
-    K["internal/api and cmd/lifelog: one catalog, one Siren handler, the CLI's do, all generated from the catalog. It holds no HTML, CSS, JavaScript or picture. siren, client and app are public packages of this ring (app: the package a connected app serves its catalog with)."]
+    K["internal/api and cmd/lifelog: one catalog, one Siren handler, the CLI's do, all generated from the catalog. It holds no HTML, CSS, JavaScript or picture. siren, client and app are public packages of this ring (app: the shell of an extension program, and the package a connected app serves its catalog with)."]
   end
   subgraph R3["ring 3: extensions, in any language"]
     X["extensions/NAME, the program lifelog-NAME: a client of API.md, run as lifelog NAME. lifelog-web is the browser. An extension names the third party. It may serve a catalog of its own, which ring 2 aggregates under /with/NAME (plan 154), or it is the one task service, which ring 2 serves under /tasks (plan 158)."]
@@ -193,14 +193,14 @@ and a new one is added in the change that moves the thing out), **the core dials
 no presentation** (no `.html`, `.css`, `.js` or picture file under `internal/` or `cmd/`, and no import of
 `html/template` in the Go sources of the core and its public packages). Go enforces the fourth: an extension never
 imports `lifelog/internal`. The core dials its own server and the children that `serve --with`
-started, and only in the files that `remoteAllowed` names (`cmd/lifelog/with.go`, `internal/api/with.go`). The list of
+started, and only in the files that `remoteAllowed` names in `boundary_test.go`. The list of
 third parties has `ticktick`, so the core never says it: the connector `extensions/ticktick` names it. The browser is an
 extension, by the owner's word (2026-10-31, [plan 161](docs/plans/161-the-browser-as-an-extension.md)): ring 3 holds
 `extensions/web`, which draws the answers of the API.
 
 - **Ordinary Go first.** Follow [Go Code Review Comments](https://go.dev/wiki/CodeReviewComments): clear names,
   early error returns, cohesive packages, explicit dependencies and small public surfaces. Keep supporting packages
-  under `internal/`, except `siren`, `client`, `app` and `text`, the packages the Go extensions import (`app`: the package a connected app serves its catalog with; `text`: the read-only grammar of titles and wikilinks that a UI needs, the Go reference of [titles and wikilinks](docs/contract/titles-and-wikilinks.md)), and `lifelogtest`, the kit for the tests of extensions only. Prefer the standard library; justify a dependency by the complexity or risk it removes.
+  under `internal/`, except `siren`, `client`, `app` and `text`, the packages the Go extensions import (`app`: the shell of an extension program, and the package a connected app serves its catalog with; `text`: the read-only grammar of titles and wikilinks that a UI needs, the Go reference of [titles and wikilinks](docs/contract/titles-and-wikilinks.md)), and `lifelogtest`, the kit for the tests of extensions only. Prefer the standard library; justify a dependency by the complexity or risk it removes.
 - **A rule about the data is a CHECK or a trigger, never Go.** When a write must be refused because of what the row
   says (a range, a shape, a state, a relation to another row), the refusal is written in `schema.sql`, with its
   decision, its mutant and its suite witness; the Go cites the constraint name and lets the file refuse. Go holds

@@ -237,7 +237,7 @@ func TestSourceIsRefusedOnTheLineOfMCP(t *testing.T) {
 // does not exist, which gives it no LIFELOG_URL. The refusal is the owner's to mend: the status is 78.
 func TestWithoutAServerTheMCPServerRefuses(t *testing.T) {
 	b := build(t)
-	const want = "no LIFELOG_URL and no --url"
+	const want = "no LIFELOG_URL and no --url: run it as `lifelog mcp` on" // the line names the command of this program
 	for _, line := range [][]string{
 		{filepath.Join(b.dir, "lifelog-mcp"), "--agent", "x"},
 		{b.lifelog, "mcp", "--agent", "x", "--db", filepath.Join(b.dir, "missing", "life.db")},

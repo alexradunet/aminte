@@ -27,7 +27,7 @@ type Client struct {
 	addFile *siren.Action // the add-file action, read from the catalog once; a failed read is not kept
 }
 
-// New makes the client of the extension over c, the client of the server. c writes as Source: app.API(url, Source) makes
+// New makes the client of the extension over c, the client of the server. c writes as Source: app.API(command, url, Source) makes
 // it from the address and the token of the environment.
 func New(c *client.Client) *Client {
 	return &Client{c: c}
