@@ -1,7 +1,7 @@
 package web_test
 
-// The parity of the browser. Web holds its own parity, as the table "Every action on every surface"
-// of the README says for the surfaces other than the API and the CLI: each action of GET /actions, the actions of the core
+// The parity of the browser. Web holds its own parity, as the rule "Every action on every surface" of the README
+// says for the surfaces other than the API and the CLI: each action of GET /actions, the actions of the core
 // and the actions of a connected app, has its form in the pages that web draws. The test reads the catalog of the core,
 // asks web for the page of every action (/actions), and reads the forms of the HTML as a browser reads them.
 
