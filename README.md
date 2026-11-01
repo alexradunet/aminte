@@ -237,12 +237,15 @@ These are this application's own engineering decisions ([D14](docs/decisions/D14
   422, and that day's conversation offers no `say`); it is the owner's alone: an
   `agent:*` or `import:*` writer is refused (403), and it is never an MCP tool, so no agent speaks as the owner. The
   agent's turn is written by `reply` (`POST /days/{day}/reply`), which is no owner action: the core puts the reply right
-  after the owner's turn that it answers, in one write, and an agent or an import cannot save the body of a conversation
-  page (403), so only `say` writes a turn of the owner. The core escapes a line of a `say` or a `reply` that reads as a
-  marker and closes a code fence that the text leaves open, so the page stays readable as turns. The WhatsApp extension relays the owner's words as the owner, with `via=whatsapp`; the paragraph then reads `**Owner** (HH:MM, via whatsapp): `. `GET /days/{day}/conversation` gives the turns, parsed from
+  after the owner's turn that it answers, in one write. Each turn of the conversation has a `key`, and `reply` names the
+  turn by it: the key does not move when the page changes, and a key that is no more on the page is 409. An agent or an
+  import cannot save the body of a conversation page (403), and no write makes a page under a conversation title or
+  changes the type of its page (409), so only `say` writes a turn of the owner. A wikilink may still make an empty page
+  with that title, and the first `say` adopts it. The core escapes a line of a `say` or a `reply` that reads as a
+  marker or as a tool line, and closes a code fence that the text or an edit leaves open, so the page stays readable as turns. The WhatsApp extension relays the owner's words as the owner, with `via=whatsapp`; the paragraph then reads `**Owner** (HH:MM, via whatsapp): `. `GET /days/{day}/conversation` gives the turns, parsed from
   the body, with the page's properties, links and actions when the page exists (as a series carries a metric's page,
   [plan 144](docs/plans/144-one-view-for-a-metric.md)), and `say`. The page of a live conversation links to it (rel
-  `conversation`). A live conversation page keeps its title: it offers no
+  `conversation`). A conversation page keeps its title: it offers no
   `rename` or `promote`, and `rename` to such a title is 409. The agent (`lifelog-agent`, run by `serve --with agent`) reads
   today's page, answers a turn of the owner on it and writes as `agent:lifelog`; the core calls no model. The conversation names each address in the tool lines of a turn as a
   `ref`, and `?embed=ref` ([embedding](API.md#embedding)) replaces it by the entity that the server's own handler

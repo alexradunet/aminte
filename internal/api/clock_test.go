@@ -120,10 +120,11 @@ func TestEveryDayFieldReadsTheWordToday(t *testing.T) {
 			return do("say", map[string]string{"day": w, "text": "Good morning."})
 		}, "is not a local day"},
 		"reply day": {func(w string) (*siren.Entity, error) {
-			if _, err := do("say", map[string]string{"day": "today", "text": "Anything new?"}); err != nil {
+			said, err := do("say", map[string]string{"day": "today", "text": "Anything new?"})
+			if err != nil {
 				return nil, err
 			}
-			return do("reply", map[string]string{"day": w, "turn": "1", "text": "Nothing."})
+			return do("reply", map[string]string{"day": w, "turn": keyOf(t, said, "owner", 0), "text": "Nothing."})
 		}, "is not a local day"},
 		"create-person birth_day": {func(w string) (*siren.Entity, error) {
 			return do("create-person", map[string]string{"title": title("Born"), "birth_day": w})

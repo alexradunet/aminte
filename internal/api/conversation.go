@@ -1,11 +1,14 @@
 package api
 
 // The conversation of a day: a plain page, as API.md describes it. This file is the one home of its convention in
-// the program: the title, the category, the first line, the owner's paragraph and the parse of the turns. The core
-// calls no model. An agent (an extension) reads the page and writes its own paragraphs in the same format.
+// the program: the category, the first line, the owner's paragraph, the parse of the turns and their keys. Its title,
+// and the rule that only say makes a page under that title, are in internal/core (conversation.go). The core calls no
+// model. An agent (an extension) reads the page and writes its own paragraphs in the same format.
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"net/http"
 	"regexp"
@@ -21,9 +24,6 @@ import (
 
 // conversationCategory is the category page that every conversation page is filed in.
 const conversationCategory = "Conversations"
-
-// ConversationTitle is the title of the conversation page of a local day.
-func ConversationTitle(day string) string { return "Conversation " + day }
 
 // conversationFirstLine is the first line of the page: a link to the day it is about.
 func conversationFirstLine(day string) string { return "[[" + day + "]]" }
@@ -55,11 +55,19 @@ func words(text string) string { return strings.TrimSpace(strings.ReplaceAll(tex
 // paragraph read a fence by this one rule.
 func fenceLine(l string) bool { return strings.HasPrefix(l, "```") }
 
+// toolMark starts a tool line: ParseTurns reads the lines that start with it, right before a marker of lifelog, as the
+// tool lines of that marker.
+const toolMark = "- `"
+
 // paragraph is one turn as the page keeps it: the marker of who (Owner or lifelog) with its stamp, then the words. The
 // owner or the model wrote the words, and ParseTurns must read exactly one turn from the paragraph, so the words are
 // made safe first:
 //   - a line outside a fence that reads as a marker is escaped (`\*\*Owner\*\* (09:31): ...`): it shows the same
 //     in a Markdown view, and it is text and not a turn;
+//   - a line outside a fence that starts with a dash, a space and a backtick (toolMark) has a backslash before the
+//     dash: it shows the same in a Markdown view, and it is no tool line. ParseTurns gives the tool lines right
+//     before a marker of lifelog to that marker, so a turn of the owner that ends in such lines would lose them to the
+//     reply that follows;
 //   - a fence that the words open and do not close is closed by a line of three backticks at the end, so the next
 //     marker is not hidden inside it;
 //   - the words start on a line of their own when their first line is a fence line: after the marker, on its line, it
@@ -74,11 +82,17 @@ func paragraph(who, stamp, text string) string {
 		sep, from = "\n", 0
 	}
 	fenced := false
-	for i := from; i < len(lines); i++ {
-		if l := lines[i]; fenceLine(l) {
+	for i, l := range lines {
+		switch {
+		case fenceLine(l):
 			fenced = !fenced
-		} else if m := turnStart.FindStringSubmatch(l); m != nil && !fenced {
-			lines[i] = `\*\*` + m[1] + `\*\*` + l[len(m[1])+4:]
+		case fenced:
+		case strings.HasPrefix(l, toolMark):
+			lines[i] = `\` + l
+		case i >= from:
+			if m := turnStart.FindStringSubmatch(l); m != nil {
+				lines[i] = `\*\*` + m[1] + `\*\*` + l[len(m[1])+4:]
+			}
 		}
 	}
 	if fenced {
@@ -87,38 +101,13 @@ func paragraph(who, stamp, text string) string {
 	return marker + sep + strings.Join(lines, "\n")
 }
 
-// conversationDay is the day of a conversation page, from its title; "" when the title is not one.
-func conversationDay(title string) string {
-	day, ok := strings.CutPrefix(title, "Conversation ")
-	if !ok || !text.IsDay(day) || ConversationTitle(day) != title {
-		return ""
-	}
-	return day
-}
-
-// isConversationTitle says that a title names the conversation page of a day, whatever its case: the key of a title
-// ignores case, so the page "conversation 2031-05-14" is the page of the day too.
-func isConversationTitle(title string) bool {
-	day, ok := strings.CutPrefix(text.TitleKey(title), "conversation ")
-	return ok && text.IsDay(day)
-}
-
-// refuseAgentWrite refuses a writer that is not the owner's (an agent, an import, or a name that is no writer name)
-// when it writes the body of the conversation page titled title (403). The page holds the owner's turns, and a line
-// that reads as one would be a turn that the owner never said. The agent writes its turn with reply, which makes the
-// line safe. Any other title passes.
-func refuseAgentWrite(source, title string) error {
-	if !ownerWriter(source) && isConversationTitle(title) {
-		return &core.Error{Status: http.StatusForbidden, Msg: "an agent or an import may not write a conversation page: the agent writes its turn with reply"}
-	}
-	return nil
-}
-
 // Turn is one turn of a conversation, as ParseTurns reads it. Who is owner, lifelog, or text for a paragraph that no
-// turn starts (the owner edited the page): At is then empty. Tools are the tool lines of a lifelog turn.
-// Refs are the addresses that the tool lines name, in order, each once. Via is the writer that relayed the turn.
+// turn starts (the owner edited the page): At is then empty. Key names the turn (withKeys). Tools are the tool lines of
+// a lifelog turn. Refs are the addresses that the tool lines name, in order, each once. Via is the writer that relayed
+// the turn.
 type Turn struct {
 	Who   string   `json:"who"`
+	Key   string   `json:"key"`
 	At    string   `json:"at,omitempty"`
 	Via   string   `json:"via,omitempty"`
 	Text  string   `json:"text"`
@@ -127,6 +116,24 @@ type Turn struct {
 }
 
 var turnStart = regexp.MustCompile(`^\*\*(Owner|lifelog)\*\* \((\d\d[:.]\d\d)(?:, via ([a-z0-9_:.-]+))?\): ?`)
+
+// withKeys gives each turn its key and gives the turns back. A key is 16 hex digits of a SHA-256 hash of the who, the
+// time, the relay and the words of the turn, and of the number of turns before it that have the same four: so no two
+// turns of a page have one key, and a key does not move when a reply is written or an earlier turn is removed. A key
+// changes when the owner edits the words, the time or the relay of the turn; reply then refuses it (409) and the
+// agent reads the page again. A turn is named by what it is, not by its place, because the page changes while an agent
+// works on a turn.
+func withKeys(turns []Turn) []Turn {
+	before := map[string]int{}
+	for i := range turns {
+		t := &turns[i]
+		same := fmt.Sprintf("%q %q %q %q", t.Who, t.At, t.Via, t.Text) // quoted: no two different turns write one string
+		sum := sha256.Sum256([]byte(same + " " + strconv.Itoa(before[same])))
+		before[same]++
+		t.Key = hex.EncodeToString(sum[:8])
+	}
+	return turns
+}
 
 // toolRefs are the addresses that the tool lines name after an arrow (siren.ToolLine), in order, each once.
 func toolRefs(tools []string) []string {
@@ -177,7 +184,7 @@ func (h *server) earlierConversations(ctx context.Context, today string) ([]stri
 	var days []string
 	for i := 1; i <= earlierSpan && len(days) < earlierDays; i++ {
 		day := t.AddDate(0, 0, -i).Format(time.DateOnly)
-		id, err := h.s.PageID(ctx, ConversationTitle(day))
+		id, err := h.s.PageID(ctx, core.ConversationTitle(day))
 		if err != nil {
 			return nil, err
 		}
@@ -188,7 +195,7 @@ func (h *server) earlierConversations(ctx context.Context, today string) ([]stri
 		if err != nil {
 			return nil, err
 		}
-		if p.DeletedAt == "" {
+		if isConversation(p) {
 			days = append([]string{day}, days...)
 		}
 	}
@@ -218,6 +225,22 @@ func scanLines(lines []string) (marks []int, fenced bool) {
 	return marks, fenced
 }
 
+// attach is the lines of a page and then block, a paragraph, after a blank line: the end of the page for say, and the
+// place after the answered turn for a reply. The blank edge of the lines goes. Where the lines end inside a fence that
+// an edit of the owner left open, a line of three backticks closes it first, so the marker of the block is read as a
+// marker and the block is not text in the fence. This is the one rule that a paragraph starts outside a fence, which
+// paragraph assumes.
+func attach(lines []string, block string) string {
+	head := strings.TrimRight(strings.Join(lines, "\n"), " \t\r\n")
+	if _, fenced := scanLines(lines); fenced {
+		head += "\n```"
+	}
+	if head == "" {
+		return block
+	}
+	return head + "\n\n" + block
+}
+
 // ParseTurns reads the turns of the body of the conversation page of day (CRLF is read as LF). A marker line starts
 // with `**Owner** (HH:MM): ` or `**lifelog** (HH:MM): `, and may name the relaying writer inside the brackets,
 // `**Owner** (HH:MM, via NAME): ` (NAME is [a-z0-9_:.-]+), and is outside a fenced code block (a line that starts with
@@ -243,7 +266,7 @@ func ParseTurns(day, body string) []Turn {
 			end--
 		}
 		start := end
-		for start > 0 && strings.HasPrefix(seg[start-1], "- `") {
+		for start > 0 && strings.HasPrefix(seg[start-1], toolMark) {
 			start--
 		}
 		for _, l := range seg[start:end] {
@@ -290,8 +313,12 @@ func (h *server) say(r *http.Request, a admitted) (*siren.Entity, error) {
 	if via != "" && !writerRE.MatchString(via) {
 		return nil, core.Invalid("via %q: a name of letters, digits, _ : . -", via)
 	}
-	_, sync, err := h.s.AppendParagraph(r.Context(), a.src, ConversationTitle(day), day, conversationCategory,
-		conversationFirstLine(day), paragraph("Owner", h.stamp(via), entry))
+	block := paragraph("Owner", h.stamp(via), entry)
+	_, sync, err := h.s.AppendParagraph(r.Context(), a.src, core.ConversationTitle(day), day, conversationCategory,
+		conversationFirstLine(day), func(body string) string {
+			lines, _ := bodyLines(day, body)
+			return attach(lines, block)
+		})
 	if err != nil {
 		return nil, err
 	}
@@ -299,17 +326,18 @@ func (h *server) say(r *http.Request, a admitted) (*siren.Entity, error) {
 }
 
 // reply is the agent's turn: the paragraph **lifelog** (HH:MM): text, with the tool lines before it, written right after
-// the owner's turn that it answers (the field turn counts the owner's turns of the page, from 1). The place is found
+// the owner's turn that it answers (the field turn is the key of that turn, from the conversation). The place is found
 // and the write is made in one transaction, so a turn that the owner said meanwhile stays after the reply and waits
-// for the next one. A turn that has a reply is 409; a turn the page does not have is 404.
+// for the next one. A turn that has a reply is 409, and so is a key that no owner turn of the page has now: the owner
+// edited the turn, or removed it, and the agent reads the page again.
 func (h *server) reply(r *http.Request, a admitted) (*siren.Entity, error) {
 	day, err := h.conversationDayOf(r)
 	if err != nil {
 		return nil, err
 	}
-	turn, err := strconv.Atoi(a.v.Get("turn"))
-	if err != nil || turn < 1 {
-		return nil, core.Invalid("turn %q: the number of an owner's turn of the page, 1 or more", a.v.Get("turn"))
+	key := strings.TrimSpace(a.v.Get("turn"))
+	if key == "" {
+		return nil, core.Invalid("missing field turn")
 	}
 	text := words(a.v.Get("text"))
 	if text == "" {
@@ -323,8 +351,8 @@ func (h *server) reply(r *http.Request, a admitted) (*siren.Entity, error) {
 	if tools != "" {
 		block = tools + "\n\n" + block
 	}
-	_, sync, err := h.s.EditBody(r.Context(), a.src, ConversationTitle(day), func(body string) (string, error) {
-		return insertReply(day, body, turn, block)
+	_, sync, err := h.s.EditBody(r.Context(), a.src, core.ConversationTitle(day), func(body string) (string, error) {
+		return insertReply(day, body, key, block)
 	})
 	if err != nil {
 		return nil, err
@@ -340,7 +368,7 @@ func toolLines(field string) (string, error) {
 		if l = strings.TrimRight(l, " \t\r"); l == "" {
 			continue
 		}
-		if !strings.HasPrefix(l, "- `") {
+		if !strings.HasPrefix(l, toolMark) {
 			return "", core.Invalid("tools: a tool line starts with - ` (a dash, a space and a backtick): %q", l)
 		}
 		lines = append(lines, l)
@@ -348,12 +376,11 @@ func toolLines(field string) (string, error) {
 	return strings.Join(lines, "\n"), nil
 }
 
-// insertReply puts block, the paragraph of a reply with its tool lines, right after the turn of the owner that is the
-// turn-th owner turn of the body, and gives the new body. The turn after the answered turn is the next marker line, so
-// the block goes before it: a turn that follows stays after the reply. A turn whose next turn is a turn of lifelog has
-// its reply (409). Where the lines before the block end inside a fence that an edit left open, a line of three
-// backticks closes it, so the marker of the block is read.
-func insertReply(day, body string, turn int, block string) (string, error) {
+// insertReply puts block, the paragraph of a reply with its tool lines, right after the turn of the owner that has the
+// key, and gives the new body. The turn after the answered turn is the next marker line, so the block goes before it: a
+// turn that follows stays after the reply. A turn whose next turn is a turn of lifelog has its reply (409). A key that
+// no owner turn has is 409 too: the page changed since the agent read it.
+func insertReply(day, body, key, block string) (string, error) {
 	all, skip := bodyLines(day, body)
 	lines := all[skip:]
 	marks, _ := scanLines(lines)
@@ -363,21 +390,27 @@ func insertReply(day, body string, turn int, block string) (string, error) {
 			owners = append(owners, k)
 		}
 	}
-	if turn > len(owners) {
-		return "", core.NotFound("no owner turn %d: the conversation of %s has %d", turn, day, len(owners))
+	n, seen := -1, 0 // n is the place of the key among the owner turns
+	for _, t := range withKeys(ParseTurns(day, body)) {
+		if t.Who == "owner" && t.Key == key {
+			n = seen
+			break
+		}
+		if t.Who == "owner" {
+			seen++
+		}
 	}
-	at, end := owners[turn-1], len(lines)
+	if n < 0 {
+		return "", core.Conflict("no owner turn of the conversation of %s has the key %q: the page changed, read it again", day, key)
+	}
+	at, end := owners[n], len(lines)
 	if at+1 < len(marks) {
 		end = marks[at+1]
 		if strings.HasPrefix(lines[end], "**lifelog**") {
-			return "", core.Conflict("the owner turn %d of the conversation of %s has a reply already", turn, day)
+			return "", core.Conflict("the owner turn %q of the conversation of %s has a reply already", key, day)
 		}
 	}
-	head := strings.TrimRight(strings.Join(all[:skip+end], "\n"), " \t\r\n")
-	if _, fenced := scanLines(lines[:end]); fenced {
-		head += "\n```"
-	}
-	out := head + "\n\n" + block
+	out := attach(all[:skip+end], block)
 	if tail := strings.TrimLeft(strings.Join(all[skip+end:], "\n"), "\n"); tail != "" {
 		out += "\n\n" + tail
 	}
@@ -405,12 +438,17 @@ func (h *server) conversationDayOf(r *http.Request) (string, error) {
 // conversationHref is the address of the conversation of a day.
 func conversationHref(day string) string { return siren.DayHref(day) + "/conversation" }
 
+// isConversation says that the page p is a conversation: a plain page that is live. A tombstoned page is none (say makes it
+// live again), and a page of another type that holds the title (a file, a person or a metric: no write makes one now) holds
+// no turns, whatever its body says.
+func isConversation(p *core.Page) bool { return p.Type == "page" && p.DeletedAt == "" }
+
 // conversationEntity is the conversation of a day: its turns, say, the links earlier to the conversations of the
 // days before today (the day bar of a chat client) and, when a turn names addresses, the sub-entities ref. When the
 // page exists it carries the page as a metric's series does (plan 144): its properties, links and actions, so one view
 // draws both.
 func (h *server) conversationEntity(ctx context.Context, day string) (*siren.Entity, error) {
-	title := ConversationTitle(day)
+	title := core.ConversationTitle(day)
 	today := h.s.Today()
 	e := &siren.Entity{Class: []string{"conversation"}, Title: title,
 		Links:   []siren.Link{link("self", conversationHref(day), title), link("day", siren.DayHref(day), day), link("index", "/", "Home")},
@@ -431,11 +469,11 @@ func (h *server) conversationEntity(ctx context.Context, day string) (*siren.Ent
 	if err != nil || id == 0 {
 		return e, err
 	}
-	pe, err := h.pageEntity(ctx, id)
+	p, err := h.s.PageByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
-	if slices.Contains(pe.Class, "deleted") { // a tombstoned page is no conversation: say revives it
+	if !isConversation(p) {
 		return e, nil
 	}
 	if err := h.carryPage(ctx, e, id); err != nil {
@@ -443,7 +481,7 @@ func (h *server) conversationEntity(ctx context.Context, day string) (*siren.Ent
 	}
 	e.Class = append(e.Class, "page")
 	e.Links = append(e.Links, link("page", siren.PageHref(id), title))
-	turns := ParseTurns(day, fmt.Sprint(props["body"]))
+	turns := withKeys(ParseTurns(day, fmt.Sprint(props["body"])))
 	props["turns"] = turns
 	for _, ref := range refsOf(turns) {
 		e.Entities = append(e.Entities, link(refRel, ref, ""))

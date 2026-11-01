@@ -89,7 +89,8 @@ func (t *Tx) createNamed(typ, title, body string, day any, extra func(int64) err
 		if err != nil {
 			return 0, err
 		}
-		return 0, &ExistsError{ID: p.ID, Title: title, Plain: plain}
+		// A conversation page keeps its type (reservedTitle): promote would refuse it, so the error offers none.
+		return 0, &ExistsError{ID: p.ID, Title: title, Plain: plain && ConversationDay(p.Title) == ""}
 	}
 	id, err := t.insertPage(typ, title, text.TitleKey(title), day, body)
 	if err != nil || extra == nil {
@@ -112,28 +113,23 @@ func (t *Tx) promotable(id int64) (bool, error) {
 
 // promote is Store.Promote in t.
 func (t *Tx) promote(id int64, name, birth, death string) error {
-	var have string
-	err := t.tx.QueryRowContext(t.ctx, `SELECT entity_type FROM entities WHERE id = ?`, id).Scan(&have)
-	if errors.Is(err, sql.ErrNoRows) {
-		return NotFound("no page %d", id)
-	}
+	p, err := t.findPage(false, `e.id = ?`, id)
 	if err != nil {
 		return err
+	}
+	if p == nil {
+		return NotFound("no page %d", id)
 	}
 	// The schema refuses a person, a metric or a file promoted to another type (entities_promote_from_page). A person
 	// promoted to a person changes no type, so no rule of the schema sees it: the people insert would fail on its key.
 	// The writer refuses it with this 409.
-	if have == "person" {
-		return Conflict("page %d is a %s, not a plain page to promote", id, have)
+	if p.Type == "person" {
+		return Conflict("page %d is a %s, not a plain page to promote", id, p.Type)
 	}
-	if _, err := t.tx.ExecContext(t.ctx, `UPDATE entities SET entity_type = 'person', deleted_at = NULL WHERE id = ?`, id); err != nil {
+	if err := t.retype(p, "person"); err != nil {
 		return err
 	}
 	if name == "" {
-		p, err := t.findPage(false, `e.id = ?`, id)
-		if err != nil {
-			return err
-		}
 		name = p.Title
 	}
 	_, err = t.tx.ExecContext(t.ctx, `INSERT INTO people(id, name, birth_day, death_day) VALUES (?, ?, ?, ?)`,
@@ -552,46 +548,66 @@ func (s *Store) searchNewest(ctx context.Context, q, omit string, args []any, li
 	return out, nil
 }
 
-// AppendParagraph adds paragraph to the end of the page titled title, after a blank line, in one write. The page is
-// made on the first call, written on day, with head as its first line, and filed in category when that is not empty.
-// A tombstoned page is revived, as a capture revives a day page. A title that a page of another type holds is a 409.
-// It returns the page's id and what the save did to the wikilinks of the body.
-func (s *Store) AppendParagraph(ctx context.Context, source, title, day, category, head, paragraph string) (int64, Sync, error) {
+// AppendParagraph adds a paragraph to the page titled title, in one write: add makes the new body from the body that the
+// page has. It runs inside the transaction, so it must be quick and do no I/O. This is say, the one write that makes a
+// conversation page (conversation.go).
+//
+// The page is made on the first call, written on day, from head, its first line, and filed in category when that is not
+// empty. A plain page that has no words (a wikilink made it before the first call) is adopted the same way: it gets
+// head, its day when it has none, and its category. A tombstoned page is revived, as a capture revives a day page. A
+// title that a page of another type holds is a 409. It returns the page's id and what the save did to the wikilinks of
+// the body. An empty day is today.
+func (s *Store) AppendParagraph(ctx context.Context, source, title, day, category, head string, add func(body string) string) (int64, Sync, error) {
 	m, err := alone(s, ctx, source, func(t *Tx) (made, error) {
+		if day == "" {
+			day = t.today()
+		}
 		p, err := t.lookupWithBody(title)
 		if err != nil {
 			return made{}, err
 		}
-		if p == nil {
-			id, r, err := t.CreatePage(title, head+"\n\n"+paragraph, day)
-			if err != nil {
-				return made{}, err
-			}
-			// The category is the writer's own convention: a deleted one (the owner's file keeps one from an earlier
-			// design) is revived, as a deleted page of the conversation is below, so the first turn is not refused.
-			if c, err := t.lookup(category); err != nil {
-				return made{}, err
-			} else if c != nil && c.Deleted {
-				if err := t.setDeleted(c.ID, false); err != nil {
-					return made{}, err
-				}
-			}
-			return made{id, r}, t.fileNew(id, category)
-		}
-		if p.Type != "page" {
+		if p != nil && p.Type != "page" {
 			return made{}, Conflict("%q is a %s, not a plain page: a paragraph cannot be added to it", title, p.Type)
 		}
-		if p.Deleted {
+		if p != nil && p.Deleted {
 			if err := t.setDeleted(p.ID, false); err != nil {
 				return made{}, err
 			}
 		}
-		body := paragraph
-		if strings.TrimSpace(p.Body) != "" {
-			body = strings.TrimRight(p.Body, "\r\n") + "\n\n" + paragraph
+		if p != nil && strings.TrimSpace(p.Body) != "" {
+			r, err := t.SetBody(p.ID, add(p.Body))
+			return made{p.ID, r}, err
 		}
-		r, err := t.SetBody(p.ID, body)
-		return made{p.ID, r}, err
+		body := add(head)
+		var id int64
+		var r Sync
+		if p == nil {
+			if err := checkTitle("title", title); err != nil {
+				return made{}, err
+			}
+			if id, err = t.insertRow("page", title, text.TitleKey(title), day, body); err != nil {
+				return made{}, err
+			}
+			r, err = t.syncWikilinks(id, body)
+		} else {
+			id = p.ID
+			if _, err = t.tx.ExecContext(t.ctx, `UPDATE entities SET day = ? WHERE id = ? AND day IS NULL`, day, id); err == nil {
+				r, err = t.SetBody(id, body)
+			}
+		}
+		if err != nil {
+			return made{}, err
+		}
+		// The category is the writer's own convention: a deleted one (the owner's file keeps one from an earlier
+		// design) is revived, as a deleted page of the conversation is above, so the first turn is not refused.
+		if c, err := t.lookup(category); err != nil {
+			return made{}, err
+		} else if c != nil && c.Deleted {
+			if err := t.setDeleted(c.ID, false); err != nil {
+				return made{}, err
+			}
+		}
+		return made{id, r}, t.fileNew(id, category)
 	})
 	return m.id, m.sync, err
 }

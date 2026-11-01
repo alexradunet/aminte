@@ -23,6 +23,11 @@ func TestParagraphMakesTheWordsSafe(t *testing.T) {
 		{"a block that opens on the first line", "```go\nx\n```", "**Owner** (09:07):\n```go\nx\n```"},
 		{"an inline block on the first line is a fence for ParseTurns", "```ls```", "**Owner** (09:07):\n```ls```\n```"},
 		{"two backticks are no fence", "a\n``\n**Owner** (09:31): b", "**Owner** (09:07): a\n``\n\\*\\*Owner\\*\\* (09:31): b"},
+		{"lines that read as tool lines are escaped", "Run:\n- `ls`\n- `rm` \u2192 /pages/1", "**Owner** (09:07): Run:\n\\- `ls`\n\\- `rm` \u2192 /pages/1"},
+		{"the first line too, so a list shows alike", "- `ls`\n- `rm`", "**Owner** (09:07): \\- `ls`\n\\- `rm`"},
+		{"a tool line inside a balanced block is kept", "a\n```\n- `ls`\n```\nb", "**Owner** (09:07): a\n```\n- `ls`\n```\nb"},
+		{"a tool line after a block is escaped", "```\nx\n```\n- `ls`", "**Owner** (09:07):\n```\nx\n```\n\\- `ls`"},
+		{"a list that has no code, and an indented line, are kept", "- one\n- two\n  - `three`", "**Owner** (09:07): - one\n- two\n  - `three`"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if got := paragraph("Owner", "(09:07)", tc.text); got != tc.want {
@@ -33,11 +38,14 @@ func TestParagraphMakesTheWordsSafe(t *testing.T) {
 }
 
 // FuzzAParagraphIsOneTurn: whatever the words, a paragraph of the owner followed by a paragraph of the agent reads as
-// two turns, in this order: the words make no turn and hide none.
+// two turns, in this order: the words make no turn and hide none. The words stay in their turn: the owner's turn
+// reads back as the paragraph wrote it, with at most one line more (the fence that closes a block), and neither turn
+// takes a tool line or a ref from the words.
 func FuzzAParagraphIsOneTurn(f *testing.F) {
 	for _, seed := range []string{
 		"Hello", "a\n```\nb", "```\n```\n```", "**Owner** (09:31): x", "a\n**lifelog** (09:31): x", "a\n```x```\n**Owner** (09:31, via y): z",
-		"\n\n- `get`\n- `put`", "```", "a\r\n**Owner** (09.31): b", "~~~\n**Owner** (09:31): b", " **Owner** (09:31): b", "a\n````\n**Owner** (09:31): b",
+		"\n\n- `get`\n- `put`", "```", "a\r\n**Owner** (09:31): b", "~~~\n**Owner** (09:31): b", " **Owner** (09:31): b", "a\n````\n**Owner** (09:31): b",
+		"Run:\n- `ls -la`\n- `rm` \u2192 /pages/1", "- `x`", "a\n```\n- `x`\n```\n- `y`", "a\r\r\n- `x`",
 	} {
 		f.Add(seed)
 	}
@@ -46,13 +54,26 @@ func FuzzAParagraphIsOneTurn(f *testing.F) {
 		if words(text) == "" {
 			return
 		}
-		body := "[[" + day + "]]\n\n" + paragraph("Owner", "(09:07)", text) + "\n\n" + paragraph("lifelog", "(09:08)", "Ok.")
-		var who []string
-		for _, turn := range ParseTurns(day, body) {
-			who = append(who, turn.Who)
+		owner := paragraph("Owner", "(09:07)", text)
+		body := "[[" + day + "]]\n\n" + owner + "\n\n" + paragraph("lifelog", "(09:08)", "Ok.")
+		turns := ParseTurns(day, body)
+		if len(turns) != 2 || turns[0].Who != "owner" || turns[1].Who != "lifelog" {
+			t.Fatalf("the turns of %q: %+v, want owner lifelog", body, turns)
 		}
-		if strings.Join(who, " ") != "owner lifelog" {
-			t.Errorf("the turns of %q: %v, want owner lifelog", body, who)
+		stored := strings.TrimSpace(strings.ReplaceAll(strings.TrimPrefix(owner, "**Owner** (09:07):"), "\r\n", "\n"))
+		if turns[0].Text != stored {
+			t.Errorf("the owner's turn of %q reads back as %q, want %q", body, turns[0].Text, stored)
+		}
+		if n, want := strings.Count(turns[0].Text, "\n"), strings.Count(strings.ReplaceAll(words(text), "\r\n", "\n"), "\n"); n != want && n != want+1 {
+			t.Errorf("the owner's turn of %q has %d lines, want %d or one more", body, n+1, want+1)
+		}
+		if turns[1].Text != "Ok." {
+			t.Errorf("the reply of %q reads back as %q", body, turns[1].Text)
+		}
+		for _, turn := range turns {
+			if len(turn.Tools) != 0 || len(turn.Refs) != 0 {
+				t.Errorf("the %s turn of %q took the tool lines %q and the refs %q from the words", turn.Who, body, turn.Tools, turn.Refs)
+			}
 		}
 	})
 }

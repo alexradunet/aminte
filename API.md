@@ -556,10 +556,10 @@ tombstoned page adds `deleted`. Links: `day` (a day page's day view), `series` (
 conversation page's day: it carries the page, as a series carries a metric's page, so a client that draws the view and not the page follows it), `preview` (a
 file's picture), `cover` (the
 picture of the page's cover, when it has one), `choose-cover` (the [pictures it may take](#cover-choice): a live page that
-is not a file), `make-metric` (a live plain page that is not a day page: the address of the [New metric form](#metrics) with the name filled; registering the metric turns this page into it and keeps its text). Embedded: every outgoing link under its kind, every incoming one under `backlink` and its kind, with the class
+is not a file), `make-metric` (a live plain page that is not a day page or a conversation page: the address of the [New metric form](#metrics) with the name filled; registering the metric turns this page into it and keeps its text). Embedded: every outgoing link under its kind, every incoming one under `backlink` and its kind, with the class
 `category` added to a `part-of` backlink from a category page. Actions by
 what is legal: `save-body` (with the current `body` and `version` filled; an empty `body` is refused, so a save
-cannot empty a page), `promote` (it makes a person) and `rename` (neither on a live [conversation page](#conversation): its day names it, so `rename` of it, and `rename` of any page to a title `Conversation YYYY-MM-DD`, is 409 `a conversation page keeps its title: its day names it`, and writes nothing), `edit-person` (a live person: `name`, `birth_day` and `death_day` filled with the current values; a field left out stays, an empty date removes it, and an edit with no field is 422), `edit-metric` (a live metric: `daily` filled with the current mark, 1 or 0; a field left out is 0; a page that is not a live metric is 409), [`file-pages`](#filed) (a page that may
+cannot empty a page), `promote` (it makes a person) and `rename` (neither on a [conversation page](#conversation), whatever the case of its title: its day names it, so `rename` of it, and `rename` of any page to a title `Conversation YYYY-MM-DD`, is 409, and writes nothing), `edit-person` (a live person: `name`, `birth_day` and `death_day` filled with the current values; a field left out stays, an empty date removes it, and an edit with no field is 422), `edit-metric` (a live metric: `daily` filled with the current mark, 1 or 0; a field left out is 0; a page that is not a live metric is 409), [`file-pages`](#filed) (a page that may
 be `part-of`, not a day page: `ids` is this page, and `category` offers the category titles; a new title is made),
 `create-page` with `category` filled (a live category page: something is `part-of` it; the new page is made and
 filed in it in one write), `set-cover` (a live page that is not a file), `tombstone-pages` with `ids` this page, or
@@ -923,7 +923,9 @@ alone, as the agent's action);
 when the page exists, the actions of [the page](#page-person-file) after it (`save-body` with the `version`, and
 the others). When the page exists, the answer carries the page as a series carries a metric's page: its properties
 (the rows below that follow `turns`), its links but `self`, `conversation` and `index`, and its embedded links. A page that is
-deleted is no conversation: the answer has no turns, and `say` makes it live again. The page of a live conversation links to this resource (rel `conversation`); the JSON of the page is the page's own.
+deleted is no conversation: the answer has no turns, and `say` makes it live again. A page of another type that holds the
+title (a file, a person or a metric) is no conversation either: the answer has no turns and no `page`, and `say` and `reply`
+are 409. The page of a live conversation links to this resource (rel `conversation`); the JSON of the page is the page's own.
 
 `POST /days/{day}/say` (the action `say`, the owner's: 403 `forbidden` to an `agent:*` or `import:*` writer): the field `text` is added to the page of the day as the
 owner's turn, with the time of the server's clock in its zone. The page is made on the first turn of the day, in
@@ -931,39 +933,61 @@ the same write; a deleted page of the conversation, or a deleted category `Conve
 answer is this entity, and `result` is the [save result](#result-of-capture-create-page-save-body).
 A line of the `text` outside a fenced code block that reads as a marker of a turn is written with its asterisks escaped
 (`\*\*Owner\*\* (09:31): ...`), so it is text and not a turn. A code fence that the `text` opens and does not close is
-closed by a line of three backticks at the end of the turn. A balanced block stays as it is.
+closed by a line of three backticks at the end of the turn. A balanced block stays as it is. A line of the `text` outside
+a fenced block that starts with ``- ` `` (a dash, a space and a backtick) is written with a backslash before the dash: it
+shows the same in a Markdown view, and it is not a tool line, so a reply with no tool lines takes no line of the owner's
+turn. A code fence that an edit of the owner left open at the end of the page is closed before the turn, so the turn is
+read as a turn.
 `say` is for today: a `day` that is not the server's local today is 422 `say is for today: the agent answers today's
 conversation`, and writes nothing. A `text` that is empty or only blanks is 422 and writes nothing. The optional field
 `via` names the relay, the program that carries the owner's words (`[a-z0-9_:.-]{1,64}`); another value is 422.
 `say` answers at once and calls no model. When the agent runs (`lifelog-agent`, started by `serve --with agent`), it reads
 the page, finds the turn of the owner that nobody has answered (the last turn is the owner's), and writes its reply on the
-page as `agent:lifelog`, with `reply`. A client reads the page to see the reply. Only `say` starts a turn of the agent:
-an `agent:*` or `import:*` writer is refused (403 `forbidden`: `an agent or an import may not write a conversation
-page: the agent writes its turn with reply`) when it runs `save-body` on a conversation page, and when it runs `create-page`
-with the title of one. The owner edits the page as before, and text that the owner adds with `save-body` is an edit.
+page as `agent:lifelog`, with `reply`. A client reads the page to see the reply. Only `say` writes a turn of the owner,
+and the owner's edits are no turns: text that the owner adds with `save-body` is an edit. An `agent:*` or `import:*`
+writer that runs `save-body` on a conversation page is refused (403 `forbidden`: `an agent or an import may not write a
+conversation page: the agent writes its turn with reply`).
+
+**The title of a conversation page.** The title `Conversation YYYY-MM-DD`, in any case, belongs to the plain page that
+`say` makes. A write that would make a page under that title, give a page that title, take it from the page, or change
+the type of the page that holds it is 409 for every writer, and writes nothing: `create-page` (also its `category`),
+`file-pages` (its `category`), `create-person`, `register-metric`, `add-file`, `rename` (to the title or from it) and
+`promote`. The message says that the title is a conversation title. A [wikilink](docs/contract/titles-and-wikilinks.md) is
+the one other write that makes such a page: the save contract makes an empty plain page for a target that does not exist.
+That page has no turns, so it is no conversation yet, and the first `say` of its day adopts it: it writes the first
+line, files the page in `Conversations` and gives it its day, as for a page that it makes itself.
 
 `POST /days/{day}/reply` (the action `reply`; no owner action: the agent's writer `agent:lifelog` runs it, and so may
 any writer): the agent's turn, written in one transaction on the conversation page of `day` (a local day or the word
 `today`, any day that has a page).
 
-- `turn` (number, required): the owner turn that the reply answers, counted from 1 over the owner's turns of the page. An
-  agent that read N owner turns answers `turn` N. It is 422 when it is not a whole number of 1 or more.
+- `turn` (text, required): the key of the owner turn that the reply answers, from `turns[].key` of the conversation. An
+  agent that read the page answers the key of the turn that it read. A missing or blank `turn` is 422.
 - `text` (text, required): the words of the reply. Empty or only blanks is 422. It is made safe as the `text` of `say` is.
 - `tools` (text): the tool lines of the turn, one for each line (LF or CRLF between them). A blank line is dropped. Each
   line starts with ``- ` `` (a dash, a space and a backtick), or the answer is 422. They are written right before the
   paragraph of the reply.
 
+A key names a turn by what it is and not by its place on the page, because the page changes while an agent works on a
+turn. It is a string of 16 hex digits that the server makes from the `who`, the `at`, the `via` and the `text` of the turn,
+and from the number of turns before it that have the same four: so two turns of one page never have the same key. An agent
+treats it as an opaque string and compares it whole. A reply that is written, a turn that the owner says, and an edit that
+removes an earlier turn move no key. A key changes when the owner edits the words, the time or the relay of the turn: the
+agent then reads the page again, and answers the key that it finds.
+
 The reply is the paragraph `**lifelog** (HH:MM): text`, with the time of the server's clock in its zone, written right
 after the owner turn that it answers: before the marker line of the next turn, or at the end of the page. A turn that the
 owner said while the agent worked stays after the reply and waits for its own. The page keeps LF line ends. A code fence
-that an edit left open before the reply is closed by a line of three backticks, so the reply is a turn. The answer is
+that an edit left open before the reply is closed by a line of three backticks, so the reply is a turn. A line of the `text`
+that starts with ``- ` `` outside a fenced block is written with a backslash before the dash, so it is no tool line of this
+or of the next reply. The answer is
 the conversation of the day, and `result` is the [save result](#result-of-capture-create-page-save-body).
 
 | status | `code` | when |
 |---|---|---|
-| 404 | `not_found` | the day has no conversation page, or the page has fewer than `turn` owner turns |
-| 409 | `conflict` | the owner turn `turn` has a reply already (the turn after it is a turn of the agent): nothing is written, so a resent reply never answers twice. Or the page is deleted: `reply` does not revive it |
-| 422 | `invalid` | a missing or bad `turn` or `text`, a `tools` line that is not a tool line, a `day` that is not a day, a field the action does not list |
+| 404 | `not_found` | the day has no conversation page |
+| 409 | `conflict` | no owner turn of the page has the key `turn` now: the owner edited or removed the turn, or the key is not the key of an owner turn, and the agent reads the page again. Or the owner turn has a reply already (the turn after it is a turn of the agent): nothing is written, so a resent reply never answers twice. Or the page is deleted, or is not a plain page: `reply` does not revive it |
+| 422 | `invalid` | a missing or blank `turn` or `text`, a `tools` line that is not a tool line, a `day` that is not a day, a field the action does not list |
 
 **The format of the page.** An agent in any language reads the conversation, and writes its turn with `reply` and the
 turn of the owner with `say`. The page:
@@ -992,6 +1016,7 @@ turn of the owner with `say`. The page:
 | `day` | day | the day of the conversation |
 | `turns[]` | list | the turns, in the order of the page; empty when the page does not exist |
 | `turns[].who` | string | `owner`, `lifelog`, or `text` for a free paragraph |
+| `turns[].key` | string | the name of the turn for `reply`: 16 hex digits, opaque; no two turns of one page have the same |
 | `turns[].at` | string | `HH:MM`, also for a marker written as `HH.MM`; absent for a free paragraph |
 | `turns[].via` | string | the relay named by `via`; absent when the owner wrote on a surface of lifelog |
 | `turns[].text` | string | the words of the turn, without the mark |

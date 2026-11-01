@@ -7,8 +7,22 @@ import (
 	"lifelog/internal/core"
 )
 
+// ownerKey is the key that the conversation gives to the n-th owner turn of the body (from 1); a key that no turn has
+// when the body has fewer owner turns.
+func ownerKey(day, body string, n int) string {
+	for _, t := range withKeys(ParseTurns(day, body)) {
+		if t.Who == "owner" {
+			if n--; n == 0 {
+				return t.Key
+			}
+		}
+	}
+	return "0123456789abcdef"
+}
+
 // TestInsertReplyPlacesTheBlockByTurns: the vectors are written by hand. The block goes right after the owner turn that
-// is counted, before the next marker line, whatever the bytes of the page are; a turn that follows keeps its place.
+// has the key (turn names it by its place in the body that the vector holds), before the next marker line, whatever the
+// bytes of the page are; a turn that follows keeps its place.
 func TestInsertReplyPlacesTheBlockByTurns(t *testing.T) {
 	const day = "2031-05-14"
 	const block = "**lifelog** (09:08): R"
@@ -36,7 +50,7 @@ func TestInsertReplyPlacesTheBlockByTurns(t *testing.T) {
 		{"a fence that the page leaves open is closed", "[[2031-05-14]]\n\n**Owner** (09:07): A\n```\nx", 1, "[[2031-05-14]]\n\n**Owner** (09:07): A\n```\nx\n```\n\n" + block},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			got, err := insertReply(day, tc.body, tc.turn, block)
+			got, err := insertReply(day, tc.body, ownerKey(day, tc.body, tc.turn), block)
 			if err != nil || got != tc.want {
 				t.Errorf("got %q, %v\nwant %q", got, err, tc.want)
 			}
@@ -47,13 +61,13 @@ func TestInsertReplyPlacesTheBlockByTurns(t *testing.T) {
 		turn       int
 		status     int
 	}{
-		{"a turn the page does not have", "[[2031-05-14]]\n\n**Owner** (09:07): A", 2, 404},
-		{"a page with no turn", "[[2031-05-14]]", 1, 404},
+		{"a turn the page does not have", "[[2031-05-14]]\n\n**Owner** (09:07): A", 2, 409},
+		{"a page with no turn", "[[2031-05-14]]", 1, 409},
 		{"a turn that has a reply", "[[2031-05-14]]\n\n**Owner** (09:07): A\n\n**lifelog** (09:07): R", 1, 409},
-		{"the reply is a turn of the agent, the second owner turn has none", "[[2031-05-14]]\n\n**Owner** (09:07): A\n\n**lifelog** (09:07): R", 2, 404},
+		{"the reply is a turn of the agent, the second owner turn does not exist", "[[2031-05-14]]\n\n**Owner** (09:07): A\n\n**lifelog** (09:07): R", 2, 409},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := insertReply(day, tc.body, tc.turn, block)
+			_, err := insertReply(day, tc.body, ownerKey(day, tc.body, tc.turn), block)
 			var ce *core.Error
 			if !errors.As(err, &ce) || ce.Status != tc.status {
 				t.Errorf("got %v, want the status %d", err, tc.status)

@@ -164,7 +164,8 @@ func TestTheRootCarriesTheFrame(t *testing.T) {
 func TestAConversationNamesItsRefsAndTheEarlierDays(t *testing.T) {
 	s, ctx := dataStore(t), t.Context()
 	page := func(day, body string) int64 {
-		id, _, err := s.CreatePage(ctx, "cli", ConversationTitle(day), conversationFirstLine(day)+"\n\n"+body, "")
+		id, _, err := s.AppendParagraph(ctx, "cli", core.ConversationTitle(day), day, "", conversationFirstLine(day),
+			func(string) string { return conversationFirstLine(day) + "\n\n" + body })
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -230,7 +231,7 @@ func TestAConversationNamesItsRefsAndTheEarlierDays(t *testing.T) {
 
 	// Beyond 14 days there is no earlier day.
 	far := dataStore(t)
-	if _, _, err := far.CreatePage(ctx, "cli", ConversationTitle("2031-04-29"), "[[2031-04-29]]\n", ""); err != nil {
+	if _, _, err := far.AppendParagraph(ctx, "cli", core.ConversationTitle("2031-04-29"), "2031-04-29", "", "[[2031-04-29]]", func(string) string { return "[[2031-04-29]]\n" }); err != nil {
 		t.Fatal(err)
 	}
 	if e := readData(t, NewWith(far, nil), "/days/today/conversation"); e.LinkByRel("earlier") != nil {

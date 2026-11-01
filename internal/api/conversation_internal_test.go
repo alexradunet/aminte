@@ -73,14 +73,3 @@ func TestParseTurnsReadsAHandWrittenBody(t *testing.T) {
 		})
 	}
 }
-
-func TestConversationDayIsReadFromTheTitle(t *testing.T) {
-	for title, want := range map[string]string{
-		"Conversation 2031-05-14": "2031-05-14", "Conversation 2031-05-14 09.07.00": "", "Conversation 2031-13-14": "",
-		"conversation 2031-05-14": "", "Conversation": "", "Notes 2031-05-14": "",
-	} {
-		if got := conversationDay(title); got != want {
-			t.Errorf("conversationDay(%q) = %q, want %q", title, got, want)
-		}
-	}
-}

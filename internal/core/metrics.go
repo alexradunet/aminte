@@ -58,7 +58,7 @@ func (t *Tx) RegisterMetric(m NewMetric) (added bool, err error) {
 	}
 	// a day page is never a metric (entities_day_page_plain), and a person or a file never becomes one
 	// (entities_promote_from_page): the schema refuses the update
-	if _, err := t.tx.ExecContext(t.ctx, `UPDATE entities SET entity_type = 'metric', deleted_at = NULL WHERE id = ?`, p.ID); err != nil {
+	if err := t.retype(p, "metric"); err != nil {
 		return false, err
 	}
 	if _, err := t.tx.ExecContext(t.ctx, `INSERT INTO metrics(id, unit, daily) VALUES (?, ?, ?)`, p.ID, unit, daily); err != nil {

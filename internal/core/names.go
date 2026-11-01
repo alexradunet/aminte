@@ -10,9 +10,30 @@ import (
 	"lifelog/text"
 )
 
-// insertPage is the universal insert convention (cookbook/capture.md): entities first, RETURNING id, then the
-// owned-name row with that id. The writer sets no import_key on an entity.
-func (t *Tx) insertPage(typ, title, key string, day any, body string) (id int64, err error) {
+// insertPage makes the page of a write that the caller chose to make: it refuses a conversation title (reservedTitle),
+// then inserts the row.
+func (t *Tx) insertPage(typ, title, key string, day any, body string) (int64, error) {
+	if err := reservedTitle(title); err != nil {
+		return 0, err
+	}
+	return t.insertRow(typ, title, key, day, body)
+}
+
+// retype changes the type of the page p to typ and revives it. The page keeps its id and its links. A page that holds a
+// conversation title keeps its type (reservedTitle). The schema refuses the other changes that it cannot allow
+// (entities_promote_from_page).
+func (t *Tx) retype(p *pageRef, typ string) error {
+	if err := reservedTitle(p.Title); err != nil {
+		return err
+	}
+	_, err := t.tx.ExecContext(t.ctx, `UPDATE entities SET entity_type = ?, deleted_at = NULL WHERE id = ?`, typ, p.ID)
+	return err
+}
+
+// insertRow is the universal insert convention (cookbook/capture.md): entities first, RETURNING id, then the
+// owned-name row with that id. The writer sets no import_key on an entity. It checks no rule of the writer: the caller
+// is insertPage, a wikilink that makes its target, or say that makes a conversation page.
+func (t *Tx) insertRow(typ, title, key string, day any, body string) (id int64, err error) {
 	title = periodSpelling(title, key)
 	err = t.tx.QueryRowContext(t.ctx, `INSERT INTO entities(entity_type, preferred_name_key, day, body, created_at, updated_at, source)
                          VALUES (?, ?, ?, ?, `+nowSQL+`, `+nowSQL+`, ?)
@@ -119,7 +140,7 @@ func (t *Tx) ensurePage(title, key string, day any) (id int64, created, revived 
 	case err != nil:
 		return 0, false, false, err
 	case p == nil:
-		id, err = t.insertPage("page", title, key, day, "")
+		id, err = t.insertRow("page", title, key, day, "") // a target of a wikilink: the contract makes it, whatever its title
 		return id, true, false, err
 	case p.Deleted:
 		_, err = t.tx.ExecContext(t.ctx, `UPDATE entities SET deleted_at = NULL WHERE id = ?`, p.ID)
@@ -132,11 +153,17 @@ func (t *Tx) ensurePage(title, key string, day any) (id int64, created, revived 
 // triggers entity_names_day_insert and entities_day_identity refuse the write. A day page renamed to its own date
 // writes nothing, so no trigger sees it: rename refuses it, as step 0 of cookbook/rename-a-page.md says.
 func (t *Tx) rename(id int64, newTitle string) (int64, error) {
-	if _, err := t.livePage(id); err != nil {
+	p, err := t.livePage(id)
+	if err != nil {
 		return 0, err
 	}
 	if err := checkTitle("title", newTitle); err != nil {
 		return 0, err
+	}
+	for _, title := range []string{p.Title, newTitle} { // neither from nor to a conversation title
+		if err := reservedTitle(title); err != nil {
+			return 0, err
+		}
 	}
 	key := text.TitleKey(newTitle)
 	target, err := t.lookupKey(key)

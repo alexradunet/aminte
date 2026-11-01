@@ -1224,21 +1224,29 @@ func rowSay(x *parityRun) {
 }
 
 // reply is no owner action: an agent runs it as the owner does. The owner's turn is set up with the store (an agent
-// cannot say). A day with no page is 404; the turn counts from 1 and a turn the page does not have is 404; a turn that
-// has a reply is 409 and the page stays as it was; the tool lines come in one field, one for each line. The one
+// cannot say). A day with no page is 404; the turn is the key of the owner's turn, and a key that no owner turn has is
+// 409; a turn that has a reply is 409 and the page stays as it was; the tool lines come in one field, one for each line. The one
 // difference between the writers is the save of the page: the owner edits it, an agent or an import is refused (403).
 func rowReply(x *parityRun) {
 	title := "Conversation " + parityToday
-	args := map[string]string{"day": "today", "turn": "1", "text": "Hi.", "tools": "- `search`: no hits\n- `get` → [/days/2031-05-20](/days/2031-05-20)"}
+	args := map[string]string{"day": "today", "turn": "0123456789abcdef", "text": "Hi.", "tools": "- `search`: no hits\n- `get` → [/days/2031-05-20](/days/2031-05-20)"}
 	x.refused("reply", args, http.StatusNotFound, "not_found")
 	x.absent(title)
-	if _, _, err := x.store.AppendParagraph(x.t.Context(), "api", title, parityToday, "Conversations", "[["+parityToday+"]]", "**Owner** (09:00): Hello."); err != nil {
+	if _, _, err := x.store.AppendParagraph(x.t.Context(), "api", title, parityToday, "Conversations", "[["+parityToday+"]]",
+		func(body string) string { return body + "\n\n**Owner** (09:00): Hello." }); err != nil {
 		x.t.Fatal(err)
 	}
-	x.refused("reply", map[string]string{"day": "today", "turn": "0", "text": "Hi."}, http.StatusUnprocessableEntity, "invalid")
-	x.refused("reply", map[string]string{"day": "today", "turn": "1", "text": " \n "}, http.StatusUnprocessableEntity, "invalid")
-	x.refused("reply", map[string]string{"day": "today", "turn": "1", "text": "Hi.", "tools": "not a tool line"}, http.StatusUnprocessableEntity, "invalid")
-	x.refused("reply", map[string]string{"day": "today", "turn": "2", "text": "Hi."}, http.StatusNotFound, "not_found")
+	conv := props(x.t, apitest.Must(x.t)(x.read.Get(x.t.Context(), "/days/today/conversation")))
+	first, _ := conv["turns"].([]any)
+	key, _ := first[0].(map[string]any)["key"].(string)
+	if key == "" {
+		x.t.Fatalf("the owner's turn has no key: %v", first)
+	}
+	x.refused("reply", map[string]string{"day": "today", "text": "Hi."}, http.StatusUnprocessableEntity, "invalid")
+	x.refused("reply", map[string]string{"day": "today", "turn": key, "text": " \n "}, http.StatusUnprocessableEntity, "invalid")
+	x.refused("reply", map[string]string{"day": "today", "turn": key, "text": "Hi.", "tools": "not a tool line"}, http.StatusUnprocessableEntity, "invalid")
+	x.refused("reply", map[string]string{"day": "today", "turn": "1", "text": "Hi."}, http.StatusConflict, "conflict")
+	args["turn"] = key
 	e := x.ok("reply", args)
 	p := props(x.t, e)
 	turns, _ := p["turns"].([]any)

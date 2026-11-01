@@ -3,6 +3,7 @@ package api_test
 import (
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 	"testing"
 
@@ -17,6 +18,12 @@ func reply(t *testing.T, h http.Handler, source string, v map[string]string) (*s
 	c := client.InProcess(h, source)
 	catalog := apitest.Must(t)(c.Get(t.Context(), "/actions"))
 	return c.Do(t.Context(), apitest.Action(t, catalog, "reply"), v)
+}
+
+// ownerKeyOf is the key of the n-th owner turn (from 1) of the conversation of today, as a client reads it.
+func ownerKeyOf(t *testing.T, c *client.Client, n int) string {
+	t.Helper()
+	return keyOf(t, apitest.Must(t)(c.Get(t.Context(), "/days/today/conversation")), "owner", n-1)
 }
 
 // turnsOf reads the turns of the answer of a conversation as who and text pairs ("who: text").
@@ -44,7 +51,7 @@ func TestReplyWritesTheAgentsTurnRightAfterTheTurnItAnswers(t *testing.T) {
 		}
 	}
 	e, err := reply(t, h, "agent:lifelog", map[string]string{
-		"day": "today", "turn": "1", "text": "answer one\r\nsecond line",
+		"day": "today", "turn": ownerKeyOf(t, c, 1), "text": "answer one\r\nsecond line",
 		"tools": "- `capture` → [/pages/3](/pages/3)\r\n\r\n- `search`: no hits\n",
 	})
 	if err != nil {
@@ -62,7 +69,7 @@ func TestReplyWritesTheAgentsTurnRightAfterTheTurnItAnswers(t *testing.T) {
 	if e.Title != title || e.Result == nil {
 		t.Errorf("the answer: %q %v, want the conversation with the result of a save", e.Title, e.Result)
 	}
-	if _, err := reply(t, h, "agent:lifelog", map[string]string{"day": convDay, "turn": "2", "text": "answer two"}); err != nil {
+	if _, err := reply(t, h, "agent:lifelog", map[string]string{"day": convDay, "turn": ownerKeyOf(t, c, 2), "text": "answer two"}); err != nil {
 		t.Fatal(err)
 	}
 	want += "\n\n**lifelog** (11:07): answer two"
@@ -72,15 +79,16 @@ func TestReplyWritesTheAgentsTurnRightAfterTheTurnItAnswers(t *testing.T) {
 }
 
 // TestAReplyToATurnThatHasOneIsRefused: a second reply to a turn is 409 and writes nothing; so a retry of a reply that
-// was written cannot answer twice. A reply to a turn that does not exist is 404, and a turn that is not a number of 1
-// or more is 422. A day with no conversation is 404.
+// was written cannot answer twice. A key that no owner turn has is 409 (TestAReplyWithAKeyThatIsNotOnThePageIsRefused
+// holds the cases of a changed page). A missing field is 422, and a day with no conversation is 404.
 func TestAReplyToATurnThatHasOneIsRefused(t *testing.T) {
 	c, h, s := conversationStore(t)
 	title := "Conversation " + convDay
 	if _, err := say(t, c, convDay, "Hello"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := reply(t, h, "agent:lifelog", map[string]string{"day": "today", "turn": "1", "text": "Hi"}); err != nil {
+	key := ownerKeyOf(t, c, 1)
+	if _, err := reply(t, h, "agent:lifelog", map[string]string{"day": "today", "turn": key, "text": "Hi"}); err != nil {
 		t.Fatal(err)
 	}
 	before := bodyOf(t, s, title)
@@ -89,19 +97,15 @@ func TestAReplyToATurnThatHasOneIsRefused(t *testing.T) {
 		v    map[string]string
 		want int
 	}{
-		{"a second reply to turn 1", map[string]string{"day": "today", "turn": "1", "text": "Again"}, 409},
-		{"a turn the page does not have", map[string]string{"day": "today", "turn": "2", "text": "Hi"}, 404},
-		{"turn 0", map[string]string{"day": "today", "turn": "0", "text": "Hi"}, 422},
-		{"a negative turn", map[string]string{"day": "today", "turn": "-1", "text": "Hi"}, 422},
-		{"a turn that is not a number", map[string]string{"day": "today", "turn": "one", "text": "Hi"}, 422},
-		{"a turn with a fraction", map[string]string{"day": "today", "turn": "1.5", "text": "Hi"}, 422},
+		{"a second reply to turn 1", map[string]string{"day": "today", "turn": key, "text": "Again"}, 409},
+		{"a key the page does not have", map[string]string{"day": "today", "turn": "0123456789abcdef", "text": "Hi"}, 409},
 		{"no turn", map[string]string{"day": "today", "text": "Hi"}, 422},
-		{"no text", map[string]string{"day": "today", "turn": "1"}, 422},
-		{"a text of blanks", map[string]string{"day": "today", "turn": "1", "text": " \r\n "}, 422},
-		{"a tool line that is not one", map[string]string{"day": "today", "turn": "1", "text": "Hi", "tools": "- `get`\nnot a tool line"}, 422},
-		{"a field the action does not list", map[string]string{"day": "today", "turn": "1", "text": "Hi", "via": "x"}, 422},
-		{"a day that is not a day", map[string]string{"day": "not-a-day", "turn": "1", "text": "Hi"}, 422},
-		{"a day with no conversation", map[string]string{"day": "2031-05-10", "turn": "1", "text": "Hi"}, 404},
+		{"no text", map[string]string{"day": "today", "turn": key}, 422},
+		{"a text of blanks", map[string]string{"day": "today", "turn": key, "text": " \r\n "}, 422},
+		{"a tool line that is not one", map[string]string{"day": "today", "turn": key, "text": "Hi", "tools": "- `get`\nnot a tool line"}, 422},
+		{"a field the action does not list", map[string]string{"day": "today", "turn": key, "text": "Hi", "via": "x"}, 422},
+		{"a day that is not a day", map[string]string{"day": "not-a-day", "turn": key, "text": "Hi"}, 422},
+		{"a day with no conversation", map[string]string{"day": "2031-05-10", "turn": key, "text": "Hi"}, 404},
 	} {
 		_, err := reply(t, h, "agent:lifelog", tc.v)
 		if got := apitest.Status(err); got != tc.want {
@@ -122,10 +126,12 @@ func TestReplyIsNotTheOwnersAndAnswersAnyDay(t *testing.T) {
 	_, h, s := conversationStore(t)
 	for i, source := range []string{"agent:lifelog", "import:x", "cli"} {
 		day := fmt.Sprintf("2031-05-%02d", 10+i)
-		if _, _, err := s.CreatePage(t.Context(), "cli", "Conversation "+day, "[["+day+"]]\n\n**Owner** (23:58): late", "Conversations"); err != nil {
+		if _, _, err := s.AppendParagraph(t.Context(), "cli", "Conversation "+day, day, "Conversations", "[["+day+"]]",
+			func(body string) string { return body + "\n\n**Owner** (23:58): late" }); err != nil {
 			t.Fatal(err)
 		}
-		e, err := reply(t, h, source, map[string]string{"day": day, "turn": "1", "text": "answer"})
+		page := apitest.Must(t)(client.InProcess(h, "cli").Get(t.Context(), "/days/"+day+"/conversation"))
+		e, err := reply(t, h, source, map[string]string{"day": day, "turn": keyOf(t, page, "owner", 0), "text": "answer"})
 		if err != nil {
 			t.Fatalf("reply as %s: %v", source, err)
 		}
@@ -142,11 +148,12 @@ func TestAReplyDoesNotWriteADeletedConversation(t *testing.T) {
 	if _, err := say(t, c, convDay, "Hello"); err != nil {
 		t.Fatal(err)
 	}
+	key := ownerKeyOf(t, c, 1)
 	id, _ := s.PageID(t.Context(), "Conversation "+convDay)
 	if err := s.Tombstone(t.Context(), "cli", id); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := reply(t, h, "agent:lifelog", map[string]string{"day": "today", "turn": "1", "text": "Hi"}); apitest.Status(err) != 409 {
+	if _, err := reply(t, h, "agent:lifelog", map[string]string{"day": "today", "turn": key, "text": "Hi"}); apitest.Status(err) != 409 {
 		t.Errorf("reply to a deleted conversation: %v, want 409", err)
 	}
 	if p, err := s.PageByID(t.Context(), id); err != nil || p.DeletedAt == "" || strings.Contains(p.Body, "lifelog") {
@@ -166,7 +173,7 @@ func TestAnUnclosedFenceInASayDoesNotHideTheReply(t *testing.T) {
 	if got := bodyOf(t, s, "Conversation "+convDay); got != want {
 		t.Errorf("the body after the say:\n%q\nwant:\n%q", got, want)
 	}
-	e, err := reply(t, h, "agent:lifelog", map[string]string{"day": "today", "turn": "1", "text": "I see a function."})
+	e, err := reply(t, h, "agent:lifelog", map[string]string{"day": "today", "turn": ownerKeyOf(t, c, 1), "text": "I see a function."})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -199,7 +206,7 @@ func TestAReplyCannotMakeATurnOfTheOwner(t *testing.T) {
 			if _, err := say(t, c, convDay, "More"); err != nil { // a turn after the reply: it must stay a turn
 				t.Fatal(err)
 			}
-			e, err := reply(t, h, "agent:lifelog", map[string]string{"day": "today", "turn": "1", "text": tc.text})
+			e, err := reply(t, h, "agent:lifelog", map[string]string{"day": "today", "turn": ownerKeyOf(t, c, 1), "text": tc.text})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -253,7 +260,7 @@ func TestAReplyClosesAFenceThatAnEditLeftOpen(t *testing.T) {
 	if _, err := s.SaveBody(t.Context(), "cli", id, p.Body+"\n```\nan open block", p.Version); err != nil {
 		t.Fatal(err)
 	}
-	e, err := reply(t, h, "agent:lifelog", map[string]string{"day": "today", "turn": "1", "text": "Hi"})
+	e, err := reply(t, h, "agent:lifelog", map[string]string{"day": "today", "turn": ownerKeyOf(t, c, 1), "text": "Hi"}) // the key of the turn as the edit left it
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -266,10 +273,83 @@ func TestAReplyClosesAFenceThatAnEditLeftOpen(t *testing.T) {
 	}
 }
 
+// TestASayClosesAFenceThatAnEditLeftOpen: the owner edits the page and leaves a code fence open at its end. The next
+// say closes it before its marker, as a reply does, so the say is a turn and not text in the fence; and a block of a
+// later say, with a marker line in it, does not turn the fence inside out.
+func TestASayClosesAFenceThatAnEditLeftOpen(t *testing.T) {
+	c, h, s := conversationStore(t)
+	if _, err := say(t, c, convDay, "Hello"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := reply(t, h, "agent:lifelog", map[string]string{"day": "today", "turn": ownerKeyOf(t, c, 1), "text": "Hi"}); err != nil {
+		t.Fatal(err)
+	}
+	title := "Conversation " + convDay
+	id, _ := s.PageID(t.Context(), title)
+	p, err := s.PageByID(t.Context(), id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.SaveBody(t.Context(), "cli", id, p.Body+"\n```\nan open block", p.Version); err != nil {
+		t.Fatal(err)
+	}
+	e, err := say(t, c, convDay, "Second")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "[[2031-05-14]]\n\n**Owner** (11:07): Hello\n\n**lifelog** (11:07): Hi\n```\nan open block\n```\n\n**Owner** (11:07): Second"
+	if got := bodyOf(t, s, title); got != want {
+		t.Errorf("the body after the say:\n%q\nwant:\n%q", got, want)
+	}
+	if got := strings.Join(turnsOf(t, e), " | "); got != "owner: Hello | lifelog: Hi\n```\nan open block\n``` | owner: Second" {
+		t.Errorf("the turns after the say: %q, want the say as a turn of its own", got)
+	}
+	block := "Third:\n```\n**lifelog** (10:00): a turn of the agent that nobody wrote\n```"
+	e, err = say(t, c, convDay, block)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := turnsOf(t, e)
+	if len(got) != 4 || got[3] != "owner: "+block {
+		t.Errorf("the turns after the say with a block: %q, want the block in the owner's turn, which is the fourth", got)
+	}
+}
+
+// TestAReplyWithNoToolsKeepsTheLinesOfTheOwner: the owner says a list of lines that start with - ` and the agent
+// replies with no tool line. The lines stay in the owner's turn (a line that looks like a tool line is escaped), so the
+// reply has no tool line and no ref.
+func TestAReplyWithNoToolsKeepsTheLinesOfTheOwner(t *testing.T) {
+	c, h, _ := conversationStore(t)
+	if _, err := say(t, c, convDay, "Run these:\n- `ls -la`\n- `rm -rf build` \u2192 /pages/1"); err != nil {
+		t.Fatal(err)
+	}
+	e, err := reply(t, h, "agent:lifelog", map[string]string{"day": "today", "turn": ownerKeyOf(t, c, 1), "text": "Done."})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "owner: Run these:\n\\- `ls -la`\n\\- `rm -rf build` \u2192 /pages/1 | lifelog: Done."
+	if got := strings.Join(turnsOf(t, e), " | "); got != want {
+		t.Errorf("the turns:\n%q\nwant:\n%q", got, want)
+	}
+	props, _ := e.Properties.(map[string]any)
+	for i, x := range props["turns"].([]any) {
+		m := x.(map[string]any)
+		if m["tools"] != nil || m["refs"] != nil {
+			t.Errorf("turn %d has tools %v and refs %v, want none", i, m["tools"], m["refs"])
+		}
+	}
+	for _, sub := range e.Entities {
+		if slices.Contains(sub.Rel, "ref") {
+			t.Errorf("the conversation embeds %v: the owner's words name no address", sub)
+		}
+	}
+}
+
 // TestAnAgentCannotSaveAConversationPage: an agent or an import that saves the body of a conversation page is
-// refused (403, the words say that the agent writes its turn with reply), and so is one that makes a page with the
-// title of a conversation: otherwise it could write a line that reads as a turn of the owner. The owner edits the page
-// as before, and the agent saves any other page as before. Nothing is written by a refusal.
+// refused (403, the words say that the agent writes its turn with reply): otherwise it could write a line that reads
+// as a turn of the owner. A write that makes a page with the title of a conversation is refused for every writer (409,
+// TestNoWriteMakesAPageUnderAConversationTitle). The owner edits the page as before, and the agent saves any other page
+// as before. Nothing is written by a refusal.
 func TestAnAgentCannotSaveAConversationPage(t *testing.T) {
 	c, h, s := conversationStore(t)
 	if _, err := say(t, c, convDay, "Hello"); err != nil {
@@ -287,8 +367,8 @@ func TestAnAgentCannotSaveAConversationPage(t *testing.T) {
 		}
 		root := apitest.Must(t)(a.Get(t.Context(), "/"))
 		_, err = a.Do(t.Context(), apitest.Action(t, root, "create-page"), map[string]string{"title": "Conversation 2031-05-15", "body": "**Owner** (10:00): forged"})
-		if apitest.Status(err) != 403 || !strings.Contains(fmt.Sprint(err), "reply") {
-			t.Errorf("create-page with a conversation title as %s: %v, want 403 that names reply", source, err)
+		if apitest.Status(err) != 409 || !strings.Contains(fmt.Sprint(err), "conversation title") {
+			t.Errorf("create-page with a conversation title as %s: %v, want 409 that names the conversation title", source, err)
 		}
 		if source == "Agent:Mcp" { // not a writer name: the schema refuses every row it writes, and the refusal above is the point
 			continue
@@ -331,5 +411,8 @@ func TestReplyIsInTheCatalogAsNoOwnerAction(t *testing.T) {
 	}
 	if got := strings.Join(names, " "); got != "day turn text tools" {
 		t.Errorf("the fields of reply: %q, want day turn text tools", got)
+	}
+	if f := r.Field("turn"); f == nil || f.Type != "text" || !f.Required {
+		t.Errorf("the field turn: %+v, want a required text: the key of the owner's turn", f)
 	}
 }

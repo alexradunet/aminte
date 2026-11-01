@@ -175,7 +175,7 @@ func (t *Tx) keepNew(f FileIn, d fileDay) (k Kept, err error) {
 // promoteToFile makes the plain page p the page of the file f, and sets k to say so. It returns the text of the
 // page: the text of p, or that of f when p has none. Two different texts are never merged.
 func (t *Tx) promoteToFile(k *Kept, p *pageRef, f FileIn, d fileDay) (body string, err error) {
-	if _, err := t.tx.ExecContext(t.ctx, `UPDATE entities SET entity_type = 'file', deleted_at = NULL WHERE id = ?`, p.ID); err != nil {
+	if err := t.retype(p, "file"); err != nil {
 		return "", err
 	}
 	if p.Body != "" && f.Body != "" && p.Body != f.Body {

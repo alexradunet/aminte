@@ -77,12 +77,13 @@ func (h *server) pageEntity(ctx context.Context, id int64) (*siren.Entity, error
 	if p.Type == "metric" { // the page of a metric links its readings, and its readings link the page
 		e.Links = append(e.Links, link("series", siren.MetricHref(p.Title), "Readings"))
 	}
-	if day := conversationDay(p.Title); day != "" { // the page of a conversation links the talk of its day, which carries the page
+	day := core.ConversationDay(p.Title)
+	if day != "" { // the page of a conversation links the talk of its day, which carries the page
 		e.Links = append(e.Links, link("conversation", conversationHref(day), "Conversation"))
 	}
 	e.Links = append(e.Links, coverLinks(p)...)
 	// register-metric turns a plain page into the metric; not a period page or a category (core's promotable)
-	if p.Type == "page" && !p.IsDayPage && p.Period == "" && p.DeletedAt == "" && !slices.ContainsFunc(p.In, func(l core.Edge) bool { return l.Kind == "part-of" }) {
+	if p.Type == "page" && day == "" && !p.IsDayPage && p.Period == "" && p.DeletedAt == "" && !slices.ContainsFunc(p.In, func(l core.Edge) bool { return l.Kind == "part-of" }) {
 		e.Links = append(e.Links, link("make-metric", siren.NewMetricHref(p.Title), "Make it a metric"))
 	}
 	for _, l := range p.Out {
@@ -130,7 +131,7 @@ func pageActions(p *core.Page, kinds []string, cats []core.Category) []siren.Act
 	}
 	out = append(out, saveBodyAction(p.ID, p.Body, p.Version))
 	if !p.IsDayPage {
-		keeps := conversationDay(p.Title) != "" // its day names it
+		keeps := core.ConversationDay(p.Title) != "" // its day names it: no write changes its title or its type
 		if p.Type == "page" && !keeps {
 			out = append(out, action("promote", ids, nil))
 		}
@@ -285,9 +286,6 @@ func (h *server) search(r *http.Request, a admitted) (*siren.Entity, error) {
 }
 
 func (h *server) createPage(r *http.Request, a admitted) (*siren.Entity, error) {
-	if err := refuseAgentWrite(a.src, a.v.Get("title")); err != nil {
-		return nil, err
-	}
 	id, sync, err := h.s.CreatePage(r.Context(), a.src, a.v.Get("title"), a.v.Get("body"), a.v.Get("category"))
 	if err != nil {
 		return nil, err
@@ -296,13 +294,16 @@ func (h *server) createPage(r *http.Request, a admitted) (*siren.Entity, error) 
 }
 
 func (h *server) saveBody(r *http.Request, a admitted) (*siren.Entity, error) {
-	if !ownerWriter(a.src) { // the owner edits a conversation page; an agent writes its turn with reply
+	// The page of a conversation holds the turns of the owner, and a line that reads as one would be a turn that the
+	// owner never said. So the owner edits it, and an agent, an import or a name that is no writer name is refused
+	// (403): the agent writes its turn with reply, which makes the line safe.
+	if !ownerWriter(a.src) {
 		p, err := h.s.PageByID(r.Context(), a.id)
 		if err != nil {
 			return nil, err
 		}
-		if err := refuseAgentWrite(a.src, p.Title); err != nil {
-			return nil, err
+		if core.ConversationDay(p.Title) != "" {
+			return nil, &core.Error{Status: http.StatusForbidden, Msg: "an agent or an import may not write a conversation page: the agent writes its turn with reply"}
 		}
 	}
 	sync, err := h.s.SaveBody(r.Context(), a.src, a.id, a.v.Get("body"), a.v.Get("version"))
@@ -395,13 +396,6 @@ func (h *server) revive(r *http.Request, a admitted) (*siren.Entity, error) {
 }
 
 func (h *server) rename(r *http.Request, a admitted) (*siren.Entity, error) {
-	p, err := h.s.PageByID(r.Context(), a.id)
-	if err != nil {
-		return nil, err
-	}
-	if isConversationTitle(p.Title) || isConversationTitle(strings.TrimSpace(a.v.Get("title"))) {
-		return nil, core.Conflict("a conversation page keeps its title: its day names it")
-	}
 	to, err := h.s.Rename(r.Context(), a.src, a.id, a.v.Get("title"))
 	if err != nil {
 		return nil, err
