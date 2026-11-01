@@ -50,6 +50,7 @@ reply when WhatsApp does not run.
 | the reply | `say` answers at once. The agent writes the reply on the conversation page when the model is done. A client reads the page. |
 | the terminal mode | `lifelog-whatsapp --terminal` is deleted. The chat of the browser and `lifelog do say` do the same. |
 | the writer of the agent | `agent:lifelog`, whatever the surface. The turn keeps its `via`. |
+| the turns of a conversation | **The core writes both turns** (2026-11-01, after the review of wave 1): `say` writes the owner's turn, and a new action `reply` writes the agent's turn, right after the turn that it answers. The core closes a code fence that a turn leaves open and escapes a line that reads as a marker, so a turn cannot make a turn. A second reply to one turn is refused. An agent writer cannot save the body of a conversation page. |
 | the README table "Every action on every surface" | It is generated: `lifelog actions --human` prints it. The table and its test leave the README. The rule of parity stays. |
 | CI | It loops over `extensions/*/`. A new extension needs no CI edit. |
 | the shell of an extension | One exit code for "the owner acts first": 78. The package `app` gets `Main` and `API`. |
@@ -63,7 +64,7 @@ flowchart LR
   P -->|"lifelog-agent reads the page and finds the owner's turns after its last reply"| Q["lifelog-agent, a child of serve: one turn at a time, 16 steps and 5 minutes at most"]
   Q -->|"chat completions, the model URL of the settings of the core"| M["the model server"]
   Q -->|"the tools: the catalog without the owner actions, as agent:lifelog"| C
-  Q -->|"save-body as agent:lifelog: the tool lines and the reply"| P
+  Q -->|"reply as agent:lifelog: the tool lines and the reply, right after the turn that it answers"| P
   P -->|"the browser polls the page"| B["the chat of the browser"]
   P -->|"lifelog-whatsapp reads the page and sends each new turn"| W["the phone"]
 ```
@@ -93,7 +94,7 @@ Done: the six refusals pass; a test of `lifelogtest` shows that a catalog with n
 2. The turns: the agent reads today's conversation every 3 seconds, as whatsapp does today. The owner's turns after
    its last reply start a turn of the agent; only `say` writes an owner's turn. After a restart, a page whose last turn
    is the owner's is answered. The agent runs one turn at a time, with at most 16 model steps and 5 minutes. It writes
-   the tool lines and the reply in one `save-body`, so a page has the whole answer or none. It needs no state folder:
+   the tool lines and the reply in one `reply`, so a page has the whole answer or none. It needs no state folder:
    the page says what is answered.
 3. The tools are the catalog without the owner actions and without a file field (`client/tools`), read at each turn.
    The settings (`model_url`, `model`, `model_key`) come from `GET /settings` at each turn, through a second client with
