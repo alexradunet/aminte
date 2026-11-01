@@ -274,23 +274,10 @@ func main() {
 	for pattern, f := range map[string]func(*http.Request) (*siren.Entity, error){
 		"GET /lists": showLists, "GET /open": open, "GET /done": done, "GET /tasks/{id}": show,
 	} {
-		mux.HandleFunc(pattern, serveGet(f))
+		mux.HandleFunc(pattern, app.Entity(f))
 	}
 	if err := app.Listen(ctx, mux); err != nil {
 		fmt.Fprintln(os.Stderr, "taskservice:", err)
 		os.Exit(1)
-	}
-}
-
-// serveGet answers a read: the entity, or the error entity.
-func serveGet(f func(*http.Request) (*siren.Entity, error)) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		e, err := f(r)
-		if ae, ok := err.(*app.Error); ok {
-			app.Fail(w, ae.Status, ae.Code, ae.Msg)
-			return
-		}
-		w.Header().Set("Content-Type", "application/vnd.siren+json")
-		_ = siren.WriteJSON(w, e, "")
 	}
 }

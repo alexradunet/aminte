@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -168,6 +169,53 @@ func TestCatalogAnswersErrors(t *testing.T) {
 		if strings.Contains(rec.Body.String(), "secret detail") {
 			t.Errorf("%s %s: the error text leaked", tc.method, tc.path)
 		}
+	}
+}
+
+// TestEntityAnswersAnEntityAndEveryKindOfError holds the one helper that answers a handler: the callers are the
+// actions of Catalog and the reads that a program serves beside it. An Error keeps its status and its code, also when a
+// handler wraps it. Any other error, and a missing entity, is 500 internal, and the text of the cause is not sent.
+func TestEntityAnswersAnEntityAndEveryKindOfError(t *testing.T) {
+	selfLink := []siren.Link{{Rel: []string{"self"}, Href: "/things/7", Title: "Seven"}}
+	for _, tc := range []struct {
+		name, method string
+		entity       *siren.Entity
+		err          error
+		status       int
+		code         string
+		location     string
+	}{
+		{"a read", "GET", &siren.Entity{Class: []string{"thing"}, Links: selfLink}, nil, 200, "", ""},
+		{"a write with a self link", "POST", &siren.Entity{Class: []string{"thing"}, Links: selfLink}, nil, 200, "", "/things/7"},
+		{"an Error", "GET", nil, &Error{Status: 404, Code: "not_found", Msg: "no such thing"}, 404, "not_found", ""},
+		{"a wrapped Error", "GET", nil, fmt.Errorf("the thing: %w", &Error{Status: 409, Code: "stale_version", Msg: "stale"}), 409, "stale_version", ""},
+		{"another error", "GET", nil, errors.New("secret detail"), 500, "internal", ""},
+		{"no entity and no error", "GET", nil, nil, 500, "internal", ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			h := Entity(func(*http.Request) (*siren.Entity, error) { return tc.entity, tc.err })
+			rec := httptest.NewRecorder()
+			h.ServeHTTP(rec, httptest.NewRequest(tc.method, "/things/7", nil))
+			if rec.Code != tc.status {
+				t.Fatalf("status %d, want %d:\n%s", rec.Code, tc.status, rec.Body)
+			}
+			if ct := rec.Header().Get("Content-Type"); ct != "application/vnd.siren+json" {
+				t.Errorf("content type %q", ct)
+			}
+			if got := rec.Header().Get("Location"); got != tc.location {
+				t.Errorf("Location %q, want %q", got, tc.location)
+			}
+			var e siren.Entity
+			if err := json.NewDecoder(rec.Body).Decode(&e); err != nil {
+				t.Fatalf("the body is not an entity: %v", err)
+			}
+			if tc.code != "" && props(&e)["code"] != tc.code {
+				t.Errorf("code %v, want %s", props(&e)["code"], tc.code)
+			}
+			if tc.err != nil && strings.Contains(rec.Body.String(), "secret detail") {
+				t.Error("the text of the cause was sent")
+			}
+		})
 	}
 }
 

@@ -162,7 +162,7 @@ func fakeTaskServiceOfEveryAction(t *testing.T) http.Handler {
 func TestEveryActionOfAnAppAndOfTheTaskServiceIsDrawnOnce(t *testing.T) {
 	l := lifeStartingOn(t, "2026-09-30")
 	l.core.Connect(t, "testapp", fakeAppOfEveryAction())
-	l.core.ConnectTasks(t, "svc", fakeTaskServiceOfEveryAction(t))
+	l.core.Connect(t, "svc", fakeTaskServiceOfEveryAction(t))
 	for _, path := range []string{"/with/testapp/", "/tasks", "/tasks/week", "/tasks/items/t1"} {
 		t.Run(path, func(t *testing.T) {
 			e := must(t)(l.api.Get(t.Context(), path))

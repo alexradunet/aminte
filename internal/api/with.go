@@ -139,7 +139,7 @@ func (a *Apps) set(name, base, title string, actions []siren.Action) error {
 			return fmt.Errorf("the app %s: %w", name, err)
 		}
 		taken := name + "-" + act.Name
-		if _, ok := lookup(taken); ok || isTaskAction(taken) {
+		if _, ok := lookup(taken); ok || slices.ContainsFunc(taskCatalog, func(t spec) bool { return t.Name == taken }) {
 			return fmt.Errorf("the app %s: the action %s is in the catalog already", name, taken)
 		}
 		for other, o := range a.apps {
@@ -159,7 +159,7 @@ func (a *Apps) set(name, base, title string, actions []siren.Action) error {
 
 // setTasks says that the child NAME is the task service, at base (http://127.0.0.1:PORT), with its catalog and its
 // lists (docs/plans/158-one-task-service-behind-tasks.md). It refuses the child, and the registry stays as it was,
-// when another task service runs, or when the catalog lacks one of the six writes of the protocol (taskWrites). The
+// when another task service runs, or when the catalog lacks one of the six writes of the protocol (taskCatalog). The
 // name stops being an app: Expect made it known, and setTasks takes it back, so /with/NAME is 404.
 func (a *Apps) setTasks(name, base string, actions []siren.Action, lists []taskList) error {
 	a.mu.Lock()
@@ -167,9 +167,9 @@ func (a *Apps) setTasks(name, base string, actions []siren.Action, lists []taskL
 	if a.tasks != nil && a.tasks.name != name {
 		return fmt.Errorf("a task service runs already: %s", a.tasks.name)
 	}
-	for _, w := range taskWrites {
-		if !slices.ContainsFunc(actions, func(x siren.Action) bool { return x.Method == "POST" && x.Href == w.Href }) {
-			return fmt.Errorf("the task service has no action POST %s", w.Href)
+	for _, t := range taskCatalog {
+		if !slices.ContainsFunc(actions, func(x siren.Action) bool { return x.Method == "POST" && x.Href == t.Service }) {
+			return fmt.Errorf("the task service has no action POST %s", t.Service)
 		}
 	}
 	delete(a.apps, name)

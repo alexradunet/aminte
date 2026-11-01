@@ -1,6 +1,6 @@
 package web_test
 
-// The pages of Tasks, as web draws them over the real core and a small task service (lifelogtest.ConnectTasks). The core
+// The pages of Tasks, as web draws them over the real core and a small task service (lifelogtest.Connect). The core
 // answers Siren JSON: the rows with their round buttons, the due chips, the side column and the quick-add. These tests
 // hold the HTML of that path from end to end, and the write of a round button through web.
 
@@ -78,7 +78,7 @@ func wantTaskRows(t *testing.T, what, page, back string) {
 // the lists. The page names neither an app address nor the service.
 func TestThePagesOfTasksDrawTheRowsTheQuickAddAndTheSideColumn(t *testing.T) {
 	l := emptyLife(t)
-	l.core.ConnectTasks(t, "taskservice", newWatchedTaskService())
+	l.core.Connect(t, "taskservice", newWatchedTaskService())
 
 	today := pageAt(t, l.web, "/tasks")
 	wantInPage(t, "/tasks", today,
@@ -99,7 +99,7 @@ func TestThePagesOfTasksDrawTheRowsTheQuickAddAndTheSideColumn(t *testing.T) {
 func TestTheRoundFormOfATaskRowPostsThroughWebAndReturnsToThePage(t *testing.T) {
 	service := newWatchedTaskService()
 	l := emptyLife(t)
-	l.core.ConnectTasks(t, "taskservice", service)
+	l.core.Connect(t, "taskservice", service)
 
 	page := pageAt(t, l.web, "/tasks/lists/home")
 	form := regexp.MustCompile(`(?s)<form method="POST" action="/tasks/items/t2/complete" class="round">.*?</form>`).FindString(page)
@@ -126,7 +126,7 @@ func TestTheRoundFormOfATaskRowPostsThroughWebAndReturnsToThePage(t *testing.T) 
 func TestAFailedReadOfTheTaskServiceIsAnErrorPageThatNamesNoService(t *testing.T) {
 	service := newWatchedTaskService()
 	l := emptyLife(t)
-	l.core.ConnectTasks(t, "taskservice", service)
+	l.core.Connect(t, "taskservice", service)
 	service.failing.Store(true)
 
 	for _, path := range []string{"/tasks", "/tasks/lists/home"} {

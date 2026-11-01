@@ -134,7 +134,7 @@ func taskServiceHandler() http.Handler {
 // after Browse. The page names neither the address of an app nor the name of the service.
 func TestTheTaskServiceIsDrawnAsTasksAndNotAsAnApp(t *testing.T) {
 	l := emptyLife(t)
-	l.core.ConnectTasks(t, "taskservice", taskServiceHandler())
+	l.core.Connect(t, "taskservice", taskServiceHandler())
 
 	page := pageAt(t, l.web, "/tasks")
 	for _, row := range []string{"Fix tap", "Call mom"} { // the page is drawn from the service, so the next checks are not about an empty page

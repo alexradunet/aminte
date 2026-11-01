@@ -25,6 +25,7 @@ type spec struct {
 	Fields                                       []siren.Field
 	Owner, Danger                                bool
 	Class                                        []string // at most one of siren.ActionClasses: what the action does
+	Service                                      string   // the href of the action at the task service; only the rows of taskCatalog have it
 }
 
 func path(name, typ, title string) siren.Field {

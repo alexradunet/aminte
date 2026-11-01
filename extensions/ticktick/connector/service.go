@@ -90,26 +90,9 @@ func Service(p *Poller, lists []ticktick.Project) http.Handler {
 	for pattern, f := range map[string]func(*http.Request) (*siren.Entity, error){
 		"GET /lists": s.showLists, "GET /open": s.open, "GET /done": s.done, "GET /tasks/{id}": s.show,
 	} {
-		mux.HandleFunc(pattern, respond(f))
+		mux.HandleFunc(pattern, app.Entity(f))
 	}
 	return mux
-}
-
-// respond answers a GET route: the entity, or the error as the error entity. An error that is not an app.Error is 500.
-func respond(f func(*http.Request) (*siren.Entity, error)) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		e, err := f(r)
-		var ae *app.Error
-		switch {
-		case errors.As(err, &ae):
-			app.Fail(w, ae.Status, ae.Code, ae.Msg)
-		case err != nil:
-			app.Fail(w, http.StatusInternalServerError, siren.CodeInternal, "internal error")
-		default:
-			w.Header().Set("Content-Type", "application/vnd.siren+json")
-			_ = siren.WriteJSON(w, e, "")
-		}
-	}
 }
 
 // upstream turns an error of TickTick into the error of the service. TickTick's body is not in it, and neither is its

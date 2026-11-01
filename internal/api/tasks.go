@@ -77,44 +77,29 @@ type svcTask struct {
 	DoneAt  string `json:"done_at"`
 }
 
-// taskWrites are the six writes that the protocol asks of the service: the name of the action of this server, and the
-// href of the service. setTasks refuses a catalog that lacks one of them.
-var taskWrites = []struct{ Name, Href string }{
-	{"add-task", "/tasks"},
-	{"edit-task", "/tasks/{id}"},
-	{"complete-task", "/tasks/{id}/complete"},
-	{"reopen-task", "/tasks/{id}/reopen"},
-	{"delete-task", "/tasks/{id}/delete"},
-	{"sync-tasks", "/sync"},
-}
-
-// isTaskAction says that name is the name of one of the six actions, so no app may take it.
-func isTaskAction(name string) bool {
-	return slices.ContainsFunc(taskWrites, func(w struct{ Name, Href string }) bool { return w.Name == name })
-}
-
 // taskCatalog are the six actions of Tasks, as rows of the merged catalog. They are in GET /actions while a task
-// service runs (taskService.specs). The options of the field list are the names of the lists, which only the service
-// knows, so the row has none here.
+// service runs (taskService.specs). Path is the route of this server, and Service is the href of the same write at the
+// service (extensions/README.md, "A task service"): setTasks refuses a service that lacks one. The options of the
+// field list are the names of the lists, which only the service knows, so the row has none here.
 var taskCatalog = []spec{
-	{Name: "add-task", Title: "Add a task", Class: []string{"create"}, Method: "POST", Path: "/tasks",
+	{Name: "add-task", Title: "Add a task", Class: []string{"create"}, Method: "POST", Path: "/tasks", Service: "/tasks",
 		Description: "Make a task in the task service. list is the name of a list (the default list when absent). due is a day, YYYY-MM-DD.",
 		Hint:        "Make a task.",
 		Fields:      []siren.Field{req("title", "text", "Title"), opt("list", "text", "List"), opt("due", "date", "Due day"), area("notes", "Notes", 4)}},
-	{Name: "edit-task", Title: "Edit a task", Class: []string{"edit"}, Method: "POST", Path: "/tasks/items/{id}",
+	{Name: "edit-task", Title: "Edit a task", Class: []string{"edit"}, Method: "POST", Path: "/tasks/items/{id}", Service: "/tasks/{id}",
 		Description: "Change the title, the notes or the due day of a task. A field that is not sent stays as it is. An empty due or notes clears it.",
 		Fields: []siren.Field{path("id", "text", "Task"), opt("title", "text", "Title"), area("notes", "Notes", 4),
 			opt("due", "date", "Due day")}},
-	{Name: "complete-task", Title: "Complete a task", Class: []string{"toggle"}, Method: "POST", Path: "/tasks/items/{id}/complete",
+	{Name: "complete-task", Title: "Complete a task", Class: []string{"toggle"}, Method: "POST", Path: "/tasks/items/{id}/complete", Service: "/tasks/{id}/complete",
 		Description: "Mark a task as done.",
 		Fields:      []siren.Field{path("id", "text", "Task")}},
-	{Name: "reopen-task", Title: "Reopen a task", Class: []string{"toggle"}, Method: "POST", Path: "/tasks/items/{id}/reopen",
+	{Name: "reopen-task", Title: "Reopen a task", Class: []string{"toggle"}, Method: "POST", Path: "/tasks/items/{id}/reopen", Service: "/tasks/{id}/reopen",
 		Description: "Mark a done task as open again.",
 		Fields:      []siren.Field{path("id", "text", "Task")}},
-	{Name: "delete-task", Title: "Delete a task", Method: "POST", Path: "/tasks/items/{id}/delete", Owner: true, Danger: true,
+	{Name: "delete-task", Title: "Delete a task", Method: "POST", Path: "/tasks/items/{id}/delete", Service: "/tasks/{id}/delete", Owner: true, Danger: true,
 		Description: "Delete a task in the task service. The service cannot give it back.",
 		Fields:      []siren.Field{path("id", "text", "Task")}},
-	{Name: "sync-tasks", Title: "Sync the done tasks", Method: "POST", Path: "/tasks/sync",
+	{Name: "sync-tasks", Title: "Sync the done tasks", Method: "POST", Path: "/tasks/sync", Service: "/sync",
 		Description: "Ask the task service to write the tasks that are done as entries of their days, once each."},
 }
 
@@ -126,23 +111,26 @@ type taskService struct {
 	lists []taskList
 }
 
-// specs are the six actions with the names of the lists as the options of the field list of add-task.
-func (s taskService) specs() []spec {
-	out := slices.Clone(taskCatalog)
-	for i := range out {
-		out[i].Fields = slices.Clone(out[i].Fields)
-		for j := range out[i].Fields {
-			if out[i].Fields[j].Name == "list" {
-				out[i].Fields[j].Options = listNames(s.lists)
-			}
-		}
+// spec is the row of the action with that name, as the service offers it. The names are the six of taskCatalog. The
+// field list of add-task gets the names of the lists as its options. That row has a copy of its fields, so the row of
+// taskCatalog does not change. The other rows are the rows of taskCatalog, and a page that draws many tasks copies
+// nothing for them.
+func (s taskService) spec(name string) spec {
+	row := taskCatalog[slices.IndexFunc(taskCatalog, func(x spec) bool { return x.Name == name })]
+	if i := slices.IndexFunc(row.Fields, func(f siren.Field) bool { return f.Name == "list" }); i >= 0 {
+		row.Fields = slices.Clone(row.Fields)
+		row.Fields[i].Options = listNames(s.lists)
 	}
-	return out
+	return row
 }
 
-// spec is the row of the action with that name. The names are the six of taskCatalog.
-func (s taskService) spec(name string) spec {
-	return s.specs()[slices.IndexFunc(taskCatalog, func(x spec) bool { return x.Name == name })]
+// specs are the six actions, each as spec gives it.
+func (s taskService) specs() []spec {
+	out := make([]spec, len(taskCatalog))
+	for i, row := range taskCatalog {
+		out[i] = s.spec(row.Name)
+	}
+	return out
 }
 
 // action is the action as a page draws it: path fields filled from params, other fields with the values.
@@ -469,55 +457,47 @@ func (h *server) tasksList(r *http.Request) (*siren.Entity, error) {
 	})
 }
 
-// tasksDone is the tasks done in the last doneWindow days, newest first.
+// tasksDone is the tasks done in the last doneWindow days, newest first, across the lists.
 func (h *server) tasksDone(r *http.Request) (*siren.Entity, error) {
-	return h.doneOf(r, "/tasks/done", "Done", false)
-}
-
-// tasksListDone is the same for one list.
-func (h *server) tasksListDone(r *http.Request) (*siren.Entity, error) {
-	return h.doneOf(r, "", "", true)
-}
-
-// doneOf is a page of done tasks. For one list, the href and the title come from the list.
-func (h *server) doneOf(r *http.Request, href, title string, oneList bool) (*siren.Entity, error) {
 	return h.withTasks(r, func(ctx context.Context, svc taskService) (*siren.Entity, error) {
-		listID := ""
-		if oneList {
-			l, err := svc.listOf(r)
-			if err != nil {
-				return nil, err
-			}
-			listID, href, title = l.ID, taskListHref(l.ID)+"/done", "Done · "+l.Name
-		}
-		tasks, err := svc.done(ctx, r, daysOf(h.s.Local()).DoneSince, listID)
+		return h.donePage(ctx, r, svc, "", "/tasks/done", "Done")
+	})
+}
+
+// tasksListDone is the same for one list. The href and the title come from the list.
+func (h *server) tasksListDone(r *http.Request) (*siren.Entity, error) {
+	return h.withTasks(r, func(ctx context.Context, svc taskService) (*siren.Entity, error) {
+		l, err := svc.listOf(r)
 		if err != nil {
 			return nil, err
 		}
-		return &siren.Entity{Class: []string{"done"}, Title: title, Properties: map[string]any{"count": len(tasks)},
-			Entities: svc.rows(tasks, !oneList), Links: svc.links(href, title, nil)}, nil
+		return h.donePage(ctx, r, svc, l.ID, taskListHref(l.ID)+"/done", "Done · "+l.Name)
 	})
+}
+
+// donePage is a page of done tasks. listID limits it to one list; "" is every list, and then each row names its list.
+func (h *server) donePage(ctx context.Context, r *http.Request, svc taskService, listID, href, title string) (*siren.Entity, error) {
+	tasks, err := svc.done(ctx, r, daysOf(h.s.Local()).DoneSince, listID)
+	if err != nil {
+		return nil, err
+	}
+	return &siren.Entity{Class: []string{"done"}, Title: title, Properties: map[string]any{"count": len(tasks)},
+		Entities: svc.rows(tasks, listID == ""), Links: svc.links(href, title, nil)}, nil
 }
 
 // tasksItem is one task.
 func (h *server) tasksItem(r *http.Request) (*siren.Entity, error) {
 	return h.withTasks(r, func(ctx context.Context, svc taskService) (*siren.Entity, error) {
-		return svc.taskAt(ctx, r, "/tasks/"+url.PathEscape(r.PathValue("id")), nil)
+		e, err := svc.get(ctx, r, "/tasks/"+url.PathEscape(r.PathValue("id")))
+		if err != nil {
+			return nil, err
+		}
+		return svc.pageOf(r, e)
 	})
 }
 
-// taskAt asks the service for a task and gives its page: a GET when values is nil, else a POST of the values.
-func (s taskService) taskAt(ctx context.Context, r *http.Request, href string, values map[string]string) (*siren.Entity, error) {
-	var e *siren.Entity
-	var err error
-	if values == nil {
-		e, err = s.get(ctx, r, href)
-	} else {
-		e, err = s.post(ctx, r, href, values)
-	}
-	if err != nil {
-		return nil, err
-	}
+// pageOf is the page of the task that the service answered.
+func (s taskService) pageOf(r *http.Request, e *siren.Entity) (*siren.Entity, error) {
 	var t svcTask
 	if err := propertiesOf(e, &t); err != nil || t.ID == "" {
 		return nil, forwardError(r, "the task service", fmt.Errorf("the answer is not a task: %v", err))
@@ -531,7 +511,8 @@ func (s taskService) taskAt(ctx context.Context, r *http.Request, href string, v
 func (h *server) taskWrite(name string) func(*http.Request) (*siren.Entity, error) {
 	return func(r *http.Request) (*siren.Entity, error) {
 		return h.withTasks(r, func(ctx context.Context, svc taskService) (*siren.Entity, error) {
-			a, err := admit(r, svc.spec(name))
+			row := svc.spec(name)
+			a, err := admit(r, row)
 			if err != nil {
 				return nil, err
 			}
@@ -539,15 +520,18 @@ func (h *server) taskWrite(name string) func(*http.Request) (*siren.Entity, erro
 			if err := svc.checkValues(values); err != nil {
 				return nil, err
 			}
-			href := taskWrites[slices.IndexFunc(taskWrites, func(w struct{ Name, Href string }) bool { return w.Name == name })].Href
-			href = strings.ReplaceAll(href, "{id}", url.PathEscape(r.PathValue("id")))
+			href := strings.ReplaceAll(row.Service, "{id}", url.PathEscape(r.PathValue("id")))
 			switch name {
 			case "sync-tasks":
 				return svc.synced(ctx, r, href)
 			case "delete-task":
 				return svc.deleted(ctx, r, href)
 			}
-			return svc.taskAt(ctx, r, href, values)
+			e, err := svc.post(ctx, r, href, values)
+			if err != nil {
+				return nil, err
+			}
+			return svc.pageOf(r, e)
 		})
 	}
 }

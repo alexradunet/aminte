@@ -153,7 +153,7 @@ func CatalogOf(role, title string, home func(*http.Request) (*siren.Entity, erro
 			Actions: actions,
 		})
 	})
-	mux.HandleFunc("GET /{$}", serve(func(r *http.Request) (*siren.Entity, error) {
+	mux.HandleFunc("GET /{$}", Entity(func(r *http.Request) (*siren.Entity, error) {
 		e, err := home(r)
 		if e != nil && e.LinkByRel("self") == nil {
 			e.Links = append(e.Links, siren.Link{Rel: []string{"self"}, Href: "/", Title: title})
@@ -161,13 +161,17 @@ func CatalogOf(role, title string, home func(*http.Request) (*siren.Entity, erro
 		return e, err
 	}))
 	for _, a := range actions {
-		mux.HandleFunc(a.Method+" "+a.Href, serve(run[a.Name]))
+		mux.HandleFunc(a.Method+" "+a.Href, Entity(run[a.Name]))
 	}
 	return mux
 }
 
-// serve turns a handler that returns an entity into an http.HandlerFunc.
-func serve(f func(*http.Request) (*siren.Entity, error)) http.HandlerFunc {
+// Entity turns a handler that returns an entity into an http.HandlerFunc: it is how the actions of Catalog answer, and
+// how a program answers a read that it serves beside them (a GET route of its own). The entity is sent with status 200
+// and, for a POST whose entity has a self link, with that link as the Location header. An Error, also one that the
+// handler wrapped, is sent with its status and its code. Any other error, and a missing entity, is 500 internal: the
+// text of the cause is not sent.
+func Entity(f func(*http.Request) (*siren.Entity, error)) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		e, err := f(r)
 		var ae *Error

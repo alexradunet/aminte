@@ -136,28 +136,20 @@ func taskService(t *testing.T) http.Handler {
 }
 
 // TestAChildWithTheClassTasksMakesTheServiceTasks registers a small task service and reads Tasks through the server:
-// the list of the service is a list of the page. Connect reads the class, as serve does, and so ConnectTasks, which is
-// Connect, does too.
+// the list of the service is a list of the page. Connect reads the class, as serve does.
 func TestAChildWithTheClassTasksMakesTheServiceTasks(t *testing.T) {
-	for name, connect := range map[string]func(*lifelogtest.Server, testing.TB, string, http.Handler){
-		"Connect":      (*lifelogtest.Server).Connect,
-		"ConnectTasks": (*lifelogtest.Server).ConnectTasks,
-	} {
-		t.Run(name, func(t *testing.T) {
-			s := lifelogtest.New(t, "2031-05-14")
-			connect(s, t, "svc", taskService(t))
-			tasks, err := client.Remote(s.URL, "cli", "").Get(t.Context(), "/tasks")
-			if err != nil {
-				t.Fatalf("GET /tasks: %v", err)
-			}
-			b, err := json.Marshal(tasks)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if !strings.Contains(string(b), `"Home"`) {
-				t.Errorf("GET /tasks does not name the list Home: %s", b)
-			}
-		})
+	s := lifelogtest.New(t, "2031-05-14")
+	s.Connect(t, "svc", taskService(t))
+	tasks, err := client.Remote(s.URL, "cli", "").Get(t.Context(), "/tasks")
+	if err != nil {
+		t.Fatalf("GET /tasks: %v", err)
+	}
+	b, err := json.Marshal(tasks)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(b), `"Home"`) {
+		t.Errorf("GET /tasks does not name the list Home: %s", b)
 	}
 }
 

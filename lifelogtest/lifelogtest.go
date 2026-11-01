@@ -58,10 +58,3 @@ func (s *Server) Connect(t testing.TB, name string, h http.Handler) {
 		t.Fatalf("lifelogtest.Connect %s: %v", name, err)
 	}
 }
-
-// ConnectTasks is Connect. The class of the catalog of h makes it the task service, as it does for serve. It stays only
-// until the callers use Connect.
-func (s *Server) ConnectTasks(t testing.TB, name string, h http.Handler) {
-	t.Helper()
-	s.Connect(t, name, h)
-}

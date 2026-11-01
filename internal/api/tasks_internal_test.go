@@ -93,12 +93,37 @@ func TestDueBetweenAndOverdue(t *testing.T) {
 	}
 }
 
+// theSixTaskActions are the names of the six actions of Tasks, and the hrefs of the six writes of the protocol of a task
+// service (extensions/README.md, "A task service"), written out by hand: the expected answers do not come from
+// taskCatalog.
+var theSixTaskActions = []string{"add-task", "edit-task", "complete-task", "reopen-task", "delete-task", "sync-tasks"}
+var theSixTaskWrites = []string{"/tasks", "/tasks/{id}", "/tasks/{id}/complete", "/tasks/{id}/reopen", "/tasks/{id}/delete", "/sync"}
+
+// actionsOfWrites is the catalog of a task service: the six writes of the protocol.
 func actionsOfWrites() []siren.Action {
 	var out []siren.Action
-	for _, w := range taskWrites {
-		out = append(out, siren.Action{Name: w.Name, Method: "POST", Href: w.Href})
+	for i, href := range theSixTaskWrites {
+		out = append(out, siren.Action{Name: theSixTaskActions[i], Method: "POST", Href: href})
 	}
 	return out
+}
+
+// taskCatalog is the one table of the six actions: each row has the name of its action and the href of its write at the
+// service, and the table has no other row. A service that answers the six hrefs is registered (the tests below).
+func TestTheTaskCatalogHoldsTheSixWritesOfTheProtocol(t *testing.T) {
+	if len(taskCatalog) != len(theSixTaskActions) {
+		t.Fatalf("taskCatalog has %d rows, want %d", len(taskCatalog), len(theSixTaskActions))
+	}
+	for i, name := range theSixTaskActions {
+		at := slices.IndexFunc(taskCatalog, func(x spec) bool { return x.Name == name })
+		if at < 0 {
+			t.Errorf("taskCatalog has no row %s", name)
+			continue
+		}
+		if got := taskCatalog[at].Service; got != theSixTaskWrites[i] {
+			t.Errorf("%s: the href at the service is %q, want %q", name, got, theSixTaskWrites[i])
+		}
+	}
 }
 
 // The registry holds one task service. It refuses a second, and a catalog that lacks a write; Remove frees the role;
@@ -304,9 +329,9 @@ func TestWhenTheTaskServiceEndsTasksIsGone(t *testing.T) {
 		t.Error("the root still links to /tasks")
 	}
 	body := send(h, "GET", "/actions", "", nil).Body.String()
-	for _, w := range taskWrites {
-		if strings.Contains(body, `"`+w.Name+`"`) {
-			t.Errorf("GET /actions still has %s", w.Name)
+	for _, name := range theSixTaskActions {
+		if strings.Contains(body, `"`+name+`"`) {
+			t.Errorf("GET /actions still has %s", name)
 		}
 	}
 	rec := send(h, "GET", "/tasks", "", nil)
