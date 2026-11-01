@@ -201,7 +201,12 @@ counter-review. The waves keep the scopes apart:
 ## The record (2026-11-01)
 
 Built on the branch `plan-162` (`926b819..35597ba`, 28 commits) by Sonnet builders in worktrees; the main session
-merged each part and ran the checks. Not live yet.
+merged each part and ran the checks. Live on 2026-11-01 at 10:16, built from `0c552c6`. The owner stopped the service,
+kept the old programs as `.prev`, built the eight programs into `/home/cico/.local/bin` (the new one is `lifelog-agent`),
+added `--with agent` to the drop-in `/etc/systemd/system/lifelog.service.d/plan-161.conf`, and started the service.
+The log: `serving ... on http://127.0.0.1:7777 (token required)`, `started` for whatsapp, ticktick, web and agent,
+`the task service, 3 lists`, and at 10:18:31 `lifelog-agent: turn answered: 282 bytes out, 2 tool calls`. The owner
+confirmed that it works.
 
 | step | what it holds |
 |---|---|
