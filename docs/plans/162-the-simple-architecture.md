@@ -198,6 +198,40 @@ counter-review. The waves keep the scopes apart:
 | 2 | G2 (`internal/api/tasks.go`, `app`, ticktick), D3 and D4 (the tests of `internal/api` and `cmd/lifelog`) | They come after the admission of A. |
 | 3 | F (`app`, the six programs), G1 (CI, the build line), D5, E (the pages) | F touches the mains of whatsapp and of the agent after B. E says what the code says at the end. |
 
+## The record (2026-11-01)
+
+Built on the branch `plan-162` (`926b819..35597ba`, 28 commits) by Sonnet builders in worktrees; the main session
+merged each part and ran the checks. Not live yet.
+
+| step | what it holds |
+|---|---|
+| wave 1 | A: one admission step (`admit`), one handshake (`Register`), `api.New` folded into `NewWith`. B: `extensions/agent`, whatsapp as a transport, CI over `extensions/*/`, one build line. C: web reads the embed of the core (a day page reads the core 3 times, not 8). D: faster tests, the hand counts of `tests/README.md` gone. H: the HEIF reader deleted. I: the index is the one home of a status; 30 plans closed. |
+| the reviews of wave 1 | Three Opus reviews of the conversation. The first found a loop with no bound in the agent (one `say` gave 4 replies in 13 s and the replies went on), a relay that lost a reply, and forged owner turns. The owner decided that the core writes both turns (`reply`). The second and the third found more ways to forge or block a turn, all from one root: the core found the conversation by its title alone. The fixes: a key for each turn, a conversation title kept for `say`, every body write of a conversation page by an agent refused in `SetBody`, the category `Conversations` kept a plain page. |
+| wave 2 | G2: one table of the six task actions, `app.Entity`, no `ConnectTasks`. D3 and D4: rules in place of hand lists; 15 parity rows deleted; three mutants for three core integrity tests. |
+| wave 3 | F: `app.Main`, `app.API`, `app.StateDir`; 78 is the one exit status for "the owner acts first". E: one home for each rule in the pages; `lifelog actions --human` in place of the README table of the surfaces. |
+| the final review | Waves 2 and 3: a refused duplicate `create-page` had lost its test (HIGH), the orphan query a witness, the classes some pins, and several lines of the pages a detail. All fixed. |
+
+The numbers, at `35597ba` against `926b819`:
+
+- The baseline at the root (`go test -count=1 ./...`, 3 runs in turn on the same machine, Linux, 4 vCPUs): median
+  56.3 s before, 47.2 s after.
+- Lines: Go code +2486 and -2430; tests +8183 and -3514; the pages +683 and -569. The estimate of the critic was about
+  3400 out and 600 in. It did not hold: the code moved more than it went (the agent left whatsapp, `reply` came in),
+  and the tests grew by about 4600 lines, most of them for the rules of a conversation that the reviews of wave 1
+  forced (about 2100 in `internal/api`) and for the agent (about 2600 in `extensions/agent`, moved from whatsapp and
+  grown). The gain is in the structure, not in the count.
+- 288 mutants, all killed.
+
+Checks at `35597ba`: at the root `go vet ./...`, `go test -count=1 ./...`, `-shuffle=on`, `staticcheck` 2026.2.2,
+`govulncheck` v1.9.0 (no vulnerabilities), `go mod tidy -diff`, and the race check for `internal/api`,
+`cmd/lifelog`, `app` and `lifelogtest`; in each of the seven extensions `go vet`, `go test` (the end-to-end tests
+too), `go mod tidy -diff` and `staticcheck`, and the race check for `extensions/agent` and `extensions/whatsapp`.
+Linux only.
+
+The live move: `lifelog`, `lifelog-agent` and `lifelog-whatsapp` ship together. The new core refuses a reply that the
+old whatsapp writes with `save-body`, and the new whatsapp writes no reply. So the service stops first, every program
+is built, the drop-in gets `--with agent`, and the service starts.
+
 ## Checks
 
 - Each wave: `gofmt`; at the root `go vet ./... && go test ./...`, `go test -count=1 -shuffle=on ./...`, `staticcheck
