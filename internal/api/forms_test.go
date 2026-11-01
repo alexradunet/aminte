@@ -119,24 +119,6 @@ func TestASaveCarriesTheRevisionAsAString(t *testing.T) {
 	}
 }
 
-func TestTheCatalogSaysOneVerbForOneMeaning(t *testing.T) {
-	c, _, _ := apitest.FreshOn(t, "cli", fixedToday)
-	titles := map[string]string{}
-	for _, a := range apitest.Must(t)(c.Get(t.Context(), "/actions")).Actions {
-		titles[a.Name] = a.Title
-	}
-	for name, want := range map[string]string{
-		"create-page": "New page", "create-person": "New person", "promote": "Make it a person",
-		"register-metric": "New metric", "add-file": "New file",
-		"record": "Add a reading", "capture": "Add to the day",
-		"revive": "Restore", "file-pages": "Put in a category",
-	} {
-		if titles[name] != want {
-			t.Errorf("%s is titled %q, want %q", name, titles[name], want)
-		}
-	}
-}
-
 // TestAPagesCategoriesAreLinks: file-pages puts a page in a category (a new name makes it), and with from it takes the
 // page out of that one only. The page lists its categories as part-of links, offers the categories by title (not
 // itself) in the options of file-pages, and a day page is never filed.

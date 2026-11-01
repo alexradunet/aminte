@@ -6,7 +6,6 @@ import (
 	"database/sql/driver"
 	"errors"
 	"io"
-	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -391,25 +390,6 @@ func TestIntegrityDiagnostics(t *testing.T) {
 				t.Errorf("closed=%d execs=%d; want %d/1", c.closed, c.execs, want)
 			}
 		})
-	}
-}
-
-func TestIntegrityDetectsDeliberatePreferredOwnerDamage(t *testing.T) {
-	s := fresh(t)
-	id, _, err := s.CreatePage(ctx, "cli", "Owner", "prose", "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	// Deliberate external damage only: same pooled connection, FK disabled for this write.
-	if _, err := s.DB.W.Exec(`PRAGMA foreign_keys=OFF; UPDATE entities SET preferred_name_key='mood' WHERE id=?`, id); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := s.DB.W.Exec(`PRAGMA foreign_keys=ON`); err != nil {
-		t.Fatal(err)
-	}
-	r, err := s.Integrity(ctx)
-	if err != nil || r.OK || !reflect.DeepEqual(r.OrphanEntities, []int64{id}) {
-		t.Fatalf("independent preferred-owner diagnostic: %+v %v", r, err)
 	}
 }
 

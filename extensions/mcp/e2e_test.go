@@ -108,7 +108,8 @@ func TestTheMCPServerOnTheRealLifelog(t *testing.T) {
 	for _, tool := range listed.Tools {
 		have[tool.Name] = true
 	}
-	for _, name := range []string{"find", "capture", "get", "save_body", "add_file", "edit_person", "edit_metric"} {
+	// A floor of two names: the comparison below reads the full list from the catalog, and it would pass with an empty list on both sides.
+	for _, name := range []string{"find", "capture"} {
 		if !have[name] {
 			t.Errorf("no tool %q", name)
 		}

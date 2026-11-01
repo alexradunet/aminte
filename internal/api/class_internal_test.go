@@ -62,24 +62,57 @@ func TestTheCatalogUsesOnlyKnownClassesAndOneToAnAction(t *testing.T) {
 	}
 }
 
-// TestTheCatalogGivesEachActionItsClass: the classes of the vocabulary (plan 159), by name, in the catalog and in the
-// rows of the task service.
-func TestTheCatalogGivesEachActionItsClass(t *testing.T) {
-	want := map[string]string{
-		"create-page": "create", "create-person": "create", "add-file": "create", "register-metric": "create",
-		"record": "create", "capture": "create", "snapshot": "create",
-		"rename": "edit", "edit-person": "edit", "edit-metric": "edit", "correct": "edit", "save-body": "edit",
-		"set-cover": "edit", "settings": "edit", "promote": "edit",
-		"revive":   "toggle",
-		"add-task": "create", "edit-task": "edit", "complete-task": "toggle", "reopen-task": "toggle",
-	}
+// TestTheClassOfARowIsWhatTheRowDoes: API.md says what each class does, and a row shows it: its method, its title, whether
+// it acts on one resource by {id}, and what it asks a person for (the fields that are not path fields). The test reads
+// these from every row of the catalog and of the task service, so a new action needs no edit here, and the message
+// names the row that breaks a rule. The rules:
+//
+//   - A row with a class is a POST row: a GET reads and changes nothing.
+//   - A title that starts with New or Add is a create (one verb for one meaning), and a create has such a title. The
+//     one create that asks for nothing, the snapshot of the file, has a plain verb.
+//   - A POST on {id} that asks for nothing and is no danger is a toggle. A toggle asks for nothing, or for one field
+//     with two options.
+//   - A POST on {id} that asks for a field is an edit, unless it has the shape of a toggle. An edit asks for a field.
+//   - A danger row has no class: its danger mark draws it.
+//
+// The rules leave two things open, because a row cannot show them: a class that is taken away from settings (an edit
+// that acts on no {id}), and an edit, or a toggle that asks for nothing, that is given to a row with no {id}, such as
+// file-pages, say or rebuild-search.
+func TestTheClassOfARowIsWhatTheRowDoes(t *testing.T) {
 	for _, s := range append(slices.Clone(catalog), taskCatalog...) {
-		var got string
+		var class string
 		if len(s.Class) > 0 {
-			got = s.Class[0]
+			class = s.Class[0]
 		}
-		if got != want[s.Name] {
-			t.Errorf("%s has the class %q, want %q", s.Name, got, want[s.Name])
+		var onID bool
+		var asked []siren.Field
+		for _, f := range s.Fields {
+			switch {
+			case f.In != "path":
+				asked = append(asked, f)
+			case f.Name == "id":
+				onID = true
+			}
+		}
+		aToggle := len(asked) == 0 || len(asked) == 1 && len(asked[0].Options) == 2
+		newOrAdd := strings.HasPrefix(s.Title, "New ") || strings.HasPrefix(s.Title, "Add ")
+		switch {
+		case class != "" && s.Method != "POST":
+			t.Errorf("%s has the class %q and the method %s, want POST", s.Name, class, s.Method)
+		case newOrAdd && class != "create":
+			t.Errorf("%s is titled %q, which starts a create, and has the class %q", s.Name, s.Title, class)
+		case class == "create" && !newOrAdd && len(asked) > 0:
+			t.Errorf("%s is a create titled %q: want a title that starts with New or Add", s.Name, s.Title)
+		case s.Danger && class != "":
+			t.Errorf("%s is a danger and has the class %q, want none", s.Name, class)
+		case s.Method == "POST" && onID && !s.Danger && len(asked) == 0 && class != "toggle":
+			t.Errorf("%s acts on {id} and asks for nothing: the class is %q, want toggle", s.Name, class)
+		case s.Method == "POST" && onID && !s.Danger && len(asked) > 0 && !aToggle && class != "edit":
+			t.Errorf("%s acts on {id} and asks for %d fields: the class is %q, want edit", s.Name, len(asked), class)
+		case class == "edit" && len(asked) == 0:
+			t.Errorf("%s is an edit and asks for no field", s.Name)
+		case class == "toggle" && !aToggle:
+			t.Errorf("%s is a toggle and asks for %d fields, want none or one with two options", s.Name, len(asked))
 		}
 	}
 }

@@ -293,7 +293,7 @@ func TestAScoreRangeOutOfOrderIsRefused(t *testing.T) {
 }
 
 // The metrics as cards (docs/plans/112-metrics-as-cards.md): the cards that /metrics draws. Several metrics filed in a
-// category in one write are TestFileMetricsAtOnce's; the parity table of cmd/lifelog runs file-pages on every surface.
+// category in one write are TestFileMetricsAtOnce's.
 
 // cardsFixture registers Ferritin (read on two days long ago), Weight (read on the two days before fixedToday), Walk
 // (a habit) and Steps (never read), and returns the client, the handler and the metric ids by name.

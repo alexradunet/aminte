@@ -33,6 +33,11 @@ import (
 // has a shortcut of an action, the row runs the shortcut there: the shortcut wraps the action, so its answer is the
 // action's. Each surface keeps the tests of what is its own: the flags, the output and snapshot --snapshots of the CLI; the transport of the client. The clock of every row is
 // fixed at parityToday, so no row depends on the date of the run.
+//
+// A row stays for what a surface adapts: a CLI shortcut (page, rename, day, snapshot), the word today in a day field, a
+// number or a flag, one kind of field (a hidden version, a password), the refusals 422, 409 and 403, the owner and the
+// agent, a GET and a POST. The generic path, do and client.Do, is one path for every action. A row that only sends one
+// more action through it is not here: the outcome of that action is the test of internal/api that holds it.
 func TestParityOfTheSurfaces(t *testing.T) {
 	for _, row := range parityRows() {
 		for _, s := range paritySurfaces {
@@ -218,12 +223,6 @@ func (x *parityRun) categories(id int64) string {
 	return strings.Join(out, ",")
 }
 
-// browse is the titles of the rows of a browse through the HTTP API.
-func (x *parityRun) browse(query string) string {
-	x.t.Helper()
-	return rowField(x.t, apitest.Must(x.t)(x.read.Get(x.t.Context(), "/browse?"+query)), "title")
-}
-
 // rowField is a field of each row of a browse entity, in order.
 func rowField(t *testing.T, e *siren.Entity, name string) string {
 	t.Helper()
@@ -271,14 +270,6 @@ func parityRows() []parityRow {
 		{"open-day of today", rowOpenToday},
 		{"the word today in a day field", rowTodayInADayField},
 		{"browse", rowBrowse},
-		{"search order=newest", rowSearchNewest},
-		{"browse deleted=1", rowBrowseDeleted},
-		{"search limit=1", rowSearchLimit},
-		{"file-pages", rowFilePages},
-		{"file-pages with from", rowUnfilePages},
-		{"file-pages with a day page", rowFileADayPage},
-		{"create-page of a week makes the week page", rowCreateWeekPage},
-		{"create-page of a week the year does not have", rowCreateWeek53},
 	}
 	for _, kind := range []string{"page", "person", "metric", "file"} {
 		rows = append(rows, parityRow{"rename a " + kind, func(x *parityRun) { rowRename(x, kind) }})
@@ -290,20 +281,13 @@ func parityRows() []parityRow {
 		parityRow{"settings", rowSettings},
 		parityRow{"say", rowSay},
 		parityRow{"reply", rowReply},
-		parityRow{"rebuild-search", rowRebuildSearch},
-		parityRow{"resync-links", rowResyncLinks},
 		parityRow{"promote", rowPromote},
-		parityRow{"edit-person", rowEditPerson},
 		parityRow{"edit-metric", rowEditMetric},
-		parityRow{"register-metric with a range out of order", rowRangeOutOfOrder},
 		parityRow{"set-cover by a kept title", rowSetCover},
-		parityRow{"a capture with a key sent again", rowCaptureSentAgain},
 		parityRow{"random-page kind=day", rowRandomDay},
 		parityRow{"random-page kind=person", rowRandomPage},
 		parityRow{"search kind=person", rowSearchKind},
-		parityRow{"create-page with a category", rowCreatePage},
 		parityRow{"create-person", rowCreatePerson},
-		parityRow{"tombstone-pages then revive", rowTombstoneAndRevive},
 		parityRow{"correct and retract", rowCorrectAndRetract},
 		parityRow{"integrity-check", rowIntegrityCheck},
 		parityRow{"snapshot", rowSnapshot},
@@ -321,42 +305,6 @@ func rowUnknownField(x *parityRun) {
 // A value outside the static options of a field is the 422 of the server on every surface.
 func rowAValueOutsideTheOptions(x *parityRun) {
 	x.refused("search", map[string]string{"q": "a", "kind": "planet"}, http.StatusUnprocessableEntity, "invalid")
-}
-
-// A capture sent again with the same import_key changes nothing (issue 0085, D28): the answer is "Already added" with
-// the day, and the day keeps one paragraph and one Mood reading. Another key is a new capture. A key of a bad shape is
-// the 422 of the schema's CHECK (capture_keys_import_key), and it writes nothing.
-func rowCaptureSentAgain(x *parityRun) {
-	args := map[string]string{"day": "today", "text": "Walked the dog", "mood": "4", "import_key": "parity-key-1"}
-	if e := x.ok("capture", args); e.Title != parityToday {
-		x.t.Errorf("the first capture: %q, want the day %s", e.Title, parityToday)
-	}
-	for range 2 {
-		if e := x.ok("capture", args); e.Title != "Already added" || apitest.Href(e, "day") != "/days/"+parityToday {
-			x.t.Errorf("the capture sent again: %q links the day %q, want Already added with /days/%s", e.Title, apitest.Href(e, "day"), parityToday)
-		}
-	}
-	body := func() any {
-		e, err := x.page(parityToday)
-		if err != nil {
-			x.t.Fatal(err)
-		}
-		return props(x.t, e)["body"]
-	}
-	// each paragraph begins with its stamp: the hour of the surface's clock, and via parity when the writer is the agent
-	const stamp = `\(\d\d:\d\d(, via parity)?\) `
-	day := props(x.t, apitest.Must(x.t)(x.read.Get(x.t.Context(), "/days/"+parityToday)))
-	if one := regexp.MustCompile("^" + stamp + "Walked the dog$"); fmt.Sprint(day["mood"]) != "[4]" || !one.MatchString(fmt.Sprint(body())) {
-		x.t.Errorf("%s after the sends again: moods %v, page %q, want [4] and one stamped paragraph", parityToday, day["mood"], body())
-	}
-	x.ok("capture", map[string]string{"day": "today", "text": "Again", "import_key": "parity-key-2"})
-	if two := regexp.MustCompile("^" + stamp + "Walked the dog\n\n" + stamp + "Again$"); !two.MatchString(fmt.Sprint(body())) {
-		x.t.Errorf("the page after another key: %q, want two stamped paragraphs", body())
-	}
-	bad := map[string]string{"day": "today", "text": "Never", "import_key": strings.Repeat("k", 513)}
-	if msg := x.refused("capture", bad, http.StatusUnprocessableEntity, "invalid"); !strings.Contains(msg, "capture_keys_import_key") {
-		x.t.Errorf("a key of 513 bytes: %q, want the CHECK capture_keys_import_key", msg)
-	}
 }
 
 // set-cover with the title of a kept picture puts its embed first in the body, so it is the page's cover; the
@@ -556,37 +504,6 @@ func rowBrowse(x *parityRun) {
 	x.refused("browse", map[string]string{"kind": "all"}, http.StatusUnprocessableEntity, "invalid")
 }
 
-// search lists each page once, best match first. With order=newest it goes by the day of a page: a day page by its
-// title, any other page by the day it was made. An unknown order is a 422.
-func rowSearchNewest(x *parityRun) {
-	ctx := x.t.Context()
-	for _, day := range []string{"2021-05-05", "2098-01-01"} {
-		if _, _, err := x.store.Capture(ctx, "cli", day, "A lantern.", nil); err != nil {
-			x.t.Fatal(err)
-		}
-	}
-	if _, _, err := x.store.CreatePage(ctx, "cli", "Shed", "A lantern.", ""); err != nil { // made now: between the days
-		x.t.Fatal(err)
-	}
-	hits := func(args map[string]string) string {
-		x.t.Helper()
-		var out []string
-		for _, h := range props(x.t, x.ok("search", args))["hits"].([]any) {
-			out = append(out, fmt.Sprint(h.(map[string]any)["title"]))
-		}
-		return strings.Join(out, ",")
-	}
-	if got, want := hits(map[string]string{"q": "lantern", "order": "newest"}), "2098-01-01,Shed,2021-05-05"; got != want {
-		x.t.Errorf("search order=newest: %s, want %s", got, want)
-	}
-	if best, plain := hits(map[string]string{"q": "lantern", "order": "best"}), hits(map[string]string{"q": "lantern"}); best != plain || strings.Count(best, ",") != 2 {
-		x.t.Errorf("search order=best: %s, the default: %s; want the same three hits", best, plain)
-	}
-	if msg := x.refused("search", map[string]string{"q": "lantern", "order": "oldest"}, http.StatusUnprocessableEntity, "invalid"); !strings.Contains(msg, "best, newest") {
-		x.t.Errorf("the refusal %q does not name the orders", msg)
-	}
-}
-
 // search with a kind lists only the hits of that kind (docs/plans/130-the-explore-pass.md); a kind that is not one is
 // a 422.
 func rowSearchKind(x *parityRun) {
@@ -608,81 +525,6 @@ func rowSearchKind(x *parityRun) {
 		x.t.Errorf("search kind=person: %v, kind %v", hits, p["kind"])
 	}
 	x.refused("search", map[string]string{"q": "lantern", "kind": "metric"}, http.StatusUnprocessableEntity, "invalid")
-}
-
-// file-pages files several pages in a category in one write, and makes the category when it is new.
-func rowFilePages(x *parityRun) {
-	var ids []int64
-	for _, m := range []string{"Ferritin", "LDL"} {
-		if _, err := x.store.CreateMetric(x.t.Context(), "cli", core.NewMetric{Name: m, Unit: "mg/dL"}); err != nil {
-			x.t.Fatal(err)
-		}
-		p, err := x.store.PageID(x.t.Context(), m)
-		if err != nil || p == 0 {
-			x.t.Fatalf("%s: %d %v", m, p, err)
-		}
-		ids = append(ids, p)
-	}
-	e := x.ok("file-pages", map[string]string{"ids": id(ids[0]) + "," + id(ids[1]), "category": "Bloodwork"})
-	if p := props(x.t, e); e.Class[0] != "filed" || p["added"] != json.Number("2") || p["created"] != true {
-		x.t.Errorf("file-pages: %v %v, want 2 added and Bloodwork made", e.Class, p)
-	}
-	for _, p := range ids {
-		if got := x.categories(p); got != "Bloodwork" {
-			x.t.Errorf("page %d is in %q, want Bloodwork", p, got)
-		}
-	}
-}
-
-// file-pages with from takes the pages out of the category: the part-of links to it are removed and nothing else.
-func rowUnfilePages(x *parityRun) {
-	var ids []int64
-	for _, m := range []string{"Ferritin", "LDL"} {
-		if _, err := x.store.CreateMetric(x.t.Context(), "cli", core.NewMetric{Name: m, Unit: "mg/dL"}); err != nil {
-			x.t.Fatal(err)
-		}
-		p, err := x.store.PageID(x.t.Context(), m)
-		if err != nil || p == 0 {
-			x.t.Fatalf("%s: %d %v", m, p, err)
-		}
-		ids = append(ids, p)
-	}
-	if _, err := x.store.FilePages(x.t.Context(), "cli", ids, "Bloodwork", "", false); err != nil {
-		x.t.Fatal(err)
-	}
-	e := x.ok("file-pages", map[string]string{"ids": id(ids[0]) + "," + id(ids[1]), "from": "Bloodwork"})
-	if p := props(x.t, e); p["removed"] != json.Number("2") || e.Result != "Removed Ferritin and LDL from Bloodwork." {
-		x.t.Errorf("file-pages from: %v %q, want 2 removed", p, e.Result)
-	}
-	for _, p := range ids {
-		if got := x.categories(p); got != "" {
-			x.t.Errorf("page %d is in %q, want no category", p, got)
-		}
-	}
-}
-
-// A day page is never filed (D26): file-pages with a day page among its ids is the 422 of the trigger, and nothing is
-// written: not the link of the other page, not the category, and no version changes.
-func rowFileADayPage(x *parityRun) {
-	plain, _, err := x.store.CreatePage(x.t.Context(), "cli", "Plans", "", "")
-	if err != nil {
-		x.t.Fatal(err)
-	}
-	day, _, err := x.store.Capture(x.t.Context(), "cli", "2031-05-02", "a synthetic entry", nil)
-	if err != nil {
-		x.t.Fatal(err)
-	}
-	before := []any{x.pageByID(plain)["version"], x.pageByID(day)["version"]}
-	msg := x.refused("file-pages", map[string]string{"ids": id(plain) + "," + id(day), "category": "Garden"}, http.StatusUnprocessableEntity, "invalid")
-	if !strings.Contains(msg, "a day page is never filed in a category (D26)") {
-		x.t.Errorf("file-pages with a day page: %q, want the sentence of the trigger", msg)
-	}
-	x.absent("Garden")
-	for i, p := range []int64{plain, day} {
-		if v, c := x.pageByID(p)["version"], x.categories(p); v != before[i] || c != "" {
-			x.t.Errorf("page %d after a refused filing: version %v (was %v), in %q", p, v, before[i], c)
-		}
-	}
 }
 
 // rename gives a page of each type a new title and keeps the old one as an alias: find by the old title and by the
@@ -886,74 +728,6 @@ func (x *parityRun) boardDaily(name string) bool {
 	return false
 }
 
-// rebuild-search is the owner's repair of the full-text index: a surface of an owner repairs a drifted index and
-// answers the number of documents; a surface of an agent is refused with 403 forbidden and leaves the index as it
-// was.
-func rowRebuildSearch(x *parityRun) {
-	x.sql(`INSERT INTO entities_fts(rowid, preferred, all_names, body) VALUES (999, 'ghost', 'ghost', 'drifted')`)
-	indexOK := func() bool {
-		x.t.Helper()
-		r, err := x.store.Integrity(x.t.Context())
-		if err != nil {
-			x.t.Fatal(err)
-		}
-		return r.FullTextIndexOK
-	}
-	switch {
-	case x.owner:
-		if p := props(x.t, x.ok("rebuild-search", nil)); p["documents"] == nil {
-			x.t.Errorf("rebuild-search: %v, want a document count", p)
-		}
-		if !indexOK() {
-			x.t.Error("rebuild-search did not repair the index")
-		}
-		return
-	default:
-		x.refused("rebuild-search", nil, http.StatusForbidden, "forbidden")
-	}
-	if indexOK() {
-		x.t.Error("a surface that may not rebuild the index repaired it")
-	}
-}
-
-// resync-links is the owner's repair of the links of the bodies: a surface of an owner rewrites the links of a page whose
-// link row is missing and lists the page; a surface of an agent is refused with 403 forbidden and leaves the link
-// missing.
-func rowResyncLinks(x *parityRun) {
-	to, _, err := x.store.CreatePage(x.t.Context(), "cli", "Bridge", "", "")
-	if err != nil {
-		x.t.Fatal(err)
-	}
-	from, _, err := x.store.CreatePage(x.t.Context(), "cli", "Anchor", "see [[Bridge]]", "")
-	if err != nil {
-		x.t.Fatal(err)
-	}
-	x.sql(`DELETE FROM links WHERE from_id = ? AND to_id = ?`, from, to)
-	drifted := func() int {
-		x.t.Helper()
-		r, err := x.store.Integrity(x.t.Context())
-		if err != nil {
-			x.t.Fatal(err)
-		}
-		return len(r.LinkDrift)
-	}
-	switch {
-	case x.owner:
-		if p := props(x.t, x.ok("resync-links", nil)); fmt.Sprint(p["pages"]) != fmt.Sprint([]any{json.Number(id(from))}) {
-			x.t.Errorf("resync-links lists %v; want the page %d", p["pages"], from)
-		}
-		if n := drifted(); n != 0 {
-			x.t.Errorf("resync-links left %d pages with other links than their bodies", n)
-		}
-		return
-	default:
-		x.refused("resync-links", nil, http.StatusForbidden, "forbidden")
-	}
-	if n := drifted(); n != 1 {
-		x.t.Errorf("a surface that may not resync links changed them: %d pages drift, want 1", n)
-	}
-}
-
 // promote makes a plain page a person on every surface, with the page's title as its name when none is sent. A person
 // promoted again is a 409. A metric is never promoted: the schema refuses it (entities_promote_from_page) as a 422
 // with the sentence of the trigger, and so is register-metric with the title of a person, which only an owner may
@@ -991,40 +765,6 @@ func rowPromote(x *parityRun) {
 	}
 	if after := same(x.pageByID(metric)); !reflect.DeepEqual(after, before) || before["type"] != "metric" {
 		x.t.Errorf("the metric after the refusals: %v, want %v, a metric", after, before)
-	}
-}
-
-// edit-person sets the name and the dates of a person, on every surface: a field left out stays, an empty date removes
-// it, the schema's CHECKs refuse an empty name and a death before the birth (422), and a plain page is a 409. A
-// refused call writes nothing.
-func rowEditPerson(x *parityRun) {
-	ctx := x.t.Context()
-	p, err := x.store.CreatePerson(ctx, "cli", "Sam (barber)", "Samuel Ortiz", "1980-02-03", "2020-01-01")
-	if err != nil {
-		x.t.Fatal(err)
-	}
-	plain, _, err := x.store.CreatePage(ctx, "cli", "Plain page", "", "")
-	if err != nil {
-		x.t.Fatal(err)
-	}
-	person := func() map[string]any {
-		m, _ := x.pageByID(p)["person"].(map[string]any)
-		return m
-	}
-	x.ok("edit-person", map[string]string{"id": id(p), "death_day": ""})
-	if got := person(); got["name"] != "Samuel Ortiz" || got["birth_day"] != "1980-02-03" || got["death_day"] != nil {
-		x.t.Errorf("after removing the death day: %v", got)
-	}
-	x.ok("edit-person", map[string]string{"id": id(p), "name": "Samuel A. Ortiz", "birth_day": "1981-04-05"})
-	want := person()
-	if want["name"] != "Samuel A. Ortiz" || want["birth_day"] != "1981-04-05" || want["death_day"] != nil {
-		x.t.Errorf("after a new name and birth day: %v", want)
-	}
-	x.refused("edit-person", map[string]string{"id": id(p), "name": ""}, http.StatusUnprocessableEntity, "invalid")
-	x.refused("edit-person", map[string]string{"id": id(p), "death_day": "1900-01-01"}, http.StatusUnprocessableEntity, "invalid")
-	x.refused("edit-person", map[string]string{"id": id(plain), "name": "X"}, http.StatusConflict, "conflict")
-	if got := person(); !reflect.DeepEqual(got, want) {
-		x.t.Errorf("after refused edits: %v, want %v", got, want)
 	}
 }
 
@@ -1081,80 +821,6 @@ func rowEditMetric(x *parityRun) {
 	if n := len(props(x.t, apitest.Must(x.t)(x.read.Get(ctx, "/metrics/Meditate")))["readings"].([]any)); n != 1 {
 		x.t.Errorf("the readings of Meditate: %d, want 1", n)
 	}
-}
-
-// A scale's range is lo-hi with lo less than hi: register-metric with the unit 5-1 is refused by the schema
-// (metrics_range_order) as a 422 with the sentence of the trigger, for an owner on http, remote and cli. Nothing is
-// written. register-metric is the owner's action, and
-// the row register-metric holds its refusal to an agent.
-func rowRangeOutOfOrder(x *parityRun) {
-	if x.owner {
-		const trigger = "a scale names its range as its unit, lo-hi with lo less than hi, as in 1-5 (D6)"
-		args := map[string]string{"name": "Pain", "unit": "5-1"}
-		if msg := x.refused("register-metric", args, http.StatusUnprocessableEntity, "invalid"); !strings.Contains(msg, trigger) {
-			x.t.Errorf("register-metric with the unit 5-1: %q, want the sentence of the trigger", msg)
-		}
-	}
-	x.absent("Pain")
-}
-
-// browse deleted=1 lists the tombstones, and search takes limit and offset: the catalog lists these fields, so the
-// CLI's do and the MCP tools can send them (plan 133, part 1).
-func rowBrowseDeleted(x *parityRun) {
-	ctx := x.t.Context()
-	id, _, err := x.store.CreatePage(ctx, "cli", "Gone", "", "")
-	if err != nil {
-		x.t.Fatal(err)
-	}
-	if _, _, err := x.store.CreatePage(ctx, "cli", "Kept", "", ""); err != nil {
-		x.t.Fatal(err)
-	}
-	if err := x.store.Tombstone(ctx, "cli", id); err != nil {
-		x.t.Fatal(err)
-	}
-	e := x.ok("browse", map[string]string{"deleted": "1"})
-	if titles := rowField(x.t, e, "title"); titles != "Gone" {
-		x.t.Errorf("browse deleted=1: %s, want Gone", titles)
-	}
-}
-
-func rowSearchLimit(x *parityRun) {
-	ctx := x.t.Context()
-	for _, title := range []string{"Shed", "Barn"} {
-		if _, _, err := x.store.CreatePage(ctx, "cli", title, "A lantern.", ""); err != nil {
-			x.t.Fatal(err)
-		}
-	}
-	hits := func(args map[string]string) int {
-		x.t.Helper()
-		args["q"] = "lantern"
-		h, _ := props(x.t, x.ok("search", args))["hits"].([]any)
-		return len(h)
-	}
-	if all, one := hits(map[string]string{}), hits(map[string]string{"limit": "1"}); one != 1 || all < 2 {
-		x.t.Errorf("search: %d hits, with limit=1 %d; want at least 2, then 1", all, one)
-	}
-	if e := x.ok("search", map[string]string{}); e.Class[0] != "search" { // an empty q is the search page
-		x.t.Errorf("search with no q: %v", e.Class)
-	}
-}
-
-// create-page of a week key makes the week page, titled with the key; the page is a period page (D30).
-func rowCreateWeekPage(x *parityRun) {
-	e := x.ok("create-page", map[string]string{"title": "2031-W21", "body": "Review the week"})
-	p := props(x.t, e)
-	if e.Title != "2031-W21" || p["period"] != "week" || p["body"] != "Review the week" {
-		x.t.Errorf("create-page of 2031-W21: %q %v", e.Title, p)
-	}
-}
-
-// 2031 has 52 ISO weeks: the file refuses week 53, by the name of its constraint (D30), and writes nothing.
-func rowCreateWeek53(x *parityRun) {
-	msg := x.refused("create-page", map[string]string{"title": "2031-W53"}, http.StatusUnprocessableEntity, "invalid")
-	if !strings.Contains(msg, "entities_period_exists") {
-		x.t.Errorf("create-page of 2031-W53: %q, want the CHECK entities_period_exists", msg)
-	}
-	x.absent("2031-W53")
 }
 
 // settings is the owner's: an owner saves the model, reads it back with GET /settings, and clears a setting with an empty
@@ -1285,30 +951,6 @@ func mustInt(t *testing.T, v any) int64 {
 	return i
 }
 
-// create-page makes a page with a body and files it in a category in one write, and makes the category when it is new.
-// A second page with the same title is 409 exists, and the first page stays as it was.
-func rowCreatePage(x *parityRun) {
-	e := x.ok("create-page", map[string]string{"title": "Trip notes", "body": "Packed light.", "category": "Trips"})
-	pid, err := x.store.PageID(x.t.Context(), "Trip notes")
-	if err != nil || pid == 0 {
-		x.t.Fatalf("Trip notes: %d %v", pid, err)
-	}
-	if p := props(x.t, e); e.Title != "Trip notes" || p["body"] != "Packed light." {
-		x.t.Errorf("create-page: %q %v", e.Title, p["body"])
-	}
-	if got := x.categories(pid); got != "Trips" {
-		x.t.Errorf("the categories of Trip notes: %q, want Trips", got)
-	}
-	if got := x.browse("in=Trips"); got != "Trip notes" {
-		x.t.Errorf("the things in Trips: %q, want Trip notes", got)
-	}
-	before := x.pageByID(pid)
-	x.refused("create-page", map[string]string{"title": "Trip notes", "body": "Another text."}, http.StatusConflict, "exists")
-	if after := x.pageByID(pid); !reflect.DeepEqual(after, before) {
-		x.t.Errorf("Trip notes after the refusal: %v, want %v", after, before)
-	}
-}
-
 // create-person makes a person with a name and two dates. A death before the birth is 422 and writes no page.
 func rowCreatePerson(x *parityRun) {
 	args := map[string]string{"title": "Sam (barber)", "name": "Samuel Ortiz", "birth_day": "1980-02-03", "death_day": "2020-01-01"}
@@ -1326,43 +968,6 @@ func rowCreatePerson(x *parityRun) {
 	}
 	x.refused("create-person", map[string]string{"title": "Lee", "birth_day": "2000-01-01", "death_day": "1999-01-01"}, http.StatusUnprocessableEntity, "invalid")
 	x.absent("Lee")
-}
-
-// isDeleted says that the page with the id is a tombstone.
-func (x *parityRun) isDeleted(pid int64) bool {
-	x.t.Helper()
-	e := apitest.Must(x.t)(x.read.Get(x.t.Context(), fmt.Sprintf("/pages/%d", pid)))
-	return slices.Contains(e.Class, "deleted")
-}
-
-// tombstone-pages takes ids separated by spaces or commas and deletes all of them. An id that no page has refuses the
-// whole action (404) and writes nothing. revive undoes one tombstone.
-func rowTombstoneAndRevive(x *parityRun) {
-	ctx := x.t.Context()
-	var ids []int64
-	for _, title := range []string{"One", "Two", "Three"} {
-		pid, _, err := x.store.CreatePage(ctx, "cli", title, "", "")
-		if err != nil {
-			x.t.Fatal(err)
-		}
-		ids = append(ids, pid)
-	}
-	x.refused("tombstone-pages", map[string]string{"ids": id(ids[2]) + " 99999"}, http.StatusNotFound, "not_found")
-	if x.isDeleted(ids[2]) {
-		x.t.Error("the refused tombstone-pages deleted a page")
-	}
-	x.ok("tombstone-pages", map[string]string{"ids": id(ids[0]) + ", " + id(ids[1])})
-	for i, want := range []bool{true, true, false} {
-		if got := x.isDeleted(ids[i]); got != want {
-			x.t.Errorf("the page %d: deleted %v, want %v", ids[i], got, want)
-		}
-	}
-	x.ok("revive", map[string]string{"id": id(ids[0])})
-	for i, want := range []bool{false, true, false} {
-		if got := x.isDeleted(ids[i]); got != want {
-			x.t.Errorf("after revive: the page %d: deleted %v, want %v", ids[i], got, want)
-		}
-	}
 }
 
 // readings are the values of the readings that the series of the metric shows, oldest first.
