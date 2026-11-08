@@ -4,8 +4,8 @@ import (
 	"context"
 	"strings"
 
-	"lifelog/internal/core"
-	"lifelog/text"
+	"aminte/internal/core"
+	"aminte/text"
 )
 
 // renames executes the canonical recipe and compares independent storage outcomes

@@ -16,7 +16,7 @@ Create three place identities and `Tokyo located-in Kanto located-in Japan`, wit
 
 ## Rules involved
 
-The active-read policy in `lifelog_meta.deletes`, [D11](../decisions/D11-tombstones.md), the [containment recipe](../cookbook/inside-a-place.md) and [category recipe](../cookbook/metrics-by-category.md).
+The active-read policy in `aminte_meta.deletes`, [D11](../decisions/D11-tombstones.md), the [containment recipe](../cookbook/inside-a-place.md) and [category recipe](../cookbook/metrics-by-category.md).
 
 ## Resolution
 

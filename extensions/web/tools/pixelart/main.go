@@ -10,7 +10,7 @@ import (
 	"image/png"
 	"os"
 
-	"lifelog-web/pixelart"
+	"aminte-web/pixelart"
 )
 
 func main() {

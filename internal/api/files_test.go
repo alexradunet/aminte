@@ -17,10 +17,10 @@ import (
 	"strings"
 	"testing"
 
-	"lifelog/internal/api/apitest"
-	"lifelog/internal/photo"
-	"lifelog/internal/photo/phototest"
-	"lifelog/siren"
+	"aminte/internal/api/apitest"
+	"aminte/internal/photo"
+	"aminte/internal/photo/phototest"
+	"aminte/siren"
 )
 
 // jpegFile writes a synthetic w×h JPEG and returns its path and the SHA-256 of its bytes.
@@ -65,7 +65,7 @@ func TestAPictureThatCannotBeSentIsLogged(t *testing.T) {
 	if got := w.header.Get("Content-Type"); got != "image/jpeg" {
 		t.Errorf("Content-Type %q, want the picture", got)
 	}
-	if n := strings.Count(logged.String(), "lifelog: GET /pages/{id}/preview: the picture was not sent: the client went away"); n != 1 {
+	if n := strings.Count(logged.String(), "aminte: GET /pages/{id}/preview: the picture was not sent: the client went away"); n != 1 {
 		t.Errorf("the log has the failed write %d times, want 1: %q", n, logged.String())
 	}
 }
@@ -125,7 +125,7 @@ func TestAddFileFromAnAgentAndWithAPicture(t *testing.T) {
 	if _, err := c.Do(t.Context(), add, map[string]string{"title": "Memo 2.m4a", "body": "x"}); err == nil {
 		t.Error("a keep with neither the original nor its hash")
 	}
-	// a format lifelog cannot read keeps no picture until one is sent with the same original
+	// a format aminte cannot read keeps no picture until one is sent with the same original
 	heic := filepath.Join(t.TempDir(), "IMG_0002.HEIC")
 	os.WriteFile(heic, []byte("not really a HEIC, but its bytes are hashed"), 0o644)
 	e = apitest.Must(t)(c.Do(t.Context(), add, map[string]string{"title": "IMG_0002.HEIC", "original": heic}))
@@ -201,12 +201,12 @@ func TestAPhotosDay(t *testing.T) {
 	}
 }
 
-// TestAHEICTakesTheDayOfTheRequest: lifelog reads no metadata of a HEIC. The file has the day that the request gives.
+// TestAHEICTakesTheDayOfTheRequest: aminte reads no metadata of a HEIC. The file has the day that the request gives.
 // With none, it has no day and goes in no day page: a photo whose day is unknown is never given the day it is kept.
 func TestAHEICTakesTheDayOfTheRequest(t *testing.T) {
 	c, _, _ := apitest.Fresh(t, "cli")
 	add := apitest.Action(t, apitest.Must(t)(c.Get(t.Context(), "/")), "add-file")
-	// a HEIC: its box of type ftyp, then bytes that no reader of lifelog looks into; each name has its own bytes, so its own hash
+	// a HEIC: its box of type ftyp, then bytes that no reader of aminte looks into; each name has its own bytes, so its own hash
 	heic := func(name string) []byte {
 		return []byte("\x00\x00\x00\x10ftypheic\x00\x00\x00\x00the Exif item of " + name + " is not read")
 	}

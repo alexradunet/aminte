@@ -73,7 +73,7 @@ period on that day"). `AddFile` keeps the bounds of a position, since a position
 - `go generate ./... && go vet ./... && go test ./...` green; `gofmt`; `staticcheck ./...`;
   `go run golang.org/x/tools/cmd/deadcode@v0.52.0 -test ./...` names nothing.
 - `sqlite3` on a fresh file refuses `Mood = 9`, a check-in of 2 and an `at` from a person.
-- `lifelog capture "x" --mood 9` answers 422 on every surface.
+- `aminte capture "x" --mood 9` answers 422 on every surface.
 
 ## Result (2026-10-13)
 

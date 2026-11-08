@@ -12,8 +12,8 @@ import (
 	"fmt"
 	"strings"
 
-	"lifelog/client"
-	"lifelog/siren"
+	"aminte/client"
+	"aminte/siren"
 )
 
 // Tool is one function a model may call: an action of the catalog, or the read get.

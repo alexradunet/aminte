@@ -6,7 +6,7 @@ import (
 	"go.mau.fi/whatsmeow/types"
 	"go.mau.fi/whatsmeow/types/events"
 
-	"lifelog-whatsapp/relay"
+	"aminte-whatsapp/relay"
 )
 
 // Filter turns an event into a message of the chat, or says that the relay must not see it. A message is passed

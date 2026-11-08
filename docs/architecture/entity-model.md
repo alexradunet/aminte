@@ -57,7 +57,7 @@ A reading is a fact, not an entity: `measurements` is append-only ([D7](../decis
 `measurements.supersedes_id` points back at the row it corrects; `measurements.captured_with_id` records
 provenance (a mood reading points at its day page). A metric is a page with a `metrics` row, as a person is a page with a `people` row ([D27](../decisions/D27-a-metric-is-a-page.md));
 it is filed in a category, which is a page, by a `part-of` link ([D26](../decisions/D26-metric-categories.md)). `capture_keys` holds the key of each capture the file has added, so that a capture sent again changes nothing; it points at
-the day page of the capture ([D28](../decisions/D28-capture-keys.md)). `lifelog_meta` stands alone: the rules that span
+the day page of the capture ([D28](../decisions/D28-capture-keys.md)). `aminte_meta` stands alone: the rules that span
 tables ([D17](../decisions/D17-contract-as-data.md)).
 
 ```mermaid
@@ -87,7 +87,7 @@ erDiagram
         INTEGER id PK
         INTEGER page_id FK
     }
-    lifelog_meta {
+    aminte_meta {
         TEXT key PK
     }
 ```

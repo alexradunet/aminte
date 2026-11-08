@@ -104,7 +104,7 @@ func graphSequence(s *S, operations []byte, label string) {
 			s.K(step+" no-op preserves revisions", c.tab(selectVersions) == versions)
 		}
 		check(step + " inside transaction")
-		// Which pages a graph change advances (lifelog_meta.edit_revisions), from the rule and not from the triggers:
+		// Which pages a graph change advances (aminte_meta.edit_revisions), from the rule and not from the triggers:
 		// a link is an edit of the page it leaves; a wikilink
 		// is derived from the body, so only editing its note is an edit; no page is advanced by a link it receives.
 		advanced := map[int64]bool{}

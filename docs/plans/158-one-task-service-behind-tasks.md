@@ -14,7 +14,7 @@
   says "the task service", never the name of the child), Part B `f4a0b09` and `bbfbc40` (the edit form sends every
   field, so the day that a task has already keeps its due with its time; a test held the fault first). Checks: root
   `go vet ./... && go test ./...` and `go test -count=1 -shuffle=on ./...` passed, `staticcheck ./...` (2026.2.2)
-  clean, `govulncheck ./...` no vulnerabilities, `CGO_ENABLED=1 go test -race -count=1 ./cmd/lifelog -run
+  clean, `govulncheck ./...` no vulnerabilities, `CGO_ENABLED=1 go test -race -count=1 ./cmd/aminte -run
   'Task|With'` passed (the sub-agent's run); in `extensions/ticktick`: `go vet`, `go test -count=1 -shuffle=on ./...`
   (the end-to-end test ran the real `serve --with ticktick`), `go mod tidy -diff` and `staticcheck` clean; in
   `extensions/whatsapp` and `extensions/mcp`: `go vet` and `go test -count=1 -shuffle=on ./...` passed. Not done:
@@ -28,9 +28,9 @@
   manager) and `19102d4` (the values of TickTick pass byte for byte, so a number over 2^53 does not change). Checks
   on master `19102d4`, after plan 159 Part A: root `go vet ./... && go test ./...` and `go test -count=1
   -shuffle=on ./...` passed, `staticcheck ./...` clean, `govulncheck ./...` no vulnerabilities, `CGO_ENABLED=1 go test
-  -race -count=1 ./cmd/lifelog -run 'Task|With'` passed; in `extensions/ticktick`, `extensions/whatsapp` and
+  -race -count=1 ./cmd/aminte -run 'Task|With'` passed; in `extensions/ticktick`, `extensions/whatsapp` and
   `extensions/mcp`: `go vet`, `go test -count=1 -shuffle=on ./...`, `go mod tidy -diff` and `staticcheck` clean.
-  Live 2026-10-30: the owner rebuilt `~/.local/bin/lifelog` and `lifelog-ticktick` from master `fcd2ebe` (with plan
+  Live 2026-10-30: the owner rebuilt `~/.local/bin/aminte` and `aminte-ticktick` from master `fcd2ebe` (with plan
   159 Part A) and restarted the service at 16:50:26; the log says `with ticktick: the task service, 3 lists, on
   127.0.0.1:41107`, and the first poll wrote 0 entries. Reopen and a cleared due day wait for the owner's first try.
 
@@ -41,28 +41,28 @@ denominator pair of features that can adapt to most of the task management servi
 it's ticktick or todoist or google tasks. Only one integration type will be active at one time."
 
 The owner's answers (2026-10-30):
-- **lifelog builds the pages.** The provider is a small data adapter.
+- **aminte builds the pages.** The provider is a small data adapter.
 - **The common set** is the lists, Today, Next 7 days, Done, add, complete, **edit, reopen and delete**. There is no
   priority, because Google Tasks has none.
 - **No Tasks entry** in the rail while no task service runs.
 
-Today (plans 155 to 157) the TickTick connector builds every page, and lifelog draws them under `/with/ticktick` with
-the rail entry "TickTick" and the actions `ticktick-*`. After this plan, lifelog owns a Tasks section at `/tasks`
+Today (plans 155 to 157) the TickTick connector builds every page, and aminte draws them under `/with/ticktick` with
+the rail entry "TickTick" and the actions `ticktick-*`. After this plan, aminte owns a Tasks section at `/tasks`
 with the actions `add-task` and the others. One child of `serve --with` says in its handshake that it is the task
 service, and it answers a small fixed protocol. The core never names the service. A Todoist or Google Tasks
 adapter is the same protocol, about ten routes.
 
-D23 holds: the file keeps no task. lifelog shows the tasks of the app the owner plans in. `docs/` does not change.
+D23 holds: the file keeps no task. aminte shows the tasks of the app the owner plans in. `docs/` does not change.
 
 ```mermaid
 flowchart LR
-  B["the browser, lifelog do, the MCP tools, WhatsApp"] -->|"GET /tasks...; add-task, complete-task, ..."| L["lifelog serve: the Tasks pages and actions (ring 2)"]
-  L -->|"the task protocol, as the writer of the request"| P["the task service: lifelog-ticktick today"]
+  B["the browser, aminte do, the MCP tools, WhatsApp"] -->|"GET /tasks...; add-task, complete-task, ..."| L["aminte serve: the Tasks pages and actions (ring 2)"]
+  L -->|"the task protocol, as the writer of the request"| P["the task service: aminte-ticktick today"]
   P -->|"the API of the service"| T["TickTick, Todoist, Google Tasks, ..."]
   P -->|"capture, as import:NAME: a Done entry"| L
 ```
 
-## The task protocol (the provider serves it on LIFELOG_LISTEN)
+## The task protocol (the provider serves it on AMINTE_LISTEN)
 
 The home is `extensions/README.md`, in a new section "A task service". All answers are Siren JSON. Data is in
 `properties`.
@@ -96,7 +96,7 @@ An error is the error entity, as for any app. The service writes its Done entrie
 
 ## Part A: the core (ring 2)
 
-**The registry** (`internal/api/with.go`, `cmd/lifelog/with.go`):
+**The registry** (`internal/api/with.go`, `cmd/aminte/with.go`):
 - If the catalog of a child has the class `tasks`, `probeCatalog` reads `GET /lists`. It then calls a new
   `Apps.SetTasks(name, base, lists)`, not `Set`.
 - A task service is not an app. It has no `/with/NAME`, no rail link and no `NAME-*` actions.
@@ -158,9 +158,9 @@ README table, which reads a server with no child, does not get them. They follow
 - `internal/pixelart/icons.go` gets a new 10×10 glyph `tasks`, a check box in the style of the others. `app.css`
   gets its position.
 
-**The example service** (`cmd/lifelog/testdata/taskservice/main.go`):
-- It serves the whole protocol in memory, from `lifelog/app`, and is the example for an author.
-- `cmd/lifelog/tasks_test.go` runs it on the real `serve --with` and checks these points:
+**The example service** (`cmd/aminte/testdata/taskservice/main.go`):
+- It serves the whole protocol in memory, from `aminte/app`, and is the example for an author.
+- `cmd/aminte/tasks_test.go` runs it on the real `serve --with` and checks these points:
   - The rail has Tasks and has no app link.
   - `GET /actions` has the six actions and nothing that starts with `taskservice-`.
   - Today, the week, a list, Done and a task page give the right rows, in the right order. The expected values are
@@ -209,10 +209,10 @@ README table, which reads a server with no child, does not get them. They follow
 ## Part C: live (the owner runs it with `!`)
 
 ```
-go build -o ~/.local/bin/lifelog ./cmd/lifelog
-go build -C extensions/ticktick -o ~/.local/bin/lifelog-ticktick ./cmd/lifelog-ticktick
-sudo systemctl restart lifelog
-journalctl -u lifelog -n 5     # with ticktick: the task service, N lists, on 127.0.0.1:PORT
+go build -o ~/.local/bin/aminte ./cmd/aminte
+go build -C extensions/ticktick -o ~/.local/bin/aminte-ticktick ./cmd/aminte-ticktick
+sudo systemctl restart aminte
+journalctl -u aminte -n 5     # with ticktick: the task service, N lists, on 127.0.0.1:PORT
 ```
 
 The unit keeps `--with ticktick`. Then:
@@ -224,7 +224,7 @@ The owner's first reopen and edit are the live check of two TickTick calls that 
 
 ## Decided by default
 
-- `delete-task` is owner-only and danger. An agent cannot destroy a record in the service, and lifelog cannot give it
+- `delete-task` is owner-only and danger. An agent cannot destroy a record in the service, and aminte cannot give it
   back.
 - Complete and Reopen are only the round buttons of the rows. Edit and Delete are on the task page. This follows
   "one way to do a thing".
@@ -244,5 +244,5 @@ The owner's first reopen and edit are the live check of two TickTick calls that 
   `govulncheck ./...`.
 - `extensions/ticktick`, `extensions/whatsapp` and `extensions/mcp`: `go vet ./... && go test -shuffle=on ./...`,
   `go mod tidy -diff` and `staticcheck`.
-- The race detector on `cmd/lifelog -run Task` (the registry has a new role).
+- The race detector on `cmd/aminte -run Task` (the registry has a new role).
 - All checks run on Linux only. The report says so.

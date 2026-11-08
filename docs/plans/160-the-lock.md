@@ -25,7 +25,7 @@
   now counted before the compare, under the mutex, and an ended session compares no PIN and gets no state again; (2)
   a preview kept its year of cache, so a locked browser showed it from the cache; every answer of a session but
   `/assets/` is `no-store` now; (3) `next` echoed the query, such as the words of a search; it is the path alone; (4)
-  the old `lifelog_token` cookie stayed in a browser that did not log in again; any request that carries it clears it.
+  the old `aminte_token` cookie stayed in a browser that did not log in again; any request that carries it clears it.
   Known and written in the README: a restart, or a day with no request, gives 5 tries again; the browser's history
   keeps the titles of the pages.
 
@@ -43,7 +43,7 @@ The owner's answers (2026-10-30):
 The danger is a person at the owner's own device: a laptop on a desk, a phone in another hand. The lock is not a
 defence against a person who has the token, or against the network (the token and TLS hold that).
 
-Today (`internal/api/public.go`) `POST /login` sets the cookie `lifelog_token`, and its value is the token itself, for
+Today (`internal/api/public.go`) `POST /login` sets the cookie `aminte_token`, and its value is the token itself, for
 one year. The server cannot tell one browser from another, and it cannot lock one. A local listener (no `--public`)
 has no login, so it has no lock: the lock is a part of the public listener, as the login is. The live service runs
 `--public` on `127.0.0.1:7777` behind the proxy, so every browser of the owner goes through it.
@@ -52,11 +52,11 @@ has no login, so it has no lock: the lock is a part of the public listener, as t
 
 ### A session in the cookie
 
-`POST /login` with the token sets the cookie `lifelog_session`. Its value is a random id (16 bytes from
+`POST /login` with the token sets the cookie `aminte_session`. Its value is a random id (16 bytes from
 `crypto/rand`) and an HMAC-SHA256 of the id, keyed by a key that the server derives from the token. The server
 checks the HMAC; it stores no list of sessions on disk. A new token file ends every session, as it does today.
 
-The cookie `lifelog_token` is no longer a credential: it would open a locked browser. A request with it only is sent
+The cookie `aminte_token` is no longer a credential: it would open a locked browser. A request with it only is sent
 to `/login`, and the login clears it. The `Authorization: Bearer` header does not change. A program (the CLI, the MCP
 server, an extension) never locks.
 
@@ -143,7 +143,7 @@ lock is on through the request, in one place; the view draws the button from a l
 flowchart TD
   R["a request to the public listener"] --> B{"a Bearer header?"}
   B -->|"yes, the token"| N["the API"]
-  B -->|"no"| C{"a valid lifelog_session?"}
+  B -->|"no"| C{"a valid aminte_session?"}
   C -->|"no"| L["HTML: to /login; else 401 token_required"]
   C -->|"yes"| K{"lock on, and the session locked or idle too long?"}
   K -->|"no"| A["count activity if it is the owner's; the API, no-store"]
@@ -153,7 +153,7 @@ flowchart TD
 ## The work
 
 1. `internal/api/public.go` (or a new `lock.go` beside it): the session cookie, its HMAC, the state in memory under a
-   mutex, the routes `/lock`, `/unlock`, `/locked`, `/awake`, the rules of activity, `no-store`. The `lifelog_token`
+   mutex, the routes `/lock`, `/unlock`, `/locked`, `/awake`, the rules of activity, `no-store`. The `aminte_token`
    cookie stops being a credential.
 2. `internal/core/settings.go` and `internal/api/settings.go`: `lock_after` and the PIN hash; the catalog's two
    fields; the 422.
@@ -163,8 +163,8 @@ flowchart TD
 
 ## Tests
 
-- A session: login sets `lifelog_session`, never the token; a forged or changed HMAC is refused; an old
-  `lifelog_token` cookie is sent to `/login`; a new token ends old sessions.
+- A session: login sets `aminte_session`, never the token; a forged or changed HMAC is refused; an old
+  `aminte_token` cookie is sent to `/login`; a new token ends old sessions.
 - The lock: with a fixed clock, a session locks after the minutes plus one; the poll of `chat.js`, a prerender
   (`Sec-Purpose`) and a fetch do not keep it open; a navigation and `POST /awake` do. `POST /lock` locks at once.
 - A locked session: an HTML `GET` goes to `/locked?next=`; an API request is 401 `locked`; the page `/locked` holds
@@ -181,4 +181,4 @@ flowchart TD
 ## Shipping
 
 The owner's browsers log in once with the token after the change. Then the owner sets the PIN and the minutes in
-Settings. Install: `go build -o ~/.local/bin/lifelog ./cmd/lifelog`, restart the service, and report its log line.
+Settings. Install: `go build -o ~/.local/bin/aminte ./cmd/aminte`, restart the service, and report its log line.

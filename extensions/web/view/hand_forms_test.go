@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"lifelog/siren"
+	"aminte/siren"
 )
 
 // TestAFixedValueIsAHiddenInput: a form whose fields are all fixed or hidden is hidden inputs and one button, the

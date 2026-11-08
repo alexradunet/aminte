@@ -1,5 +1,5 @@
 // Package api serves life.db as hypermedia: Siren-style JSON for every client, and bytes (a picture, a snapshot). It
-// draws no page: a UI is a client, and the browser is the extension lifelog-web. A client needs no rules of its own: an
+// draws no page: a UI is a client, and the browser is the extension aminte-web. A client needs no rules of its own: an
 // action is offered only where it is legal, with its fields (and their current values) filled in. The Siren types and
 // the addresses of the resources are in package siren, which the clients import too. This file holds the catalog of the
 // actions.
@@ -10,8 +10,8 @@ import (
 	"slices"
 	"strings"
 
-	"lifelog/internal/core"
-	"lifelog/siren"
+	"aminte/internal/core"
+	"aminte/siren"
 )
 
 const formType = "application/x-www-form-urlencoded"
@@ -87,7 +87,7 @@ var catalog = []spec{
 			opt("via", "hidden", "Relay: the name of the program that carries the owner's words")},
 	},
 	{Name: "reply", Title: "Reply",
-		Description: "Write the agent's turn on the conversation page of a local day (the page Conversation YYYY-MM-DD): text is added as the paragraph **lifelog** (HH:MM): text, with the time in the server's zone, right after the owner's turn that it answers. turn is the key of that owner turn: the key of a turn of the conversation (turns[].key). A key names a turn by what it is and not by its place, so an edit that removes an earlier turn moves no reply. A turn that the owner said meanwhile stays after the reply and waits for its own. tools is the tool lines of the turn, one for each line, each starting with - ` (a dash, a space and a backtick); they are written right before the paragraph. The write is one transaction. A turn that has a reply already is 409, a key that no owner turn of the page has now is 409 (the owner edited the turn or removed it: read the conversation again), and a day with no conversation is 404. reply is not the owner's: an agent writes its turn with it, because an agent or an import is refused when it saves the body of a conversation page (403). A line of the text that reads as a turn marker is escaped, and a code fence that the text does not close is closed, so the page stays readable as turns. The answer is the conversation of the day.",
+		Description: "Write the agent's turn on the conversation page of a local day (the page Conversation YYYY-MM-DD): text is added as the paragraph **aminte** (HH:MM): text, with the time in the server's zone, right after the owner's turn that it answers. turn is the key of that owner turn: the key of a turn of the conversation (turns[].key). A key names a turn by what it is and not by its place, so an edit that removes an earlier turn moves no reply. A turn that the owner said meanwhile stays after the reply and waits for its own. tools is the tool lines of the turn, one for each line, each starting with - ` (a dash, a space and a backtick); they are written right before the paragraph. The write is one transaction. A turn that has a reply already is 409, a key that no owner turn of the page has now is 409 (the owner edited the turn or removed it: read the conversation again), and a day with no conversation is 404. reply is not the owner's: an agent writes its turn with it, because an agent or an import is refused when it saves the body of a conversation page (403). A line of the text that reads as a turn marker is escaped, and a code fence that the text does not close is closed, so the page stays readable as turns. The answer is the conversation of the day.",
 		Hint:        "Write the agent's answer to a turn of the owner on the conversation of a day.",
 		Method:      "POST", Path: "/days/{day}/reply",
 		Fields: []siren.Field{path("day", "date", "Local day"), req("turn", "text", "The key of the owner's turn that it answers (turns[].key of the conversation)"), areaReq("text", "The reply", 4),

@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"lifelog/siren"
+	"aminte/siren"
 )
 
 func wait(t *testing.T, ch <-chan struct{}) {

@@ -10,7 +10,7 @@ import (
 	"sort"
 	"strings"
 
-	"lifelog/internal/db"
+	"aminte/internal/db"
 )
 
 // schemaObjectsQuery selects the objects of the schema that the DDL names. Two kinds of rows are left out on purpose.
@@ -43,7 +43,7 @@ func schemaObjects(ctx context.Context, q queryer) (map[string]string, error) {
 // embeddedSchemaObjects is schemaObjects of a file that the embedded DDL builds in a temporary folder. The file lives
 // only for this call.
 func embeddedSchemaObjects(ctx context.Context) (objects map[string]string, err error) {
-	dir, err := os.MkdirTemp("", "lifelog-schema-")
+	dir, err := os.MkdirTemp("", "aminte-schema-")
 	if err != nil {
 		return nil, err
 	}

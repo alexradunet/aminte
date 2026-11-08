@@ -29,7 +29,7 @@ func TestOpenRefusesUnsupportedSchemaVersion(t *testing.T) {
 				fixture.SetMaxOpenConns(1)
 				for _, statement := range []string{
 					"PRAGMA journal_mode=DELETE",
-					"INSERT INTO lifelog_meta(key,value) VALUES('version-test','retained synthetic contents')",
+					"INSERT INTO aminte_meta(key,value) VALUES('version-test','retained synthetic contents')",
 					fmt.Sprintf("PRAGMA user_version=%d", version),
 				} {
 					if _, err := fixture.Exec(statement); err != nil {
@@ -89,7 +89,7 @@ func TestOpenReadsSchemaVersionFromWAL(t *testing.T) {
 	if err := Init(t.Context(), path); err != nil {
 		t.Fatal(err)
 	}
-	fixture, err := sql.Open("lifelog", dsn(path, false))
+	fixture, err := sql.Open("aminte", dsn(path, false))
 	if err != nil {
 		t.Fatal(err)
 	}

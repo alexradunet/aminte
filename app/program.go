@@ -9,7 +9,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"lifelog/client"
+	"aminte/client"
 )
 
 // The shell of an extension program: the signal, the last line, the exit status and the client of the API. Every Go
@@ -45,8 +45,8 @@ func ExitCode(err error) int {
 	return 1
 }
 
-// Main is the main function of a program lifelog-NAME. It runs run with a context that ends on an interrupt or on
-// SIGTERM, prints the line "lifelog-NAME: err" on stderr when run fails, and ends the process with ExitCode of the
+// Main is the main function of a program aminte-NAME. It runs run with a context that ends on an interrupt or on
+// SIGTERM, prints the line "aminte-NAME: err" on stderr when run fails, and ends the process with ExitCode of the
 // error. A program that ends with no error returns from Main.
 func Main(name string, run func(ctx context.Context) error) {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -61,20 +61,20 @@ func Main(name string, run func(ctx context.Context) error) {
 func finish(name string, err error, stderr io.Writer) int {
 	code := ExitCode(err)
 	if code != 0 {
-		fmt.Fprintf(stderr, "lifelog-%s: %v\n", name, err)
+		fmt.Fprintf(stderr, "aminte-%s: %v\n", name, err)
 	}
 	return code
 }
 
-// API is the client of the lifelog server at url, for the program that writes as source (for example
-// siren.AgentPrefix+"agent", or siren.ImportPrefix+"sheets"; "" is the owner). It sends LIFELOG_TOKEN as the bearer
+// API is the client of the aminte server at url, for the program that writes as source (for example
+// siren.AgentPrefix+"agent", or siren.ImportPrefix+"sheets"; "" is the owner). It sends AMINTE_TOKEN as the bearer
 // token when the variable is set. It refuses an empty url: a program never guesses an address, because
 // 127.0.0.1:7777 could be the server of another file (extensions/README.md). The refusal is OwnerActs, in one line
-// that names command: the line that the owner types to run the program, for example "lifelog agent". A program that
-// has several commands names the one that needs the server. `lifelog` gives that run a url.
+// that names command: the line that the owner types to run the program, for example "aminte agent". A program that
+// has several commands names the one that needs the server. `aminte` gives that run a url.
 func API(command, url, source string) (*client.Client, error) {
 	if url == "" {
-		return nil, OwnerActs(fmt.Errorf("no LIFELOG_URL and no --url: run it as `%s` on a life.db that exists, or start `lifelog serve` and give --url", command))
+		return nil, OwnerActs(fmt.Errorf("no AMINTE_URL and no --url: run it as `%s` on a life.db that exists, or start `aminte serve` and give --url", command))
 	}
-	return client.Remote(url, source, os.Getenv("LIFELOG_TOKEN")), nil
+	return client.Remote(url, source, os.Getenv("AMINTE_TOKEN")), nil
 }

@@ -10,7 +10,7 @@ import (
 	"sort"
 	"strings"
 
-	"lifelog/text"
+	"aminte/text"
 )
 
 // RegisterMetric makes a metric (D27): a page titled m.Name, whose body is m.Note, and its metrics row with the

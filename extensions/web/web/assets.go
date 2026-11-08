@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"lifelog-web/view"
-	"lifelog/siren"
+	"aminte-web/view"
+	"aminte/siren"
 )
 
 // maxRequestBody is the largest body that web reads: the text of a form (write.go) and /render. It is the limit of the

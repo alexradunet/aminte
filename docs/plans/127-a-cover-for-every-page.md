@@ -68,7 +68,7 @@ flowchart LR
 | `set-cover` in the catalog, offered on every live page but a file; the links `cover` and `choose-cover`; the day's `cover`; the picker | `internal/api/catalog.go`, `pages.go`, `days.go`, `browse.go`, `files.go`, `serve.go` |
 | `markdownCover`; the square and the other pictures, the picker, the square of a row, the calendar's cells | `internal/api/view/markdown.go`, `html/page.html`, `day.html`, `browse.html`, `month.html`, `app.css` |
 | `embeddedPictures`, `picturesOf`, the swap of `showFirst`; `DayEntry.Picture` | `internal/core/cover.go`, `journal.go` |
-| `lifelog cover PAGE-ID [PHOTO]` | `cmd/lifelog/main.go`, `file.go` |
+| `aminte cover PAGE-ID [PHOTO]` | `cmd/aminte/main.go`, `file.go` |
 | The docs | `API.md` (`cover`, `choose-cover`, `set-cover`, `cover-choice`), `README.md` |
 
 ## Done when
@@ -84,7 +84,7 @@ flowchart LR
       (parity row).
 - [x] The day view leads to the picker when its day page has no cover (tested). The owner did not find the button
       there (2026-10-17): the first version had it on the page view only.
-- [x] `lifelog cover PAGE-ID PHOTO` sends a new photo, and `lifelog cover PAGE-ID --title T` takes a kept one
+- [x] `aminte cover PAGE-ID PHOTO` sends a new photo, and `aminte cover PAGE-ID --title T` takes a kept one
       (tested). The owner chose this shortcut (2026-10-17); an MCP agent still takes a kept picture only, since its
       tools carry no file.
 - [x] The cover is a square at the head of the margin, first on a phone, with the other pictures under it; a press on

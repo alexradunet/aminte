@@ -36,7 +36,7 @@ summaries, have no structure without sessions. Day-page prose can keep them.
 ## Rules involved
 
 [D22](../decisions/D22-events.md), [D7](../decisions/D07-measurements.md), session time (removed by RFC 0013),
-measurement scope (removed by RFC 0013), `lifelog_meta.measurement_scope`. The goals
+measurement scope (removed by RFC 0013), `aminte_meta.measurement_scope`. The goals
 ([principles 6 and 7](../architecture/goals-and-principles.md)): a table needs real use, and a cut happens before the
 freeze ([D13](../decisions/D13-migrations-and-freeze.md)).
 

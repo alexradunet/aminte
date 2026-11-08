@@ -5,10 +5,10 @@ import (
 	"database/sql"
 	"errors"
 
-	"lifelog/internal/db"
+	"aminte/internal/db"
 )
 
-// Tx is one BEGIN IMMEDIATE write transaction and the writer whose rows it writes (lifelog_meta.source).
+// Tx is one BEGIN IMMEDIATE write transaction and the writer whose rows it writes (aminte_meta.source).
 // Every write operation is a method on it, so one write can do several operations: CreateMetric registers a metric
 // and files it, and internal/scaletest writes each synthetic day in one transaction and its notes 50 to a
 // transaction. Each Store method is one operation alone. Its SQL uses the context of the owning Do call.
@@ -16,7 +16,7 @@ type Tx struct {
 	tx     *sql.Tx
 	ctx    context.Context
 	today  func() string // the local day of the store's clock (Store.Today)
-	source string        // the writer (lifelog_meta.source), held by the CHECKs of the rows that carry it
+	source string        // the writer (aminte_meta.source), held by the CHECKs of the rows that carry it
 }
 
 // Do runs fn in one write transaction, committed when fn returns nil. It does not check source: a row that carries it

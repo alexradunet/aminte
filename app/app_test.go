@@ -16,18 +16,18 @@ import (
 	"testing"
 	"time"
 
-	"lifelog/siren"
+	"aminte/siren"
 )
 
 func TestListenRefuses(t *testing.T) {
 	for _, tc := range []struct{ env, want string }{
-		{"", "lifelog serve --with <name>"},
+		{"", "aminte serve --with <name>"},
 		{"0.0.0.0:1", "loopback"},
 		{"example.com:80", "loopback"},
 		{"nonsense", "host:port"},
 	} {
 		t.Run(tc.env, func(t *testing.T) {
-			t.Setenv("LIFELOG_LISTEN", tc.env)
+			t.Setenv("AMINTE_LISTEN", tc.env)
 			err := Listen(context.Background(), http.NotFoundHandler())
 			if err == nil || !strings.Contains(err.Error(), tc.want) {
 				t.Fatalf("got %v, want an error with %q", err, tc.want)
@@ -43,7 +43,7 @@ func TestListenServesUntilTheContextEnds(t *testing.T) {
 	}
 	addr := l.Addr().String()
 	l.Close()
-	t.Setenv("LIFELOG_LISTEN", addr)
+	t.Setenv("AMINTE_LISTEN", addr)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	h := Catalog("T", func(*http.Request) (*siren.Entity, error) { return &siren.Entity{}, nil }, nil, nil)
@@ -261,7 +261,7 @@ func TestStateDir(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if dir != filepath.Join(cfg, "lifelog-demo") {
+	if dir != filepath.Join(cfg, "aminte-demo") {
 		t.Errorf("dir %q", dir)
 	}
 	if fi, err := os.Stat(dir); err != nil || !fi.IsDir() {
@@ -279,7 +279,7 @@ func TestListenLetsInTheServerAlone(t *testing.T) {
 	}
 	addr := l.Addr().String()
 	l.Close()
-	t.Setenv("LIFELOG_LISTEN", addr)
+	t.Setenv("AMINTE_LISTEN", addr)
 	ctx, cancel := context.WithCancel(context.Background())
 	var calls atomic.Int32
 	h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { calls.Add(1); write(w, 200, &siren.Entity{Title: "ok"}) })

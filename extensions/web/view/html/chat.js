@@ -13,7 +13,7 @@
   }, true);
   const chat = document.getElementById('chat') || document.getElementById('conversation');
   if (!chat) return;
-  const same = { credentials: 'same-origin' }, KEY = 'lifelog.chat.open'; let timer;
+  const same = { credentials: 'same-origin' }, KEY = 'aminte.chat.open'; let timer;
 
   // swap replaces the column's content with the one in a page's HTML, keeps a draft that is being typed, and gives the
   // new box the focus that the old one had.

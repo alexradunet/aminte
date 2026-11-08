@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"lifelog/internal/core"
+	"aminte/internal/core"
 )
 
 // TestMultipartUnknownNameProjection: parseFileForm keeps the value of a name the action lists, and refuses any other

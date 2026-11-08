@@ -5,7 +5,7 @@ import (
 	"slices"
 	"strings"
 
-	"lifelog/siren"
+	"aminte/siren"
 )
 
 // The folds of Browse (docs/plans/118-fold-and-find.md): the category tree folds each branch. It is drawn from the

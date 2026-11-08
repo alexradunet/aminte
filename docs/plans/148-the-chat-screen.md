@@ -24,7 +24,7 @@
   address beyond the newest 36 drew nothing (its link now); the extension's e2e holds the relay part. The contrast
   test needed no new pair: the new classes use the aliases of the materials. Screenshots on a synthetic database:
   the screen, the menu and the menu with Edit open, on the desktop and the phone. Live since 2026-10-28 19:20 (the
-  binary installed, the service restarted with its agent, the previous binary kept as `lifelog.prev`).
+  binary installed, the service restarted with its agent, the previous binary kept as `aminte.prev`).
 - **Resolves:** the owner's words of 2026-10-28 (below). No issue.
 
 ## The owner's words (2026-10-28)
@@ -81,7 +81,7 @@ flowchart LR
    the composer pinned (`say`, the textarea growing to 40 vh, the Say button, the hint line). The page's parts the
    margin drew are under `⋯` or gone (the facts); `page-margin` is not drawn. The screen takes the height of the
    viewport in the shell (`.column` of the shell gets no padding on this view, the screen is a grid of three rows).
-2. **The grammar.** The `thread` template: a turn has `.meta` (who: You, lifelog; `via` as "· via NAME"; the time),
+2. **The grammar.** The `thread` template: a turn has `.meta` (who: You, aminte; `via` as "· via NAME"; the time),
    the chips of the tool lines (`.tools`, name and the words after it), the bubble (`.bubble`, the words as markdown,
    wikilinks as chips by CSS), the cards (below). A date separator above the first turn. The waiting line becomes
    the three-dot mark (`.thinking`, animated, still under reduced motion).

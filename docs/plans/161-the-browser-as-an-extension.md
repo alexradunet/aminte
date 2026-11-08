@@ -12,8 +12,8 @@
 - **Status:** DONE. Stages 1, 2 and 3 are built, and the findings of both counter-reviews (Opus, 2026-10-31) are
   fixed. Live on 2026-10-31 at 19:33, built from `946c0c9`. The owner ran the move in one step: the service stopped;
   the seven programs built into `/home/cico/.local/bin` (each old one kept as `.prev`); the one-off copy of the
-  settings of the browser; the drop-in `/etc/systemd/system/lifelog.service.d/plan-161.conf` (the new `ExecStart` with
-  `--with web`, `LIFELOG_WEB_LISTEN`, `LIFELOG_WEB_ORIGINS` and `ReadWritePaths` for `~/.config/lifelog-web`); the
+  settings of the browser; the drop-in `/etc/systemd/system/aminte.service.d/plan-161.conf` (the new `ExecStart` with
+  `--with web`, `AMINTE_WEB_LISTEN`, `AMINTE_WEB_ORIGINS` and `ReadWritePaths` for `~/.config/aminte-web`); the
   start; and `tailscale serve --bg http://127.0.0.1:7780`. The log of the service: `serving ... on
   http://127.0.0.1:7777 (token required)`, `with web: started`, `the browser is on http://127.0.0.1:7780`, `with web: a
   catalog of 1 actions`, `with ticktick: the task service, 3 lists`. The owner logged in through the proxy and
@@ -24,7 +24,7 @@
 | stage 1 | `bc548e4` | `embed`; the shell reads only the API | day page 4.7 to 5.9 ms, browse 4.2 to 4.8 ms, metrics 4.9 to 6.3 ms, conversation 2.7 to 4.1 ms |
 | stage 2 A1 | `c100c76` | `extensions/web`: the read side; 68 routes side by side | day page 14.3 ms from the core, 19.7 ms through web; browse 13.9 and 19.7 ms |
 | stage 2 A2 | `7da7a3f` | the forms, the login, the lock and the settings of the browser; the catalog of web | none given |
-| stage 2 B | `4bd6b6b` | `extensions/web/e2e_test.go` (the real `lifelog serve --public --with web`), `web/parity_test.go` (each action has its form), the steps to run it live in its README | none |
+| stage 2 B | `4bd6b6b` | `extensions/web/e2e_test.go` (the real `aminte serve --public --with web`), `web/parity_test.go` (each action has its form), the steps to run it live in its README | none |
 | stage 3 | `7be5af0..ca3ba7f` (17 commits on `c8768bd`) | the core with no presentation; the HTML claims of its tests ported to `extensions/web`; the docs; the fixes of the second counter-review | the table below |
 
 The commit messages give the page times of stages 1 and 2. Each of those rows was measured by its own test, so they
@@ -64,12 +64,12 @@ confirmed and 6 refuted. None was a BLOCKER. Each fix of a fault has a test that
 | MEDIUM | `--token-file=` (an empty path) started the core with no bearer check. | The empty value is refused: "--token-file needs a path". |
 | MEDIUM | A token with a space at its start or end was taken, and then no client could send it (a header value loses the space). | The core and web refuse it before they listen. |
 | MEDIUM | A panic in web after the status was sent added the page of the internal error after the partial body, as a 200. | Web cuts the answer (`http.ErrAbortHandler`) after one log record. The page of a panic before the answer has `Cache-Control: no-store`. |
-| MEDIUM | No web test drew the task pages end to end (decision 15): the round Complete form, the quick-add, the side column, a POST through web, a failed read of the service. | `web/tasks_test.go` with `lifelogtest.ConnectTasks`; a mutant that drops the actions of the rows fails it. |
+| MEDIUM | No web test drew the task pages end to end (decision 15): the round Complete form, the quick-add, the side column, a POST through web, a failed read of the service. | `web/tasks_test.go` with `amintetest.ConnectTasks`; a mutant that drops the actions of the rows fails it. |
 | MEDIUM | The reload checks of the toast ports checked no status, so an error page passed them. | They read the page through a helper that needs 200 and a whole page. |
 | MEDIUM | The order of the daily metrics of a day had no JSON test in the core. | `TestADayListsItsDailyMetricsInNameOrder`. |
 | MEDIUM | The way back in the Install section of web left the service down: the old core refuses the new unit. | The README gives the steps back across the move: the old programs, the old unit, the proxy to 7777. |
 | LOW | HEAD with `?new=` was 422 where the GET is 200. | `known()` takes HEAD as GET. |
-| LOW | A test export with no caller; stale lines in API.md, the README and the READMEs of web and ticktick (the answers that are not Siren, the names a read takes, "lifelog draws the tasks", the line of the browser without a token, `ReadWritePaths`). | Deleted; the pages say the current truth. |
+| LOW | A test export with no caller; stale lines in API.md, the README and the READMEs of web and ticktick (the answers that are not Siren, the names a read takes, "aminte draws the tasks", the line of the browser without a token, `ReadWritePaths`). | Deleted; the pages say the current truth. |
 
 At the merge the main session also fixed a fault of web that a port found (a form over the limit did not close the
 connection, because `noStore` hid the writer of the server from `http.MaxBytesReader`), and made one copy of the
@@ -83,7 +83,7 @@ Each finding was fixed with a test that held the fault first.
 |---|---|---|
 | BLOCKER | The poll of `chat.js` asks for Siren JSON, and web drew a page: the column waited for ever, and its lock branch was dead. | A request that asks for Siren JSON and not for HTML gets the core's entity through web (no-store), and web's own errors as JSON. |
 | HIGH | `/settings` had the core's `ground`, `lock_after` and `lock_pin` beside the form "This browser": a lock set in the core's form never locked web. | Web draws the core's form without the settings of the browser; one field for each. |
-| MEDIUM | Web's catalog on `LIFELOG_LISTEN` took the settings from any local caller, also with another `Host` (DNS rebinding). | `app.Listen` refuses a `Host` that is not its address and a cross-site browser write, for every connected app. |
+| MEDIUM | Web's catalog on `AMINTE_LISTEN` took the settings from any local caller, also with another `Host` (DNS rebinding). | `app.Listen` refuses a `Host` that is not its address and a cross-site browser write, for every connected app. |
 | MEDIUM | An address with a space in a tool line made the core panic in the embedded read. | The embedded read is made from the URL, not from a request line. |
 | MEDIUM | The door decided by the decoded path, the routes by the escaped one (`/assets%2Ficon.svg`). | The door decides by the pattern of the route that answers. |
 | MEDIUM | Exit status 2 meant "the owner acts", and the Go runtime exits with 2 on a panic: a crash stopped the browser for good. | `app.ExitOwnerActs` is 78 (owner's word); `serve` starts a child again after 2. A settings file that cannot be read now is status 1. |
@@ -117,25 +117,25 @@ README of the core. The README of the extension states its own rule for its two 
 | subject | decision |
 |---|---|
 | goal | The core is headless: rings 0 to 2 hold no HTML, CSS, JavaScript or picture. The browser is one optional extension. Anyone can write another UI against API.md alone, in any language. |
-| topology | `lifelog serve --with web` runs `lifelog-web` as a child. It is the front door of the browser, on `LIFELOG_WEB_LISTEN` (the unit sets it; the default is `127.0.0.1:7780`). The local proxy points to it. |
-| the core on the network | The core listens on the loopback only. A token (`--token-file` or `$LIFELOG_TOKEN`) turns on the bearer check by itself. No token means no check, as the temporary server of `lifelog NAME` has today. `--public`, `--allow-origin`, `--tls-cert`, `--tls-key`, the cookie login and the lock leave the core. |
-| remote use | Only the browser is remote. The proxy maps the name on the tailnet to web alone. The CLI and the MCP server run on the server. Web reads the allowed origins from `LIFELOG_WEB_ORIGINS` and the owner's token from `LIFELOG_TOKEN`, for its login and for its requests to the core. |
-| the grammar | `internal/text` becomes the public package `lifelog/text`, the fourth after `siren`, `client` and `app`. It is the Go reference of [titles and wikilinks](../contract/titles-and-wikilinks.md). |
+| topology | `aminte serve --with web` runs `aminte-web` as a child. It is the front door of the browser, on `AMINTE_WEB_LISTEN` (the unit sets it; the default is `127.0.0.1:7780`). The local proxy points to it. |
+| the core on the network | The core listens on the loopback only. A token (`--token-file` or `$AMINTE_TOKEN`) turns on the bearer check by itself. No token means no check, as the temporary server of `aminte NAME` has today. `--public`, `--allow-origin`, `--tls-cert`, `--tls-key`, the cookie login and the lock leave the core. |
+| remote use | Only the browser is remote. The proxy maps the name on the tailnet to web alone. The CLI and the MCP server run on the server. Web reads the allowed origins from `AMINTE_WEB_ORIGINS` and the owner's token from `AMINTE_TOKEN`, for its login and for its requests to the core. |
+| the grammar | `internal/text` becomes the public package `aminte/text`, the fourth after `siren`, `client` and `app`. It is the Go reference of [titles and wikilinks](../contract/titles-and-wikilinks.md). |
 | the scripts | No interim fix in the core. `chat.js` and `lock.js` move with the browser. |
-| the settings of the browser | `ground`, `lock_after` and `lock_pin_hash` move to `os.UserConfigDir()/lifelog-web/`, as actions of the own catalog of web at `/with/web`. A one-off step copies the owner's values. |
-| parity | Each surface holds its own parity. The API and the CLI are in the core. mcp and web hold theirs by an end-to-end test against the real `lifelog`. The table of the README keeps its four columns. |
+| the settings of the browser | `ground`, `lock_after` and `lock_pin_hash` move to `os.UserConfigDir()/aminte-web/`, as actions of the own catalog of web at `/with/web`. A one-off step copies the owner's values. |
+| parity | Each surface holds its own parity. The API and the CLI are in the core. mcp and web hold theirs by an end-to-end test against the real `aminte`. The table of the README keeps its four columns. |
 | the data of the shell | A generic `embed` in the API (below), not many small requests. |
 | the rollout | In stages, side by side: stage 1 cuts the seam in the core; stage 2 runs web beside the old browser and compares their pages; stage 3 deletes the old browser. |
-| the name | `web`: `extensions/web`, the program `lifelog-web`, `/with/web`. |
-| the tests of web | A public test kit, `lifelog/lifelogtest`, gives a test an `httptest` server that runs the real core handler over a fresh synthetic file, in process. Only `_test.go` files import it. The tests of the pages move to web with their cases and keep their speed. |
+| the name | `web`: `extensions/web`, the program `aminte-web`, `/with/web`. |
+| the tests of web | A public test kit, `aminte/amintetest`, gives a test an `httptest` server that runs the real core handler over a fresh synthetic file, in process. Only `_test.go` files import it. The tests of the pages move to web with their cases and keep their speed. |
 | execution | Sonnet sub-agents build each stage. The main session briefs, reviews and runs the checks. Opus 5.5 does the counter-review. |
 
 ```mermaid
 flowchart LR
-  B["the browser"] -->|"cookie, HTML forms"| W["lifelog-web (ring 3): login, lock, assets, view, post then redirect, its settings"]
-  W -->|"Siren JSON with embed, bearer token, X-Lifelog-Source: ui"| C["lifelog serve on 127.0.0.1 (rings 0 to 2): catalog, Siren JSON, bytes"]
-  M["lifelog-mcp"] --> C
-  L["lifelog do (the CLI)"] --> C
+  B["the browser"] -->|"cookie, HTML forms"| W["aminte-web (ring 3): login, lock, assets, view, post then redirect, its settings"]
+  W -->|"Siren JSON with embed, bearer token, X-Aminte-Source: ui"| C["aminte serve on 127.0.0.1 (rings 0 to 2): catalog, Siren JSON, bytes"]
+  M["aminte-mcp"] --> C
+  L["aminte do (the CLI)"] --> C
   C -->|"serve --with web: start, start again, stop"| W
 ```
 
@@ -172,7 +172,7 @@ flowchart TD
 | the shell reads `core.Store`: the clock, the ground, the Today strip (`Streak`, `Moods`, `Habits`), the chat, the links of the apps, the task service, the cards | `serve.go` (`pageAnswer`), `strip.go`, `cards.go` | stage 1: data on the entities, and embed |
 | `SharedForms`: a browser form may send the fields of a second action | `request.go` (`known`), `view/forms.go` | stage 2: web sends only the fields of the action of the button |
 | post, then redirect | `serve.go` (`serve`) | web |
-| the writer `ui` by default | `serve.go` (`source`) | web sends `X-Lifelog-Source: ui` |
+| the writer `ui` by default | `serve.go` (`source`) | web sends `X-Aminte-Source: ui` |
 | the routes of the browser: the cookie login (`public.go`), the lock (`lock.go`), `POST /render` (`editing.go`; it resolves nothing), the fonts, the manifest, the icons, `/assets/*`, the pictures of pixelart | `serve.go` (`routes`) | web |
 | `ground`, `lock_after`, `lock_pin_hash`, `grounds` | `internal/core/settings.go`, `internal/api/settings.go` | the settings of web |
 | `view.Num`, `view.AppLink`, `view.ToolChip`, `view.Strip`, `view.Chat` in the api | `days.go`, `measurements.go`, `with.go`, `conversation.go`, `strip.go`, `chat.go` | stage 1: a small helper outside `view`; only the code that draws imports `view` |
@@ -194,20 +194,20 @@ flowchart TD
 ## Stage 2 — `extensions/web`, side by side
 
 1. `internal/text` moves to `text`. The imports and the list of the public packages in AGENTS.md change with it.
-2. The module `extensions/web` (`replace lifelog => ../..`; it imports `lifelog/siren`, `lifelog/client`,
-   `lifelog/app`, `lifelog/text`) holds a copy of `view` with its templates and sheets, `pixelart`, the cookie login
-   and the lock, `/render`, the assets, post then redirect, the split of `SharedForms` and `X-Lifelog-Source: ui`. The
+2. The module `extensions/web` (`replace aminte => ../..`; it imports `aminte/siren`, `aminte/client`,
+   `aminte/app`, `aminte/text`) holds a copy of `view` with its templates and sheets, `pixelart`, the cookie login
+   and the lock, `/render`, the assets, post then redirect, the split of `SharedForms` and `X-Aminte-Source: ui`. The
    pictures and the files stream through it. The copy is for the time of the stage: stage 3 deletes the one in the
    core.
-3. Its own catalog on `LIFELOG_LISTEN` through `lifelog/app`: the settings `ground`, `lock_after` and the PIN, in
-   its state folder. Its front door on `LIFELOG_WEB_LISTEN`.
-4. **The test side by side**, end to end: it builds the real `lifelog`, makes a synthetic file, and runs the old
+3. Its own catalog on `AMINTE_LISTEN` through `aminte/app`: the settings `ground`, `lock_after` and the PIN, in
+   its state folder. Its front door on `AMINTE_WEB_LISTEN`.
+4. **The test side by side**, end to end: it builds the real `aminte`, makes a synthetic file, and runs the old
    browser and web. For a list of routes that covers every template and the shell, it gets the page from both and
    compares the HTML. It names each difference that it allows, and it allows no other. Stage 3 deletes it with the
    old browser.
 5. **The parity test of web:** each action of `GET /actions` has its form in web.
-6. **Live:** build `lifelog` and `lifelog-web` into the install folder, add `--with web`, `LIFELOG_WEB_LISTEN` and
-   `LIFELOG_WEB_ORIGINS` to the unit, copy the settings (a one-off line that the owner runs), start the service
+6. **Live:** build `aminte` and `aminte-web` into the install folder, add `--with web`, `AMINTE_WEB_LISTEN` and
+   `AMINTE_WEB_ORIGINS` to the unit, copy the settings (a one-off line that the owner runs), start the service
    again, and the owner points the proxy to `127.0.0.1:7780`.
 
 ## Stage 3 — the core with no presentation
@@ -216,7 +216,7 @@ flowchart TD
    `render` of `editing.go`, `wantsHTML`, `Vary`, `Speculation-Rules`, the default writer `ui`, post then redirect,
    `SharedForms`, `internal/pixelart`, the settings of the browser, `--public`, `--allow-origin`, `--tls-*`, CORS and
    a listen address that is not a loopback. The bearer check stays, turned on by a token alone.
-2. A new test in `cmd/lifelog/boundary_test.go`: no `.html`, `.css`, `.js` or picture file under `internal/` or
+2. A new test in `cmd/aminte/boundary_test.go`: no `.html`, `.css`, `.js` or picture file under `internal/` or
    `cmd/`, and no import of `html/template`.
 3. The docs in the same change: the README (the sections of the browser go to `extensions/web/README.md`), API.md
    (embed in, HTML out), AGENTS.md (the rings, the line "the browser stays in ring 2", the public packages, the rule
@@ -230,16 +230,16 @@ build, and the builders followed them.
 | subject | decision |
 |---|---|
 | the answer of a write | A POST answers its entity, with `Location` from its self link. There is no 303 for a POST. The redirects of the API stay: `/days/today`, `/weeks/today`, `find`, `random-page`, `open-day`, a title to its page. |
-| the writer | A request with no `Lifelog-Source` writes as `api`. Web sends `ui`. |
+| the writer | A request with no `Aminte-Source` writes as `api`. Web sends `ui`. |
 | the names of a browser | The core keeps `new`, on a read only. `back` and `feedback` are unknown fields to the core (422). Web takes them out before it asks the core. |
 | the settings | The action `settings` keeps `model_url`, `model`, `model_key` and `owner_number`. The core reads an old file with `ground`, `lock_after` and `lock_pin_hash`, and its next save drops them. |
-| the line of `serve` | `lifelog serve [--addr 127.0.0.1:7777] [--snapshots DIR] [--token-file PATH] [--with NAME]...`. A line with `--public`, `--allow-origin`, `--tls-cert` or `--tls-key` is refused as an unknown flag. |
-| the token | From `--token-file` (one trailing line break is cut), else `$LIFELOG_TOKEN`. It must be one line of 32 characters or more, with no space or tab at its start or end; an empty `--token-file` is refused. `api.RequireToken` answers a request without it with 401 `token_required`, compares in the same time for every value, and exempts no route. |
+| the line of `serve` | `aminte serve [--addr 127.0.0.1:7777] [--snapshots DIR] [--token-file PATH] [--with NAME]...`. A line with `--public`, `--allow-origin`, `--tls-cert` or `--tls-key` is refused as an unknown flag. |
+| the token | From `--token-file` (one trailing line break is cut), else `$AMINTE_TOKEN`. It must be one line of 32 characters or more, with no space or tab at its start or end; an empty `--token-file` is refused. `api.RequireToken` answers a request without it with 401 `token_required`, compares in the same time for every value, and exempts no route. |
 | the guards | `NetworkAuthority` is outside (a wrong `Host` is 403 before a missing token is 401), then the bearer check, then the API. `http.CrossOriginProtection` stays, with no trusted origin. |
 | the children of `serve --with` | They get the token of the server or none. Web exits 78 with none. |
-| `siren.CodeLocked` | It stays in the list of codes. API.md says that lifelog-web answers it, and the core never does. |
-| the boundary | `TestTheCoreHoldsNoPresentation` (`cmd/lifelog/boundary_test.go`). |
-| the tests | Each HTML assertion of a core test got a home in `extensions/web` before the core test went. The core kept the JSON part of each mixed test. A port keeps the strings of the core test and runs against the real core through `lifelogtest`. The ticktick end-to-end test asks for Siren. |
+| `siren.CodeLocked` | It stays in the list of codes. API.md says that aminte-web answers it, and the core never does. |
+| the boundary | `TestTheCoreHoldsNoPresentation` (`cmd/aminte/boundary_test.go`). |
+| the tests | Each HTML assertion of a core test got a home in `extensions/web` before the core test went. The core kept the JSON part of each mixed test. A port keeps the strings of the core test and runs against the real core through `amintetest`. The ticktick end-to-end test asks for Siren. |
 | a panic in web | A 500 page that says "internal error", and one log record with the pattern of the route, never the path. |
 | the docs | The decisions of an extension live in its README: the browser sections of README.md moved to `extensions/web/README.md`. CI runs `extensions/web`. |
 
@@ -250,7 +250,7 @@ the core's settings drops the three keys. It makes the folder with mode 0700 and
 refuses to write over a file of web that exists.
 
 ```
-python3 -c 'import json,os,sys; s=json.load(open(sys.argv[1])); o=os.path.expanduser(sys.argv[2]); os.umask(0o077); os.makedirs(os.path.dirname(o),exist_ok=True); json.dump({k:s[k] for k in ("ground","lock_after","lock_pin_hash") if s.get(k)}, open(o,"x"))' /home/cico/dev/lifelogdb/life.settings.json ~/.config/lifelog-web/settings.json
+python3 -c 'import json,os,sys; s=json.load(open(sys.argv[1])); o=os.path.expanduser(sys.argv[2]); os.umask(0o077); os.makedirs(os.path.dirname(o),exist_ok=True); json.dump({k:s[k] for k in ("ground","lock_after","lock_pin_hash") if s.get(k)}, open(o,"x"))' /home/cico/dev/aminte/life.settings.json ~/.config/aminte-web/settings.json
 ```
 
 ## Checks

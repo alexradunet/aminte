@@ -11,8 +11,8 @@ import (
 	"strings"
 	"testing"
 
-	"lifelog/app"
-	"lifelog/siren"
+	"aminte/app"
+	"aminte/siren"
 )
 
 // actionsDrawnByLink names the actions that a page opens by a link and not by a form of its own: the picker of the cover

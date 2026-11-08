@@ -7,7 +7,7 @@ import (
 	"unicode/utf8"
 )
 
-// TestParseDayReadsOnlyADayThatRoundTrips: ParseDay gives the time of a YYYY-MM-DD day (lifelog_meta.days), and a
+// TestParseDayReadsOnlyADayThatRoundTrips: ParseDay gives the time of a YYYY-MM-DD day (aminte_meta.days), and a
 // zero time and false for anything else. A string that time.Parse reads but that does not round-trip is not a day:
 // "+026-10-05" is read as the year 26. IsDay agrees with ParseDay.
 func TestParseDayReadsOnlyADayThatRoundTrips(t *testing.T) {

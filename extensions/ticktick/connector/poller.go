@@ -7,8 +7,8 @@ import (
 
 	"context"
 
-	"lifelog-ticktick/ticktick"
-	"lifelog/client"
+	"aminte-ticktick/ticktick"
+	"aminte/client"
 )
 
 // Poller runs the polls, one at a time. The timer of Serve and the sync action share it, so that two polls never run

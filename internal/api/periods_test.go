@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"lifelog/internal/api/apitest"
+	"aminte/internal/api/apitest"
 )
 
 // The period pages (D30). Today is Wednesday 2031-05-14, in ISO week 2031-W20. A period page is a plain page with a key

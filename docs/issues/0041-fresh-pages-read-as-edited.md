@@ -29,7 +29,7 @@ page that is not.
 
 ## Rules involved
 
-`lifelog_meta.edit_revisions` and the trigger `entity_names_touch_insert` in [schema.sql](../schema/schema.sql),
+`aminte_meta.edit_revisions` and the trigger `entity_names_touch_insert` in [schema.sql](../schema/schema.sql),
 [D12](../decisions/D12-no-revision-tables.md), [the day view](../cookbook/day-view.md),
 [capture](../cookbook/capture.md), [issue 0012](0012-timestamps-allow-stale-overwrites.md) (a clock is not a version).
 

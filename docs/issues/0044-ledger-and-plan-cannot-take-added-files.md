@@ -23,8 +23,8 @@ holds are reported, never removed: a line is the record that a file was imported
 
 1. A source `Notes/` with `a.md`; a workspace with the ledger made (1 file).
 2. Copy `b.md` into `Notes/`.
-3. `lifelog do make-ledger --workspace Notes.lifelog`: 409, "the ledger exists; it is never rebuilt".
-4. `lifelog import status --workspace Notes.lifelog`: `b.md` is nowhere; `lifelog import apply b.md` is refused.
+3. `aminte do make-ledger --workspace Notes.aminte`: 409, "the ledger exists; it is never rebuilt".
+4. `aminte import status --workspace Notes.aminte`: `b.md` is nowhere; `aminte import apply b.md` is refused.
 
 ## Rules involved
 

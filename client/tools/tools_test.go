@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"lifelog/siren"
+	"aminte/siren"
 )
 
 func TestToolsRefuseNormalizedDuplicates(t *testing.T) {

@@ -17,8 +17,8 @@
   test was wider than the switch. Two things differ from the plan as written: a failed settings read draws the boards
   and logs the fault, as a failed Today strip draws no strip, so a corrupt file costs no page; and the new tests are
   the files `ground_test.go` of `internal/api` and of `internal/api/view` and `ground_command_test.go` of
-  `cmd/lifelog`. Live since 2026-10-29 18:28 (`~/.local/bin/lifelog` built from `8f0cdc4`, the service restarted, the previous
-  binary kept as `lifelog.prev`). The mock-up the owner chose from (2026-10-29) is a private artifact of the session that wrote this
+  `cmd/aminte`. Live since 2026-10-29 18:28 (`~/.local/bin/aminte` built from `8f0cdc4`, the service restarted, the previous
+  binary kept as `aminte.prev`). The mock-up the owner chose from (2026-10-29) is a private artifact of the session that wrote this
   plan; of its nine grounds the owner kept four: plain oak, boards, firelight, embers.
 - **Resolves:** the owner's words of 2026-10-29 (below). No issue.
 
@@ -41,7 +41,7 @@ attribute. The pictures are embedded, served immutable, and a test holds each fi
 | question | decision |
 |---|---|
 | the setting | `ground`, a string of `core.Settings` (`json:"ground,omitempty"`), one of `boards`, `oak`, `firelight`, `embers`; empty is `boards`, the floor of today. |
-| the field | the action `settings` gains the field `ground` with those four options, in that order, titled "Ground". The browser draws it as the catalog's generic select; the CLI line is `lifelog do settings ground=embers`; the MCP has no `settings` tool (owner-only, as before). A value outside the options is 422 by `fieldsOf`, so Go checks nothing. |
+| the field | the action `settings` gains the field `ground` with those four options, in that order, titled "Ground". The browser draws it as the catalog's generic select; the CLI line is `aminte do settings ground=embers`; the MCP has no `settings` tool (owner-only, as before). A value outside the options is 422 by `fieldsOf`, so Go checks nothing. |
 | the resource | `GET /settings` carries `ground` among its properties and fills the action's value; the entity's property is the stored string, empty when unset. |
 | the shell | `view.Shell` gains `Ground string`, read from the settings where the shell is built, normalised there: empty, or a word that is not a floor, is `boards`. The layout opens `<body data-ground="{{.Shell.Ground}}">` on a page with the shell and a bare `<body>` without one (the login has the floor of today). A failed read of the settings file draws the boards and logs the fault once: the floor is a help, and the page must still come. |
 | the floor | `app.css` draws the ground from the attribute. `boards`, and no attribute, is today's rule. `oak` drops the tile: the grain alone. `firelight` keeps the boards and adds two warm glows low on the floor, `body::before` and `body::after`, fixed over the viewport under the frame (`z-index:-1`), breathing on cycles of 7 and 11 seconds (`opacity` .55 to 1, `scale` 1 to 1.07). `embers` keeps the boards and adds one picture, `embers.png`, on the same two pseudo-elements at two speeds: the tile slides up by its own height on a loop (`background-position`, `steps()` so the sparks move by whole pixels), the second layer slower and fainter. |
@@ -103,8 +103,8 @@ flowchart LR
 
 ## Done when
 
-1. `lifelog do settings ground=embers` writes the file, `GET /settings` reads it back, `ground=flagstones` is 422 on
-   every surface, and `lifelog actions` lists the field with its four options.
+1. `aminte do settings ground=embers` writes the file, `GET /settings` reads it back, `ground=flagstones` is 422 on
+   every surface, and `aminte actions` lists the field with its four options.
 2. Every page with the shell draws the chosen floor; the two moving grounds stand still under reduced motion; the
    login keeps the boards.
 3. `embers.png` equals its drawing; the baseline and the static checks are green; the README and API.md say the new

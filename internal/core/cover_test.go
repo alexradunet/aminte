@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"lifelog/internal/photo/phototest"
+	"aminte/internal/photo/phototest"
 )
 
 // TestSetCoverKeepsThePhotoAndShowsItFirst: a new photo is kept as a file with no day and no place, and its embed

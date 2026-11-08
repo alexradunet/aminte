@@ -1,5 +1,5 @@
 // Package agent answers the owner's turns of the conversation page with a model that calls the actions of the
-// lifelog API. The page is the truth: the agent reads it, and a turn of the owner after its last reply is a turn to
+// aminte API. The page is the truth: the agent reads it, and a turn of the owner after its last reply is a turn to
 // answer. The core writes both kinds of turn: the action say writes the owner's, and the action reply writes the
 // agent's, right after the owner turn that it answers. A chat (the browser, WhatsApp) shows the page.
 package agent
@@ -16,11 +16,11 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"lifelog-agent/model"
-	"lifelog/app"
-	"lifelog/client"
-	"lifelog/client/tools"
-	"lifelog/siren"
+	"aminte-agent/model"
+	"aminte/app"
+	"aminte/client"
+	"aminte/client/tools"
+	"aminte/siren"
 )
 
 const (
@@ -42,10 +42,10 @@ const (
 	pollEvery = 3 * time.Second
 )
 
-// Source is the name of the writer: the rows that the agent writes carry agent:lifelog.
-const Source = "lifelog"
+// Source is the name of the writer: the rows that the agent writes carry agent:aminte.
+const Source = "aminte"
 
-// noModel is the reply of a turn when the settings of lifelog name no model.
+// noModel is the reply of a turn when the settings of aminte name no model.
 const noModel = "No model is set: open Settings."
 
 // errNoModel says that the settings hold no model_url or no model.
@@ -114,7 +114,7 @@ func (a *Agent) Run(ctx context.Context) error {
 
 // readCatalog reads the catalog and replaces the tools and the actions with it. The tools and the actions come from
 // the same read, so a tool and its action agree. A catalog with no say or no reply is an error that the owner acts on
-// (app.OwnerActs): the server is too old, or it is not a lifelog server, and a restart of the agent does not help. say
+// (app.OwnerActs): the server is too old, or it is not an aminte server, and a restart of the agent does not help. say
 // is the only way to write a turn of the owner, so with no say there is nothing to answer, and reply is the only way
 // that the core takes the agent's turn. On an error the tools and the actions stay as they were.
 func (a *Agent) readCatalog(ctx context.Context) error {
@@ -139,7 +139,7 @@ func (a *Agent) readCatalog(ctx context.Context) error {
 	return nil
 }
 
-// model reads the settings of lifelog and makes the client of the model. It is called at each turn, so a change in
+// model reads the settings of aminte and makes the client of the model. It is called at each turn, so a change in
 // Settings is seen at once. The read is the owner's: the client AsOwner carries no source. The tools of the model
 // use Client, so their read of /settings is an agent's, and the API refuses it. The key is never in an error.
 func (a *Agent) model(ctx context.Context) (*model.Client, error) {
@@ -302,7 +302,7 @@ func (a *Agent) reply(ctx context.Context, p *page, at time.Time) (string, []str
 	case ctx.Err() != nil:
 		return "", nil, ctx.Err()
 	case errors.Is(err, errNoModel):
-		a.logger.Printf("%v: open Settings in lifelog", err)
+		a.logger.Printf("%v: open Settings in aminte", err)
 		return noModel, nil, nil
 	case err != nil:
 		a.logger.Printf("%v", err)

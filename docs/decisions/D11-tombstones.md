@@ -2,7 +2,7 @@
 
 **Status:** accepted
 
-- **Decision.** `lifelog_meta.deletes`; the `*_no_delete` triggers, which also hold on a connection that forgot
+- **Decision.** `aminte_meta.deletes`; the `*_no_delete` triggers, which also hold on a connection that forgot
   `foreign_keys` (executed), and under `recursive_triggers=ON` stop `INSERT OR REPLACE` from deleting a row
   (executed, [connection setup](../contract/connections.md)). Junk captured by accident is tombstoned like
   everything else. An import writes through the writer's operations, so it brings a tombstoned page back only as they

@@ -1,6 +1,6 @@
-// Package agentic is `lifelog agentic-init` (plan 090): it makes the folder of the executable
+// Package agentic is `aminte agentic-init` (plan 090): it makes the folder of the executable
 // ready for a coding agent opened in it. It writes AGENTS.md (and a CLAUDE.md that imports it), the skills in the two
-// folders the frameworks read, and an MCP config for Claude Code, Codex, OpenCode and Pi, each starting lifelog's
+// folders the frameworks read, and an MCP config for Claude Code, Codex, OpenCode and Pi, each starting aminte's
 // own MCP server on the folder's life.db.
 package agentic
 
@@ -88,18 +88,18 @@ func Files(p Paths) (map[string][]byte, error) {
 		Command string   `json:"command"`
 		Args    []string `json:"args"`
 	}
-	out[".mcp.json"] = jsonFile(map[string]any{"mcpServers": map[string]stdio{"lifelog": {p.Exe, server("claude")}}})
-	out[".pi/mcp.json"] = jsonFile(map[string]any{"mcpServers": map[string]stdio{"lifelog": {p.Exe, server("pi")}}})
+	out[".mcp.json"] = jsonFile(map[string]any{"mcpServers": map[string]stdio{"aminte": {p.Exe, server("claude")}}})
+	out[".pi/mcp.json"] = jsonFile(map[string]any{"mcpServers": map[string]stdio{"aminte": {p.Exe, server("pi")}}})
 	out["opencode.json"] = jsonFile(map[string]any{
 		"$schema": "https://opencode.ai/config.json",
-		"mcp": map[string]any{"lifelog": map[string]any{
+		"mcp": map[string]any{"aminte": map[string]any{
 			"type": "local", "command": append([]string{p.Exe}, server("opencode")...), "enabled": true}},
 	})
 	args := make([]string, 0, 5)
 	for _, a := range server("codex") {
 		args = append(args, tomlString(a))
 	}
-	out[".codex/config.toml"] = []byte("[mcp_servers.lifelog]\ncommand = " + tomlString(p.Exe) + "\nargs = [" + strings.Join(args, ", ") + "]\n")
+	out[".codex/config.toml"] = []byte("[mcp_servers.aminte]\ncommand = " + tomlString(p.Exe) + "\nargs = [" + strings.Join(args, ", ") + "]\n")
 	return out, nil
 }
 

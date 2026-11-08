@@ -79,7 +79,7 @@ and the change of the DDL and the pages.
    only". The `part-of` statements stay, and the registry's own `to_types` check stays as it is. In
    `entities_promote_from_page`, the comment says that the foreign key of a typed row also refuses the write and the
    trigger keeps the sentence; the `RAISE` says "a person, a metric or a file keeps its type". The `schema` row of
-   `lifelog_meta` says "the journal (one page per day), wiki, people, health metrics and the files...".
+   `aminte_meta` says "the journal (one page per day), wiki, people, health metrics and the files...".
 2. **D16** rewritten from its template: the decision, why (issue 0091: five of thirty used; a type with nothing behind
    it), alternatives (keep the kind for the difference between naming and being at: rejected, the owner's words say
    it), the cost accepted (a day that names a place it was not at reads the same as one it was at), sources
@@ -101,7 +101,7 @@ and the change of the DDL and the pages.
 4. **Suites**: the `named` suite is about a person (its "a place needs no detail row", "two Sams" with a place, and
    the cookbook runs of person-or-place and everything-about change with the recipes); the `links` and `journal`
    suites lose their `at` cases; the mutants named above go (the count in `tests/README.md` follows); the `document`
-   suite holds (every link resolves, the `lifelog_meta` rows and the stored texts name only what the file has: the
+   suite holds (every link resolves, the `aminte_meta` rows and the stored texts name only what the file has: the
    `schema` row and the comments must not say "place" or "at"); the `diagrams` suite holds (the link map equals
    `link_kinds`). The 2075 test of `document` reads the threat model's table: keep its parser happy.
 
@@ -151,7 +151,7 @@ and the change of the DDL and the pages.
 ## Part 4 — The live file (local; not for a cloud session)
 
 The owner's file holds thirty places and the `at` links of five. It follows by a one-off program in the pattern of
-plan 143: `~/.local/share/lifelog-oneoff/plan151/` holds `generic.go` (plan 143's state reader, comparer, text
+plan 143: `~/.local/share/aminte-oneoff/plan151/` holds `generic.go` (plan 143's state reader, comparer, text
 rewriter and checks, unchanged), `change.go` (the change), `main_test.go`, `OLD.sql` (`schema.sql` at master, equal
 to plan 143's NEW.sql) and `NEW.sql` (`schema.sql` at the commit of Part 0), and the binary `plan151-bin OLD.sql
 NEW.sql LIFE.db [--dry-run]`. It makes a fresh file from each SQL in a temporary folder, accepts only the exact
@@ -175,7 +175,7 @@ transaction, in this order, which the triggers force:
    the trigger made again with NEW's text; `links_endpoint_types` dropped and made again with NEW's text.
 6. The stored texts of `entities`, `links` and `link_kinds` set to NEW's through `PRAGMA writable_schema` (shapes
    equal; the one change outside a comment is the CHECK, which every row satisfies once no place is left), and the
-   `schema` row of `lifelog_meta` set to NEW's. The writer's drift check folds white space and keeps comments, so
+   `schema` row of `aminte_meta` set to NEW's. The writer's drift check folds white space and keeps comments, so
    the texts are made byte-equal.
 7. The counts (no place, no `at`, pages plus thirty), the rows of `link_kinds` against NEW's seed, the whole state
    against the fresh NEW file, `PRAGMA integrity_check` and `foreign_key_check`, and a trial write (a place refused
@@ -190,7 +190,7 @@ revisions, the types, the kinds and the tombstone refusal.
 
 The owner runs it with `!`: stop the service, `mkdir -p /home/cico/life/snapshots/2026-MM-DD-plan-151`, snapshot
 there, dry run, run, `get /integrity --human` with the staged new binary, install the staged binary (`cp` to
-`lifelog.new`, `mv -f`), start, read the `serving` line of `journalctl -o short-iso`. The counts before and after
+`aminte.new`, `mv -f`), start, read the `serving` line of `journalctl -o short-iso`. The counts before and after
 (places, `at` rows, the days that got a line) go in the status line below.
 
 ## Tests
@@ -199,7 +199,7 @@ there, dry run, run, `get /integrity --human` with the staged new binary, instal
 - `internal/core`: a promote to anything but a person is refused by the writer with a 422 before SQL, and a person's
   promote still works; the calendar's dated rows and the stream's chips carry people only; the orphan check has no
   `at` row (`integrity_rules_test.go`); `people_places_test.go` of `internal/api` becomes `people_test.go`.
-- `cmd/lifelog`: `surfaces_test.go` and `parity_test.go` lose the `link`/`unlink`/`create-place` cases and keep
+- `cmd/aminte`: `surfaces_test.go` and `parity_test.go` lose the `link`/`unlink`/`create-place` cases and keep
   parity for `promote`; `boundary_test.go` holds.
 - `extensions/mcp`: the end-to-end test lists no `create_place`, `link` or `unlink` tool.
 - The baseline: `gofmt`, `go vet ./... && go test ./...` at the root and in each extension; `staticcheck ./...` and

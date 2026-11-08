@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"lifelog/internal/api/apitest"
+	"aminte/internal/api/apitest"
 )
 
 // TestAFormWithAReturnPathIsRefused: a write answers the entity it made, with its address in Location, and goes

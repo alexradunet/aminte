@@ -24,7 +24,7 @@ flowchart LR
   C -->|"known name"| W["apply: the file, whole"]
   C -->|"new name, look-alike page,\ntombstoned or plain page"| H["held: the file stays to do\n(ledger note: held)"]
   H --> P["propose-entities:\nthe writer adds the names\nto entities.md, proposed"]
-  P --> O["the owner: approved, rejected,\nor as an existing title;\nlifelog import approve entities"]
+  P --> O["the owner: approved, rejected,\nor as an existing title;\naminte import approve entities"]
   O --> W
 ```
 

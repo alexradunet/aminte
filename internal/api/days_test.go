@@ -7,9 +7,9 @@ import (
 	"strings"
 	"testing"
 
-	"lifelog/client"
-	"lifelog/internal/api/apitest"
-	"lifelog/siren"
+	"aminte/client"
+	"aminte/internal/api/apitest"
+	"aminte/siren"
 )
 
 // journalFixture is a small life around fixedToday: a mood; two earlier day pages, one written as a mood alone.

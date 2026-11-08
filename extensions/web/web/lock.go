@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"lifelog/siren"
+	"aminte/siren"
 )
 
 // The lock (docs/plans/160-the-lock.md). A session that is idle for longer than lock_after, or that the owner locked,

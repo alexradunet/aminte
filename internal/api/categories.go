@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"lifelog/siren"
+	"aminte/siren"
 )
 
 // filePages is file-pages: every page named is filed in the category page, in one write (D26). The answer is the

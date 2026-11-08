@@ -1,0 +1,37 @@
+# Reference copy. Compare it with the installed unit before you replace it (deploy/README.md).
+[Unit]
+Description=Aminte server (life.db)
+After=network.target
+
+[Service]
+Type=simple
+# Replace OWNER and the paths.
+User=OWNER
+ExecStart=/home/OWNER/.local/bin/aminte --db /home/OWNER/aminte/life.db serve --token-file /home/OWNER/life/token --snapshots /home/OWNER/snapshots --with web --with agent --with whatsapp
+# the core listens on 127.0.0.1:7777 only. The token file turns on its bearer check: one line of 32 characters or more,
+# with no space or tab at its start or end
+# --with web runs the browser (extensions/web) beside the server: aminte-web must be beside aminte
+# the browser listens on AMINTE_WEB_LISTEN. The local proxy points to it, and not to the core
+# AMINTE_WEB_ORIGINS is the origin that the proxy shows to the browser
+Environment=AMINTE_WEB_LISTEN=127.0.0.1:7780
+Environment=AMINTE_WEB_ORIGINS=https://aminte.example
+# with ProtectHome=read-only, the browser's state folder must be writable: ReadWritePaths=/home/OWNER/.config/aminte-web
+# --with agent runs the agent beside the server (extensions/agent): it answers the owner on the conversation page, with the
+# model of the Settings. It keeps no state folder: aminte-agent must be beside aminte
+# --with whatsapp runs the WhatsApp transport beside the server (extensions/whatsapp): it carries the messages of the owner
+# to the page and the turns of the page to the phone. Run aminte whatsapp login once, as OWNER, before the first start
+# with ProtectHome=read-only, the transport's state folder must be writable: ReadWritePaths=/home/OWNER/.config/aminte-whatsapp
+# remove --with whatsapp when the number is not paired yet; the chat of the browser works with --with agent alone
+# add --with ticktick to run TickTick, a connected app, beside the server (extensions/ticktick)
+# with ProtectHome=read-only, its state folder must be writable: ReadWritePaths=/home/OWNER/.config/aminte-ticktick
+# the same holds for the state folder of any connected app: ReadWritePaths=/home/OWNER/.config/aminte-NAME
+Restart=on-failure
+# systemd stops the server with SIGTERM. aminte then drains the requests that it admitted (up to 10 seconds) and
+# closes life.db. TimeoutStopSec is longer than the drain, so systemd sends SIGKILL only to a server that is stuck.
+KillSignal=SIGTERM
+# mixed: SIGTERM reaches aminte alone, which interrupts its --with children first and then drains; the group is killed only on the timeout
+KillMode=mixed
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

@@ -12,8 +12,8 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"lifelog/app"
-	"lifelog/siren"
+	"aminte/app"
+	"aminte/siren"
 )
 
 // itemsAppHandler is a small connected app: a home with the title Test app, one item as a row with a chip and a round

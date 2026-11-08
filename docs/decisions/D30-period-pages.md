@@ -18,7 +18,7 @@
     `entity_names_day_update` keeps that spelling. `entities_day_identity` never renames it, never lets a page acquire
     the key through aliases, and never lets a page with a `part-of` link acquire it. `links_endpoint_types` refuses a
     `part-of` link from or to a period page.
-  - `lifelog_meta.periods` and the comment in the `entities` statement say the same in the file.
+  - `aminte_meta.periods` and the comment in the `entities` statement say the same in the file.
   - A plain page with a period-shaped title in a file built before this rule is adopted at the rebuild, since there is no
     migration before the freeze ([D13](D13-migrations-and-freeze.md)). In such a file the page keeps its alias and its links, since a period page is never
     renamed (`entities_day_identity`) and an alias is never deleted (`entity_names_no_delete`). The owner tombstones it and writes

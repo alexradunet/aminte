@@ -3,7 +3,7 @@ package api
 import (
 	"strings"
 
-	"lifelog/siren"
+	"aminte/siren"
 )
 
 // Editing (docs/plans/091-the-browser-for-daily-use.md): an editor as tall as its body.

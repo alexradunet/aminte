@@ -12,7 +12,7 @@ import (
 	"modernc.org/sqlite"
 )
 
-// probeOnce registers lifelog_probe, an application function with no SQLITE_INNOCUOUS flag, for every connection.
+// probeOnce registers aminte_probe, an application function with no SQLITE_INNOCUOUS flag, for every connection.
 var probeOnce sync.Once
 
 // try runs fn and turns a stop into "ERR <why>"; "OK" when fn returns.
@@ -134,10 +134,10 @@ func writers(s *S) {
 	c.must("PRAGMA foreign_keys=ON")
 	inside := c.n("PRAGMA foreign_keys")
 	c.must("COMMIT")
-	s.K("the DDL marks the file as Lifelog: application_id 0x4C494645 and user_version 1", c.n("PRAGMA application_id") == 0x4C494645 && c.n("PRAGMA user_version") == 1)
+	s.K("the DDL marks the file as Aminte: application_id 0x4C494645 and user_version 1", c.n("PRAGMA application_id") == 0x4C494645 && c.n("PRAGMA user_version") == 1)
 	s.K("PRAGMA foreign_keys is a silent no-op inside a transaction", inside == 0)
-	meta := c.str("select value from lifelog_meta where key='sqlite'")
-	s.K("lifelog_meta.sqlite names 3.51.3 and 3.53", strings.Contains(meta, "3.51.3") && strings.Contains(meta, "3.53"))
+	meta := c.str("select value from aminte_meta where key='sqlite'")
+	s.K("aminte_meta.sqlite names 3.51.3 and 3.53", strings.Contains(meta, "3.51.3") && strings.Contains(meta, "3.53"))
 	var x, y, z int
 	ver := c.str("select sqlite_version()")
 	fmt.Sscanf(ver, "%d.%d.%d", &x, &y, &z)
@@ -152,16 +152,16 @@ func writers(s *S) {
 	s.K("a mode=ro reader is not blocked by an open write transaction", ro.n("select count(*) from entities where entity_type = 'page'") == 0)
 	w.must("COMMIT")
 	s.K("...and sees the commit", ro.n("select count(*) from entities where entity_type = 'page'") == 1)
-	for _, st := range []string{"INSERT INTO lifelog_meta VALUES ('x','y')", "DELETE FROM entities", "UPDATE entities SET deleted_at=NULL", "DROP TABLE lifelog_meta"} {
+	for _, st := range []string{"INSERT INTO aminte_meta VALUES ('x','y')", "DELETE FROM entities", "UPDATE entities SET deleted_at=NULL", "DROP TABLE aminte_meta"} {
 		s.K("mode=ro refuses: "+clip(st, 30), strings.Contains(ro.tryx(st), "readonly"))
 	}
 	ro.must("BEGIN")
 	ro.n("select count(*) from entities") // hold a known reader snapshot
 	progress := make(chan string, 1)
-	go func() { progress <- w.tryx("INSERT INTO lifelog_meta VALUES ('k','v')") }()
+	go func() { progress <- w.tryx("INSERT INTO aminte_meta VALUES ('k','v')") }()
 	select {
 	case out := <-progress:
-		s.K("the writer commits while a connected reader holds a snapshot", out == "OK" && w.str("select value from lifelog_meta where key='k'") == "v", out)
+		s.K("the writer commits while a connected reader holds a snapshot", out == "OK" && w.str("select value from aminte_meta where key='k'") == "v", out)
 	case <-time.After(30 * time.Second):
 		stop("writer did not progress with connected reader")
 	}
@@ -172,12 +172,12 @@ func writers(s *S) {
 	s.K("contract/connections: readers are read-only and set trusted_schema = OFF",
 		regexp.MustCompile("Readers must be \\*\\*read-only\\*\\* and set \\*\\*`PRAGMA trusted_schema = OFF`\\*\\*").MatchString(s.d.Page("contract/connections.md")))
 	probeOnce.Do(func() {
-		sqlite.MustRegisterScalarFunction("lifelog_probe", 0, func(*sqlite.FunctionContext, []driver.Value) (driver.Value, error) {
+		sqlite.MustRegisterScalarFunction("aminte_probe", 0, func(*sqlite.FunctionContext, []driver.Value) (driver.Value, error) {
 			return int64(1), nil
 		})
 	})
 	p = s.mkdb()
-	s.connect(p, "_pragma=trusted_schema(1)").must("CREATE VIEW probe AS SELECT lifelog_probe() AS x")
+	s.connect(p, "_pragma=trusted_schema(1)").must("CREATE VIEW probe AS SELECT aminte_probe() AS x")
 	trusting := s.connect(p, "mode=ro", "_pragma=trusted_schema(1)").tryx("SELECT x FROM probe")
 	careful := s.connect(p, "mode=ro", "_pragma=trusted_schema(0)").tryx("SELECT x FROM probe")
 	s.K("a mode=ro reader with trusted_schema=ON runs the view's function", trusting == "OK", trusting)

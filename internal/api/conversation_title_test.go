@@ -10,17 +10,17 @@ import (
 	"strings"
 	"testing"
 
-	"lifelog/client"
-	"lifelog/internal/api/apitest"
-	"lifelog/internal/core"
-	"lifelog/siren"
+	"aminte/client"
+	"aminte/internal/api/apitest"
+	"aminte/internal/core"
+	"aminte/siren"
 )
 
 // The title of a conversation page is for the page that say makes. These tests hold the rule from the outside: no
 // writer makes a page under such a title, gives a page such a title, or changes the type of the page that holds it.
 
 // writers are one owner and three writers that are not the owner's, as the surfaces use them.
-var writers = []string{"cli", "agent:lifelog", "agent:mcp", "import:x.y"}
+var writers = []string{"cli", "agent:aminte", "agent:mcp", "import:x.y"}
 
 // run runs the action with the name as the writer source. The values name the path fields of the action too.
 func run(t *testing.T, h http.Handler, source, name string, values map[string]string) (*siren.Entity, error) {
@@ -120,7 +120,7 @@ func TestNoWriteChangesTheTypeOrTheTitleOfAConversationPage(t *testing.T) {
 	if _, err := say(t, c, convDay, "Still here"); err != nil {
 		t.Errorf("say after the refusals: %v", err)
 	}
-	if _, err := reply(t, h, "agent:lifelog", map[string]string{"day": "today", "turn": ownerKeyOf(t, c, 1), "text": "Hi"}); err != nil {
+	if _, err := reply(t, h, "agent:aminte", map[string]string{"day": "today", "turn": ownerKeyOf(t, c, 1), "text": "Hi"}); err != nil {
 		t.Errorf("reply after the refusals: %v", err)
 	}
 }
@@ -168,7 +168,7 @@ func TestAConversationPageOffersNoActionThatItRefuses(t *testing.T) {
 // has no turns, so it is no conversation yet. The first say writes the first line and the turn on it, files it in
 // Conversations and gives it its day, as it does for a page that it makes itself.
 func TestSayAdoptsTheStubThatAWikilinkMade(t *testing.T) {
-	for _, source := range []string{"cli", "agent:lifelog"} {
+	for _, source := range []string{"cli", "agent:aminte"} {
 		t.Run(source, func(t *testing.T) {
 			c, h, s := conversationStore(t)
 			if _, err := run(t, h, source, "create-page", map[string]string{"title": "Sleep notes", "body": "talked in [[Conversation " + convDay + "]]"}); err != nil {
@@ -229,7 +229,7 @@ func TestAPageOfAnotherTypeIsNoConversation(t *testing.T) {
 			if _, err := say(t, c, convDay, "Hello"); apitest.Status(err) != 409 {
 				t.Errorf("say with a %s page: %v, want 409", typ, err)
 			}
-			if _, err := reply(t, h, "agent:lifelog", map[string]string{"day": "today", "turn": "0123456789abcdef", "text": "Hi"}); apitest.Status(err) != 409 {
+			if _, err := reply(t, h, "agent:aminte", map[string]string{"day": "today", "turn": "0123456789abcdef", "text": "Hi"}); apitest.Status(err) != 409 {
 				t.Errorf("reply with a %s page: %v, want 409", typ, err)
 			}
 		})

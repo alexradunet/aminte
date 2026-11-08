@@ -16,7 +16,7 @@ type Meta struct {
 	Orientation int    // the EXIF orientation, 1-8; 1 when it has none
 }
 
-// Day is the local day it was taken (lifelog_meta.days: the calendar of the device that captured it), "" when none.
+// Day is the local day it was taken (aminte_meta.days: the calendar of the device that captured it), "" when none.
 func (m Meta) Day() string {
 	if len(m.Taken) < 10 {
 		return ""

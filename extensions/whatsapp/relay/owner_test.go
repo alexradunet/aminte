@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"lifelog/client"
+	"aminte/client"
 )
 
 func waitOwnerOn(t *testing.T, api *fakeAPI, tick <-chan time.Time) (chan string, *bytes.Buffer, context.CancelFunc) {

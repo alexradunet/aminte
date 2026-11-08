@@ -9,20 +9,20 @@ import (
 	"sync"
 	"testing"
 
-	"lifelog-googlephotos/review"
+	"aminte-googlephotos/review"
 )
 
-// fakeLifelog answers the four calls of the extension. Every day of May 2031 has no picture, except the days in
+// fakeAminte answers the four calls of the extension. Every day of May 2031 has no picture, except the days in
 // covered. It records the files it was sent.
-type fakeLifelog struct {
+type fakeAminte struct {
 	*httptest.Server
 	mu      sync.Mutex
 	covered map[string]bool
 	files   []string // "<day> <title> <preview?>"
 }
 
-func newFakeLifelog(t *testing.T, covered ...string) *fakeLifelog {
-	f := &fakeLifelog{covered: map[string]bool{}}
+func newFakeAminte(t *testing.T, covered ...string) *fakeAminte {
+	f := &fakeAminte{covered: map[string]bool{}}
 	for _, d := range covered {
 		f.covered[d] = true
 	}
@@ -63,8 +63,8 @@ func newFakeLifelog(t *testing.T, covered ...string) *fakeLifelog {
 		defer f.mu.Unlock()
 		_, hasPreview := r.MultipartForm.File["preview"]
 		f.files = append(f.files, fmt.Sprintf("%s %s %v", r.FormValue("day"), r.FormValue("title"), hasPreview))
-		if r.Header.Get("Lifelog-Source") != "import:google-photos" || r.Header.Get("Accept") != "application/vnd.siren+json" {
-			t.Errorf("headers: source %q, accept %q", r.Header.Get("Lifelog-Source"), r.Header.Get("Accept"))
+		if r.Header.Get("Aminte-Source") != "import:google-photos" || r.Header.Get("Accept") != "application/vnd.siren+json" {
+			t.Errorf("headers: source %q, accept %q", r.Header.Get("Aminte-Source"), r.Header.Get("Accept"))
 		}
 		fmt.Fprint(w, `{"class":["file"],"properties":{}}`)
 	})
@@ -73,7 +73,7 @@ func newFakeLifelog(t *testing.T, covered ...string) *fakeLifelog {
 	return f
 }
 
-func (f *fakeLifelog) sent() []string {
+func (f *fakeAminte) sent() []string {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return append([]string(nil), f.files...)
@@ -90,7 +90,7 @@ func threeDays() []photo {
 
 func TestACrossSitePostIsRefused(t *testing.T) {
 	g := newFakeGoogle(t, threeDays()...)
-	s := newStack(t, g, newFakeLifelog(t).URL, true)
+	s := newStack(t, g, newFakeAminte(t).URL, true)
 	for name, h := range map[string]map[string]string{
 		"another site by Fetch Metadata": {"Sec-Fetch-Site": "cross-site"},
 		"the same site, not the origin":  {"Sec-Fetch-Site": "same-site"},
@@ -110,7 +110,7 @@ func TestACrossSitePostIsRefused(t *testing.T) {
 
 func TestAnotherHostNameIsRefused(t *testing.T) {
 	g := newFakeGoogle(t)
-	s := newStack(t, g, newFakeLifelog(t).URL, true)
+	s := newStack(t, g, newFakeAminte(t).URL, true)
 	req, err := http.NewRequest(http.MethodGet, s.web.URL+"/", nil)
 	if err != nil {
 		t.Fatal(err)
@@ -136,7 +136,7 @@ func TestLoopbackAddrRefusesOtherAddresses(t *testing.T) {
 
 func TestCallbackWithAWrongStateIsRefused(t *testing.T) {
 	g := newFakeGoogle(t)
-	s := newStack(t, g, newFakeLifelog(t).URL, false)
+	s := newStack(t, g, newFakeAminte(t).URL, false)
 	r := s.get(t, "/connect")
 	if r.Status != http.StatusSeeOther || !strings.HasPrefix(r.Location, g.URL+"/auth?") {
 		t.Fatalf("GET /connect = %d %q", r.Status, r.Location)
@@ -175,7 +175,7 @@ func TestCallbackWithAWrongStateIsRefused(t *testing.T) {
 
 func TestSkipGoesToTheNextDayAndTheLastDayLeadsToDone(t *testing.T) {
 	g := newFakeGoogle(t, threeDays()...)
-	s := newStack(t, g, newFakeLifelog(t).URL, true)
+	s := newStack(t, g, newFakeAminte(t).URL, true)
 	s.pickAll(t)
 	body := s.home(t).Body
 	if !strings.Contains(body, "<h2>2031-05-01</h2>") || !strings.Contains(body, "3 days left") {
@@ -207,7 +207,7 @@ func TestSkipGoesToTheNextDayAndTheLastDayLeadsToDone(t *testing.T) {
 
 func TestAVideoIsNotOfferedAsATile(t *testing.T) {
 	g := newFakeGoogle(t, threeDays()...)
-	s := newStack(t, g, newFakeLifelog(t).URL, true)
+	s := newStack(t, g, newFakeAminte(t).URL, true)
 	s.pickAll(t)
 	s.post(t, "/skip", nil, nil) // to 2031-05-02, which has the photo b and the video v
 	body := s.home(t).Body
@@ -218,7 +218,7 @@ func TestAVideoIsNotOfferedAsATile(t *testing.T) {
 
 func TestChooseKeepsThePhotoWithItsDayAndGoesOn(t *testing.T) {
 	g := newFakeGoogle(t, threeDays()...)
-	ll := newFakeLifelog(t)
+	ll := newFakeAminte(t)
 	s := newStack(t, g, ll.URL, true)
 	s.pickAll(t)
 	if r := s.post(t, "/choose", url.Values{"item": {"a"}}, nil); r.Status != http.StatusSeeOther {
@@ -247,9 +247,9 @@ func TestChooseKeepsThePhotoWithItsDayAndGoesOn(t *testing.T) {
 }
 
 func TestTheTypeOfTheDownloadNamesTheFile(t *testing.T) {
-	// The list names a HEIC, but Google sends a JPEG: the file is a JPEG, and lifelog makes its picture itself.
+	// The list names a HEIC, but Google sends a JPEG: the file is a JPEG, and aminte makes its picture itself.
 	g := newFakeGoogle(t, photo{ID: "h", Create: "2031-05-01T10:00:00Z", Type: "PHOTO", MIME: "image/heic", Served: "image/jpeg", Seed: 1})
-	ll := newFakeLifelog(t)
+	ll := newFakeAminte(t)
 	s := newStack(t, g, ll.URL, true)
 	s.pickAll(t)
 	s.post(t, "/choose", url.Values{"item": {"h"}}, nil)
@@ -263,11 +263,11 @@ func TestTheTypeOfTheDownloadNamesTheFile(t *testing.T) {
 
 func TestADayThatGotACoverMeanwhileIsNotWritten(t *testing.T) {
 	g := newFakeGoogle(t, threeDays()...)
-	ll := newFakeLifelog(t)
+	ll := newFakeAminte(t)
 	s := newStack(t, g, ll.URL, true)
 	s.pickAll(t)
 	ll.mu.Lock()
-	ll.covered["2031-05-01"] = true // the owner sets the cover in lifelog
+	ll.covered["2031-05-01"] = true // the owner sets the cover in aminte
 	ll.mu.Unlock()
 	s.post(t, "/choose", url.Values{"item": {"a"}}, nil)
 	if got := ll.sent(); len(got) != 0 {
@@ -283,7 +283,7 @@ func TestADayThatGotACoverMeanwhileIsNotWritten(t *testing.T) {
 
 func TestDaysThatHaveACoverAreNotOffered(t *testing.T) {
 	g := newFakeGoogle(t, threeDays()...)
-	s := newStack(t, g, newFakeLifelog(t, "2031-05-01", "2031-05-02").URL, true)
+	s := newStack(t, g, newFakeAminte(t, "2031-05-01", "2031-05-02").URL, true)
 	s.pickAll(t)
 	body := s.home(t).Body
 	if !strings.Contains(body, "<h2>2031-05-03</h2>") || !strings.Contains(body, "1 day left") {
@@ -293,7 +293,7 @@ func TestDaysThatHaveACoverAreNotOffered(t *testing.T) {
 
 func TestAThumbnailIsFetchedWithTheToken(t *testing.T) {
 	g := newFakeGoogle(t, threeDays()...)
-	s := newStack(t, g, newFakeLifelog(t).URL, true)
+	s := newStack(t, g, newFakeAminte(t).URL, true)
 	s.pickAll(t)
 	r := s.get(t, "/thumb/a")
 	if r.Status != http.StatusOK || len(r.Body) == 0 || !g.fetched("/media/a=w256-h256-c") {
@@ -307,7 +307,7 @@ func TestAThumbnailIsFetchedWithTheToken(t *testing.T) {
 func TestAPickThatIsNotSetYetRefreshesThePage(t *testing.T) {
 	g := newFakeGoogle(t, threeDays()...)
 	g.set = false
-	s := newStack(t, g, newFakeLifelog(t).URL, true)
+	s := newStack(t, g, newFakeAminte(t).URL, true)
 	s.post(t, "/pick", nil, nil)
 	r := s.get(t, "/session")
 	if r.Status != http.StatusOK || !strings.Contains(r.Body, `http-equiv="refresh"`) ||
@@ -324,7 +324,7 @@ func TestAPickThatIsNotSetYetRefreshesThePage(t *testing.T) {
 
 func TestThePageSaysConnectWhenThereIsNoToken(t *testing.T) {
 	g := newFakeGoogle(t)
-	s := newStack(t, g, newFakeLifelog(t).URL, false)
+	s := newStack(t, g, newFakeAminte(t).URL, false)
 	if body := s.home(t).Body; !strings.Contains(body, `href="/connect"`) || strings.Contains(body, "/pick") {
 		t.Errorf("page: %s", body)
 	}

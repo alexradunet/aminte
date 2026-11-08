@@ -13,9 +13,9 @@ import (
 	"sync"
 	"time"
 
-	"lifelog-ticktick/ticktick"
-	"lifelog/app"
-	"lifelog/siren"
+	"aminte-ticktick/ticktick"
+	"aminte/app"
+	"aminte/siren"
 )
 
 const dayFmt = "2006-01-02"
@@ -76,7 +76,7 @@ func actions() []siren.Action {
 	}
 }
 
-// Service is the handler of the task service. It serves the task protocol and no page: lifelog draws the pages.
+// Service is the handler of the task service. It serves the task protocol and no page: aminte draws the pages.
 // lists are the lists that TickTick reported at the start.
 func Service(p *Poller, lists []ticktick.Project) http.Handler {
 	s := &service{p: p, lists: lists, project: map[string]string{}}

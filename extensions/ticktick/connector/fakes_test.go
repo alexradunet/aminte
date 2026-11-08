@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"lifelog-ticktick/ticktick"
-	"lifelog/client"
-	"lifelog/siren"
+	"aminte-ticktick/ticktick"
+	"aminte/client"
+	"aminte/siren"
 )
 
 // fakeTick is a TickTick in memory: two lists, tasks, and switches for the missing /task/completed and for a 401.
@@ -204,7 +204,7 @@ func (f *fakeTick) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// fakeLife is the part of lifelog that Sync uses: GET /actions, and capture with its import_key.
+// fakeLife is the part of aminte that Sync uses: GET /actions, and capture with its import_key.
 type fakeLife struct {
 	mu       sync.Mutex
 	captures []capture

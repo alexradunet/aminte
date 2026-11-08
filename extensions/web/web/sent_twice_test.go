@@ -13,7 +13,7 @@ import (
 	"strings"
 	"testing"
 
-	"lifelog-web/internal/formdoc"
+	"aminte-web/internal/formdoc"
 )
 
 // drawnFormPostingTo is the form of the page at uri, drawn by h, that posts to action. It fails the test when the page has none.

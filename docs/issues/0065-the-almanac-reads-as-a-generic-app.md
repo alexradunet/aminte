@@ -13,7 +13,7 @@ Plans 092 to 095 gave the browser a shell, words, a phone layout and a calm hier
 Almanac of plan 092: cool paper, ink blue, white cards with an 8 to 12 px radius, 1 px lines and a soft shadow. The
 owner keeps one material language across his projects, Hearthwood: a dark oak page, wood chrome, parchment for
 everything written, ink text, candle gold and ember, square corners, 2 px outlines, bevels and hard drops, pixel-hard
-construction. The lifelog does not share it. Each item below is a fact of the code at `e79b3eb`.
+construction. The aminte does not share it. Each item below is a fact of the code at `e79b3eb`.
 
 | area | what the browser does | what the owner expects |
 |---|---|---|
@@ -30,9 +30,9 @@ every form with no script, every colour a token with its contrast held by a test
 
 ## Reproduce
 
-1. Build `lifelog` at `e79b3eb`; on a fresh file capture on 12 days with a mood, record two metrics on 14 days, start
+1. Build `aminte` at `e79b3eb`; on a fresh file capture on 12 days with a mood, record two metrics on 14 days, start
    two habits with check-ins, and create a one-off task due three days ago, one due today and a series every 3 days.
-2. `lifelog serve`; open `/days/today`, `/months/current`, `/deadlines` and a page at 1280 px and 390 px, light and
+2. `aminte serve`; open `/days/today`, `/months/current`, `/deadlines` and a page at 1280 px and 390 px, light and
    dark. Compare with the Balaur Storybook's Life dashboard and Tasks page.
 
 ## Rules involved

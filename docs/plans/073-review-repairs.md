@@ -60,8 +60,8 @@ snapshot tests need a destination outside a Git tree: this machine's `/tmp` has 
   `TMPDIR=/var/tmp go test ./internal/core ./internal/importer -count=1`.
 - `GOMAXPROCS=1 go test ./internal/importer -run '^TestPreparedCancellationAfterObservedWriteAndPublicationRecovery$' -count=100 -shuffle=1791357917233312471`: passed after reproducing the old failure with that seed.
 - `go test ./internal/importer -run '^TestImportProcessRecovery' -count=1 -v`: all eight boundaries passed.
-- `TMPDIR=/var/tmp go test ./internal/db ./cmd/lifelog -run 'TestCopy|TestInit|TestSnapshot|TestExecutableServeDrainsActiveRequest|TestServeShutdown|TestServeFailure|TestServeBinds' -count=1`: passed.
-- `TMPDIR=/var/tmp go test ./cmd/lifelog -run 'TestExecutableServeDrainsActiveRequest|TestServeShutdown|TestServeFailure' -count=10`: passed.
+- `TMPDIR=/var/tmp go test ./internal/db ./cmd/aminte -run 'TestCopy|TestInit|TestSnapshot|TestExecutableServeDrainsActiveRequest|TestServeShutdown|TestServeFailure|TestServeBinds' -count=1`: passed.
+- `TMPDIR=/var/tmp go test ./cmd/aminte -run 'TestExecutableServeDrainsActiveRequest|TestServeShutdown|TestServeFailure' -count=10`: passed.
 - `GOMAXPROCS=1 go test ./tests -run 'TestMutants/.*(facts|dates|integrity)|TestMutantWitness|TestSuites/document' -count=1 -parallel=1 -json`: passed; all 45 affected mutants were killed at their named witnesses.
 - `go test ./internal/core -run '^$' -fuzz '^FuzzPeriodMembership$' -fuzztime=60s -parallel=2`: passed, 470,664 executions.
 - `go test ./internal/importer -run '^$' -fuzz '^FuzzSourceJSONIdentity$' -fuzztime=60s -parallel=2`: passed, 66,068 executions.
@@ -119,27 +119,27 @@ records its own VCS build metadata; `go run` reports an unavailable revision. Fo
 
 ### Completed large workloads
 
-The final runs use a binary built with `go build -o /tmp/lifelog-review-mqVUI5uI/lifescale ./tools/lifescale`.
+The final runs use a binary built with `go build -o /tmp/aminte-review-mqVUI5uI/lifescale ./tools/lifescale`.
 It records baseline revision `6ae8022d611907d56dcac5cecaaf02df0374b32d`, dirty build state, Go 1.27.1,
 modernc.org/sqlite v1.60.1 / SQLite 3.53.4, Linux amd64, and AMD Ryzen 7 7840HS. Scratch storage is btrfs on
 the encrypted SSD `/dev/mapper/root`; default writer settings are recorded in each JSON. Both profiles use seed
 2075, generator version 1, no previews, and warm queries. The profiles and validation checks overlapped, so raw
 timings are observations under contention, not an isolated benchmark comparison.
 
-`/tmp/lifelog-review-mqVUI5uI/lifescale -profile lifetime -seed 2075 -samples 5 -dir /var/tmp`
+`/tmp/aminte-review-mqVUI5uI/lifescale -profile lifetime -seed 2075 -samples 5 -dir /var/tmp`
 (plus the recorded `-storage` description) passed. Construction took 188.580 seconds: 18,262 days,
 365,240 root readings, 21,485 value corrections, 11,782 retractions, 54,786 files and 4,000 imported notes.
 The logical digest is `b1bf076df011f4591427dbc931d33c62713531db436cb45fee42b1284f9eb502`.
 All independent answers, rollback, nine workflows, integrity and restored-state checks passed. The live database
 was 407,474,176 bytes with 13,015,112 WAL bytes; snapshot 403,365,888 and restored file 403,374,080 bytes.
-The runner cleaned its scratch directory. Full report: `/tmp/lifelog-review-mqVUI5uI/lifetime-final.json`.
+The runner cleaned its scratch directory. Full report: `/tmp/aminte-review-mqVUI5uI/lifetime-final.json`.
 
 The same invocation with `-profile stress` passed. Construction took 606.437 seconds: 1,460,960 root readings,
 85,939 value corrections, 47,128 retractions, 109,572 files and 16,000 imported notes, with four times the text sizes.
 The logical digest is `e604db2dc8678d37ffb735b9d278b8b16926b7dbafdc909d937fd04bba9d353c`.
 All independent answers, rollback, nine workflows, integrity and restored-state checks passed. The live database
 was 3,268,595,712 bytes with 193,916,072 WAL bytes; snapshot 3,253,223,424 and restored file 3,253,231,616 bytes.
-The runner cleaned its scratch directory. Full report: `/tmp/lifelog-review-mqVUI5uI/stress-final.json`.
+The runner cleaned its scratch directory. Full report: `/tmp/aminte-review-mqVUI5uI/stress-final.json`.
 
 Staticcheck, govulncheck and benchstat are not installed, so those checks were not run. No tools were installed.
 Windows execution, power loss, real private imports and large JPEG-preview profiles are outside this validation run.

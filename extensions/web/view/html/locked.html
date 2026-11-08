@@ -1,6 +1,6 @@
 {{define "locked"}}{{template "head" .}}
 {{$p := .Props}}
-<header class="page-head"><div class="what"><span class="kind">Lifelog</span><h1>Locked</h1></div></header>
+<header class="page-head"><div class="what"><span class="kind">Aminte</span><h1>Locked</h1></div></header>
 <p><small class="desc">This browser is locked, because it was idle or the owner locked it. Type the PIN to go on. The page shows nothing of the journal until then.</small></p>
 {{if $p.failed}}<div class="alert danger" role="alert"><p><strong>Refused.</strong> That PIN is not the owner's.</p></div>{{end}}
 <form method="POST" action="/unlock">

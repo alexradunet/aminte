@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"lifelog/internal/api"
-	"lifelog/internal/api/apitest"
+	"aminte/internal/api"
+	"aminte/internal/api/apitest"
 )
 
 // TestABusyFileAnswers503WithRetryAfter: another writer holds the file's write lock, so the write finds SQLITE_BUSY

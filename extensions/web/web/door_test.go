@@ -18,8 +18,8 @@ import (
 	"testing"
 	"time"
 
-	"lifelog-web/web"
-	"lifelog/lifelogtest"
+	"aminte-web/web"
+	"aminte/amintetest"
 )
 
 const (
@@ -87,7 +87,7 @@ func (f *lockFixture) login(h http.Handler) string {
 	f.t.Helper()
 	rec := request(h, "POST", "/login", "token="+url.QueryEscape(testToken), map[string]string{"Sec-Fetch-Site": "same-origin", "Sec-Fetch-Mode": "navigate"})
 	for _, c := range rec.Result().Cookies() {
-		if c.Name == "lifelog_session" {
+		if c.Name == "aminte_session" {
 			return c.Name + "=" + c.Value
 		}
 	}
@@ -172,7 +172,7 @@ func TestTheDoorRequiresASession(t *testing.T) {
 	}{
 		{"no credential", nil, 401},
 		{"the token as a bearer", map[string]string{"Authorization": "Bearer " + testToken}, 401},
-		{"the token as a session cookie", map[string]string{"Cookie": "lifelog_session=" + testToken}, 401},
+		{"the token as a session cookie", map[string]string{"Cookie": "aminte_session=" + testToken}, 401},
 		{"a session", map[string]string{"Cookie": l.cookie}, 200},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -248,7 +248,7 @@ func TestTheLoginSetsASessionCookie(t *testing.T) {
 	}
 	var cookie *http.Cookie
 	for _, c := range rec.Result().Cookies() {
-		if c.Name == "lifelog_session" {
+		if c.Name == "aminte_session" {
 			cookie = c
 		}
 	}
@@ -278,7 +278,7 @@ func TestTheLoginSetsASessionCookie(t *testing.T) {
 	rec = request(h, "POST", "/logout", "", map[string]string{"Cookie": with["Cookie"], "Sec-Fetch-Site": "same-origin"})
 	cleared := false
 	for _, c := range rec.Result().Cookies() {
-		cleared = cleared || (c.Name == "lifelog_session" && c.MaxAge < 0)
+		cleared = cleared || (c.Name == "aminte_session" && c.MaxAge < 0)
 	}
 	if rec.Code != 303 || !cleared {
 		t.Fatalf("logout: %d cleared=%v", rec.Code, cleared)
@@ -289,7 +289,7 @@ func TestTheLoginSetsASessionCookie(t *testing.T) {
 // and the cookie of a session that logged out is dead although its HMAC is right.
 func TestSessionCookieChecks(t *testing.T) {
 	f := newLockFixture(t, "")
-	value := strings.TrimPrefix(f.cookie, "lifelog_session=")
+	value := strings.TrimPrefix(f.cookie, "aminte_session=")
 	id, mac, _ := strings.Cut(value, ".")
 	flip := func(s string) string {
 		if s[0] == '0' {
@@ -298,12 +298,12 @@ func TestSessionCookieChecks(t *testing.T) {
 		return "0" + s[1:]
 	}
 	for name, cookie := range map[string]string{
-		"changed mac":     "lifelog_session=" + id + "." + flip(mac),
-		"changed id":      "lifelog_session=" + flip(id) + "." + mac,
-		"no mac":          "lifelog_session=" + id,
-		"the token":       "lifelog_session=" + testToken,
+		"changed mac":     "aminte_session=" + id + "." + flip(mac),
+		"changed id":      "aminte_session=" + flip(id) + "." + mac,
+		"no mac":          "aminte_session=" + id,
+		"the token":       "aminte_session=" + testToken,
 		"nothing at all":  "",
-		"an empty cookie": "lifelog_session=",
+		"an empty cookie": "aminte_session=",
 	} {
 		rec := request(f.h, "GET", "/", "", map[string]string{"Accept": "text/html", "Cookie": cookie})
 		if rec.Code != 303 || rec.Header().Get("Location") != "/login" {
@@ -398,7 +398,7 @@ func TestAWrongLoginLeavesOneLogLine(t *testing.T) {
 // TestAnOriginThatIsListedMayWrite: the guard of the writes. An origin that the owner lists writes; any other is refused,
 // also with a session. No CORS headers are sent.
 func TestAnOriginThatIsListedMayWrite(t *testing.T) {
-	const proxy = "https://lifelog.example"
+	const proxy = "https://aminte.example"
 	l := emptyLife(t)
 	b, err := web.New(web.Options{CoreURL: l.core.URL, Token: testToken, StateDir: t.TempDir(), Origins: []string{proxy}, Now: l.clock.Now})
 	if err != nil {
@@ -635,7 +635,7 @@ func TestUnlock(t *testing.T) {
 	rec = f.post("/unlock", "pin=2222", nil)
 	cleared := false
 	for _, c := range rec.Result().Cookies() {
-		cleared = cleared || (c.Name == "lifelog_session" && c.MaxAge < 0)
+		cleared = cleared || (c.Name == "aminte_session" && c.MaxAge < 0)
 	}
 	if rec.Code != 303 || rec.Header().Get("Location") != "/login" || !cleared {
 		t.Fatalf("fifth wrong PIN: %d %q cleared=%v", rec.Code, rec.Header().Get("Location"), cleared)
@@ -725,7 +725,7 @@ func TestWithTheLockOffNothingLocks(t *testing.T) {
 // TestSettingsThatCannotBeReadStopTheStart: with the settings in memory, a file that cannot be read can only be met at the
 // start. Then the program does not start: the lock would have to guess what the file says.
 func TestSettingsThatCannotBeReadStopTheStart(t *testing.T) {
-	core := lifelogtest.New(t, today)
+	core := amintetest.New(t, today)
 	dir := t.TempDir()
 	if err := os.WriteFile(dir+"/settings.json", []byte("{not json"), 0o600); err != nil {
 		t.Fatal(err)

@@ -10,8 +10,8 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"lifelog/internal/api"
-	"lifelog/internal/api/apitest"
+	"aminte/internal/api"
+	"aminte/internal/api/apitest"
 )
 
 // TestLoopbackAddress: the address of a local serve is a numeric loopback IP or localhost, which binds to 127.0.0.1, and
@@ -57,7 +57,7 @@ func TestHTTPAuthority(t *testing.T) {
 			defer srv.Close()
 			_, port, _ := net.SplitHostPort(ln.Addr().String())
 			allowed := []string{"127.0.0.1:" + port, "127.2.3.4:" + port, "localhost:" + port, "LOCALHOST:" + port, "[::1]:" + port, "[0:0:0:0:0:0:0:1]:" + port, "[::ffff:127.0.0.1]:" + port}
-			denied := []string{"arbitrary.invalid:" + port, "lifelog.local:" + port, "localhost:1", "[::1]:1", "127.0.0.1:1", "localhost", "localhost:", "localhost:http", "localhost:+" + port, "localhost:65536", "localhost.:" + port, "0.0.0.0:" + port, "192.0.2.1:" + port, "[::]:" + port, "[localhost]:" + port, "[127.0.0.1]:" + port, "::1:" + port, "user@localhost:" + port, "localhost:" + port + ":2"}
+			denied := []string{"arbitrary.invalid:" + port, "aminte.local:" + port, "localhost:1", "[::1]:1", "127.0.0.1:1", "localhost", "localhost:", "localhost:http", "localhost:+" + port, "localhost:65536", "localhost.:" + port, "0.0.0.0:" + port, "192.0.2.1:" + port, "[::]:" + port, "[localhost]:" + port, "[127.0.0.1]:" + port, "::1:" + port, "user@localhost:" + port, "localhost:" + port + ":2"}
 			tr := &http.Transport{Proxy: nil}
 			defer tr.CloseIdleConnections()
 			hc := &http.Client{Transport: tr}

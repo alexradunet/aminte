@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	"lifelog/siren"
+	"aminte/siren"
 )
 
 // The generic view reads the shape of an entity and the class of its actions, and never the name of an app. The three

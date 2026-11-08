@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"lifelog/internal/api/apitest"
+	"aminte/internal/api/apitest"
 )
 
 // TestTheEditorIsTallAsItsBody: a page's save-body textarea grows with its body, 12 to 40 lines, and the catalog marks

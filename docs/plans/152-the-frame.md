@@ -12,7 +12,7 @@
   edge is an outline that takes no width (main was 4 px short of `--block`, and the column 4 px narrower than before
   at 1440 and below); on the phone the shell is a flex column of 100dvh and the column fills it, so the floor never
   shows under a short page; one rule for the bare shell; the skip link takes the frame's start edge. Live since
-  2026-10-29 17:05 (`~/.local/bin/lifelog`, the service restarted, the previous binary kept as `lifelog.prev`).
+  2026-10-29 17:05 (`~/.local/bin/aminte`, the service restarted, the previous binary kept as `aminte.prev`).
   Two findings wait for the owner: in the dark theme the outline (`--outline` on `--ground`, 1.01:1) is invisible
   and the slab's bevel is the only edge; the login's slab is as tall as its form, not the screen. The mock-up the
   owner approved (2026-10-29) is a private artifact of the session that wrote this plan: the light theme of it,

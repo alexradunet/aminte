@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"lifelog-web/pixelart"
-	"lifelog/siren"
+	"aminte-web/pixelart"
+	"aminte/siren"
 )
 
 // TestNavMarksThePageTheBrowserIsOn says one navigation link is current: the one whose path is the page's, else the
@@ -215,11 +215,11 @@ func TestTheColumnIsTheShellsAndTheConversationHasNone(t *testing.T) {
 	}
 	v := &view{Props: map[string]any{"turns": []any{
 		map[string]any{"who": "owner", "at": "09.07", "via": "whatsapp", "text": "Hello"},
-		map[string]any{"who": "lifelog", "at": "09.08", "text": "Hi", "tools": []any{"- `read_day`"}},
+		map[string]any{"who": "aminte", "at": "09.08", "text": "Hi", "tools": []any{"- `read_day`"}},
 		map[string]any{"who": "owner", "at": "09.09", "text": "Thanks"},
 	}}}
 	turns := v.Turns()
-	if len(turns) != 3 || turns[1].Who != "lifelog" || turns[1].At != "09.08" || turns[1].Text != "Hi" || len(turns[1].Tools) != 1 || siren.ToolLine(turns[1].Tools[0]) != (siren.Tool{Name: "read_day"}) {
+	if len(turns) != 3 || turns[1].Who != "aminte" || turns[1].At != "09.08" || turns[1].Text != "Hi" || len(turns[1].Tools) != 1 || siren.ToolLine(turns[1].Tools[0]) != (siren.Tool{Name: "read_day"}) {
 		t.Errorf("the turns: %+v", turns)
 	}
 	if turns[0].Via != "whatsapp" || turns[1].Via != "" {

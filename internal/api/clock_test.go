@@ -12,14 +12,14 @@ import (
 	"testing"
 	"time"
 
-	"lifelog/client"
-	"lifelog/internal/api"
-	"lifelog/internal/api/apitest"
-	"lifelog/internal/core"
-	"lifelog/internal/db/dbtest"
-	"lifelog/internal/photo"
-	"lifelog/internal/photo/phototest"
-	"lifelog/siren"
+	"aminte/client"
+	"aminte/internal/api"
+	"aminte/internal/api/apitest"
+	"aminte/internal/core"
+	"aminte/internal/db/dbtest"
+	"aminte/internal/photo"
+	"aminte/internal/photo/phototest"
+	"aminte/siren"
 )
 
 // TestTheStoresClockIsTheOneClock: the store's clock is in a zone far from UTC, at an instant where the UTC day and

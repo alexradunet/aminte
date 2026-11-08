@@ -14,8 +14,8 @@ import (
 	"strings"
 	"testing"
 
-	"lifelog/internal/core"
-	"lifelog/internal/db/dbtest"
+	"aminte/internal/core"
+	"aminte/internal/db/dbtest"
 )
 
 // TestAPIReferenceMatchesTheCode keeps API.md true: every property table of a class names exactly the paths the

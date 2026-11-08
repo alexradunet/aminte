@@ -16,7 +16,7 @@ import (
 	"testing"
 	"time"
 
-	"lifelog/siren"
+	"aminte/siren"
 )
 
 func TestExitCode(t *testing.T) {
@@ -59,8 +59,8 @@ func TestFinishPrintsOneLineForAnError(t *testing.T) {
 	}{
 		{"no error", nil, 0, ""},
 		{"an interrupt", context.Canceled, 0, ""},
-		{"an error", errors.New("the disk is full"), 1, "lifelog-demo: the disk is full\n"},
-		{"the owner acts first", OwnerActs(errors.New("pair the device")), ExitOwnerActs, "lifelog-demo: pair the device\n"},
+		{"an error", errors.New("the disk is full"), 1, "aminte-demo: the disk is full\n"},
+		{"the owner acts first", OwnerActs(errors.New("pair the device")), ExitOwnerActs, "aminte-demo: pair the device\n"},
 	} {
 		var stderr bytes.Buffer
 		if got := finish("demo", tc.err, &stderr); got != tc.status || stderr.String() != tc.stderr {
@@ -70,7 +70,7 @@ func TestFinishPrintsOneLineForAnError(t *testing.T) {
 }
 
 // childEnv names what TestMainChild does in the child process.
-const childEnv = "LIFELOG_APP_TEST_CHILD"
+const childEnv = "AMINTE_APP_TEST_CHILD"
 
 // TestMainChild is not a test of its own: TestMainEndsTheProcess runs it in a child process, because Main ends the
 // process with the exit status.
@@ -136,7 +136,7 @@ func child(t *testing.T, kind string, whileRunning func(*exec.Cmd)) (int, string
 }
 
 // TestMainEndsTheProcess holds the shell of a program: 0 for no error, 1 for an error, 78 for an error that the owner
-// mends, and a line "lifelog-NAME: err" on stderr for each error.
+// mends, and a line "aminte-NAME: err" on stderr for each error.
 func TestMainEndsTheProcess(t *testing.T) {
 	for _, tc := range []struct {
 		kind   string
@@ -144,8 +144,8 @@ func TestMainEndsTheProcess(t *testing.T) {
 		stderr string
 	}{
 		{"ok", 0, ""},
-		{"error", 1, "lifelog-demo: the disk is full\n"},
-		{"owner", ExitOwnerActs, "lifelog-demo: pair the device\n"},
+		{"error", 1, "aminte-demo: the disk is full\n"},
+		{"owner", ExitOwnerActs, "aminte-demo: pair the device\n"},
 	} {
 		if status, stderr := child(t, tc.kind, nil); status != tc.status || stderr != tc.stderr {
 			t.Errorf("%s: exit status %d and stderr %q, want %d and %q", tc.kind, status, stderr, tc.status, tc.stderr)
@@ -172,11 +172,11 @@ func TestMainEndsCleanlyOnAnInterrupt(t *testing.T) {
 // TestAPIRefusesAnEmptyAddressWithOneSentence: the one line names the command that the owner types to run the program,
 // as the program gave it, and not a placeholder.
 func TestAPIRefusesAnEmptyAddressWithOneSentence(t *testing.T) {
-	t.Setenv("LIFELOG_TOKEN", "the-token")
-	for _, command := range []string{"lifelog demo", "lifelog demo sync"} {
+	t.Setenv("AMINTE_TOKEN", "the-token")
+	for _, command := range []string{"aminte demo", "aminte demo sync"} {
 		c, err := API(command, "", "agent:demo")
-		if c != nil || err == nil || !strings.Contains(err.Error(), "no LIFELOG_URL and no --url") || strings.Contains(err.Error(), "\n") {
-			t.Fatalf("API with no address = %v, %v, want no client and one sentence that names LIFELOG_URL and --url", c, err)
+		if c != nil || err == nil || !strings.Contains(err.Error(), "no AMINTE_URL and no --url") || strings.Contains(err.Error(), "\n") {
+			t.Fatalf("API with no address = %v, %v, want no client and one sentence that names AMINTE_URL and --url", c, err)
 		}
 		if want := "run it as `" + command + "` on"; !strings.Contains(err.Error(), want) || strings.Contains(err.Error(), "NAME") {
 			t.Errorf("API(%q) with no address = %q, want it to hold %q and no placeholder", command, err, want)
@@ -187,7 +187,7 @@ func TestAPIRefusesAnEmptyAddressWithOneSentence(t *testing.T) {
 	}
 }
 
-// TestAPISendsTheSourceAndTheTokenOfTheEnvironment: the client writes as the source, and sends LIFELOG_TOKEN as the
+// TestAPISendsTheSourceAndTheTokenOfTheEnvironment: the client writes as the source, and sends AMINTE_TOKEN as the
 // bearer token when it is set and none when it is not.
 func TestAPISendsTheSourceAndTheTokenOfTheEnvironment(t *testing.T) {
 	var got http.Header
@@ -197,8 +197,8 @@ func TestAPISendsTheSourceAndTheTokenOfTheEnvironment(t *testing.T) {
 	}))
 	defer srv.Close()
 	for _, tc := range []struct{ token, wantAuth string }{{"the-token", "Bearer the-token"}, {"", ""}} {
-		t.Setenv("LIFELOG_TOKEN", tc.token)
-		c, err := API("lifelog demo", srv.URL, siren.ImportPrefix+"demo")
+		t.Setenv("AMINTE_TOKEN", tc.token)
+		c, err := API("aminte demo", srv.URL, siren.ImportPrefix+"demo")
 		if err != nil {
 			t.Fatal(err)
 		}

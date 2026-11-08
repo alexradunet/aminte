@@ -1,4 +1,4 @@
-# 0082 — The lifelog_meta rows name the columns of the tasks that D23 removed
+# 0082 — The aminte_meta rows name the columns of the tasks that D23 removed
 
 - **Date:** 2026-10-17
 - **Status:** resolved
@@ -10,7 +10,7 @@
 ## What happened
 
 [RFC 0019](../rfcs/0019-no-tasks.md) removed the tables `tasks` and `task_occurrences`
-([D23](../decisions/D23-no-tasks.md)). Three `lifelog_meta` rows of [schema.sql](../schema/schema.sql) still name
+([D23](../decisions/D23-no-tasks.md)). Three `aminte_meta` rows of [schema.sql](../schema/schema.sql) still name
 their columns. A reader in 2075 has only the file, and these rows tell that reader about columns that the file does
 not have.
 
@@ -42,7 +42,7 @@ Two comments inside `CREATE` statements have words of a removed feature:
 
 ```mermaid
 flowchart LR
-  R["RFC 0019 removes tasks and task_occurrences"] --> M["three lifelog_meta rows still name their columns"]
+  R["RFC 0019 removes tasks and task_occurrences"] --> M["three aminte_meta rows still name their columns"]
   M --> F["the reader of the file reads about columns the file does not have"]
   M --> S["no suite checks the names in a row"]
 ```
@@ -51,7 +51,7 @@ flowchart LR
 
 On a fresh database built from [schema.sql](../schema/schema.sql) as it was before the fix:
 
-1. `SELECT value FROM lifelog_meta WHERE key = 'days'`: the value names `tasks.anchor_day` and
+1. `SELECT value FROM aminte_meta WHERE key = 'days'`: the value names `tasks.anchor_day` and
    `task_occurrences.due_day`.
 2. `SELECT count(*) FROM sqlite_schema WHERE name IN ('tasks', 'task_occurrences')`: 0.
 
@@ -60,7 +60,7 @@ On a fresh database built from [schema.sql](../schema/schema.sql) as it was befo
 - [D23](../decisions/D23-no-tasks.md) and [RFC 0019](../rfcs/0019-no-tasks.md): there is no table of tasks.
 - [D10](../decisions/D10-time-model.md): the rules of time are the rows `instants` and `days`.
 - [D13](../decisions/D13-migrations-and-freeze.md): until the freeze, `schema.sql` is edited in place.
-- [How a change happens](../process.md), item 4 before the freeze: the `lifelog_meta` rows are read once more as a
+- [How a change happens](../process.md), item 4 before the freeze: the `aminte_meta` rows are read once more as a
   stranger would.
 
 ## Resolution
@@ -68,8 +68,8 @@ On a fresh database built from [schema.sql](../schema/schema.sql) as it was befo
 Resolved 2026-10-17 without a proposal: the fix removes words about tables that are not in the file, and it changes
 no decision ([how a change happens](../process.md)). In [schema.sql](../schema/schema.sql) the three rows lose their
 words about tasks; only the `VALUES` of the rows change, and no `CREATE` statement changes. The threat model names
-the places where the owner was as an asset, and its control cites the row `lifelog_meta.source` instead of a
-restatement of it. The `document` suite has a new witness: every name with an underscore in a `lifelog_meta` row is a
+the places where the owner was as an asset, and its control cites the row `aminte_meta.source` instead of a
+restatement of it. The `document` suite has a new witness: every name with an underscore in a `aminte_meta` row is a
 column, a schema object, a key or a pragma of the file. A mutant that puts `task_occurrences.due_day` back into the
 row `days` holds the witness.
 

@@ -12,7 +12,7 @@ import (
 	"strings"
 	"testing"
 
-	"lifelog/siren"
+	"aminte/siren"
 )
 
 // pageOfSeries returns the entity of the page that the series with the name carries, as the core answers it.

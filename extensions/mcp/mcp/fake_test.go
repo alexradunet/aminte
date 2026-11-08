@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"lifelog/client"
-	"lifelog/siren"
+	"aminte/client"
+	"aminte/siren"
 )
 
 // remote is a client over an HTTP server that serves h, closed at the end of the test.

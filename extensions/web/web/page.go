@@ -11,8 +11,8 @@ import (
 	"slices"
 	"strings"
 
-	"lifelog-web/view"
-	"lifelog/siren"
+	"aminte-web/view"
+	"aminte/siren"
 )
 
 // embedField is the query parameter that asks the core for an embedding (API.md, "Embedding"). Web sends it for the page
@@ -129,7 +129,7 @@ func (b *Browser) draw(w http.ResponseWriter, r *http.Request, status int, e *si
 	write(w, r, status, body, retryAfter, true)
 }
 
-// appName is the name of this program as a connected app: `serve --with web` runs lifelog-web. browserSettingsAction is
+// appName is the name of this program as a connected app: `serve --with web` runs aminte-web. browserSettingsAction is
 // the name that the core gives its action settings, for the core prefixes each name of an app (extensions/README.md, "A
 // catalog of its own"). The home of the app is /with/web; its one form is drawn on /settings ("This browser"), so the
 // rail does not list it as an app and its home leads to /settings (one form for one thing).

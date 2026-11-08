@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"lifelog/internal/api/apitest"
+	"aminte/internal/api/apitest"
 )
 
 // TestANumberThatIsNotDecimalIsRefusedAndWritesNothing: a reading takes a decimal number only, and a mood one of its options. Go's float

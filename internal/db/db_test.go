@@ -52,7 +52,7 @@ func TestInitRefusesExistingFile(t *testing.T) {
 			path: filepath.Join(dir, "nonempty.db"),
 			prepare: func(t *testing.T, p string) {
 				t.Helper()
-				writeFile(t, p, []byte("not a lifelog database\n"))
+				writeFile(t, p, []byte("not an aminte database\n"))
 			},
 		},
 		{
@@ -381,7 +381,7 @@ func TestAFailedInitRemovesTheWALOfItsFile(t *testing.T) {
 	t.Run("SQLite deletes a WAL beside an empty file", func(t *testing.T) {
 		dir := t.TempDir()
 		q := filepath.Join(dir, "other.db")
-		w, err := sql.Open("lifelog", dsn(q, false))
+		w, err := sql.Open("aminte", dsn(q, false))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -432,11 +432,11 @@ func TestAFailedInitRemovesTheWALOfItsFile(t *testing.T) {
 
 func TestOpenRefusesForeignFile(t *testing.T) {
 	p := filepath.Join(t.TempDir(), "other.db")
-	o, _ := sql.Open("lifelog", dsn(p, false))
+	o, _ := sql.Open("aminte", dsn(p, false))
 	o.Exec("CREATE TABLE x(a)")
 	o.Close()
-	if _, err := Open(t.Context(), p); err == nil || !strings.Contains(err.Error(), "not a Lifelog") {
-		t.Fatalf("Open of a non-Lifelog file: %v", err)
+	if _, err := Open(t.Context(), p); err == nil || !strings.Contains(err.Error(), "not an Aminte") {
+		t.Fatalf("Open of a non-Aminte file: %v", err)
 	}
 }
 
@@ -500,14 +500,14 @@ func TestLiteralDatabasePaths(t *testing.T) {
 				t.Fatalf("Open(t.Context(), %q) failed for requested literal file %q: %v", tc.requested, absForError(tc.requested), err)
 			}
 			if err := d.Write(context.Background(), func(tx *sql.Tx) error {
-				_, err := tx.Exec(`INSERT INTO lifelog_meta(key, value) VALUES ('literal-path-test', ?)`, tc.name)
+				_, err := tx.Exec(`INSERT INTO aminte_meta(key, value) VALUES ('literal-path-test', ?)`, tc.name)
 				return err
 			}); err != nil {
 				d.Close()
 				t.Fatal(err)
 			}
 			var got string
-			if err := d.R.QueryRow(`SELECT value FROM lifelog_meta WHERE key = 'literal-path-test'`).Scan(&got); err != nil || got != tc.name {
+			if err := d.R.QueryRow(`SELECT value FROM aminte_meta WHERE key = 'literal-path-test'`).Scan(&got); err != nil || got != tc.name {
 				d.Close()
 				t.Fatalf("read back from %q = %q, %v; want %q", absForError(tc.requested), got, err, tc.name)
 			}
@@ -526,7 +526,7 @@ func TestLiteralDatabasePaths(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Open(t.Context(), copy %q) failed: %v", absForError(copyPath), err)
 			}
-			if err := c.R.QueryRow(`SELECT value FROM lifelog_meta WHERE key = 'literal-path-test'`).Scan(&got); err != nil || got != tc.name {
+			if err := c.R.QueryRow(`SELECT value FROM aminte_meta WHERE key = 'literal-path-test'`).Scan(&got); err != nil || got != tc.name {
 				c.Close()
 				t.Fatalf("read back from copied literal file %q = %q, %v; want %q", absForError(copyPath), got, err, tc.name)
 			}
@@ -600,7 +600,7 @@ func TestPragmasAndReaders(t *testing.T) {
 			t.Errorf("PRAGMA %s = %d, want %d", p.name, v, p.want)
 		}
 	}
-	if _, err := d.R.Exec("INSERT INTO lifelog_meta(key, value) VALUES ('x', 'y')"); err == nil {
+	if _, err := d.R.Exec("INSERT INTO aminte_meta(key, value) VALUES ('x', 'y')"); err == nil {
 		t.Error("the read-only pool accepted a write")
 	}
 	var ts int64 = -1
@@ -611,7 +611,7 @@ func TestPragmasAndReaders(t *testing.T) {
 	if err := d.W.QueryRow("SELECT file FROM pragma_database_list WHERE name = 'main'").Scan(&path); err != nil {
 		t.Fatal(err)
 	}
-	trusting, _ := sql.Open("lifelog", "file:"+filepath.ToSlash(path)+"?mode=ro&_pragma=trusted_schema(1)")
+	trusting, _ := sql.Open("aminte", "file:"+filepath.ToSlash(path)+"?mode=ro&_pragma=trusted_schema(1)")
 	defer trusting.Close()
 	if err := trusting.Ping(); err == nil || !strings.Contains(err.Error(), "trusted_schema") {
 		t.Errorf("a reader with trusted_schema=ON was not refused: %v", err)

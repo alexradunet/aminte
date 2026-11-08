@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"lifelog/client"
-	"lifelog/internal/api/apitest"
+	"aminte/client"
+	"aminte/internal/api/apitest"
 )
 
 // TestAnActionCarriesTheHintOfItsFormAndTheActionsListTheDescription: an action on a resource says what it does in the

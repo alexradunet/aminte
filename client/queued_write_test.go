@@ -9,11 +9,11 @@ import (
 	"testing"
 	"time"
 
-	"lifelog/client"
-	"lifelog/internal/api"
-	"lifelog/internal/core"
-	"lifelog/internal/db/dbtest"
-	"lifelog/siren"
+	"aminte/client"
+	"aminte/internal/api"
+	"aminte/internal/core"
+	"aminte/internal/db/dbtest"
+	"aminte/siren"
 )
 
 // These tests are in package client_test because internal/api imports client (a connected app, plan 154): a test

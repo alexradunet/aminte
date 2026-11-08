@@ -26,7 +26,7 @@ func TestFilesystemWriteFailure(t *testing.T) {
 			ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
 			defer cancel()
 			cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestFilesystemWriteFailureChild$", "-test.count=1", "-test.v")
-			cmd.Env = append(os.Environ(), "LIFELOG_IO_FAILURE_OPERATION="+operation, "LIFELOG_IO_FAILURE_DIR="+t.TempDir())
+			cmd.Env = append(os.Environ(), "AMINTE_IO_FAILURE_OPERATION="+operation, "AMINTE_IO_FAILURE_DIR="+t.TempDir())
 			out, err := cmd.CombinedOutput()
 			if err != nil {
 				t.Fatalf("%s child: %v (context %v)\n%s", operation, err, ctx.Err(), out)
@@ -39,7 +39,7 @@ func TestFilesystemWriteFailure(t *testing.T) {
 }
 
 func TestFilesystemWriteFailureChild(t *testing.T) {
-	dir := os.Getenv("LIFELOG_IO_FAILURE_DIR")
+	dir := os.Getenv("AMINTE_IO_FAILURE_DIR")
 	if dir == "" {
 		t.Skip("subprocess helper")
 	}
@@ -93,7 +93,7 @@ func TestFilesystemWriteFailureChild(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	switch operation := os.Getenv("LIFELOG_IO_FAILURE_OPERATION"); operation {
+	switch operation := os.Getenv("AMINTE_IO_FAILURE_OPERATION"); operation {
 	case "wal":
 		body := strings.Repeat("retryword ", 32768)
 		aliasInserted := false

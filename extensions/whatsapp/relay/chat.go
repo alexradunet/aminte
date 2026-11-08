@@ -1,7 +1,7 @@
-// Package relay carries the words of the owner between a chat (WhatsApp) and the conversation page of lifelog. It
+// Package relay carries the words of the owner between a chat (WhatsApp) and the conversation page of aminte. It
 // is a transport and nothing more. A message of the owner becomes the action say, with via=whatsapp. Each new turn of
 // the page that did not come from the chat goes to the chat: the reply of the agent, and the words that the owner
-// said on another surface. The relay calls no model: lifelog-agent answers on the page.
+// said on another surface. The relay calls no model: aminte-agent answers on the page.
 package relay
 
 import (
@@ -30,7 +30,7 @@ type Message struct {
 	At     time.Time // when the sender sent it
 }
 
-// Chat is the place where the owner talks to lifelog.
+// Chat is the place where the owner talks to aminte.
 type Chat interface {
 	// Messages gives the messages that arrive. The channel closes when no more can arrive.
 	Messages() <-chan Message

@@ -15,14 +15,14 @@
   and reviewed before its merge; the baseline, `staticcheck`, `govulncheck`, a shuffled run and the race detector on
   the end-to-end tests of the handshake pass; the mermaid render check was not run (`mmdc` is not installed). Part 4
   shipped 2026-10-29: snapshot to `/home/cico/life/snapshots/2026-10-29-plan-154`, the service stopped, the one-off
-  (`~/.local/share/lifelog-oneoff/plan154/`, `OLD.sql` = `schema.sql` at `cda8c4d`, `NEW.sql` = `schema.sql` at
+  (`~/.local/share/aminte-oneoff/plan154/`, `OLD.sql` = `schema.sql` at `cda8c4d`, `NEW.sql` = `schema.sql` at
   `06bd6d2`) run after its dry run: 2143 rows and 12 bodies with a box unchanged, `entities_plans` and `has_box`
   dropped, the stored text of `entities` set, `schema_version` 198 to 199, equal to NEW, the checks ok; then
-  `~/.local/bin/lifelog` built from `563dc34`, the service started 19:47:08 (`serving ... on http://127.0.0.1:7777`,
+  `~/.local/bin/aminte` built from `563dc34`, the service started 19:47:08 (`serving ... on http://127.0.0.1:7777`,
   the WhatsApp child beside it). One thing differs from the plan as written: `create-page` of a period key stored
   today as the page's day and was refused by `entities_period_page`; Part 1 made it store no day, as D30 requires, so
   the period views can offer it. The by-hand run of the server with the test app was not done; the end-to-end test
-  holds the same assertions on the real `lifelog serve --with`.
+  holds the same assertions on the real `aminte serve --with`.
 - **Resolves:** [issue 0092](../issues/0092-plan-lines-cost-more-than-they-give.md) through
   [RFC 0025](../rfcs/0025-no-plan-lines-and-connected-apps.md), which rewrites [D29](../decisions/D29-plan-lines.md),
   [D23](../decisions/D23-no-tasks.md), [D15](../decisions/D15-recurrence.md) and [D30](../decisions/D30-period-pages.md)
@@ -32,12 +32,12 @@
 
 "I am thinking of removing again the todo and tasks functionalities of the app and in exchange to create an agnostic
 adapter that I can build integrations upon it. For my first integration, I am thinking of integrating ticktick."
-Asked what the adapter is: "I don't want to hold any ticktick specific code in lifelogdb, we should make it agnostic
+Asked what the adapter is: "I don't want to hold any ticktick specific code in aminte, we should make it agnostic
 the integration. Through this integration that is agnostic the agent or the app or the siren api will be able to
-communicate with it." Then: "I want in lifelogdb to aggregate all the 'apps' functionalities through an extremely
+communicate with it." Then: "I want in aminte to aggregate all the 'apps' functionalities through an extremely
 agnostic interface, and create my own integration in a simple modular way." Chosen: done tasks become day entries,
 plus two-way; plan lines go and period pages stay; on demand and under `serve --with`; this plan ends at the
-mechanism, the TickTick connector is a separate repo and a separate plan; the package is `lifelog/app`.
+mechanism, the TickTick connector is a separate repo and a separate plan; the package is `aminte/app`.
 
 ## What is true at the baseline
 
@@ -46,14 +46,14 @@ mechanism, the TickTick connector is a separate repo and a separate plan; the pa
   `entities_plans`; the writer has the parser `internal/text/plan.go`, the store `internal/core/plans.go`, the
   handlers `internal/api/plans.go`, the actions `plan`, `tick`, `carry`, `schedule` and the resource `plans`; the
   browser has the Plans page, a box glyph and a tick form in every body, a plan block on a day, a week, a month, a
-  year and a period page; the CLI has `lifelog plan`; the suites `plan-lines` and `plan-lines-index`, four mutants,
+  year and a period page; the CLI has `aminte plan`; the suites `plan-lines` and `plan-lines-index`, four mutants,
   two diagrams, two JSON vector blocks; [D15](../decisions/D15-recurrence.md) is about the `every:` token.
-- `lifelog serve --with NAME` ([plan 147](147-serve-with-an-extension.md)) runs `lifelog-NAME` as a child with
-  `LIFELOG_URL`, `LIFELOG_EXE`, `LIFELOG_DB` and the token of a public listener, restarts it by the exit rule, and
+- `aminte serve --with NAME` ([plan 147](147-serve-with-an-extension.md)) runs `aminte-NAME` as a child with
+  `AMINTE_URL`, `AMINTE_EXE`, `AMINTE_DB` and the token of a public listener, restarts it by the exit rule, and
   reads nothing from it. The WhatsApp agent is the one child. An extension is a client of [API.md](../../API.md);
   nothing lets it offer an action.
 - The catalog is one static list (`internal/api/catalog.go`); `GET /actions` lists it; the CLI's `do`, the MCP tools
-  (`client/tools`) and the browser's forms are generated from it. The boundary tests of `cmd/lifelog` hold that the
+  (`client/tools`) and the browser's forms are generated from it. The boundary tests of `cmd/aminte` hold that the
   core names no third party and that only `client` dials.
 - The browser draws an entity of a class without a template with `generic` (`layout.html`): class, title, links,
   properties, entities, and every action as a form.
@@ -64,16 +64,16 @@ mechanism, the TickTick connector is a separate repo and a separate plan; the pa
 |---|---|
 | what a plan becomes | nothing in the file: a plan lives in the owner's task manager. A `- [ ]` line already written stays as prose |
 | what comes back | an entry of the day: the app writes `capture` with `import_key` as `import:NAME`, so a second run writes nothing ([imports](../contract/imports.md)) |
-| the agnostic interface | the Siren catalog. A child of `serve --with` may serve its own `GET /actions` and entities on the loopback address the server gives it (`LIFELOG_LISTEN`); the server aggregates it |
+| the agnostic interface | the Siren catalog. A child of `serve --with` may serve its own `GET /actions` and entities on the loopback address the server gives it (`AMINTE_LISTEN`); the server aggregates it |
 | the names | the app's action `add-task` is `NAME-add-task` in the merged catalog, at `/with/NAME/...`; the MCP tool is `NAME_add_task`; a collision with the static catalog or another app refuses the whole catalog with a log line |
-| the request | the server re-issues it to the child through `client`, as the request's writer (`Lifelog-Source`), with the fields the catalog names and nothing else: no cookie, no bearer token. An owner-only action of the app (`owner: true`) is refused to an `agent:*` or `import:*` writer by the server, and the child is never called |
+| the request | the server re-issues it to the child through `client`, as the request's writer (`Aminte-Source`), with the fields the catalog names and nothing else: no cookie, no bearer token. An owner-only action of the app (`owner: true`) is refused to an `agent:*` or `import:*` writer by the server, and the child is never called |
 | the answer | the child's entity with its hrefs prefixed by `/with/NAME` and its action names by `NAME-`; a href with a scheme or a host is dropped. It returns through the one `serve`, so the browser gets its redirect and its toast, and an error is an error entity |
 | the errors | `unavailable` (503, `Retry-After`): the app is not running; `upstream` (502): the app answered something that is not an entity; a child's own error entity passes with its status; a slow child is the 504 `timeout` of the request's 30 s. No retries on any method |
-| the handshake | before each start the server picks a free loopback port and sets `LIFELOG_LISTEN=127.0.0.1:PORT`; after the start it probes `GET /actions` every 250 ms for 30 s; a 200 of class `actions` registers the app; any other answer, the child's exit or the end of the window stops the probe with one log line; every exit unregisters the app; a restart reads the catalog again |
+| the handshake | before each start the server picks a free loopback port and sets `AMINTE_LISTEN=127.0.0.1:PORT`; after the start it probes `GET /actions` every 250 ms for 30 s; a 200 of class `actions` registers the app; any other answer, the child's exit or the end of the window stops the probe with one log line; every exit unregisters the app; a restart reads the catalog again |
 | the browser | an entity under `/with/` is drawn by `generic`; the rail gains one entry per connected app, titled by the app's home page (`GET /`), else its name |
-| the limits | the in-process CLI and the temporary server of `lifelog NAME` have no children: `lifelog do NAME-…` works with `--url` of a running `serve`, and an agent reaches the apps with `lifelog mcp --url`. An action with a `file` field is refused in this version |
-| `lifelog/app` | a public package beside `siren` and `client`, tiny: `Listen` (reads `LIFELOG_LISTEN`, refuses an unset value with the line to run, refuses a non-loopback address, drains on the context's end), `Catalog` (a handler from a home, a list of actions and one handler per action; `GET /actions` and `GET /`; panics at build when an action has no handler), `Fail` (an error entity), `StateDir` (`os.UserConfigDir()/lifelog-NAME`), `ExitOwnerActs = 2`. No poll loop and no capture helper: a ticker is five lines, and `client.Do` with `capture` is the one way |
-| the boundary rule | `TestTheCoreDialsOnlyItsServer` gains one named exception: `client.Remote(` may appear in `cmd/lifelog/main.go`, `internal/api/apitest/apitest.go`, `cmd/lifelog/with.go` and `internal/api/with.go`, with the reason; `thirdParties` gains `ticktick` now, so the core never gains the word |
+| the limits | the in-process CLI and the temporary server of `aminte NAME` have no children: `aminte do NAME-…` works with `--url` of a running `serve`, and an agent reaches the apps with `aminte mcp --url`. An action with a `file` field is refused in this version |
+| `aminte/app` | a public package beside `siren` and `client`, tiny: `Listen` (reads `AMINTE_LISTEN`, refuses an unset value with the line to run, refuses a non-loopback address, drains on the context's end), `Catalog` (a handler from a home, a list of actions and one handler per action; `GET /actions` and `GET /`; panics at build when an action has no handler), `Fail` (an error entity), `StateDir` (`os.UserConfigDir()/aminte-NAME`), `ExitOwnerActs = 2`. No poll loop and no capture helper: a ticker is five lines, and `client.Do` with `capture` is the one way |
+| the boundary rule | `TestTheCoreDialsOnlyItsServer` gains one named exception: `client.Remote(` may appear in `cmd/aminte/main.go`, `internal/api/apitest/apitest.go`, `cmd/aminte/with.go` and `internal/api/with.go`, with the reason; `thirdParties` gains `ticktick` now, so the core never gains the word |
 | D29 | rewritten in place as "No plan lines: a plan lives outside the file, in the owner's task manager; what was done comes back as an entry"; its number stays (the decisions are D01..Dn without a gap) |
 | D23, D15, D30, D22 | D23 keeps "no tasks table" and loses the plan line; D15 keeps "no recurrence table", a repeat lives in the task manager, a birthday is a query over `people.birth_day`; D30 is a plain page with a key, made with `create-page`; D22 loses its plan sentence |
 | the period views | a week keeps its seven days and its page; a month its calendar and its page; a year its months, its quarters and its page. Where a period has no page, the view offers `create-page` with the title filled, the one action that makes a page |
@@ -81,15 +81,15 @@ mechanism, the TickTick connector is a separate repo and a separate plan; the pa
 
 ```mermaid
 flowchart LR
-  B["the browser, the CLI's do, the MCP tools: from GET /actions"] -->|"GET /actions; GET or POST /with/NAME/..."| L["lifelog serve: the one catalog, the one serve"]
-  L -->|"client.Remote on LIFELOG_LISTEN, as the request's writer"| A["lifelog-NAME, a child of serve --with: its own catalog (lifelog/app)"]
+  B["the browser, the CLI's do, the MCP tools: from GET /actions"] -->|"GET /actions; GET or POST /with/NAME/..."| L["aminte serve: the one catalog, the one serve"]
+  L -->|"client.Remote on AMINTE_LISTEN, as the request's writer"| A["aminte-NAME, a child of serve --with: its own catalog (aminte/app)"]
   A -->|"capture with import_key, as import:NAME"| L
   A -->|"the third party's own API"| T["the app outside this repo"]
 ```
 
 ```mermaid
 flowchart TD
-  S["serve: the child starts with LIFELOG_LISTEN"] --> P["probe GET /actions every 250 ms, 30 s"]
+  S["serve: the child starts with AMINTE_LISTEN"] --> P["probe GET /actions every 250 ms, 30 s"]
   P -->|"200, class actions"| R["registered: its actions in /actions as NAME-action; its routes at /with/NAME"]
   P -->|"another answer, the exit, the end of the window"| N["no catalog: one log line"]
   R -->|"the child exits"| U["unregistered: /actions without it; /with/NAME answers 503 unavailable"]
@@ -110,7 +110,7 @@ flowchart TD
    kind `plan`; `results.go` loses the plan toasts and `datesWords`; `page.go` loses the funcs `inline` and `box`;
    `shell.go` loses the rail entry Plans; `app.css` loses the plan and box rules; the icon `plans` goes from
    `internal/pixelart` and the sheet is regenerated with `tools/pixelart`, as [plan 151](151-no-places.md) did.
-4. The CLI: `lifelog plan` and `planFlags` go from `cmd/lifelog/main.go`; `plan_command_test.go` goes; the plan rows
+4. The CLI: `aminte plan` and `planFlags` go from `cmd/aminte/main.go`; `plan_command_test.go` goes; the plan rows
    of `parity_test.go` go.
 5. The tests follow: `plans_test.go`, `plans_page_test.go`, `plans_internal_test.go`, `view/plans_glyph_test.go` go;
    the period tests are renamed by what remains (`TestAWeekListsItsSevenDaysAndItsPage`,
@@ -147,7 +147,7 @@ flowchart TD
    and `TestAnErrorCodePicksItsWords` hold the three places.
 2. **`client.As`.** `func (c *Client) As(source string) *Client`: a copy that shares the transport and writes as
    `source`, so one app has one transport. A test on both transports.
-3. **`lifelog/app`.** The package of the decisions table, with its tests: `Listen` refuses an unset or a non-loopback
+3. **`aminte/app`.** The package of the decisions table, with its tests: `Listen` refuses an unset or a non-loopback
    address; `Catalog` serves `/actions` and each action, panics on an action without a handler; `Fail` writes an
    error entity. The walk of `boundary_test.go` gains `app`. The README's layout table gains its row.
 4. **`internal/api/with.go`.** `Apps` (a registry under a mutex: `Set`, `Remove`, `Names`), `api.NewWith` for
@@ -160,20 +160,20 @@ flowchart TD
    `/with/`; `Shell.Apps`, a rail group `apps`. Unit tests on an `httptest` child built from `app.Catalog`, registered
    without a process: the merged catalog, the prefixing, the owner refusal, the 422, the 503 after `Remove`, the
    rewrite of the hrefs, the HTML with a form that posts to `/with/NAME/...`.
-5. **The handshake.** `cmd/lifelog/with.go`: the free port and `LIFELOG_LISTEN` before each start; the probe after
+5. **The handshake.** `cmd/aminte/with.go`: the free port and `AMINTE_LISTEN` before each start; the probe after
    it (`probeFor`, 30 s, shortened by a test as `restartDelay` is), owned by the supervisor and joined before the
    child is done; `Apps.Set` and `Apps.Remove` with their log lines; `serve` uses `api.NewWith`.
-   `cmd/lifelog/testdata/withapp/main.go`: a test app on `lifelog/app` (home class `testapp`, title "Test app",
+   `cmd/aminte/testdata/withapp/main.go`: a test app on `aminte/app` (home class `testapp`, title "Test app",
    property `count`; `add-item` with a required `text`, `reset` owner-only, `stop` that answers then exits 0;
-   `GET /items/{id}`). `cmd/lifelog/with_app_test.go` through the real `lifelog serve --with testapp`: the merged
+   `GET /items/{id}`). `cmd/aminte/with_app_test.go` through the real `aminte serve --with testapp`: the merged
    catalog; `do testapp-add-item text=hi --url` and its rewritten `self`; the owner refusal of `testapp-reset` to
    `agent:x`; the HTML of `/with/testapp/` with its form and the rail link; after `testapp-stop` the action gone,
    `/with/testapp/` 503, `/with/nosuch/` 404; an unknown field 422. `boundary_test.go`: the named exception for
    `client.Remote(` and `ticktick` among the third parties. `client/tools/tools_test.go`: `testapp-add-item` is
    `testapp_add_item`.
-6. **The docs of the mechanism.** `extensions/README.md`: the section "A catalog of its own" (`LIFELOG_LISTEN`,
+6. **The docs of the mechanism.** `extensions/README.md`: the section "A catalog of its own" (`AMINTE_LISTEN`,
    `GET /actions`, `GET /`, loopback only, the owner mark, the prefixing, the codes, the exit rule, what an app
-   writes back and how, where its credentials live and the `lifelog NAME login` step). `API.md`: the `/with/{name}`
+   writes back and how, where its credentials live and the `aminte NAME login` step). `API.md`: the `/with/{name}`
    routes, the merged `actions`, the codes, the limits. `README.md`: the decision "Connected apps through the
    catalog", the paragraph under the table of the surfaces (the table lists the core alone), the `--with` paragraph.
    `AGENTS.md`: the four rings (ring 3 may serve a catalog that ring 2 aggregates) and the boundary rule.
@@ -189,12 +189,12 @@ the new binary is installed, the service restarted, its log line read, and `/int
 
 ## Tests
 
-- `go test ./internal/api/... ./internal/core ./internal/text ./cmd/lifelog ./tests` while editing; the baseline
+- `go test ./internal/api/... ./internal/core ./internal/text ./cmd/aminte ./tests` while editing; the baseline
   `go vet ./... && go test ./...` after every part; `go vet ./... && go test ./...` in `extensions/mcp`;
   `staticcheck ./...` and `govulncheck ./...` once the Go changes are in; `go test -count=1 -shuffle=on ./...` and the
-  race check for the handshake; `LIFELOG_MERMAID=1 go test ./tests -run TestMermaidRender` after Part 2.
-- By hand after Part 3: `./lifelog serve --with testapp --db $TMP/life.db` with the test app beside the binary;
-  `./lifelog actions --url` lists `testapp-add-item`; `./lifelog do testapp-add-item text=hi --url` answers; the
+  race check for the handshake; `AMINTE_MERMAID=1 go test ./tests -run TestMermaidRender` after Part 2.
+- By hand after Part 3: `./aminte serve --with testapp --db $TMP/life.db` with the test app beside the binary;
+  `./aminte actions --url` lists `testapp-add-item`; `./aminte do testapp-add-item text=hi --url` answers; the
   browser shows the rail entry and the form; the child stopped, the page says "The app is not running".
 - Windows: the handshake is an environment variable and a loopback address; validate there before a release, or say
   it was not.
@@ -206,6 +206,6 @@ the new binary is installed, the service restarted, its log line read, and `/int
 2. A child of `serve --with` that serves a catalog has its actions in `GET /actions`, its forms in the browser, its
    tools in the MCP over `--url`, its owner-only actions refused to an agent, and answers 503 when it is down; the
    end-to-end test holds it on the real server.
-3. The protocol is written where a connector in any language finds it, and `lifelog/app` builds the test app.
+3. The protocol is written where a connector in any language finds it, and `aminte/app` builds the test app.
 4. The baseline and the static checks are green; the live file is converted and the service restarted on the new
    binary (Part 4).

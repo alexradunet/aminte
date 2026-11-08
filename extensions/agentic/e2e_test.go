@@ -19,8 +19,8 @@ import (
 	"time"
 )
 
-// The tests build the real lifelog, lifelog-mcp and lifelog-agentic-init once, and copy them into a folder of its own
-// for each test: lifelog-agentic-init writes into the folder of lifelog. `lifelog agentic-init` then holds the
+// The tests build the real aminte, aminte-mcp and aminte-agentic-init once, and copy them into a folder of its own
+// for each test: aminte-agentic-init writes into the folder of aminte. `aminte agentic-init` then holds the
 // discovery of step 1 of plan 135, the environment of an extension (extensions/README.md) and the extension itself.
 
 var (
@@ -34,29 +34,29 @@ func TestMain(m *testing.M) {
 	func() {
 		goBin, err := exec.LookPath("go")
 		if err != nil {
-			skip = fmt.Sprintf("no go command to build lifelog: %v", err)
+			skip = fmt.Sprintf("no go command to build aminte: %v", err)
 			code = m.Run()
 			return
 		}
 		root, err := filepath.Abs(filepath.Join("..", ".."))
 		if err == nil {
-			_, err = os.Stat(filepath.Join(root, "cmd", "lifelog"))
+			_, err = os.Stat(filepath.Join(root, "cmd", "aminte"))
 		}
 		if err != nil {
-			skip = fmt.Sprintf("the lifelog sources are not at ../..: %v", err)
+			skip = fmt.Sprintf("the aminte sources are not at ../..: %v", err)
 			code = m.Run()
 			return
 		}
-		binDir, err = os.MkdirTemp("", "lifelog-agentic-test-")
+		binDir, err = os.MkdirTemp("", "aminte-agentic-test-")
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			return
 		}
 		defer os.RemoveAll(binDir)
 		for _, args := range [][]string{
-			{"build", "-C", root, "-o", filepath.Join(binDir, exeName("lifelog")), "./cmd/lifelog"},
-			{"build", "-C", filepath.Join("..", "mcp"), "-o", filepath.Join(binDir, exeName("lifelog-mcp")), "./cmd/lifelog-mcp"},
-			{"build", "-o", filepath.Join(binDir, exeName("lifelog-agentic-init")), "./cmd/lifelog-agentic-init"},
+			{"build", "-C", root, "-o", filepath.Join(binDir, exeName("aminte")), "./cmd/aminte"},
+			{"build", "-C", filepath.Join("..", "mcp"), "-o", filepath.Join(binDir, exeName("aminte-mcp")), "./cmd/aminte-mcp"},
+			{"build", "-o", filepath.Join(binDir, exeName("aminte-agentic-init")), "./cmd/aminte-agentic-init"},
 		} {
 			if out, err := exec.Command(goBin, args...).CombinedOutput(); err != nil {
 				buildErr = fmt.Errorf("go %v: %v\n%s", args, err, out)
@@ -79,7 +79,7 @@ func exeName(name string) string {
 type folder struct {
 	t         *testing.T
 	dir, work string
-	lifelog   string
+	aminte    string
 	db        string
 }
 
@@ -91,11 +91,11 @@ func newFolder(t *testing.T) *folder {
 	if buildErr != nil {
 		t.Fatal(buildErr)
 	}
-	dir, err := filepath.EvalSymlinks(t.TempDir()) // lifelog resolves symbolic links in the path of its program
+	dir, err := filepath.EvalSymlinks(t.TempDir()) // aminte resolves symbolic links in the path of its program
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{"lifelog", "lifelog-mcp", "lifelog-agentic-init"} {
+	for _, name := range []string{"aminte", "aminte-mcp", "aminte-agentic-init"} {
 		b, err := os.ReadFile(filepath.Join(binDir, exeName(name)))
 		if err != nil {
 			t.Fatal(err)
@@ -104,13 +104,13 @@ func newFolder(t *testing.T) *folder {
 			t.Fatal(err)
 		}
 	}
-	return &folder{t: t, dir: dir, work: t.TempDir(), lifelog: filepath.Join(dir, exeName("lifelog")), db: filepath.Join(dir, "life.db")}
+	return &folder{t: t, dir: dir, work: t.TempDir(), aminte: filepath.Join(dir, exeName("aminte")), db: filepath.Join(dir, "life.db")}
 }
 
 // env is the environment of a child: the inherited one without any variable that could point it at another file or
 // server than the one of the test.
 func env() []string {
-	return slices.DeleteFunc(os.Environ(), func(kv string) bool { return strings.HasPrefix(kv, "LIFELOG_") })
+	return slices.DeleteFunc(os.Environ(), func(kv string) bool { return strings.HasPrefix(kv, "AMINTE_") })
 }
 
 // run runs a program with the stripped environment in the empty working directory. It returns the exit status.
@@ -131,12 +131,12 @@ func (f *folder) run(program string, args ...string) (stdout, stderr string, sta
 	return out.String(), errb.String(), status
 }
 
-// ok runs `lifelog ARGS` and fails the test unless it exits 0.
+// ok runs `aminte ARGS` and fails the test unless it exits 0.
 func (f *folder) ok(args ...string) string {
 	f.t.Helper()
-	out, errb, status := f.run(f.lifelog, args...)
+	out, errb, status := f.run(f.aminte, args...)
 	if status != 0 {
-		f.t.Fatalf("lifelog %v: status %d\n%s\n%s", args, status, out, errb)
+		f.t.Fatalf("aminte %v: status %d\n%s\n%s", args, status, out, errb)
 	}
 	return out
 }
@@ -156,12 +156,12 @@ func TestTheFilesAndTheDatabaseBesideTheProgram(t *testing.T) {
 	if !strings.Contains(out, "written") {
 		t.Fatalf("agentic-init:\n%s", out)
 	}
-	if want := "no life.db yet: lifelog init " + f.db + " makes it\n"; !strings.Contains(out, want) {
-		t.Errorf("agentic-init does not suggest lifelog init:\n%s\nwant the line %q", out, want)
+	if want := "no life.db yet: aminte init " + f.db + " makes it\n"; !strings.Contains(out, want) {
+		t.Errorf("agentic-init does not suggest aminte init:\n%s\nwant the line %q", out, want)
 	}
 	for _, name := range []string{"AGENTS.md", "CLAUDE.md", ".mcp.json", ".codex/config.toml", "opencode.json", ".pi/mcp.json",
-		".agents/skills/lifelog-import-notes/SKILL.md", ".claude/skills/lifelog-import-notes/SKILL.md",
-		".agents/skills/lifelog-extension/SKILL.md", ".claude/skills/lifelog-extension/SKILL.md"} {
+		".agents/skills/aminte-import-notes/SKILL.md", ".claude/skills/aminte-import-notes/SKILL.md",
+		".agents/skills/aminte-extension/SKILL.md", ".claude/skills/aminte-extension/SKILL.md"} {
 		if _, err := os.Stat(filepath.Join(f.dir, filepath.FromSlash(name))); err != nil {
 			t.Errorf("%s: %v", name, err)
 		}
@@ -186,16 +186,16 @@ func TestTheFilesAndTheDatabaseBesideTheProgram(t *testing.T) {
 
 func TestTheExtensionRefusesToRunAlone(t *testing.T) {
 	f := newFolder(t)
-	tool := filepath.Join(f.dir, exeName("lifelog-agentic-init"))
+	tool := filepath.Join(f.dir, exeName("aminte-agentic-init"))
 	_, stderr, status := f.run(tool)
-	want := "lifelog-agentic-init: run it as lifelog agentic-init: it needs LIFELOG_EXE and LIFELOG_DB\n"
+	want := "aminte-agentic-init: run it as aminte agentic-init: it needs AMINTE_EXE and AMINTE_DB\n"
 	if status != 1 || stderr != want {
 		t.Errorf("without the environment: status %d, stderr %q, want 1 and %q", status, stderr, want)
 	}
 	if entries, _ := os.ReadDir(f.dir); len(entries) != 3 {
 		t.Errorf("it wrote files: %v", entries)
 	}
-	_, stderr, status = f.run(f.lifelog, "agentic-init", "extra")
+	_, stderr, status = f.run(f.aminte, "agentic-init", "extra")
 	if status != 1 || !strings.Contains(stderr, `unexpected argument "extra"`) {
 		t.Errorf("a positional argument: status %d, stderr %q, want a refusal", status, stderr)
 	}
@@ -203,7 +203,7 @@ func TestTheExtensionRefusesToRunAlone(t *testing.T) {
 
 // TestTheMCPConfigsStartTheMCPServerOfThisProgram: each MCP config that agentic-init writes starts this program with
 // the line "mcp --agent NAME --db FILE". NAME is the agent of its framework and FILE is the life.db beside the program.
-// The test then runs each line as the framework would: the program finds lifelog-mcp beside itself, and the server
+// The test then runs each line as the framework would: the program finds aminte-mcp beside itself, and the server
 // lists the tools of the agent. The MCP framing is written by hand (one JSON object per line), so that the module
 // needs no SDK.
 func TestTheMCPConfigsStartTheMCPServerOfThisProgram(t *testing.T) {
@@ -216,8 +216,8 @@ func TestTheMCPConfigsStartTheMCPServerOfThisProgram(t *testing.T) {
 		t.Run(c.agent, func(t *testing.T) {
 			command, args := f.mcpServerOf(c.file)
 			want := []string{"mcp", "--agent", c.agent, "--db", f.db}
-			if command != f.lifelog || !slices.Equal(args, want) {
-				t.Fatalf("%s: %s %q, want %s %q", c.file, command, args, f.lifelog, want)
+			if command != f.aminte || !slices.Equal(args, want) {
+				t.Fatalf("%s: %s %q, want %s %q", c.file, command, args, f.aminte, want)
 			}
 			tools := listTools(t, f, command, args)
 			for _, name := range []string{"find", "capture"} {
@@ -314,7 +314,7 @@ func listTools(t *testing.T, f *folder, command string, args []string) map[strin
 	return tools
 }
 
-// mcpServerOf is the command and the arguments of the server "lifelog" in the MCP config name of the folder.
+// mcpServerOf is the command and the arguments of the server "aminte" in the MCP config name of the folder.
 // opencode.json must also say that the server is local and enabled.
 func (f *folder) mcpServerOf(name string) (command string, args []string) {
 	t := f.t
@@ -331,7 +331,7 @@ func (f *folder) mcpServerOf(name string) (command string, args []string) {
 		if err := json.Unmarshal(b, &cfg); err != nil {
 			t.Fatalf("%s: %v", name, err)
 		}
-		s := cfg.MCPServers["lifelog"]
+		s := cfg.MCPServers["aminte"]
 		return s.Command, s.Args
 	case "opencode.json":
 		var cfg struct {
@@ -344,7 +344,7 @@ func (f *folder) mcpServerOf(name string) (command string, args []string) {
 		if err := json.Unmarshal(b, &cfg); err != nil {
 			t.Fatalf("%s: %v", name, err)
 		}
-		s := cfg.MCP["lifelog"]
+		s := cfg.MCP["aminte"]
 		if s.Type != "local" || !s.Enabled || len(s.Command) == 0 {
 			t.Fatalf("%s: %+v, want a local server that is enabled", name, s)
 		}
@@ -353,7 +353,7 @@ func (f *folder) mcpServerOf(name string) (command string, args []string) {
 		// agentic-init writes three lines: the table, then command = STRING and args = [STRING, ...]. Its strings
 		// escape only \\, \" and \uXXXX, which JSON reads in the same way, so each value is read as JSON.
 		lines := strings.Split(strings.TrimSuffix(string(b), "\n"), "\n")
-		if len(lines) != 3 || lines[0] != "[mcp_servers.lifelog]" {
+		if len(lines) != 3 || lines[0] != "[mcp_servers.aminte]" {
 			t.Fatalf("%s:\n%s", name, b)
 		}
 		for _, line := range lines[1:] {
@@ -377,8 +377,8 @@ func (f *folder) mcpServerOf(name string) (command string, args []string) {
 	return "", nil
 }
 
-// helpOf is what the built `lifelog help` says: the words of each command and the flags that its lines name, and the
-// global flags. A usage line is "  lifelog WORDS [--flag X] ...", a continuation line starts with spaces only.
+// helpOf is what the built `aminte help` says: the words of each command and the flags that its lines name, and the
+// global flags. A usage line is "  aminte WORDS [--flag X] ...", a continuation line starts with spaces only.
 type helpOf struct {
 	flags  map[string][]string // command -> its flags
 	global []string
@@ -394,9 +394,9 @@ func parseHelp(text string) helpOf {
 			inGlobal, current = true, ""
 		case inGlobal:
 			h.global = append(h.global, flagRE.FindString(line))
-		case strings.HasPrefix(line, "  lifelog "):
+		case strings.HasPrefix(line, "  aminte "):
 			current = ""
-			words := strings.Fields(strings.TrimPrefix(line, "  lifelog "))
+			words := strings.Fields(strings.TrimPrefix(line, "  aminte "))
 			if len(words) > 0 && regexp.MustCompile(`^[a-z]+$`).MatchString(words[0]) { // not NAME, [PATH] or --flag
 				current = words[0]
 				h.flags[current] = append(h.flags[current], flagRE.FindAllString(line, -1)...)
@@ -414,11 +414,11 @@ func parseHelp(text string) helpOf {
 // TestTheAgentsTextsNameWhatTheProgramHas: the texts that agentic-init writes (AGENTS.md, CLAUDE.md and the skills)
 // name only what the program has. So a rename in the program fails here, and not in the session of an agent.
 //   - The sentence of AGENTS.md that calls actions the owner's only names the tool names of all the owner's actions
-//     of the catalog (lifelog actions), and no one of them is a tool. The scan of the texts reads AGENTS.md without
+//     of the catalog (aminte actions), and no one of them is a tool. The scan of the texts reads AGENTS.md without
 //     that sentence, so an owner's name in any other sentence fails.
 //   - A backticked name that looks like a tool (lowercase words joined by _) is a tool (an action that is not the
-//     owner's, with _ for -, or get), a command of the help of lifelog (commandWords), or a word of notTools.
-//   - A backticked command line is a line with a command: "lifelog" or the program, then its words, or a short form (a
+//     owner's, with _ for -, or get), a command of the help of aminte (commandWords), or a word of notTools.
+//   - A backticked command line is a line with a command: "aminte" or the program, then its words, or a short form (a
 //     lowercase word and more words, such as "page TITLE"). The command is the first word that is not a global flag
 //     or its value. It is a command of the help, or mcp, agentic-init or gphotos. Its flags are global flags, flags
 //     that the help names for it, --agent for mcp and --force for agentic-init. A backticked flag alone is a global
@@ -427,10 +427,10 @@ func TestTheAgentsTextsNameWhatTheProgramHas(t *testing.T) {
 	f := newFolder(t)
 	f.ok("init")
 	f.ok("agentic-init")
-	// The usage goes to stderr, and the status of `lifelog help` is 2.
-	usageOut, usage, status := f.run(f.lifelog, "help")
+	// The usage goes to stderr, and the status of `aminte help` is 2.
+	usageOut, usage, status := f.run(f.aminte, "help")
 	if status != 2 || usageOut != "" {
-		t.Fatalf("lifelog help: status %d, stdout %q", status, usageOut)
+		t.Fatalf("aminte help: status %d, stdout %q", status, usageOut)
 	}
 	help := parseHelp(usage)
 	var actions []struct {
@@ -440,8 +440,8 @@ func TestTheAgentsTextsNameWhatTheProgramHas(t *testing.T) {
 	if err := json.Unmarshal([]byte(f.ok("actions", "--db", f.db)), &actions); err != nil {
 		t.Fatal(err)
 	}
-	// The tools are the list of the real lifelog-mcp; the owner's actions are the catalog's, with _ for a hyphen.
-	tools := listTools(t, f, f.lifelog, []string{"mcp", "--agent", "test", "--db", f.db})
+	// The tools are the list of the real aminte-mcp; the owner's actions are the catalog's, with _ for a hyphen.
+	tools := listTools(t, f, f.aminte, []string{"mcp", "--agent", "test", "--db", f.db})
 	owners := map[string]bool{}
 	for _, a := range actions {
 		if a.Owner {
@@ -463,11 +463,11 @@ func TestTheAgentsTextsNameWhatTheProgramHas(t *testing.T) {
 	// commandWords are the backticked words of the texts that look like a tool and are a command of the program:
 	// the short form of a command line with no words after the command.
 	commandWords := map[string]bool{
-		"actions": true, // lifelog actions
+		"actions": true, // aminte actions
 	}
 	// notTools are the other backticked words of the texts that look like a tool and are not one.
 	notTools := map[string]bool{
-		"lifelog": true, // the name of the server in the MCP configs
+		"aminte":  true, // the name of the server in the MCP configs
 		"day":     true, // a field of capture
 		"text":    true, // a field of capture
 		"created": true, // a list of the answer of capture
@@ -507,13 +507,13 @@ func TestTheAgentsTextsNameWhatTheProgramHas(t *testing.T) {
 						t.Errorf("%s: `%s` is not a command of the program", name, span)
 					}
 				case !tools[span] && !notTools[span]:
-					t.Errorf("%s: `%s` is not a tool of lifelog-mcp", name, span)
+					t.Errorf("%s: `%s` is not a tool of aminte-mcp", name, span)
 				}
-			case len(w) > 1 && (w[0] == f.lifelog || lowercase.MatchString(w[0])):
-				if w[0] == "lifelog" || w[0] == f.lifelog {
+			case len(w) > 1 && (w[0] == f.aminte || lowercase.MatchString(w[0])):
+				if w[0] == "aminte" || w[0] == f.aminte {
 					w = w[1:] // a full line: the program, then its words
 				}
-				if len(w) > 0 && w[0] == "NAME" { // the line of an extension in general: lifelog NAME ARGS...
+				if len(w) > 0 && w[0] == "NAME" { // the line of an extension in general: aminte NAME ARGS...
 					lastName, lastFlags = "", nil
 					continue
 				}
@@ -611,7 +611,7 @@ func TestAgenticInitAtAFailureOrAKeptFile(t *testing.T) {
 		if err := os.WriteFile(filepath.Join(f.dir, ".codex"), []byte("not a folder\n"), 0o644); err != nil {
 			t.Fatal(err)
 		}
-		stdout, stderr, status := f.run(f.lifelog, "agentic-init")
+		stdout, stderr, status := f.run(f.aminte, "agentic-init")
 		if status != 1 || !strings.Contains(stderr, ".codex/config.toml") {
 			t.Fatalf("agentic-init: status %d, stderr %q, want 1 and the error of .codex/config.toml", status, stderr)
 		}
@@ -645,7 +645,7 @@ func TestAgenticInitAtAFailureOrAKeptFile(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
-		const hint = "a kept file has another text; lifelog agentic-init --force replaces it\n"
+		const hint = "a kept file has another text; aminte agentic-init --force replaces it\n"
 		out := f.ok("agentic-init")
 		for _, name := range []string{agents, claude} {
 			if !strings.Contains(out, fmt.Sprintf("%-9s %s\n", "kept", name)) {

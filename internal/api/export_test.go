@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"testing"
 
-	"lifelog/internal/core"
+	"aminte/internal/core"
 )
 
 // HoldWriteLock makes a second writer on the file of s that holds the write lock until the test ends, so that a write

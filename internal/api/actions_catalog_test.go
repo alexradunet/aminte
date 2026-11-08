@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"lifelog/internal/api/apitest"
-	"lifelog/siren"
+	"aminte/internal/api/apitest"
+	"aminte/siren"
 )
 
 // TestActionsWithPathFieldsAreFilledByNew: GET /actions?new=NAME&FIELD=VALUE answers the action NAME with its href

@@ -28,7 +28,7 @@ ORDER BY (at IS NOT NULL), at;
 A page shows on the day it was *written* (a link target the app created has no day, [D5](../decisions/D05-pages-and-day-pages.md)), flagged if
 edited since. "Edited" is the edit revision above 1, never two clock values compared: creating a page, with its owned
 name and typed row, leaves revision 1, and the clocks of separate statements need not agree
-(`lifelog_meta.edit_revisions`).
+(`aminte_meta.edit_revisions`).
 
 ## The readings asked for on this day
 

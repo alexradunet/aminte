@@ -13,8 +13,8 @@ import (
 	"strconv"
 	"strings"
 
-	"lifelog/internal/core"
-	"lifelog/siren"
+	"aminte/internal/core"
+	"aminte/siren"
 )
 
 // The parsers of a request: its fields, its ids, its numbers and flags, and the page of a list. Every handler reads

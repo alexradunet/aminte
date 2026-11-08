@@ -18,9 +18,9 @@ import (
 	"time"
 	"unicode"
 
-	"lifelog/internal/core"
-	"lifelog/siren"
-	"lifelog/text"
+	"aminte/internal/core"
+	"aminte/siren"
+	"aminte/text"
 )
 
 // conversationFirstLine is the first line of the page: a link to the day it is about.
@@ -53,17 +53,17 @@ func words(text string) string { return strings.TrimSpace(strings.ReplaceAll(tex
 // paragraph read a fence by this one rule.
 func fenceLine(l string) bool { return strings.HasPrefix(l, "```") }
 
-// toolMark starts a tool line: ParseTurns reads the lines that start with it, right before a marker of lifelog, as the
+// toolMark starts a tool line: ParseTurns reads the lines that start with it, right before a marker of aminte, as the
 // tool lines of that marker.
 const toolMark = "- `"
 
-// paragraph is one turn as the page keeps it: the marker of who (Owner or lifelog) with its stamp, then the words. The
+// paragraph is one turn as the page keeps it: the marker of who (Owner or aminte) with its stamp, then the words. The
 // owner or the model wrote the words, and ParseTurns must read exactly one turn from the paragraph, so the words are
 // made safe first:
 //   - a line outside a fence that reads as a marker is escaped (`\*\*Owner\*\* (09:31): ...`): it shows the same
 //     in a Markdown view, and it is text and not a turn;
 //   - a line outside a fence that starts with a dash, a space and a backtick (toolMark) has a backslash before the
-//     dash, and it is no tool line. ParseTurns gives the tool lines right before a marker of lifelog to that
+//     dash, and it is no tool line. ParseTurns gives the tool lines right before a marker of aminte to that
 //     marker, so a turn of the owner that ends in such lines would lose them to the reply that follows. ParseTurns
 //     takes the backslash off again (turnWords), so the turn has the words that were said;
 //   - a fence that the words open and do not close is closed by a line of three backticks at the end, so the next
@@ -99,9 +99,9 @@ func paragraph(who, stamp, text string) string {
 	return marker + sep + strings.Join(lines, "\n")
 }
 
-// Turn is one turn of a conversation, as ParseTurns reads it. Who is owner, lifelog, or text for a paragraph that no
+// Turn is one turn of a conversation, as ParseTurns reads it. Who is owner, aminte, or text for a paragraph that no
 // turn starts (the owner edited the page): At is then empty. Key names the turn (withKeys). Tools are the tool lines of
-// a lifelog turn. Refs are the addresses that the tool lines name, in order, each once. Via is the writer that relayed
+// an aminte turn. Refs are the addresses that the tool lines name, in order, each once. Via is the writer that relayed
 // the turn.
 type Turn struct {
 	Who   string   `json:"who"`
@@ -113,7 +113,7 @@ type Turn struct {
 	Refs  []string `json:"refs,omitempty"`
 }
 
-var turnStart = regexp.MustCompile(`^\*\*(Owner|lifelog)\*\* \((\d\d[:.]\d\d)(?:, via ([a-z0-9_:.-]+))?\): ?`)
+var turnStart = regexp.MustCompile(`^\*\*(Owner|aminte)\*\* \((\d\d[:.]\d\d)(?:, via ([a-z0-9_:.-]+))?\): ?`)
 
 // withKeys gives each turn its key and gives the turns back. A key is 16 hex digits of a SHA-256 hash of the who, the
 // time, the relay and the words of the turn, and of the number of turns before it that have the same four: so no two
@@ -261,11 +261,11 @@ func escapeToolTail(head string) string {
 }
 
 // ParseTurns reads the turns of the body of the conversation page of day (CRLF is read as LF). A marker line starts
-// with `**Owner** (HH:MM): ` or `**lifelog** (HH:MM): `, and may name the relaying writer inside the brackets,
+// with `**Owner** (HH:MM): ` or `**aminte** (HH:MM): `, and may name the relaying writer inside the brackets,
 // `**Owner** (HH:MM, via NAME): ` (NAME is [a-z0-9_:.-]+), and is outside a fenced code block (a line that starts with
 // three backticks opens or closes a fence). A page written with the earlier separator, `(HH.MM)`, is read the same,
 // and its turn's At is HH:MM. A turn runs from its marker line to the line before the next marker line,
-// or to the end of the page; it keeps its inner blank lines and loses its blank edge. The tool lines of a lifelog
+// or to the end of the page; it keeps its inner blank lines and loses its blank edge. The tool lines of an aminte
 // turn are the lines that start with "- `" right before its marker: one block, with at most one blank line between
 // it and the marker. They are not part of the turn before. The text before the first marker, after the first line
 // [[day]], is one turn of Who text when it is not blank. The words of a turn are the words that were said: a
@@ -280,7 +280,7 @@ func ParseTurns(day, body string) []Turn {
 	// segment is lines[from:to]; it ends where the next marker begins, and the tool lines of that marker leave it.
 	segment := func(from, to int) (seg []string, tools []string) {
 		seg = lines[from:to]
-		if to == len(lines) || !strings.HasPrefix(lines[to], "**lifelog**") {
+		if to == len(lines) || !strings.HasPrefix(lines[to], "**aminte**") {
 			return seg, nil
 		}
 		end := len(seg)
@@ -367,7 +367,7 @@ func (h *server) say(r *http.Request, a admitted) (*siren.Entity, error) {
 	return withResult(h.conversationEntity(r.Context(), day))(sync)
 }
 
-// reply is the agent's turn: the paragraph **lifelog** (HH:MM): text, with the tool lines before it, written right after
+// reply is the agent's turn: the paragraph **aminte** (HH:MM): text, with the tool lines before it, written right after
 // the owner's turn that it answers (the field turn is the key of that turn, from the conversation). The place is found
 // and the write is made in one transaction, so a turn that the owner said meanwhile stays after the reply and waits
 // for the next one. A turn that has a reply is 409, and so is a key that no owner turn of the page has now: the owner
@@ -389,7 +389,7 @@ func (h *server) reply(r *http.Request, a admitted) (*siren.Entity, error) {
 	if err != nil {
 		return nil, err
 	}
-	block := paragraph("lifelog", h.stamp(""), text)
+	block := paragraph("aminte", h.stamp(""), text)
 	if tools != "" {
 		block = tools + "\n\n" + block
 	}
@@ -420,7 +420,7 @@ func toolLines(field string) (string, error) {
 
 // insertReply puts block, the paragraph of a reply with its tool lines, right after the turn of the owner that has the
 // key, and gives the new body. The turn after the answered turn is the next marker line, so the block goes before it: a
-// turn that follows stays after the reply. A turn whose next turn is a turn of lifelog has its reply (409). A key that
+// turn that follows stays after the reply. A turn whose next turn is a turn of aminte has its reply (409). A key that
 // no owner turn has is 409 too: the page changed since the agent read it.
 func insertReply(day, body, key, block string) (string, error) {
 	all, skip := bodyLines(day, body)
@@ -448,7 +448,7 @@ func insertReply(day, body, key, block string) (string, error) {
 	at, end := owners[n], len(lines)
 	if at+1 < len(marks) {
 		end = marks[at+1]
-		if strings.HasPrefix(lines[end], "**lifelog**") {
+		if strings.HasPrefix(lines[end], "**aminte**") {
 			return "", core.Conflict("the owner turn %q of the conversation of %s has a reply already", key, day)
 		}
 	}

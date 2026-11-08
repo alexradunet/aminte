@@ -19,51 +19,51 @@ import (
 
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"lifelog/app"
-	"lifelog/client/tools"
-	"lifelog/siren"
+	"aminte/app"
+	"aminte/client/tools"
+	"aminte/siren"
 )
 
-// The end-to-end test builds the real lifelog and lifelog-mcp into one folder and runs `lifelog mcp --agent test --db F`.
-// That line holds the discovery of step 1 of plan 135 (lifelog finds lifelog-mcp beside itself), the temporary server
+// The end-to-end test builds the real aminte and aminte-mcp into one folder and runs `aminte mcp --agent test --db F`.
+// That line holds the discovery of step 1 of plan 135 (aminte finds aminte-mcp beside itself), the temporary server
 // of the extension contract (extensions/README.md) and the MCP server over HTTP. The tests of ./mcp hold the schemas,
 // the arguments and the cancellation on a fake catalog; this test holds the surface against the real writer.
 //
 // The API does not show the source of a row on an entity, so this test cannot read agent:test back. The header that
 // carries it is held by client/client_test.go and the sentence of the --source refusal is held below.
 
-// built is the folder with lifelog, lifelog-mcp and a new life.db.
-type built struct{ dir, lifelog, db string }
+// built is the folder with aminte, aminte-mcp and a new life.db.
+type built struct{ dir, aminte, db string }
 
 func build(t *testing.T) built {
 	t.Helper()
 	goBin, err := exec.LookPath("go")
 	if err != nil {
-		t.Skipf("no go command to build lifelog: %v", err)
+		t.Skipf("no go command to build aminte: %v", err)
 	}
 	root, err := filepath.Abs(filepath.Join("..", ".."))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := os.Stat(filepath.Join(root, "cmd", "lifelog")); err != nil {
-		t.Skipf("the lifelog sources are not at %s: %v", root, err)
+	if _, err := os.Stat(filepath.Join(root, "cmd", "aminte")); err != nil {
+		t.Skipf("the aminte sources are not at %s: %v", root, err)
 	}
 	b := built{dir: t.TempDir()}
 	exe := ""
 	if runtime.GOOS == "windows" {
 		exe = ".exe"
 	}
-	b.lifelog, b.db = filepath.Join(b.dir, "lifelog"+exe), filepath.Join(b.dir, "life.db")
+	b.aminte, b.db = filepath.Join(b.dir, "aminte"+exe), filepath.Join(b.dir, "life.db")
 	for _, args := range [][]string{
-		{"build", "-C", root, "-o", b.lifelog, "./cmd/lifelog"},
-		{"build", "-o", filepath.Join(b.dir, "lifelog-mcp"+exe), "./cmd/lifelog-mcp"},
+		{"build", "-C", root, "-o", b.aminte, "./cmd/aminte"},
+		{"build", "-o", filepath.Join(b.dir, "aminte-mcp"+exe), "./cmd/aminte-mcp"},
 	} {
 		if out, err := exec.Command(goBin, args...).CombinedOutput(); err != nil {
 			t.Fatalf("go %v: %v\n%s", args, err, out)
 		}
 	}
 	if out, err := b.run("init", b.db); err != nil {
-		t.Fatalf("lifelog init: %v\n%s", err, out)
+		t.Fatalf("aminte init: %v\n%s", err, out)
 	}
 	return b
 }
@@ -72,22 +72,22 @@ func build(t *testing.T) built {
 // server than the one of the test.
 func env() []string {
 	return slices.DeleteFunc(os.Environ(), func(kv string) bool {
-		return strings.HasPrefix(kv, "LIFELOG_")
+		return strings.HasPrefix(kv, "AMINTE_")
 	})
 }
 
 func (b built) run(args ...string) ([]byte, error) {
-	cmd := exec.Command(b.lifelog, args...)
+	cmd := exec.Command(b.aminte, args...)
 	cmd.Env = env()
 	return cmd.Output()
 }
 
-func TestTheMCPServerOnTheRealLifelog(t *testing.T) {
+func TestTheMCPServerOnTheRealAminte(t *testing.T) {
 	b := build(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute) // a guard against a deadlock
 	defer cancel()
 
-	cmd := exec.Command(b.lifelog, "mcp", "--agent", "test", "--db", b.db)
+	cmd := exec.Command(b.aminte, "mcp", "--agent", "test", "--db", b.db)
 	cmd.Env = env()
 	session, err := mcpsdk.NewClient(&mcpsdk.Implementation{Name: "e2e", Version: "0"}, nil).
 		Connect(ctx, &mcpsdk.CommandTransport{Command: cmd}, nil)
@@ -118,7 +118,7 @@ func TestTheMCPServerOnTheRealLifelog(t *testing.T) {
 	// The tools are exactly the actions that the catalog does not mark as the owner's, and get.
 	out, err := b.run("actions", "--db", b.db)
 	if err != nil {
-		t.Fatalf("lifelog actions: %v", err)
+		t.Fatalf("aminte actions: %v", err)
 	}
 	var catalog []struct {
 		Name  string `json:"name"`
@@ -205,11 +205,11 @@ func TestTheMCPServerOnTheRealLifelog(t *testing.T) {
 	// The file holds what the session wrote (read after the session, with the CLI).
 	out, err = b.run("get", "/days/2031-05-20", "--db", b.db)
 	if err != nil {
-		t.Fatalf("lifelog get: %v", err)
+		t.Fatalf("aminte get: %v", err)
 	}
 	var day siren.Entity
 	if err := json.Unmarshal(out, &day); err != nil {
-		t.Fatalf("lifelog get: %v: %s", err, out)
+		t.Fatalf("aminte get: %v: %s", err, out)
 	}
 	if day.Title != "2031-05-20" || !strings.Contains(string(out), text) {
 		t.Errorf("the day page %q does not hold the text: %s", day.Title, out)
@@ -218,29 +218,29 @@ func TestTheMCPServerOnTheRealLifelog(t *testing.T) {
 
 func TestSourceIsRefusedOnTheLineOfMCP(t *testing.T) {
 	b := build(t)
-	cmd := exec.Command(b.lifelog, "mcp", "--source", "x", "--db", b.db)
+	cmd := exec.Command(b.aminte, "mcp", "--source", "x", "--db", b.db)
 	cmd.Env = env()
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	err := cmd.Run()
 	var ee *exec.ExitError
 	if !errors.As(err, &ee) || ee.ExitCode() == 0 {
-		t.Fatalf("lifelog mcp --source x: %v, want a non-zero status", err)
+		t.Fatalf("aminte mcp --source x: %v, want a non-zero status", err)
 	}
 	if want := "mcp writes as agent:NAME: name the agent with --agent, not --source"; !strings.Contains(stderr.String(), want) {
 		t.Errorf("stderr %q, want %q", stderr.String(), want)
 	}
 }
 
-// TestWithoutAServerTheMCPServerRefuses: lifelog-mcp never guesses an address, because 127.0.0.1:7777 may be the
-// server of another file. Alone with no LIFELOG_URL and no --url it refuses, and so does `lifelog mcp` on a file that
-// does not exist, which gives it no LIFELOG_URL. The refusal is the owner's to mend: the status is 78.
+// TestWithoutAServerTheMCPServerRefuses: aminte-mcp never guesses an address, because 127.0.0.1:7777 may be the
+// server of another file. Alone with no AMINTE_URL and no --url it refuses, and so does `aminte mcp` on a file that
+// does not exist, which gives it no AMINTE_URL. The refusal is the owner's to mend: the status is 78.
 func TestWithoutAServerTheMCPServerRefuses(t *testing.T) {
 	b := build(t)
-	const want = "no LIFELOG_URL and no --url: run it as `lifelog mcp` on" // the line names the command of this program
+	const want = "no AMINTE_URL and no --url: run it as `aminte mcp` on" // the line names the command of this program
 	for _, line := range [][]string{
-		{filepath.Join(b.dir, "lifelog-mcp"), "--agent", "x"},
-		{b.lifelog, "mcp", "--agent", "x", "--db", filepath.Join(b.dir, "missing", "life.db")},
+		{filepath.Join(b.dir, "aminte-mcp"), "--agent", "x"},
+		{b.aminte, "mcp", "--agent", "x", "--db", filepath.Join(b.dir, "missing", "life.db")},
 	} {
 		cmd := exec.Command(line[0], line[1:]...)
 		cmd.Env = env()

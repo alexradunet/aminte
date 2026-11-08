@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"lifelog/siren"
+	"aminte/siren"
 )
 
 // panicOf runs f and returns what it panics with, "" when it does not panic.

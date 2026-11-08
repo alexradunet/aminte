@@ -1,11 +1,11 @@
-module lifelog-web
+module aminte-web
 
 go 1.27.2
 
 require (
 	github.com/yuin/goldmark v1.8.6
 	golang.org/x/text v0.42.0
-	lifelog v0.0.0
+	aminte v0.0.0
 )
 
 require (
@@ -21,4 +21,4 @@ require (
 	modernc.org/sqlite v1.60.1 // indirect
 )
 
-replace lifelog => ../..
+replace aminte => ../..

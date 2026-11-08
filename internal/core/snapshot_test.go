@@ -14,8 +14,8 @@ import (
 	"testing"
 	"time"
 
-	"lifelog/internal/db"
-	"lifelog/internal/db/dbtest"
+	"aminte/internal/db"
+	"aminte/internal/db/dbtest"
 )
 
 // TestASnapshotTellsARefusalFromAFailure: a name in use, a folder inside a git work tree and a folder that is not there

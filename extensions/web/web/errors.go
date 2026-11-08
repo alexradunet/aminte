@@ -10,8 +10,8 @@ import (
 	"runtime/debug"
 	"strings"
 
-	"lifelog-web/view"
-	"lifelog/siren"
+	"aminte-web/view"
+	"aminte/siren"
 )
 
 // retryAfter is the Retry-After of a 503, in seconds. It is the wait of the core (internal/api, retryAfter).
@@ -80,11 +80,11 @@ func (b *Browser) unreachable(w http.ResponseWriter, r *http.Request, err error)
 	var netErr net.Error
 	if errors.Is(err, context.DeadlineExceeded) || errors.As(err, &netErr) && netErr.Timeout() {
 		logFault(r, "the core is too slow", err)
-		b.fail(w, r, http.StatusGatewayTimeout, siren.CodeTimeout, "lifelog did not answer in time")
+		b.fail(w, r, http.StatusGatewayTimeout, siren.CodeTimeout, "aminte did not answer in time")
 		return
 	}
 	logFault(r, "the core cannot be reached", err)
-	b.fail(w, r, http.StatusServiceUnavailable, siren.CodeUnavailable, "lifelog is not running")
+	b.fail(w, r, http.StatusServiceUnavailable, siren.CodeUnavailable, "aminte is not running")
 }
 
 // recovered ends the request of a handler that panicked. Defer it at the top of the handler: recover sees a panic only

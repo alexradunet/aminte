@@ -1,6 +1,6 @@
 {
-  "name": "Lifelog",
-  "short_name": "Lifelog",
+  "name": "Aminte",
+  "short_name": "Aminte",
   "description": "The one writer of life.db",
   "start_url": "/",
   "scope": "/",

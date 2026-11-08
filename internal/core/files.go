@@ -7,8 +7,8 @@ import (
 	"mime"
 	"strings"
 
-	"lifelog/internal/preview"
-	"lifelog/text"
+	"aminte/internal/preview"
+	"aminte/text"
 )
 
 // FileIn is a file to keep (docs/cookbook/keep-a-file.md, D9): the hash and type of the original, which is never

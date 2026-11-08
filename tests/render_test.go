@@ -11,12 +11,12 @@ import (
 )
 
 // TestMermaidRender renders every mermaid block of the docs with mermaid-cli, so a syntax error cannot ship.
-// Opt-in: LIFELOG_MERMAID=1. Needs node with `mmdc` on PATH (or MMDC=/path/to/mmdc) and a Chromium or Chrome
+// Opt-in: AMINTE_MERMAID=1. Needs node with `mmdc` on PATH (or MMDC=/path/to/mmdc) and a Chromium or Chrome
 // (PUPPETEER_EXECUTABLE_PATH, or chromium / google-chrome on PATH); install once: npm i -g @mermaid-js/mermaid-cli.
 // Nothing is written into the repository: the SVGs go to a temporary folder.
 func TestMermaidRender(t *testing.T) {
-	if os.Getenv("LIFELOG_MERMAID") == "" {
-		t.Skip("set LIFELOG_MERMAID=1 to render the diagrams (needs mmdc and a Chromium)")
+	if os.Getenv("AMINTE_MERMAID") == "" {
+		t.Skip("set AMINTE_MERMAID=1 to render the diagrams (needs mmdc and a Chromium)")
 	}
 	mmdc := os.Getenv("MMDC")
 	if mmdc == "" {

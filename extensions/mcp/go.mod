@@ -1,4 +1,4 @@
-module lifelog-mcp
+module aminte-mcp
 
 go 1.27.2
 
@@ -15,7 +15,7 @@ require (
 
 require (
 	github.com/modelcontextprotocol/go-sdk v1.8.0
-	lifelog v0.0.0
+	aminte v0.0.0
 )
 
-replace lifelog => ../..
+replace aminte => ../..

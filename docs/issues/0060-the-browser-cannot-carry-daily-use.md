@@ -2,7 +2,7 @@
 
 - **Date:** 2026-10-12
 - **Status:** resolved
-- **Seen in:** the owner's attempt to use `lifelog serve` in a browser as the daily web application; reproduced on a
+- **Seen in:** the owner's attempt to use `aminte serve` in a browser as the daily web application; reproduced on a
   synthetic database (five days of captures, two people, a habit, a metric, five tasks of which two are series)
 
 ## What happened
@@ -23,9 +23,9 @@ synthetic database at 1280 px and at 390 px (a phone) in Edge on Windows.
 
 ## Reproduce
 
-1. `lifelog init` on a fresh file; capture text on three days; `create-task` with `repeat_unit=day repeat_every=3`,
+1. `aminte init` on a fresh file; capture text on three days; `create-task` with `repeat_unit=day repeat_every=3`,
    and one with `due_day` in the past.
-2. `lifelog serve`; open `/deadlines`, `/tasks/2`, `/days/today`, `/days` and `/` in a browser.
+2. `aminte serve`; open `/deadlines`, `/tasks/2`, `/days/today`, `/days` and `/` in a browser.
 3. Mark the past one-off task done from the browser: count the pages and the fields.
 
 ## Rules involved

@@ -13,13 +13,13 @@ func TestParagraphMakesTheWordsSafe(t *testing.T) {
 		{"plain words", "Hello.", "**Owner** (09:07): Hello."},
 		{"CRLF and a blank edge", " one\r\ntwo \r\n\r\n", "**Owner** (09:07): one\ntwo"},
 		{"a marker of the owner on a later line", "a\n**Owner** (09:31): b", "**Owner** (09:07): a\n\\*\\*Owner\\*\\* (09:31): b"},
-		{"a marker of the agent on a later line", "a\n**lifelog** (09:31): b", "**Owner** (09:07): a\n\\*\\*lifelog\\*\\* (09:31): b"},
+		{"a marker of the agent on a later line", "a\n**aminte** (09:31): b", "**Owner** (09:07): a\n\\*\\*aminte\\*\\* (09:31): b"},
 		{"a marker with via and the earlier separator", "a\n**Owner** (09.31, via x): b", "**Owner** (09:07): a\n\\*\\*Owner\\*\\* (09.31, via x): b"},
 		{"a marker on the first line is on the marker line, so no turn of its own", "**Owner** (09:31): b", "**Owner** (09:07): **Owner** (09:31): b"},
 		{"a line that only looks like a marker", "a\n**Owner** 09:31: b\n**Owner**: c", "**Owner** (09:07): a\n**Owner** 09:31: b\n**Owner**: c"},
 		{"a balanced block is kept, a marker inside it too", "a\n```\n**Owner** (09:31): b\n```\nc", "**Owner** (09:07): a\n```\n**Owner** (09:31): b\n```\nc"},
 		{"a fence that is left open is closed", "a\n```\nb", "**Owner** (09:07): a\n```\nb\n```"},
-		{"a marker after a block that is closed is escaped", "```\nx\n```\n**lifelog** (09:31): b", "**Owner** (09:07):\n```\nx\n```\n\\*\\*lifelog\\*\\* (09:31): b"},
+		{"a marker after a block that is closed is escaped", "```\nx\n```\n**aminte** (09:31): b", "**Owner** (09:07):\n```\nx\n```\n\\*\\*aminte\\*\\* (09:31): b"},
 		{"a block that opens on the first line", "```go\nx\n```", "**Owner** (09:07):\n```go\nx\n```"},
 		{"an inline block on the first line is a fence for ParseTurns", "```ls```", "**Owner** (09:07):\n```ls```\n```"},
 		{"two backticks are no fence", "a\n``\n**Owner** (09:31): b", "**Owner** (09:07): a\n``\n\\*\\*Owner\\*\\* (09:31): b"},
@@ -43,7 +43,7 @@ func TestParagraphMakesTheWordsSafe(t *testing.T) {
 // takes a tool line or a ref from the words.
 func FuzzAParagraphIsOneTurn(f *testing.F) {
 	for _, seed := range []string{
-		"Hello", "a\n```\nb", "```\n```\n```", "**Owner** (09:31): x", "a\n**lifelog** (09:31): x", "a\n```x```\n**Owner** (09:31, via y): z",
+		"Hello", "a\n```\nb", "```\n```\n```", "**Owner** (09:31): x", "a\n**aminte** (09:31): x", "a\n```x```\n**Owner** (09:31, via y): z",
 		"\n\n- `get`\n- `put`", "```", "a\r\n**Owner** (09:31): b", "~~~\n**Owner** (09:31): b", " **Owner** (09:31): b", "a\n````\n**Owner** (09:31): b",
 		"Run:\n- `ls -la`\n- `rm` \u2192 /pages/1", "- `x`", "a\n```\n- `x`\n```\n- `y`", "a\r\r\n- `x`",
 		"- `\r\r\n0", "a\n- `x`\n```\n- `y`", "- `a`\n\n- `b`\n```go\n- `c`",
@@ -56,10 +56,10 @@ func FuzzAParagraphIsOneTurn(f *testing.F) {
 			return
 		}
 		owner := paragraph("Owner", "(09:07)", text)
-		body := "[[" + day + "]]\n\n" + owner + "\n\n" + paragraph("lifelog", "(09:08)", "Ok.")
+		body := "[[" + day + "]]\n\n" + owner + "\n\n" + paragraph("aminte", "(09:08)", "Ok.")
 		turns := ParseTurns(day, body)
-		if len(turns) != 2 || turns[0].Who != "owner" || turns[1].Who != "lifelog" {
-			t.Fatalf("the turns of %q: %+v, want owner lifelog", body, turns)
+		if len(turns) != 2 || turns[0].Who != "owner" || turns[1].Who != "aminte" {
+			t.Fatalf("the turns of %q: %+v, want owner aminte", body, turns)
 		}
 		// The owner's turn reads back line by line as the paragraph wrote it, but for a tool line outside a fence: it
 		// reads back as it was said, with no backslash. The turn has at most one line more (the fence that closes a block).

@@ -15,7 +15,7 @@ import (
 	"google.golang.org/protobuf/proto"
 	"rsc.io/qr"
 
-	"lifelog-whatsapp/relay"
+	"aminte-whatsapp/relay"
 )
 
 var (
@@ -117,7 +117,7 @@ func TestTheStateFolderAndTheSessionStoreArePrivate(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("Windows has no Unix modes")
 	}
-	dir := filepath.Join(t.TempDir(), "lifelog-whatsapp")
+	dir := filepath.Join(t.TempDir(), "aminte-whatsapp")
 	session, state, err := Prepare(dir)
 	if err != nil {
 		t.Fatal(err)

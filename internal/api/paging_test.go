@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"lifelog/client"
-	"lifelog/internal/api/apitest"
+	"aminte/client"
+	"aminte/internal/api/apitest"
 )
 
 // walk follows a list's next links from first, returning every item title and the page sizes seen.

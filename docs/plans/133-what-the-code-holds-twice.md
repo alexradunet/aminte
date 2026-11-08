@@ -73,7 +73,7 @@ Each one gets a failing test before its fix.
    handlers bypass `fieldsOf`. Fix: add `deleted` to `browse` and `limit` and `offset` to `search`, make `q` optional,
    read both through `fieldsOf(r, act)`, delete the carve-outs for `search` in `api_test.go`, and run the two through
    the parity table. The README's table of the surfaces does not change.
-3. **`lifelog cover ID --title T --preview P` drops `--preview` in silence** (`cmd/lifelog/file.go`), against the
+3. **`aminte cover ID --title T --preview P` drops `--preview` in silence** (`cmd/aminte/file.go`), against the
    rule that a flag is refused, never ignored. The same file repeats the server's rule "a title or a photo". Fix:
    send `preview` whenever it is given; delete the client-side rule; `keepFile` and `setCover` build their values
    and call `doAction`.
@@ -88,9 +88,9 @@ unchecked `Close` of the writer in `db.go`.
 
 ## Part 2 — The schema embedded from the root
 
-- Add `schema.go` at the root of the repo: `package lifelog`, `//go:embed docs/schema/schema.sql`, `var Schema
+- Add `schema.go` at the root of the repo: `package aminte`, `//go:embed docs/schema/schema.sql`, `var Schema
   string`, with a comment that says it is the one canonical DDL, read by `internal/db`.
-- `internal/db/db.go` imports `lifelog` and reads `lifelog.Schema`; its `go:generate` and `go:embed` lines go.
+- `internal/db/db.go` imports `aminte` and reads `aminte.Schema`; its `go:generate` and `go:embed` lines go.
 - Delete `tools/copyschema/`, `internal/db/schema.sql`, `TestSchemaCopyIsCurrent` and the step "Verify generated
   schema" of `.github/workflows/windows-validation.yml`.
 - AGENTS.md (the baseline line and the sentence on `go generate`), README.md (the build line, Checks, the Layout row
@@ -207,7 +207,7 @@ tests/README.md lists four personas, and the row stays.)
 ## Done when
 
 - The four defects of part 1 have their tests and pass.
-- `go build ./cmd/lifelog` on a fresh clone needs no `go generate`, and nothing in the repo names it.
+- `go build ./cmd/aminte` on a fresh clone needs no `go generate`, and nothing in the repo names it.
 - No Go predicate recomputes `is_journal`; `keepNew` has no `ExistsError`.
 - Every item of parts 4 and 5 is done or recorded here as left, with the reason.
 - `site/index.html` names nothing the product does not have.
@@ -221,7 +221,7 @@ Every part is done, on the branch `plan-133`, by one commit a part and the merge
 14933 lines to 14877, because the four defects brought tests and helpers with them. Where the work went another way
 than the text above, this is what was done and why:
 
-- **`Store.Capture` stays.** About a hundred test call sites, in `internal/api`, `cmd/lifelog` and `tests/`, use it
+- **`Store.Capture` stays.** About a hundred test call sites, in `internal/api`, `cmd/aminte` and `tests/`, use it
   as their shortest write. `Tx.Capture` and `Store.Search` are gone; the API and the scale runner call
   `CaptureWithKey` and `SearchWith`.
 - **A title another file holds keeps its 409.** No trigger sees it (no type changes), and the insert would fail

@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"lifelog/internal/photo/phototest"
+	"aminte/internal/photo/phototest"
 )
 
 func TestPeopleAndPromotion(t *testing.T) {

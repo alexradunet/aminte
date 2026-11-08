@@ -33,7 +33,7 @@ Each row is a fact of the code at `c53cf4a`.
 
 ## Reproduce
 
-1. Build `lifelog` at `c53cf4a`. On a fresh file, capture a day page on 14 May 2031, create a task due on 14 May
+1. Build `aminte` at `c53cf4a`. On a fresh file, capture a day page on 14 May 2031, create a task due on 14 May
    2031, capture a session on 14 May 2031 and create a person born on 14 May 1990.
 2. Open `/months/2031-05`. The cell of 14 May shows the first line of the day page and nothing else.
 3. Open `/days/2031-05-14`. It shows the task, but not the session and not the birthday.

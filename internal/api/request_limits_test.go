@@ -16,9 +16,9 @@ import (
 	"testing"
 	"time"
 
-	"lifelog/internal/api"
-	"lifelog/internal/core"
-	"lifelog/internal/db/dbtest"
+	"aminte/internal/api"
+	"aminte/internal/core"
+	"aminte/internal/db/dbtest"
 )
 
 type repeatedByte byte

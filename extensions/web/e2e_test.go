@@ -30,16 +30,16 @@ import (
 	"testing"
 	"time"
 
-	"lifelog-web/internal/formdoc"
-	"lifelog/client"
-	"lifelog/siren"
+	"aminte-web/internal/formdoc"
+	"aminte/client"
+	"aminte/siren"
 )
 
-// The end-to-end test builds the real lifelog and lifelog-web into one folder and runs the line of the live unit on a new
-// life.db: `lifelog serve --token-file F --with web`, with LIFELOG_WEB_LISTEN and LIFELOG_WEB_ORIGINS in the
+// The end-to-end test builds the real aminte and aminte-web into one folder and runs the line of the live unit on a new
+// life.db: `aminte serve --token-file F --with web`, with AMINTE_WEB_LISTEN and AMINTE_WEB_ORIGINS in the
 // environment, and a configuration folder of the test for the state folder. Then it is a browser: a cookie jar, Accept: text/html, the fetch headers of a
 // navigation, and no other door than the door of web. It holds what the tests of ./web cannot: the program, its
-// environment, the handshake of the catalog "This browser" (served on LIFELOG_LISTEN, merged by the core as /with/web),
+// environment, the handshake of the catalog "This browser" (served on AMINTE_LISTEN, merged by the core as /with/web),
 // the owner rule of the core, and the stop by an interrupt. The pages, the forms and the lock are held in detail by the
 // tests of ./web; this test holds that the whole line carries them.
 //
@@ -48,7 +48,7 @@ import (
 // wait is a guard against a deadlock, not a measure of speed.
 const wait = 2 * time.Minute
 
-// stopBound is the longest time that an interrupt of lifelog may take to end both processes: "Run by serve" in
+// stopBound is the longest time that an interrupt of aminte may take to end both processes: "Run by serve" in
 // extensions/README.md gives the child 10 seconds, and the server then drains for 10 seconds at most. Five seconds of
 // slack are for a slow machine.
 const stopBound = 25 * time.Second
@@ -61,7 +61,7 @@ const ownerToken = "e2e-token-e2e-token-e2e-token-e2e-token"
 const ownerPIN = "4821"
 
 // proxyOrigin is the origin that a proxy shows to the browser: web trusts it besides its own.
-const proxyOrigin = "https://lifelog.example"
+const proxyOrigin = "https://aminte.example"
 
 // lockedBuffer is the stderr of the server: the process writes it and the test reads it.
 type lockedBuffer struct {
@@ -81,27 +81,27 @@ func (l *lockedBuffer) String() string {
 	return l.b.String()
 }
 
-// bins is the folder with lifelog and lifelog-web.
-type bins struct{ dir, lifelog string }
+// bins is the folder with aminte and aminte-web.
+type bins struct{ dir, aminte string }
 
 func build(t *testing.T) bins {
 	t.Helper()
 	goBin, err := exec.LookPath("go")
 	if err != nil {
-		t.Skipf("no go command to build lifelog: %v", err)
+		t.Skipf("no go command to build aminte: %v", err)
 	}
 	root, err := filepath.Abs(filepath.Join("..", ".."))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := os.Stat(filepath.Join(root, "cmd", "lifelog")); err != nil {
-		t.Skipf("the lifelog sources are not at %s: %v", root, err)
+	if _, err := os.Stat(filepath.Join(root, "cmd", "aminte")); err != nil {
+		t.Skipf("the aminte sources are not at %s: %v", root, err)
 	}
 	b := bins{dir: t.TempDir()}
-	b.lifelog = filepath.Join(b.dir, "lifelog")
+	b.aminte = filepath.Join(b.dir, "aminte")
 	for _, args := range [][]string{
-		{"build", "-C", root, "-o", b.lifelog, "./cmd/lifelog"},
-		{"build", "-o", filepath.Join(b.dir, "lifelog-web"), "./cmd/lifelog-web"},
+		{"build", "-C", root, "-o", b.aminte, "./cmd/aminte"},
+		{"build", "-o", filepath.Join(b.dir, "aminte-web"), "./cmd/aminte-web"},
 	} {
 		if out, err := exec.Command(goBin, args...).CombinedOutput(); err != nil {
 			t.Fatalf("go %s: %v\n%s", strings.Join(args, " "), err, out)
@@ -122,10 +122,10 @@ func loopbackAddr(t *testing.T) string {
 	return l.Addr().String()
 }
 
-// stack is a running `lifelog serve --token-file F --with web`.
+// stack is a running `aminte serve --token-file F --with web`.
 type stack struct {
 	t       *testing.T
-	bin     string // the lifelog program, for the command line
+	bin     string // the aminte program, for the command line
 	cmd     *exec.Cmd
 	stderr  *lockedBuffer
 	exited  chan error
@@ -142,21 +142,21 @@ func startStack(t *testing.T, b bins) *stack {
 	t.Helper()
 	work := t.TempDir()
 	db, tokenFile := filepath.Join(work, "life.db"), filepath.Join(work, "token")
-	if out, err := exec.Command(b.lifelog, "init", db).CombinedOutput(); err != nil {
-		t.Fatalf("lifelog init: %v\n%s", err, out)
+	if out, err := exec.Command(b.aminte, "init", db).CombinedOutput(); err != nil {
+		t.Fatalf("aminte init: %v\n%s", err, out)
 	}
 	if err := os.WriteFile(tokenFile, []byte(ownerToken+"\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	s := &stack{t: t, bin: b.lifelog, stderr: new(lockedBuffer), exited: make(chan error, 1), state: filepath.Join(work, "config", "lifelog-web")}
+	s := &stack{t: t, bin: b.aminte, stderr: new(lockedBuffer), exited: make(chan error, 1), state: filepath.Join(work, "config", "aminte-web")}
 	listen := loopbackAddr(t)
 	s.door = "http://" + listen
-	s.cmd = exec.Command(b.lifelog, "--db", db, "serve", "--addr", "127.0.0.1:0", "--token-file", tokenFile, "--with", "web")
-	// The environment of the unit, and nothing of the owner's: any LIFELOG_ variable of the shell could point the child
+	s.cmd = exec.Command(b.aminte, "--db", db, "serve", "--addr", "127.0.0.1:0", "--token-file", tokenFile, "--with", "web")
+	// The environment of the unit, and nothing of the owner's: any AMINTE_ variable of the shell could point the child
 	// at another file or server, and the configuration folder of the user holds the state folder of web (s.state).
 	s.cmd.Env = append(slices.DeleteFunc(os.Environ(), func(kv string) bool {
-		return strings.HasPrefix(kv, "LIFELOG_") || strings.HasPrefix(kv, "XDG_CONFIG_HOME=") || strings.HasPrefix(kv, "APPDATA=")
-	}), "LIFELOG_WEB_LISTEN="+listen, "LIFELOG_WEB_ORIGINS="+s.door+" "+proxyOrigin,
+		return strings.HasPrefix(kv, "AMINTE_") || strings.HasPrefix(kv, "XDG_CONFIG_HOME=") || strings.HasPrefix(kv, "APPDATA=")
+	}), "AMINTE_WEB_LISTEN="+listen, "AMINTE_WEB_ORIGINS="+s.door+" "+proxyOrigin,
 		"XDG_CONFIG_HOME="+filepath.Join(work, "config"), "APPDATA="+filepath.Join(work, "config"))
 	s.cmd.Stderr = s.stderr
 	if err := s.cmd.Start(); err != nil {
@@ -165,27 +165,27 @@ func startStack(t *testing.T, b bins) *stack {
 	go func() { s.exited <- s.cmd.Wait() }()
 	t.Cleanup(s.stop)
 
-	line := s.waitFor("lifelog: serving ")
+	line := s.waitFor("aminte: serving ")
 	_, rest, _ := strings.Cut(line, " on http://")
 	addr, _, _ := strings.Cut(rest, " ")
 	s.core = "http://" + addr
-	started := regexp.MustCompile(`lifelog: with web: started \(pid (\d+)\)`).FindStringSubmatch(s.waitFor("lifelog: with web: started (pid "))
+	started := regexp.MustCompile(`aminte: with web: started \(pid (\d+)\)`).FindStringSubmatch(s.waitFor("aminte: with web: started (pid "))
 	if started == nil {
 		t.Fatalf("no pid of web in the log:\n%s", s.stderr)
 	}
 	s.webPID, _ = strconv.Atoi(started[1])
-	s.waitFor("lifelog: with web: a catalog of 1 actions on 127.0.0.1:")
+	s.waitFor("aminte: with web: a catalog of 1 actions on 127.0.0.1:")
 	s.waitForDoor()
 	return s
 }
 
-// lifelogCLI runs `lifelog --url CORE args...` as the owner does at a shell: with the token in $LIFELOG_TOKEN and no other
-// LIFELOG_ variable. It returns what the program wrote and how it ended.
-func (s *stack) lifelogCLI(args ...string) (stdout, stderr string, err error) {
+// aminteCLI runs `aminte --url CORE args...` as the owner does at a shell: with the token in $AMINTE_TOKEN and no other
+// AMINTE_ variable. It returns what the program wrote and how it ended.
+func (s *stack) aminteCLI(args ...string) (stdout, stderr string, err error) {
 	ctx, cancel := context.WithTimeout(s.t.Context(), wait)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, s.bin, append([]string{"--url", s.core}, args...)...)
-	cmd.Env = append(slices.DeleteFunc(os.Environ(), func(kv string) bool { return strings.HasPrefix(kv, "LIFELOG_") }), "LIFELOG_TOKEN="+ownerToken)
+	cmd.Env = append(slices.DeleteFunc(os.Environ(), func(kv string) bool { return strings.HasPrefix(kv, "AMINTE_") }), "AMINTE_TOKEN="+ownerToken)
 	var out, errOut bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &errOut
 	err = cmd.Run()
@@ -523,9 +523,9 @@ const (
 	fileTitle    = "E2E heron.jpg"
 )
 
-func TestWebOnTheRealLifelog(t *testing.T) {
+func TestWebOnTheRealAminte(t *testing.T) {
 	if testing.Short() {
-		t.Skip("the end-to-end test builds lifelog; -short skips it")
+		t.Skip("the end-to-end test builds aminte; -short skips it")
 	}
 	if runtime.GOOS == "windows" {
 		t.Skip("Windows cannot send an interrupt to another process")
@@ -569,7 +569,7 @@ func TestWebOnTheRealLifelog(t *testing.T) {
 			t.Fatalf("the right token: %d to %q, want 303 to /", right.Status, right.location())
 		}
 		cookie := strings.Join(right.Header.Values("Set-Cookie"), "\n")
-		for _, want := range []string{"lifelog_session=", "HttpOnly", "SameSite=Strict"} {
+		for _, want := range []string{"aminte_session=", "HttpOnly", "SameSite=Strict"} {
 			if !strings.Contains(cookie, want) {
 				t.Errorf("the session cookie %q lacks %s", cookie, want)
 			}
@@ -661,7 +661,7 @@ func TestWebOnTheRealLifelog(t *testing.T) {
 		home := person.get("/")
 		form := formOf(t, home.Body, named("capture"))
 		before := s.dayWords(today)
-		// A browser that sends no Sec-Fetch-Site sends Origin: the origin of the proxy is listed in LIFELOG_WEB_ORIGINS.
+		// A browser that sends no Sec-Fetch-Site sends Origin: the origin of the proxy is listed in AMINTE_WEB_ORIGINS.
 		viaProxy := person.post(form.Action, url.Values{"text": {"Said through the proxy."}}, "/", "Sec-Fetch-Site", "", "Origin", proxyOrigin)
 		if viaProxy.Status != http.StatusSeeOther {
 			t.Errorf("a write from the origin of the proxy: %d, want 303", viaProxy.Status)
@@ -744,9 +744,9 @@ func TestWebOnTheRealLifelog(t *testing.T) {
 	})
 
 	t.Run("the ground is set on the command line, and a floor outside the four is refused", func(t *testing.T) {
-		out, errOut, err := s.lifelogCLI("do", "web-settings", "ground=embers")
+		out, errOut, err := s.aminteCLI("do", "web-settings", "ground=embers")
 		if err != nil {
-			t.Fatalf("lifelog do web-settings ground=embers: %v\n%s%s", err, out, errOut)
+			t.Fatalf("aminte do web-settings ground=embers: %v\n%s%s", err, out, errOut)
 		}
 		if saved := s.savedSettings(); saved["ground"] != "embers" || saved["lock_after"] != "5" {
 			t.Errorf("the settings file after the command: %v, want the ground embers and the lock as it was", saved)
@@ -754,7 +754,7 @@ func TestWebOnTheRealLifelog(t *testing.T) {
 		if landed := person.get("/settings"); landed.Status != http.StatusOK || !strings.Contains(landed.Body, `data-ground="embers"`) {
 			t.Errorf("the page of the settings after the command: %d, no data-ground=embers", landed.Status)
 		}
-		out, errOut, err = s.lifelogCLI("do", "web-settings", "ground=flagstones")
+		out, errOut, err = s.aminteCLI("do", "web-settings", "ground=flagstones")
 		var exit *exec.ExitError
 		if !errors.As(err, &exit) || !strings.Contains(out+errOut, "ground") {
 			t.Errorf("ground=flagstones: %v, want a refusal that names the field\n%s%s", err, out, errOut)
@@ -802,7 +802,7 @@ func TestWebOnTheRealLifelog(t *testing.T) {
 		}
 	})
 
-	t.Run("an interrupt of lifelog ends both programs", func(t *testing.T) {
+	t.Run("an interrupt of aminte ends both programs", func(t *testing.T) {
 		if strings.Contains(s.stderr.String(), "started again in") {
 			t.Errorf("a program ended and started again during the test:\n%s", s.stderr)
 		}
@@ -814,20 +814,20 @@ func TestWebOnTheRealLifelog(t *testing.T) {
 		case err := <-s.exited:
 			s.stopped = true
 			if err != nil {
-				t.Errorf("lifelog ended with %v, want status 0", err)
+				t.Errorf("aminte ended with %v, want status 0", err)
 			}
 		case <-time.After(stopBound):
 			_ = s.cmd.Process.Kill()
-			t.Fatalf("lifelog did not end within %s of the interrupt:\n%s", stopBound, s.stderr)
+			t.Fatalf("aminte did not end within %s of the interrupt:\n%s", stopBound, s.stderr)
 		}
 		t.Logf("both ended %s after the interrupt", time.Since(began).Round(time.Millisecond))
 		log := s.stderr.String()
 		t.Logf("the log of the server:\n%s", log)
-		if !strings.Contains(log, "lifelog: with web: ended\n") || strings.Contains(log, "ended by the stop") {
+		if !strings.Contains(log, "aminte: with web: ended\n") || strings.Contains(log, "ended by the stop") {
 			t.Errorf("web did not end cleanly on the interrupt:\n%s", log)
 		}
-		if !strings.Contains(log, "lifelog: stopped serving ") || strings.Contains(log, "with an error") {
-			t.Errorf("lifelog did not stop cleanly:\n%s", log)
+		if !strings.Contains(log, "aminte: stopped serving ") || strings.Contains(log, "with an error") {
+			t.Errorf("aminte did not stop cleanly:\n%s", log)
 		}
 		for _, secret := range []string{ownerToken, ownerPIN, captureWords} {
 			if strings.Contains(log, secret) {
@@ -835,12 +835,12 @@ func TestWebOnTheRealLifelog(t *testing.T) {
 			}
 		}
 		if proc, err := os.FindProcess(s.webPID); err == nil && proc.Signal(syscall.Signal(0)) == nil {
-			t.Errorf("web (pid %d) still runs after lifelog ended", s.webPID)
+			t.Errorf("web (pid %d) still runs after aminte ended", s.webPID)
 		}
 		for name, base := range map[string]string{"the door": s.door, "the core": s.core} {
 			if conn, err := net.DialTimeout("tcp", strings.TrimPrefix(base, "http://"), time.Second); err == nil {
 				conn.Close()
-				t.Errorf("%s still listens after lifelog ended", name)
+				t.Errorf("%s still listens after aminte ended", name)
 			}
 		}
 	})

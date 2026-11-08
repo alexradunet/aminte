@@ -31,7 +31,7 @@ func identity(s *S) {
 			odd = append(odd, t)
 		}
 	}
-	s.K("the tables without a single INTEGER primary key are exactly the two registries", slices.Equal(slices.Sorted(slices.Values(odd)), []string{"lifelog_meta", "link_kinds"}), odd)
+	s.K("the tables without a single INTEGER primary key are exactly the two registries", slices.Equal(slices.Sorted(slices.Values(odd)), []string{"aminte_meta", "link_kinds"}), odd)
 
 	// ---- ids by RETURNING
 	c = s.fresh()
@@ -56,7 +56,7 @@ func identity(s *S) {
 	p := P{}
 	sync := func(st string) { // the cookbook/save-a-body link sync, inside cookbook/capture's transaction
 		if strings.HasPrefix(strings.ToUpper(st), "UPDATE ENTITIES SET BODY") {
-			c.link(p["page_id"], c.page("Lifelog"), "wikilink")
+			c.link(p["page_id"], c.page("Aminte"), "wikilink")
 		}
 	}
 	_, e2 := c.runBlock(s.d.Block("capture"), p, sync)

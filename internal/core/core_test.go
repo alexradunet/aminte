@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"lifelog/internal/db/dbtest"
+	"aminte/internal/db/dbtest"
 )
 
 var ctx = context.Background()

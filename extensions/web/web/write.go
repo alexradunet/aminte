@@ -15,8 +15,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"lifelog-web/view"
-	"lifelog/siren"
+	"aminte-web/view"
+	"aminte/siren"
 )
 
 // The write side of the browser. A form posts to web. Web sends the same write to the core, with the same path, as the

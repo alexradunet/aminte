@@ -1,0 +1,11 @@
+# Reference copy. Compare it with the installed unit before you replace it (deploy/README.md).
+[Unit]
+Description=Aminte nightly snapshot of life.db
+
+[Timer]
+OnCalendar=*-*-* 03:17:00
+# A night when the machine was off: run once at the next start.
+Persistent=true
+
+[Install]
+WantedBy=timers.target

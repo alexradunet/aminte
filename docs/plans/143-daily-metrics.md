@@ -82,7 +82,7 @@ The path of [the process](../process.md), in one commit.
 2. The new action `edit-metric`: `POST /pages/{id}/metric`, fields `id` (path) and `daily` (flag; absent is 0, as an
    unticked checkbox sends nothing). Handler beside `editPerson`; `Store.EditMetric` updates the one column, and the
    trigger `metrics_touch` advances the page's revision, as `people_touch` does for a person
-   (`lifelog_meta.edit_revisions`). `register-metric` sent a `daily` that differs from an existing metric's mark is
+   (`aminte_meta.edit_revisions`). `register-metric` sent a `daily` that differs from an existing metric's mark is
    refused (409) and names `edit-metric`; sent no `daily`, the metric is returned as it is. A page that is not a live metric is refused as `edit-person` refuses a
    page that is not a person.
 3. `core.Page` gains `Metric` (unit, daily) beside `Person`; `pageActions` offers `edit-metric` on a metric's page, and
@@ -133,8 +133,8 @@ The owner ran each line. The service was stopped at 15:16; the snapshot
 `/home/cico/life/snapshots/2026-10-23-plan-143/life-2026-10-23.db` passed its restore check; the dry run and the run of
 `plan143-bin` found the file equal to the old DDL, added the column to 119 metrics (every mark 0), made `metrics_touch`,
 and left the file equal to the new DDL with `integrity_check` ok; the new binary's `/integrity` reported no schema
-drift; the binary was installed with the previous one kept as `lifelog.prev`; the service started at 15:21:10 and
-logged "serving /home/cico/dev/lifelogdb/life.db on http://127.0.0.1:7777".
+drift; the binary was installed with the previous one kept as `aminte.prev`; the service started at 15:21:10 and
+logged "serving /home/cico/dev/aminte/life.db on http://127.0.0.1:7777".
 
 ## Done when
 

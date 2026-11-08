@@ -9,7 +9,7 @@
 
 The import's first step is a survey of the source: which folders hold what, how many files of each kind, which are
 archives still to extract, where the notes are and how their files are named — the facts behind `rules.md` and the
-choice of a workspace per source. Only `lifelog import takeout inventory` exists, and it reads three families of one
+choice of a workspace per source. Only `aminte import takeout inventory` exists, and it reads three families of one
 product (Timeline, Fit, Fitbit): it found nothing in an extraction whose health data is elsewhere, and it says nothing
 about a notes folder or a camera dump. The survey was done with ad-hoc shell commands (`find`, `unzip -l`, `sed`),
 written and run by hand, and each one risked printing a value.
@@ -22,7 +22,7 @@ way, and the sources it recognises (a folder of Markdown notes, a Takeout extrac
 ## Reproduce
 
 1. A folder `Ingest/` with `Notes/Journal/2031-04-11.md`, `Notes/photo.png`, `Camera/DSC0001.JPG` and `old.zip`.
-2. `lifelog import takeout inventory Ingest`: every folder is "Other"; no families; nothing about notes, names or the
+2. `aminte import takeout inventory Ingest`: every folder is "Other"; no families; nothing about notes, names or the
    archive.
 3. There is no other survey command.
 
@@ -33,4 +33,4 @@ way, and the sources it recognises (a folder of Markdown notes, a Takeout extrac
 
 ## Resolution
 
-Resolved by [plan 077](../plans/077-ingest-folder-survey-and-passes.md): `lifelog import inventory FOLDER` surveys any folder with no content read and no single file name printed.
+Resolved by [plan 077](../plans/077-ingest-folder-survey-and-passes.md): `aminte import inventory FOLDER` surveys any folder with no content read and no single file name printed.

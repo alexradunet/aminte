@@ -1,13 +1,13 @@
 // Package dbtest makes the fresh life.db of a test: a new file in the test's temporary folder, made from the embedded
 // DDL and opened with the connection settings of the program (docs/contract/connections.md). It imports only db, so
-// the tests inside a package of lifelog can use it too.
+// the tests inside a package of aminte can use it too.
 package dbtest
 
 import (
 	"path/filepath"
 	"testing"
 
-	"lifelog/internal/db"
+	"aminte/internal/db"
 )
 
 // New makes a fresh life.db and opens it as the program opens it. The cleanup of the test closes it, and an error of

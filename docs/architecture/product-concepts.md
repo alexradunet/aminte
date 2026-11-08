@@ -18,4 +18,4 @@
 | Imported notes (a vault) | `entities.import_key`, unique per `source`: a re-run inserts nothing, a changed note updates its page ([import a row once](../cookbook/import-a-row-once.md)) |
 | Photos, recordings, scans | a file page: its text (a transcript, a caption) in the body, a small JPEG in `files.preview`, the original left outside; `![[Lake.jpg]]` in a day page links it ([keep a file](../cookbook/keep-a-file.md), [D9](../decisions/D09-binary-files.md)) |
 | Search | `entities_fts` ([full-text search](../cookbook/full-text-search.md)) |
-| "Which of my agents wrote this?" | `source` on every entity, link and measurement (`lifelog_meta.source`, [D10](../decisions/D10-time-model.md)) |
+| "Which of my agents wrote this?" | `source` on every entity, link and measurement (`aminte_meta.source`, [D10](../decisions/D10-time-model.md)) |

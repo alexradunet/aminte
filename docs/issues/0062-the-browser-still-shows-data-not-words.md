@@ -24,9 +24,9 @@ a fact of the code at `3fa2fb6`.
 
 ## Reproduce
 
-1. Build `lifelog` at `3fa2fb6`; on a fresh file, capture on three days, record a weight on two days, start a habit,
+1. Build `aminte` at `3fa2fb6`; on a fresh file, capture on three days, record a weight on two days, start a habit,
    and create a task that repeats every 3 days.
-2. `lifelog serve`; open a page, the reading, `/sessions`, the task, and `/days/today`, at 1280 px and 390 px.
+2. `aminte serve`; open a page, the reading, `/sessions`, the task, and `/days/today`, at 1280 px and 390 px.
 3. Save a body with a `[[link]]` from the browser and read the result.
 
 ## Rules involved

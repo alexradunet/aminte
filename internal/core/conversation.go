@@ -7,8 +7,8 @@ import (
 	"regexp"
 	"strings"
 
-	"lifelog/siren"
-	"lifelog/text"
+	"aminte/siren"
+	"aminte/text"
 )
 
 // The conversation page of a day is the plain page that say makes (API.md, the conversation). Its title is the one

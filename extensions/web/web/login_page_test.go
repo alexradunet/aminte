@@ -13,7 +13,7 @@ import (
 	"strings"
 	"testing"
 
-	"lifelog/siren"
+	"aminte/siren"
 )
 
 // The login page shows nothing of the life log. It is a page with no shell: a bare column, no sidebar, no script, no

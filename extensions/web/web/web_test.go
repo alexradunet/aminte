@@ -14,9 +14,9 @@ import (
 	"testing"
 	"time"
 
-	"lifelog-web/view"
-	"lifelog-web/web"
-	"lifelog/siren"
+	"aminte-web/view"
+	"aminte-web/web"
+	"aminte/siren"
 )
 
 // recorder is a handler between web and the real core. It records the requests that web makes, and passes each to the
@@ -140,7 +140,7 @@ func TestTheColumnDrawsSixCardsAndTheScreenDrawsEveryOne(t *testing.T) {
 	page := must(t)(l.api.Get(t.Context(), href(conv, "page")))
 	body, _ := page.Properties.(map[string]any)["body"].(string)
 	must(t)(l.api.Do(t.Context(), act(t, page, "save-body"), map[string]string{"body": body + "\n\n" + toolLines(older...) +
-		"\n**lifelog** (09:30): First.\n\n**Owner** (09:31): More.\n\n" + toolLines(newer...) + "\n**lifelog** (09:32): Second.\n"}))
+		"\n**aminte** (09:30): First.\n\n**Owner** (09:31): More.\n\n" + toolLines(newer...) + "\n**aminte** (09:32): Second.\n"}))
 
 	var every, column []string
 	for _, ref := range append(older, newer...) { // the page shows the turns in order, the older first
@@ -165,7 +165,7 @@ func TestACardAsksForWhatThePageMayRead(t *testing.T) {
 	conv := must(t)(l.api.Get(t.Context(), "/days/"+today+"/conversation"))
 	page := must(t)(l.api.Get(t.Context(), href(conv, "page")))
 	body, _ := page.Properties.(map[string]any)["body"].(string)
-	must(t)(l.api.Do(t.Context(), act(t, page, "save-body"), map[string]string{"body": body + "\n\n" + toolLines("/settings", "/integrity") + "\n**lifelog** (09:30): No.\n"}))
+	must(t)(l.api.Do(t.Context(), act(t, page, "save-body"), map[string]string{"body": body + "\n\n" + toolLines("/settings", "/integrity") + "\n**aminte** (09:30): No.\n"}))
 	for _, uri := range []string{"/days/today/conversation", "/browse"} {
 		got := ask(l.web, http.MethodGet, uri).Body.String()
 		if strings.Contains(got, "model_key") || strings.Contains(got, "card-settings") || strings.Contains(got, "card-integrity") {

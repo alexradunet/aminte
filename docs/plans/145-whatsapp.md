@@ -7,8 +7,8 @@
 
 - **Date / baseline:** 2026-10-28, `dbeea3d` (master).
 - **Priority:** P2. **Effort:** M. **Risk:** MEDIUM. Nothing for the schema, the contract, the catalog or the
-  `lifelog` binary: the extension is a client of [API.md](../../API.md), in ring 3. A model writes through the
-  catalog with no approval step, as [plan 102](102-a-conversation-with-lifelog.md) accepted: its rows carry
+  `aminte` binary: the extension is a client of [API.md](../../API.md), in ring 3. A model writes through the
+  catalog with no approval step, as [plan 102](102-a-conversation-with-aminte.md) accepted: its rows carry
   `agent:whatsapp`, the owner-only actions are refused to it by the API, and nothing is ever deleted. The transport
   is the unofficial WhatsApp Web protocol: it can break when the protocol changes, and the paired number can be
   banned, so the agent has its own number.
@@ -21,14 +21,14 @@
   action with a file field is no tool now); an owner's text saved while the model ran was adopted in silence (one
   line on WhatsApp says it was not answered); the time of a turn is read once (midnight). [Plan 146](146-settings-and-the-chat-column.md)
   moved the model's settings into the app and the conversation's convention into the core. The extension is
-  installed beside `lifelog` since 2026-10-28 15:33; the pairing of the agent's number, its unit and the first
+  installed beside `aminte` since 2026-10-28 15:33; the pairing of the agent's number, its unit and the first
   reply on the phone wait for the owner: they need the second number.
 - **Resolves:** the owner's words of 2026-10-28 (below). No issue: the file is right; the owner wants a way to talk
   to it from a phone.
 
 ## The owner's words (2026-10-28)
 
-"I want to be able to add an always on agentic gateway to lifelogdb and use whatsapp to communicate with the agent."
+"I want to be able to add an always on agentic gateway to aminte and use whatsapp to communicate with the agent."
 On the choice between a minimal gateway of our own, Hermes and OpenClaw: "let's do it as a ring 3 extension." On
 the transport: whatsmeow, with a second number for the agent. On the model: "something more agnostic, maybe an
 OpenAI compatible API only." Then: "we should have one conversation per day, with the AI to have the possibility to
@@ -39,15 +39,15 @@ in CLI or in any other API capability."
 
 | question | decision |
 |---|---|
-| the ring | 3: `extensions/whatsapp`, the module `lifelog-whatsapp`, the program `lifelog-whatsapp`, run as `lifelog whatsapp` ([the contract of an extension](../../extensions/README.md)). It names the third party; the core does not. |
-| the transport | [whatsmeow](https://github.com/tulir/whatsmeow) (`go.mau.fi/whatsmeow`, MPL-2.0), the Go client of the WhatsApp Web multi-device protocol. Paired by a QR code as a linked device of a number that is the agent's own. Its session store is a SQLite file opened through `modernc.org/sqlite`, the driver `lifelog` already pins: no cgo (probed on 2026-10-28: `sqlstore.NewWithDB(db, "sqlite3", nil)` on a `sql.Open("sqlite", …)` upgrades and runs with `CGO_ENABLED=0`). |
-| the model | the OpenAI chat-completions protocol over `net/http`, as [plan 102](102-a-conversation-with-lifelog.md) did: `LIFELOG_MODEL_URL` (the base URL, ending in `/v1`), `LIFELOG_MODEL` (the model id), `LIFELOG_MODEL_KEY` (optional, a bearer credential). Any server that speaks it: a local model, or a hosted one. No model SDK. |
+| the ring | 3: `extensions/whatsapp`, the module `aminte-whatsapp`, the program `aminte-whatsapp`, run as `aminte whatsapp` ([the contract of an extension](../../extensions/README.md)). It names the third party; the core does not. |
+| the transport | [whatsmeow](https://github.com/tulir/whatsmeow) (`go.mau.fi/whatsmeow`, MPL-2.0), the Go client of the WhatsApp Web multi-device protocol. Paired by a QR code as a linked device of a number that is the agent's own. Its session store is a SQLite file opened through `modernc.org/sqlite`, the driver `aminte` already pins: no cgo (probed on 2026-10-28: `sqlstore.NewWithDB(db, "sqlite3", nil)` on a `sql.Open("sqlite", …)` upgrades and runs with `CGO_ENABLED=0`). |
+| the model | the OpenAI chat-completions protocol over `net/http`, as [plan 102](102-a-conversation-with-aminte.md) did: `AMINTE_MODEL_URL` (the base URL, ending in `/v1`), `AMINTE_MODEL` (the model id), `AMINTE_MODEL_KEY` (optional, a bearer credential). Any server that speaks it: a local model, or a hosted one. No model SDK. |
 | the tools | the catalog, as the MCP server does ([extensions/mcp](../../extensions/mcp/README.md)): one function per action of `GET /actions` that is not the owner's, with `_` for `-`, plus `get` to follow a link. The owner's actions are never offered, and the API refuses them to an `agent:*` writer anyway. |
 | who may talk | one number, `--owner`. A message from any other sender, and any group message, is ignored and logged. Nothing else is accepted: a forwarded message is text the model reads, never an instruction (the instructions say so, as the MCP server's do). |
-| the conversation | one a day, and it is a page of `life.db` (the owner's words, 2026-10-28, second message; [plan 102](102-a-conversation-with-lifelog.md) option A): the page titled `Conversation YYYY-MM-DD` (the local day), made on the first turn of the day with `create-page` and `category` `Conversations`, its first line the day's wikilink `[[YYYY-MM-DD]]` so the day page lists it. Each turn is appended to its body: the owner's text, the tool calls, the reply. The body is the whole memory of the day: the model reads it on every turn, and an edit by the owner is what the model reads next. The extension keeps nothing of its own in `life.db`; the conversation is the owner's, on every surface. |
-| continued anywhere | the extension watches today's conversation page. Text appended to it by any surface (the body editor in a browser, `lifelog do save-body`, an MCP tool, any client) is an owner's turn: the reply is appended to the page and sent on WhatsApp too. One conversation, continued from the phone, the web, the CLI or the API; the core does not change. |
+| the conversation | one a day, and it is a page of `life.db` (the owner's words, 2026-10-28, second message; [plan 102](102-a-conversation-with-aminte.md) option A): the page titled `Conversation YYYY-MM-DD` (the local day), made on the first turn of the day with `create-page` and `category` `Conversations`, its first line the day's wikilink `[[YYYY-MM-DD]]` so the day page lists it. Each turn is appended to its body: the owner's text, the tool calls, the reply. The body is the whole memory of the day: the model reads it on every turn, and an edit by the owner is what the model reads next. The extension keeps nothing of its own in `life.db`; the conversation is the owner's, on every surface. |
+| continued anywhere | the extension watches today's conversation page. Text appended to it by any surface (the body editor in a browser, `aminte do save-body`, an MCP tool, any client) is an owner's turn: the reply is appended to the page and sent on WhatsApp too. One conversation, continued from the phone, the web, the CLI or the API; the core does not change. |
 | earlier days | the model reads them through the catalog: the instructions say that the day before's conversation is the page `Conversation YYYY-MM-DD`, reached with `get` on `/pages?title=` (API.md: it redirects to the page), and that the day pages are the log. No second memory store. |
-| the pairing | `lifelog whatsapp login`: the QR code drawn in the terminal, the session saved, exit. A QR encoder is the one small dependency this needs (`rsc.io/qr`); the terminal rendering is ours. |
+| the pairing | `aminte whatsapp login`: the QR code drawn in the terminal, the session saved, exit. A QR encoder is the one small dependency this needs (`rsc.io/qr`); the terminal rendering is ours. |
 | a reply only | the agent answers a message. It sends nothing on its own: a morning push is a later plan with the owner's word. |
 | text only | a photo, a voice note or a document from the owner is answered with one line that says the agent reads text for now ("refused, never ignored"). An action with a file field (`add-file`, `set-cover`) is not a tool of the model: the MCP server offers it as the path of a local file, which the owner's own coding agent reads, but this model acts on text that any surface wrote to the page, and a path there could name the token or the session store. Media is a later plan. |
 
@@ -55,10 +55,10 @@ in CLI or in any other API capability."
 
 ```mermaid
 flowchart LR
-  P["the owner's phone, WhatsApp"] <-->|"WhatsApp Web protocol, whatsmeow"| W["lifelog-whatsapp: the chat"]
+  P["the owner's phone, WhatsApp"] <-->|"WhatsApp Web protocol, whatsmeow"| W["aminte-whatsapp: the chat"]
   W --> A["the agent: one turn at a time"]
-  A <-->|"chat completions with tools, net/http"| M["the model at LIFELOG_MODEL_URL"]
-  A <-->|"HTTP, Lifelog-Source: agent:whatsapp, Bearer token"| L["lifelog serve, 127.0.0.1:7777"]
+  A <-->|"chat completions with tools, net/http"| M["the model at AMINTE_MODEL_URL"]
+  A <-->|"HTTP, Aminte-Source: agent:whatsapp, Bearer token"| L["aminte serve, 127.0.0.1:7777"]
 ```
 
 ```mermaid
@@ -67,7 +67,7 @@ sequenceDiagram
   participant C as the chat (whatsmeow)
   participant A as the agent
   participant M as the model
-  participant L as the lifelog API
+  participant L as the aminte API
   alt from the phone
     O->>C: a text message
     C->>A: Message{sender, text, at}
@@ -91,12 +91,12 @@ sequenceDiagram
 
 | package | holds | tested by |
 |---|---|---|
-| `siren/`, `client/` | copies of `extensions/mcp/siren` and `extensions/mcp/client`: the entity, the catalog, `Do` and `Get`, the source header and the bearer token. An extension never imports `lifelog/internal`; the MCP server set the precedent of its own copy. | the copied tests |
+| `siren/`, `client/` | copies of `extensions/mcp/siren` and `extensions/mcp/client`: the entity, the catalog, `Do` and `Get`, the source header and the bearer token. An extension never imports `aminte/internal`; the MCP server set the precedent of its own copy. | the copied tests |
 | `model/` | the chat-completions client: `Chat(ctx, messages, tools) (reply)`: the request (`model`, `messages`, `tools` as `{"type":"function","function":{name,description,parameters}}`), the answer (`choices[0].message` with `content` and `tool_calls[]{id, function{name, arguments}}`), the `Authorization: Bearer` header when the key is set, an answer read up to 8 MiB, a non-2xx status as an error with the status and the first line of the body. | an `httptest` server |
 | `agent/` | `tools(actions)`, `inputSchema`, `toolName` and `arguments` as in `extensions/mcp/mcp/tools.go` (copied, the schema is the function's `parameters`); the instructions; the conversation page of the day (find, make, append, save); the watcher; the loop of one turn; the queue. | a fake catalog server, a fake model, a fake chat |
 | `whatsapp/` | the whatsmeow adapter: the state folder, the store, `login` with the QR in the terminal, the connection, the event filter, `Send`, `Typing`, `MarkRead`; the QR renderer. | the filter and the renderer; the connection has no test (it needs WhatsApp) and the README says so |
 | `terminal/` | the terminal chat: a line of stdin is a message of the owner, a reply is a line of stdout. The owner tries the agent without a phone, and the end-to-end test holds the real binaries with it. | the end-to-end test |
-| `cmd/lifelog-whatsapp` | the command line, the flags, the environment, the exit codes | the end-to-end test |
+| `cmd/aminte-whatsapp` | the command line, the flags, the environment, the exit codes | the end-to-end test |
 
 ### The chat, as the agent sees it
 
@@ -137,9 +137,9 @@ the owner's number and the transcript path.
    sent as its JSON text (as the MCP server does).
 4. The reply is the model's final text. A model that fails (a network error, a status, a malformed answer) gives the
    reply "The model failed: <the first line>." A turn that reaches the step bound gives the model's last text, or
-   "I stopped after 16 steps." The reply is appended to the page as the paragraph `**lifelog** (HH.MM): text`, after
+   "I stopped after 16 steps." The reply is appended to the page as the paragraph `**aminte** (HH.MM): text`, after
    one line per tool call (`- \`capture\` → [/days/2026-10-28](/days/2026-10-28)`, the href of the answer's `self`;
-   an error: `- \`capture\` failed: <code>`), as [plan 102](102-a-conversation-with-lifelog.md) wrote them; saved
+   an error: `- \`capture\` failed: <code>`), as [plan 102](102-a-conversation-with-aminte.md) wrote them; saved
    with `save-body` and the version read at the start of the turn. A `stale_version` (the owner saved meanwhile)
    reads the page again and appends once more, and one line on WhatsApp says that what the owner saved was not
    answered; a second one is an error. Then the reply is sent on WhatsApp. Typing off. The state file `state.json`
@@ -169,7 +169,7 @@ in at each turn.
 
 ### The WhatsApp adapter
 
-- The state folder is `os.UserConfigDir()/lifelog-whatsapp/` (mode 0700): `session.db` (the whatsmeow store, mode
+- The state folder is `os.UserConfigDir()/aminte-whatsapp/` (mode 0700): `session.db` (the whatsmeow store, mode
   0600; it holds the account's keys) and `state.json` (the conversation page's id, version and body after the
   extension's own last save).
 - `login`: a store with no device starts `GetQRChannel` before `Connect`; each code is drawn in the terminal as
@@ -177,7 +177,7 @@ in at each turn.
   with the line "Open WhatsApp on the agent's phone, Linked devices, Link a device, and scan this." The final item
   of the channel ends it: `success` saves the session and exits 0; `timeout` or an error is said and exits 1. A
   store that already has a device refuses: "already paired as <number>; delete <session.db> to pair again."
-- The serve path: a store with no device refuses with "not paired: run lifelog whatsapp login" and exits 2.
+- The serve path: a store with no device refuses with "not paired: run aminte whatsapp login" and exits 2.
   `Connect`, then the handler. whatsmeow reconnects on its own when the socket drops, and not after `LoggedOut`
   (the owner unlinked the device), `StreamReplaced` (another client took the session), `TemporaryBan`,
   `ClientOutdated` or a `ConnectFailure` with an unknown reason. Each ends the run with its reason on stderr: the
@@ -199,35 +199,35 @@ in at each turn.
 
 | line | what happens |
 |---|---|
-| `lifelog whatsapp login` | pairs the agent's number; needs nothing else |
-| `lifelog whatsapp --owner NUMBER [--token-file F] [--url U] [--terminal]` | serves: answers the owner on WhatsApp, or on the terminal with `--terminal` (then no WhatsApp session is needed) |
+| `aminte whatsapp login` | pairs the agent's number; needs nothing else |
+| `aminte whatsapp --owner NUMBER [--token-file F] [--url U] [--terminal]` | serves: answers the owner on WhatsApp, or on the terminal with `--terminal` (then no WhatsApp session is needed) |
 
 - `--owner`: the owner's number, digits with the country code (`40712345678`). Required to serve.
-- `--url`: the address of lifelog, default `$LIFELOG_URL`, which `lifelog whatsapp` sets; with neither it refuses,
-  as the other extensions do. `--token-file F` reads the bearer token from a file (`lifelog serve --token-file`
-  has the same flag; a unit cannot put a file in an environment variable); `$LIFELOG_TOKEN` when set, else the
+- `--url`: the address of aminte, default `$AMINTE_URL`, which `aminte whatsapp` sets; with neither it refuses,
+  as the other extensions do. `--token-file F` reads the bearer token from a file (`aminte serve --token-file`
+  has the same flag; a unit cannot put a file in an environment variable); `$AMINTE_TOKEN` when set, else the
   file, else none.
-- `LIFELOG_MODEL_URL` and `LIFELOG_MODEL` are required to serve; without them it refuses with the two names.
-  `LIFELOG_MODEL_KEY` is optional.
+- `AMINTE_MODEL_URL` and `AMINTE_MODEL` are required to serve; without them it refuses with the two names.
+  `AMINTE_MODEL_KEY` is optional.
 - `--source` is not a flag: the extension writes as `agent:whatsapp` ([the contract](../../extensions/README.md)).
 - Exit: 0 on an interrupt or SIGTERM; 1 an error, or a failure of the connection; 2 not paired; 3 the connection
   ended for good (logged out, replaced, banned, outdated).
 
 ### The unit
 
-The README of the extension gives this unit, beside `lifelog.service`:
+The README of the extension gives this unit, beside `aminte.service`:
 
 ```ini
 [Unit]
-Description=lifelog WhatsApp agent
-After=network-online.target lifelog.service
-Wants=lifelog.service
+Description=aminte WhatsApp agent
+After=network-online.target aminte.service
+Wants=aminte.service
 
 [Service]
 User=cico
 Group=cico
 EnvironmentFile=/home/cico/life/whatsapp.env
-ExecStart=/home/cico/.local/bin/lifelog whatsapp --url http://127.0.0.1:7777 --token-file /home/cico/life/token --owner NUMBER
+ExecStart=/home/cico/.local/bin/aminte whatsapp --url http://127.0.0.1:7777 --token-file /home/cico/life/token --owner NUMBER
 Restart=always
 RestartSec=10
 RestartPreventExitStatus=2 3
@@ -237,18 +237,18 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=read-only
-ReadWritePaths=/home/cico/.config/lifelog-whatsapp
+ReadWritePaths=/home/cico/.config/aminte-whatsapp
 
 [Install]
 WantedBy=multi-user.target
 ```
 
-`whatsapp.env` (mode 0600) holds `LIFELOG_MODEL_URL`, `LIFELOG_MODEL` and `LIFELOG_MODEL_KEY`. `lifelog-whatsapp` is
-installed beside `lifelog` in `/home/cico/.local/bin`. The login runs once, as the same user, before the unit starts.
+`whatsapp.env` (mode 0600) holds `AMINTE_MODEL_URL`, `AMINTE_MODEL` and `AMINTE_MODEL_KEY`. `aminte-whatsapp` is
+installed beside `aminte` in `/home/cico/.local/bin`. The login runs once, as the same user, before the unit starts.
 
 ## Part 1 — The extension (one Go module)
 
-1. `extensions/whatsapp/go.mod`: module `lifelog-whatsapp`, the Go version of the root `go.mod`; requires
+1. `extensions/whatsapp/go.mod`: module `aminte-whatsapp`, the Go version of the root `go.mod`; requires
    `go.mau.fi/whatsmeow` (pinned to the pseudo-version of the day), `modernc.org/sqlite` at the root's version,
    `rsc.io/qr v0.2.0`, `google.golang.org/protobuf` as whatsmeow needs it. No other direct dependency.
 2. The packages above. `siren/` and `client/` are copies of the MCP server's, with their tests; the package comment
@@ -263,7 +263,7 @@ installed beside `lifelog` in `/home/cico/.local/bin`. The login runs once, as t
    - `agent/`: on a fake catalog server (as `extensions/mcp/mcp/fake_test.go`), a fake model (`httptest`) and a fake
      chat: the first turn of a day makes the page `Conversation YYYY-MM-DD` with the day's wikilink and the
      category, and appends the owner's paragraph before the model is called; a turn with one tool call writes
-     through the client with `Lifelog-Source: agent:whatsapp`, appends the tool line and the reply paragraph, and
+     through the client with `Aminte-Source: agent:whatsapp`, appends the tool line and the reply paragraph, and
      sends the reply; the model receives the body as its user message; a tool result over 64 KiB is cut with the
      note; the step bound; a model error gives the "The model failed" reply, on the page too; two messages are
      answered in order; a message of another number is ignored; an image from the owner gets the one-line answer;
@@ -274,32 +274,32 @@ installed beside `lifelog` in `/home/cico/.local/bin`. The login runs once, as t
    - `whatsapp/`: the filter on built events (from me, history, group, old, text, image); the renderer: a code's
      lines have the width of the matrix plus the quiet zone, the count of lines is half the height rounded up, and
      the four corners of the quiet zone are blank; the state folder's modes.
-   - `e2e_test.go`: builds the real `lifelog` and `lifelog-whatsapp` into one folder (as `extensions/mcp/e2e_test.go`
-     does), runs `lifelog whatsapp --owner 123 --terminal --db F` with `LIFELOG_MODEL_URL` at a fake model that
+   - `e2e_test.go`: builds the real `aminte` and `aminte-whatsapp` into one folder (as `extensions/mcp/e2e_test.go`
+     does), runs `aminte whatsapp --owner 123 --terminal --db F` with `AMINTE_MODEL_URL` at a fake model that
      answers the first step with a `capture` tool call and the second with text, writes a line to stdin, reads the
-     reply on stdout, ends the extension (close stdin, wait for exit 0), then reads the day page with `lifelog day
-     --db F` of the built binary and finds the captured text, and reads the page `Conversation YYYY-MM-DD` (`lifelog
-     get` or `lifelog page`, whichever the CLI has) and finds the owner's paragraph, the tool line and the reply.
-     A second case: no `LIFELOG_MODEL_URL` is refused with the names; no `--owner` is refused; no
-     `LIFELOG_URL` and no `--url` is refused with the line that says what to run.
+     reply on stdout, ends the extension (close stdin, wait for exit 0), then reads the day page with `aminte day
+     --db F` of the built binary and finds the captured text, and reads the page `Conversation YYYY-MM-DD` (`aminte
+     get` or `aminte page`, whichever the CLI has) and finds the owner's paragraph, the tool line and the reply.
+     A second case: no `AMINTE_MODEL_URL` is refused with the names; no `--owner` is refused; no
+     `AMINTE_URL` and no `--url` is refused with the line that says what to run.
 
 ## Part 2 — The records of the repository
 
 1. `extensions/README.md`: the row of `extensions/whatsapp` in the table of the extensions (binary, command line,
    writes as `agent:whatsapp`, needs the server: yes).
-2. `README.md`: the build line in the first block (`go build -C extensions/whatsapp -o ../../lifelog-whatsapp
-   ./cmd/lifelog-whatsapp`), the bullet under Extensions, `lifelog-whatsapp` in the ring 3 box of the diagram. The
+2. `README.md`: the build line in the first block (`go build -C extensions/whatsapp -o ../../aminte-whatsapp
+   ./cmd/aminte-whatsapp`), the bullet under Extensions, `aminte-whatsapp` in the ring 3 box of the diagram. The
    site's build block (`site/index.html`) gets the same line in the same commit.
-3. `cmd/lifelog/boundary_test.go`: `whatsapp` and `whatsmeow` join `thirdParties`, so the core never names them.
+3. `cmd/aminte/boundary_test.go`: `whatsapp` and `whatsmeow` join `thirdParties`, so the core never names them.
 4. `docs/plans/README.md`: this plan's row; the next number is 146.
 
 ## Done when
 
 - `gofmt -l` is empty; `go vet ./... && go test ./...` passes at the root and in `extensions/whatsapp`;
-  `CGO_ENABLED=0 go build ./cmd/lifelog-whatsapp` builds in the extension's folder; `staticcheck ./...` and
+  `CGO_ENABLED=0 go build ./cmd/aminte-whatsapp` builds in the extension's folder; `staticcheck ./...` and
   `govulncheck ./...` are clean there, or their findings have a disposition.
-- The end-to-end test shows the real `lifelog whatsapp --terminal` writing a captured line as `agent:whatsapp`
+- The end-to-end test shows the real `aminte whatsapp --terminal` writing a captured line as `agent:whatsapp`
   through a fake model.
-- The owner pairs the agent's number with `lifelog whatsapp login`, fills `whatsapp.env`, installs the unit, and
+- The owner pairs the agent's number with `aminte whatsapp login`, fills `whatsapp.env`, installs the unit, and
   reports the first reply on the phone. The install and the pairing wait for the owner: both need the second
   number and the model endpoint, which no agent has.

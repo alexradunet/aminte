@@ -14,7 +14,7 @@ import (
 	"github.com/yuin/goldmark/util"
 	"golang.org/x/text/unicode/norm"
 
-	"lifelog/text"
+	"aminte/text"
 )
 
 // CommonMark owns links and images before eligible plain text is enhanced. The links panel,

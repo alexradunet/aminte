@@ -26,7 +26,7 @@ counts it apart and names it only when nothing else is to do.
 ## Reproduce
 
 1. A source `Notes/` with `a.md` and `img/1.png`, `img/2.png`; the ledger made.
-2. `lifelog do skip-file file=img/*.png reason=attachment`: refused, `img/*.png is not in the ledger`.
+2. `aminte do skip-file file=img/*.png reason=attachment`: refused, `img/*.png is not in the ledger`.
 3. Skip `img/1.png` alone; *status* names `img/2.png` as the next file, before `a.md` is done.
 4. There is no mark that keeps `img/2.png` out of `next_file` and still in the ledger as to do.
 

@@ -96,7 +96,7 @@ for a writer, the freeze checklist, the suite guide and `AGENTS.md`):
 - After the box: words and tokens. A token is `key:value`, no spaces, bounded by spaces or the line's ends, key one
   of `on`, `due`, `done`, `every`, `from`. Any other `key:value` is words. The **text** is the line without its box
   and tokens, spaces collapsed; it is what `tick` and `carry` compare.
-- `on:`, `due:`, `done:` are `lifelog_meta.days` values. A line is planned on `on:`, else on `due:`; a line with
+- `on:`, `due:`, `done:` are `aminte_meta.days` values. A line is planned on `on:`, else on `due:`; a line with
   neither is listed only on its own page (an imported vault's lines stay where they are).
 - Each key at most once; `done:` only with `[x]`; `from:done` only with `every:`; `every:` only with a day. A line
   that breaks one is malformed: drawn with its raw text, never listed under a day, refused by `tick` with 422.
@@ -124,7 +124,7 @@ for a writer, the freeze checklist, the suite guide and `AGENTS.md`):
 | `entity_names_day_insert`, `entity_names_day_update` | a period-shaped key is reserved like a date: no alias, one spelling `upper(key)` (`2026-W43`) |
 | `entities_day_identity` | a period page is never renamed, never acquired through aliases, never filed |
 | `links_endpoint_types` | `part-of` refuses a period page on either end; `at` stays day-only (D16) |
-| `lifelog_meta` | a row `plans` with the grammar in one sentence; the `entities` comment names the four shapes; two rows in the 2075 table of the threat model |
+| `aminte_meta` | a row `plans` with the grammar in one sentence; the `entities` comment names the four shapes; two rows in the 2075 table of the threat model |
 
 A plain page titled `2026` or `1984` in a real file is adopted as the year page at the rebuild (before the freeze
 there is no migration, [D13](../decisions/D13-migrations-and-freeze.md)); one with an alias or a `part-of` link is
@@ -192,7 +192,7 @@ only path fields. Day fields go through `dayNamed` ("today"). Each returns the p
 `appended` / `to`); the browser's `back` returns to the view it came from. Handlers in a new `internal/api/plans.go`;
 `TestTheCatalogNamesNoRemovedFeature` rewritten to guard the removed features by their routes (`/tasks`,
 `/deadlines`), not by words. API.md: the three results, the `week` class, the `period` and `lines` properties.
-README table rows in catalog order. The CLI shortcut `lifelog plan TEXT… [--page T] [--on D] [--due D] [--every R]`
+README table rows in catalog order. The CLI shortcut `aminte plan TEXT… [--page T] [--on D] [--due D] [--every R]`
 (default page: today); `tick` and `carry` by `do`. Parity rows: plan on today makes the day page; plan on
 `2026-W43` makes the week page; tick with every appends the next line; tick with a changed text is 409; carry to a
 day sets `on:`; plan on `2027-W53` is the file's 422. MCP: `plan` joins the smoke list of the end-to-end test and
@@ -234,11 +234,11 @@ use ([non-goals](../architecture/non-goals.md)).
 
 **Shipped on 2026-10-19.** The owner ran each line. The live file was made with the DDL before `entities.period`,
 `entities.has_box` and `entities_plans`, and before the freeze there is no migration (D13), so a one-off program
-outside the git tree, `plan136-bin OLD.sql NEW.sql LIFE.db [--dry-run]` in `~/.local/share/lifelog-oneoff/plan136/`,
+outside the git tree, `plan136-bin OLD.sql NEW.sql LIFE.db [--dry-run]` in `~/.local/share/aminte-oneoff/plan136/`,
 made the change. It rewrote the stored text of `entities` (two virtual columns and two CHECKs; the record format did not
 change), the four triggers, the index and the meta row `periods`, in one transaction.
 
-1. `sudo -n systemctl stop lifelog.service`.
+1. `sudo -n systemctl stop aminte.service`.
 2. A snapshot, `/home/cico/life/snapshots/2026-10-19-plan-136/life-2026-10-19.db`: its restore check was clean.
 3. The dry run refused one page: a plain page titled `1984` (a book) was filed in `Books`, and D30 makes a four-digit
    title a year page, which is never filed. The owner wrote the page anew as `1984 (novel)` (id 2121, in `Books`, the
@@ -246,21 +246,21 @@ change), the four triggers, the index and the meta row `periods`, in one transac
 4. The real run committed. Page 643 is now a tombstoned year page, its day set to NULL. Every check held, also after
    the file was opened again: the file equals `schema.sql`, integrity ok, no row breaks the period CHECKs, and the plan of
    the pages with a box uses `entities_plans`.
-5. `lifelog-plan136 get /integrity`: ok, with no schema drift.
-6. The previous binary is kept as `~/.local/bin/lifelog.prev`, and the new one is installed at `~/.local/bin/lifelog`.
+5. `aminte-plan136 get /integrity`: ok, with no schema drift.
+6. The previous binary is kept as `~/.local/bin/aminte.prev`, and the new one is installed at `~/.local/bin/aminte`.
 7. The service started, and its log line reads:
-   `Oct 19 22:10:52 balaur lifelog[309025]: lifelog: serving /home/cico/dev/lifelogdb/life.db on http://127.0.0.1:7777 (public: token required; the token travels in clear, use a private network) (version 0.1.0, user_version 1)`.
+   `Oct 19 22:10:52 balaur aminte[309025]: aminte: serving /home/cico/dev/aminte/life.db on http://127.0.0.1:7777 (public: token required; the token travels in clear, use a private network) (version 0.1.0, user_version 1)`.
 
 ## Checks
 
 - Every step: `gofmt`, `go vet ./... && go test ./...`; step 1 also the suites and the mutant count; step 4 also
   `cd extensions/mcp && go vet ./... && go test ./...`; before the last commit `go test -count=1 -shuffle=on ./...`,
   `staticcheck ./...` and `govulncheck ./...`.
-- By hand on the review server: `lifelog plan "Call the bank" --due 2026-10-24`; Home lists it under Planned with
+- By hand on the review server: `aminte plan "Call the bank" --due 2026-10-24`; Home lists it under Planned with
   Done, Dropped and Carry; Done makes the body say `[x] … done:…`; `Pay rent due:2026-11-01 every:month` ticked
-  appends `due:2026-12-01`; a carry to tomorrow leaves `[>]` today and the copy tomorrow; `lifelog do plan
+  appends `due:2026-12-01`; a carry to tomorrow leaves `[>]` today and the copy tomorrow; `aminte do plan
   page=2026-W43 text=…` shows on `/weeks/2026-W43`; `plan page=2027-W53` is 422 naming `entities_period_exists`;
-  `lifelog mcp` lists `plan`, `tick` and `carry`.
+  `aminte mcp` lists `plan`, `tick` and `carry`.
 - Skills: step 1 `designing-data-intensive-applications`; steps 2 to 4 `a-philosophy-of-software-design` with
   `code-complete`; step 5 `refactoring` with `a-philosophy-of-software-design`.
 

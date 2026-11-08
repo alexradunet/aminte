@@ -2,7 +2,7 @@
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <link rel="manifest" href="/manifest.webmanifest"><link rel="icon" href="/assets/icon.svg" type="image/svg+xml">
 <meta name="theme-color" media="(prefers-color-scheme: light)" content="#efe2bd"><meta name="theme-color" media="(prefers-color-scheme: dark)" content="#140c06">
-<title>{{.Title}} · Lifelog</title>
+<title>{{.Title}} · Aminte</title>
 <style data-sheet="base">{{basecss}}</style>
 <style data-sheet="app">{{appcss}}</style>
 </head><body{{if .Shell}} data-ground="{{.Shell.Ground}}"{{end}}>
@@ -67,7 +67,7 @@
      (docs/plans/108-the-browser-made-current.md): a modal the rail's Search opens by its command, with the search
      form inside, so a page by its title or the words of a body is one key away; Escape or a tap outside closes it. */}}
 {{define "foot"}}</main>
-<footer><p>Lifelog, the one writer of <code>life.db</code>.</p>{{if .Shell}}<p class="keys"><small>Access keys, with the browser's modifier: <kbd>k</kbd> search · <kbd>n</kbd> new · <kbd>c</kbd> capture · <kbd>t</kbd> today · <kbd>[</kbd> <kbd>]</kbd> previous, next{{if .Shell.LockMinutes}} · <kbd>l</kbd> lock{{end}}</small></p>{{end}}</footer>
+<footer><p>Aminte, the one writer of <code>life.db</code>.</p>{{if .Shell}}<p class="keys"><small>Access keys, with the browser's modifier: <kbd>k</kbd> search · <kbd>n</kbd> new · <kbd>c</kbd> capture · <kbd>t</kbd> today · <kbd>[</kbd> <kbd>]</kbd> previous, next{{if .Shell.LockMinutes}} · <kbd>l</kbd> lock{{end}}</small></p>{{end}}</footer>
 </div>
 {{if .Shell}}<dialog class="palette" id="palette" closedby="any" aria-label="Search">
 <search><form method="GET" action="/search"><input type="search" name="q" autocomplete="off" aria-label="Search" placeholder="A page's title, or words of a body"></form></search>

@@ -11,10 +11,10 @@ import (
 	"regexp"
 	"testing"
 
-	"lifelog/client"
-	"lifelog/internal/api/apitest"
-	"lifelog/internal/core"
-	"lifelog/siren"
+	"aminte/client"
+	"aminte/internal/api/apitest"
+	"aminte/internal/core"
+	"aminte/siren"
 )
 
 // TestTheTwoTransportsGiveEqualAnswers is the conformance test of the client: the same requests, sent in process and
@@ -172,7 +172,7 @@ func TestOnlyTheRemoteClientUsesASocket(t *testing.T) {
 	}
 }
 
-// instant is an instant as SQLite writes it (lifelog_meta.instants).
+// instant is an instant as SQLite writes it (aminte_meta.instants).
 var instant = regexp.MustCompile(`"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z"`)
 
 // masked is the JSON of e with each instant replaced by the same mark.

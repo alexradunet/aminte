@@ -22,9 +22,9 @@ rules decide, instead of guessing from a marker of one application.
 
 ## Reproduce
 
-1. A source `Notes/` with `Journal/2031-04-11.md` and `photo.png`, no `.obsidian` folder; a workspace `Notes.lifelog`
+1. A source `Notes/` with `Journal/2031-04-11.md` and `photo.png`, no `.obsidian` folder; a workspace `Notes.aminte`
    with `rules.md` approved.
-2. `lifelog import status --workspace Notes.lifelog`: `do_now` is "Make the ledger (make-ledger), …".
+2. `aminte import status --workspace Notes.aminte`: `do_now` is "Make the ledger (make-ledger), …".
 3. Add an empty `Notes/.obsidian/` folder; *status* now says "Plan the vault (plan-vault), …".
 
 ## Rules involved

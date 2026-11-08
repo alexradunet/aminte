@@ -104,7 +104,7 @@ func (s *Store) OpenLines(ctx context.Context, byPage bool, limit, offset int) (
   same commit.
 - Tests in `internal/api/plans_test.go`: the class and the order of the rows for both orders; `order=week` and
   `limit=0` are 422; `next` and `prev` with `limit=1`; a tick posted with `back=/plans` answers 303 to `/plans`.
-- Parity (`cmd/lifelog/parity_test.go`): `do plan page=Project text=Call` with no day, then `do plans` lists it
+- Parity (`cmd/aminte/parity_test.go`): `do plan page=Project text=Call` with no day, then `do plans` lists it
   with `title` Project. MCP (`extensions/mcp/e2e_test.go`): the tool `plans` is present and its answer lists a line
   that the test planned.
 

@@ -18,8 +18,8 @@ import (
 	"testing"
 	"time"
 
-	"lifelog/client"
-	"lifelog/siren"
+	"aminte/client"
+	"aminte/siren"
 )
 
 const owner = "40712345678"
@@ -144,7 +144,7 @@ func (f *fakeAPI) ownerSaysElsewhere(day, text string) {
 func (f *fakeAPI) agentReplies(day, text string) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.appendTo(day, "**lifelog** (09:31): "+text)
+	f.appendTo(day, "**aminte** (09:31): "+text)
 }
 
 // edit replaces the body of a page, as a save-body of another surface would.
@@ -172,7 +172,7 @@ func (f *fakeAPI) body(day string) string {
 	return f.bodies[day]
 }
 
-var marker = regexp.MustCompile(`^\*\*(Owner|lifelog)\*\* \((\d\d:\d\d)(?:, via ([a-z0-9_:.-]+))?\): ?`)
+var marker = regexp.MustCompile(`^\*\*(Owner|aminte)\*\* \((\d\d:\d\d)(?:, via ([a-z0-9_:.-]+))?\): ?`)
 
 // fakeTurn is a turn of a page as the fake API reads it.
 type fakeTurn struct{ who, at, via, text, key string }
@@ -188,8 +188,8 @@ func turnsOf(day, body string) []*fakeTurn {
 		switch {
 		case m != nil:
 			who := "owner"
-			if m[1] == "lifelog" {
-				who = "lifelog"
+			if m[1] == "aminte" {
+				who = "aminte"
 			}
 			turns = append(turns, &fakeTurn{who: who, at: m[2], via: m[3], text: para[len(m[0]):]})
 		case strings.HasPrefix(para, "[["+day+"]]"), strings.HasPrefix(para, "- `"):

@@ -1,4 +1,4 @@
-module lifelog
+module aminte
 
 go 1.27.2
 

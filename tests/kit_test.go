@@ -20,15 +20,15 @@ import (
 	"strings"
 	"sync"
 
-	"lifelog/internal/core"
-	"lifelog/internal/db"
-	"lifelog/internal/photo/phototest"
-	"lifelog/text"
+	"aminte/internal/core"
+	"aminte/internal/db"
+	"aminte/internal/photo/phototest"
+	"aminte/text"
 
 	_ "modernc.org/sqlite"
 )
 
-// NOW is the instant format of lifelog_meta.instants.
+// NOW is the instant format of aminte_meta.instants.
 const NOW = "strftime('%Y-%m-%dT%H:%M:%fZ','now')"
 
 var (

@@ -179,8 +179,8 @@ func TestOnlyTheOwnerWritesTheBodyOfAConversationPage(t *testing.T) {
 		}
 	}
 	// The two writes of turns pass for an agent.
-	if _, _, err := s.EditBody(ctx, "agent:lifelog", title, func(b string) (string, error) { return b + "\n\n**lifelog** (09:01): Hi", nil }); err != nil {
-		t.Errorf("EditBody (reply) as agent:lifelog: %v, want it allowed", err)
+	if _, _, err := s.EditBody(ctx, "agent:aminte", title, func(b string) (string, error) { return b + "\n\n**aminte** (09:01): Hi", nil }); err != nil {
+		t.Errorf("EditBody (reply) as agent:aminte: %v, want it allowed", err)
 	}
 	if _, _, err := s.AppendParagraph(ctx, "agent:mcp", title, "2031-05-14", "Conversations", "[[2031-05-14]]", turn); err != nil {
 		t.Errorf("AppendParagraph (say) as agent:mcp: %v, want it allowed", err)

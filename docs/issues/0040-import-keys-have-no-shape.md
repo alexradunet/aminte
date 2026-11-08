@@ -28,7 +28,7 @@ whose note contains `char(0)`: all succeed.
 
 ## Rules involved
 
-[`lifelog_meta.source`](../schema/schema.sql) (`import_key` is unique per source), [imports](../contract/imports.md)
+[`aminte_meta.source`](../schema/schema.sql) (`import_key` is unique per source), [imports](../contract/imports.md)
 steps 3 and 4, [import a row once](../cookbook/import-a-row-once.md), [titles and wikilinks](../contract/titles-and-wikilinks.md)
 (the 240-byte limit that names share) and [issue 0022](0022-nul-suffixes-bypass-text-checks.md) (NUL in constrained
 text).

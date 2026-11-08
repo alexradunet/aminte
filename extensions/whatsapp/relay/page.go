@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"lifelog/siren"
+	"aminte/siren"
 )
 
 // page is the conversation of a day as the relay read it: the answer of GET /days/{day}/conversation. The relay keeps
@@ -16,7 +16,7 @@ type page struct {
 	turns []turn
 }
 
-// turn is one turn of the page, as the API parsed it: who is owner, lifelog or text, and via names the relay that
+// turn is one turn of the page, as the API parsed it: who is owner, aminte or text, and via names the relay that
 // carried the turn of the owner. The key is the name that the API gives the turn. It tells the turn again at the next
 // look, wherever it stands on the page: it does not move when a reply is written, when the owner says a new turn or when
 // an earlier turn is removed, and no two turns of one page have the same key. It changes when the owner edits the

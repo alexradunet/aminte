@@ -12,12 +12,12 @@ import (
 	"testing"
 	"time"
 
-	"lifelog/client"
-	"lifelog/internal/api"
-	"lifelog/internal/api/apitest"
-	"lifelog/internal/core"
-	"lifelog/internal/db/dbtest"
-	"lifelog/siren"
+	"aminte/client"
+	"aminte/internal/api"
+	"aminte/internal/api/apitest"
+	"aminte/internal/core"
+	"aminte/internal/db/dbtest"
+	"aminte/siren"
 )
 
 // The owner's snapshot action, from any client; refused to an agent.

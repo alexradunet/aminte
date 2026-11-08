@@ -7,9 +7,9 @@ import (
 	"strings"
 	"testing"
 
-	"lifelog/client"
-	"lifelog/internal/api/apitest"
-	"lifelog/siren"
+	"aminte/client"
+	"aminte/internal/api/apitest"
+	"aminte/siren"
 )
 
 // TestANewPersonWithTheTitleOfAPlainPageOffersToPromoteIt: the answer 409 links to the page that holds the title (rel

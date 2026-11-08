@@ -15,9 +15,9 @@ import (
 	"testing"
 	"time"
 
-	"lifelog/app"
-	"lifelog/client"
-	"lifelog/siren"
+	"aminte/app"
+	"aminte/client"
+	"aminte/siren"
 )
 
 // userOf is the user message of a model request: the conversation page.
@@ -69,7 +69,7 @@ func TestATurnOfTheOwnerGetsItsToolLinesAndItsReplyOnThePageInOneReply(t *testin
 	r.api.say("I walked by the river")
 	r.poll(t)
 	got := r.api.waitReplies(t, todayTitle, 1)
-	want := "[[2031-05-20]]\n\n**Owner** (09:30): I walked by the river\n\n- `capture` → [/days/2031-05-20/capture](/days/2031-05-20/capture)\n\n**lifelog** (09:30): Written to today."
+	want := "[[2031-05-20]]\n\n**Owner** (09:30): I walked by the river\n\n- `capture` → [/days/2031-05-20/capture](/days/2031-05-20/capture)\n\n**aminte** (09:30): Written to today."
 	if got != want {
 		t.Errorf("page body\n%q\nwant\n%q", got, want)
 	}
@@ -93,11 +93,11 @@ func TestATurnOfTheOwnerGetsItsToolLinesAndItsReplyOnThePageInOneReply(t *testin
 		t.Fatalf("the keys of the owner turns are %q", keys)
 	}
 	wantForm := url.Values{"turn": {keys[0]}, "text": {"Written to today."}, "tools": {"- `capture` → [/days/2031-05-20/capture](/days/2031-05-20/capture)"}}
-	if q.Path != "/days/2031-05-20/reply" || q.Source != "agent:lifelog" || !maps.EqualFunc(q.Form, wantForm, slices.Equal) {
-		t.Errorf("reply request %+v, want the path /days/2031-05-20/reply, the source agent:lifelog and the form %v", q, wantForm)
+	if q.Path != "/days/2031-05-20/reply" || q.Source != "agent:aminte" || !maps.EqualFunc(q.Form, wantForm, slices.Equal) {
+		t.Errorf("reply request %+v, want the path /days/2031-05-20/reply, the source agent:aminte and the form %v", q, wantForm)
 	}
 	w := r.api.writes()
-	if len(w) != 1 || w[0].Path != "/days/2031-05-20/capture" || w[0].Source != "agent:lifelog" || !strings.Contains(w[0].Body, "text=Walked+by+the+river.") {
+	if len(w) != 1 || w[0].Path != "/days/2031-05-20/capture" || w[0].Source != "agent:aminte" || !strings.Contains(w[0].Body, "text=Walked+by+the+river.") {
 		t.Errorf("writes %+v", w)
 	}
 	reqs := r.mod.requests()
@@ -141,8 +141,8 @@ func TestTheSettingsAreReadAtEveryTurnWithTheOwnersTokenAndNoSourceAndEveryOther
 			}
 			continue
 		}
-		if q.Source != "agent:lifelog" {
-			t.Errorf("request %+v, want the source agent:lifelog", q)
+		if q.Source != "agent:aminte" {
+			t.Errorf("request %+v, want the source agent:aminte", q)
 		}
 		if q.Method != "GET" {
 			writes++
@@ -160,7 +160,7 @@ func TestATurnWithNoModelGivesOneLineOnThePageAndTheAgentGoesOn(t *testing.T) {
 	r.api.say("hello")
 	r.poll(t)
 	const want = "No model is set: open Settings."
-	if body := r.api.waitReplies(t, todayTitle, 1); !strings.HasSuffix(body, "**lifelog** (09:30): "+want) {
+	if body := r.api.waitReplies(t, todayTitle, 1); !strings.HasSuffix(body, "**aminte** (09:30): "+want) {
 		t.Errorf("page body %q", body)
 	}
 	if n := len(r.mod.requests()); n != 0 {
@@ -169,7 +169,7 @@ func TestATurnWithNoModelGivesOneLineOnThePageAndTheAgentGoesOn(t *testing.T) {
 	r.api.setModel(url, "test-model", "")
 	r.api.say("again")
 	r.poll(t)
-	if body := r.api.waitReplies(t, todayTitle, 2); !strings.HasSuffix(body, "**lifelog** (09:30): answer") {
+	if body := r.api.waitReplies(t, todayTitle, 2); !strings.HasSuffix(body, "**aminte** (09:30): answer") {
 		t.Errorf("page body after the model was set: %q", body)
 	}
 }
@@ -238,7 +238,7 @@ func TestABadToolCallIsAnErrorForTheModelNotACrash(t *testing.T) {
 	r.api.say("x")
 	r.poll(t)
 	body := r.api.waitReplies(t, todayTitle, 1)
-	if !strings.HasSuffix(body, "**lifelog** (09:30): done") {
+	if !strings.HasSuffix(body, "**aminte** (09:30): done") {
 		t.Errorf("page body %q", body)
 	}
 	reqs := r.mod.requests()
@@ -272,7 +272,7 @@ func TestTheStepBoundGivesTheLastTextOfTheModel(t *testing.T) {
 	})
 	r.api.say("loop")
 	r.poll(t)
-	if body := r.api.waitReplies(t, todayTitle, 1); !strings.HasSuffix(body, "**lifelog** (09:30): working on it") {
+	if body := r.api.waitReplies(t, todayTitle, 1); !strings.HasSuffix(body, "**aminte** (09:30): working on it") {
 		t.Errorf("page body %q", body)
 	}
 }
@@ -282,7 +282,7 @@ func TestAModelErrorGivesTheFailedReplyOnThePage(t *testing.T) {
 	r.api.say("hi")
 	r.poll(t)
 	body := r.api.waitReplies(t, todayTitle, 1)
-	_, got, _ := strings.Cut(body, "**lifelog** (09:30): ")
+	_, got, _ := strings.Cut(body, "**aminte** (09:30): ")
 	if !strings.HasPrefix(got, "The model failed: ") || !strings.Contains(got, "503") || !strings.Contains(got, "overloaded") || strings.Contains(got, "more") || !strings.HasSuffix(got, ".") {
 		t.Errorf("reply %q", got)
 	}
@@ -295,7 +295,7 @@ func TestTwoTurnsBeforeALookAreAnsweredByOneReplyThatSeesBoth(t *testing.T) {
 	r := startOn(t, func(n int, req chatReq) (int, string) { return text(fmt.Sprintf("answer %d", n)) }, api, fixedNow)
 	body := api.waitReplies(t, todayTitle, 1)
 	r.settle(t)
-	want := "[[2031-05-20]]\n\n**Owner** (09:30): first\n\n**Owner** (09:30): second\n\n**lifelog** (09:30): answer 1"
+	want := "[[2031-05-20]]\n\n**Owner** (09:30): first\n\n**Owner** (09:30): second\n\n**aminte** (09:30): answer 1"
 	if body != want || api.body(todayTitle) != want {
 		t.Errorf("page body %q, want %q", api.body(todayTitle), want)
 	}
@@ -316,7 +316,7 @@ func TestTheSecondTurnSeesTheFirstReplyOnThePage(t *testing.T) {
 	r.api.say("second")
 	r.poll(t)
 	r.api.waitReplies(t, todayTitle, 2)
-	want := "[[2031-05-20]]\n\n**Owner** (09:30): first\n\n**lifelog** (09:30): answer 1\n\n**Owner** (09:30): second"
+	want := "[[2031-05-20]]\n\n**Owner** (09:30): first\n\n**aminte** (09:30): answer 1\n\n**Owner** (09:30): second"
 	if got := userOf(r.mod.requests()[1]); got != want {
 		t.Errorf("second user message\n%q\nwant\n%q", got, want)
 	}
@@ -332,7 +332,7 @@ func TestATurnIsAnsweredOnce(t *testing.T) {
 	if n := len(r.mod.requests()); n != 1 {
 		t.Errorf("%d model requests, want 1", n)
 	}
-	if body := r.api.body(todayTitle); strings.Count(body, "**lifelog** (") != 1 {
+	if body := r.api.body(todayTitle); strings.Count(body, "**aminte** (") != 1 {
 		t.Errorf("page body %q", body)
 	}
 }
@@ -351,7 +351,7 @@ func TestTextThatAnEditAddsAfterAReplyIsPartOfThatReply(t *testing.T) {
 	if n := len(r.mod.requests()); n != 1 {
 		t.Errorf("%d model requests, want 1: an edit is not a turn", n)
 	}
-	if body := r.api.body(todayTitle); strings.Count(body, "**lifelog** (") != 1 || !strings.HasSuffix(body, "From the web: what did I do?") {
+	if body := r.api.body(todayTitle); strings.Count(body, "**aminte** (") != 1 || !strings.HasSuffix(body, "From the web: what did I do?") {
 		t.Errorf("page body %q", body)
 	}
 }
@@ -368,7 +368,7 @@ func TestAMarkerLineThatTheOwnerTypesInAnEditIsATurnOfTheOwner(t *testing.T) {
 	r.poll(t)
 	body := r.api.waitReplies(t, todayTitle, 2)
 	r.settle(t)
-	if want := "[[2031-05-20]]\n\n**Owner** (09:30): hi\n\n**lifelog** (09:30): answer 1\n\n**Owner** (10:00): and one more thing\n\n**lifelog** (09:30): answer 2"; body != want {
+	if want := "[[2031-05-20]]\n\n**Owner** (09:30): hi\n\n**aminte** (09:30): answer 1\n\n**Owner** (10:00): and one more thing\n\n**aminte** (09:30): answer 2"; body != want {
 		t.Errorf("page body\n%q\nwant\n%q", body, want)
 	}
 	if n := len(r.mod.requests()); n != 2 {
@@ -397,7 +397,7 @@ func TestAPageWithAWaitingTurnIsAnsweredAtTheStartAndAnAnsweredPageIsNot(t *test
 	if n := len(r.mod.requests()); n != 1 {
 		t.Errorf("%d model requests, want 1", n)
 	}
-	if body := api.body(todayTitle); !strings.HasSuffix(body, "**lifelog** (09:30): answer 1") {
+	if body := api.body(todayTitle); !strings.HasSuffix(body, "**aminte** (09:30): answer 1") {
 		t.Errorf("page body %q", body)
 	}
 	// The same page, now answered, with a new agent: a restart answers nothing.
@@ -409,10 +409,10 @@ func TestAPageWithAWaitingTurnIsAnsweredAtTheStartAndAnAnsweredPageIsNot(t *test
 	api.say("two")
 	r2.poll(t)
 	body := api.waitReplies(t, todayTitle, 2)
-	if got := userOf(r2.mod.requests()[0]); !strings.Contains(got, "**lifelog** (09:30): answer 1") || !strings.HasSuffix(got, "**Owner** (09:30): two") {
+	if got := userOf(r2.mod.requests()[0]); !strings.Contains(got, "**aminte** (09:30): answer 1") || !strings.HasSuffix(got, "**Owner** (09:30): two") {
 		t.Errorf("the restarted agent lost the thread: %q", got)
 	}
-	if strings.Count(body, "**lifelog** (") != 2 {
+	if strings.Count(body, "**aminte** (") != 2 {
 		t.Errorf("page body %q", body)
 	}
 }
@@ -424,7 +424,7 @@ func TestABodyThatABrowserSavedWithCRLFIsReadWithLFAndTheReplyGoesAfterIt(t *tes
 	api.add(todayTitle, "[[2031-05-20]]\r\n\r\n**Owner** (08:15): said in the browser\r\n\r\nand more")
 	r := startOn(t, func(n int, _ chatReq) (int, string) { return text("answer") }, api, fixedNow)
 	body := api.waitReplies(t, todayTitle, 1)
-	want := "[[2031-05-20]]\n\n**Owner** (08:15): said in the browser\n\nand more\n\n**lifelog** (09:30): answer"
+	want := "[[2031-05-20]]\n\n**Owner** (08:15): said in the browser\n\nand more\n\n**aminte** (09:30): answer"
 	if body != want {
 		t.Errorf("page body %q, want %q", body, want)
 	}
@@ -450,7 +450,7 @@ func TestTextThatTheOwnerAddsToTheAnsweredTurnWhileTheModelRunsIsAnsweredByASeco
 	r.poll(t) // the first look is done: its reply was refused
 	body := api.waitReplies(t, todayTitle, 1)
 	r.settle(t)
-	want := "[[2031-05-20]]\n\n**Owner** (09:30): hello\n\nAdded on the web.\n\n**lifelog** (09:30): noted 2"
+	want := "[[2031-05-20]]\n\n**Owner** (09:30): hello\n\nAdded on the web.\n\n**aminte** (09:30): noted 2"
 	if body != want {
 		t.Errorf("page body\n%q\nwant\n%q", body, want)
 	}
@@ -470,11 +470,11 @@ func TestTheOwnerSaysMoreWhileTheModelRunsAndTheReplyGoesBeforeThatTurn(t *testi
 		}
 		return text(fmt.Sprintf("answer %d", n))
 	}, api, fixedNow)
-	mid := "[[2031-05-20]]\n\n**Owner** (09:30): first\n\n**lifelog** (09:30): answer 1\n\n**Owner** (09:30): second"
+	mid := "[[2031-05-20]]\n\n**Owner** (09:30): first\n\n**aminte** (09:30): answer 1\n\n**Owner** (09:30): second"
 	api.waitBody(t, todayTitle, func(body string) bool { return body == mid })
 	r.poll(t)
 	body := api.waitReplies(t, todayTitle, 2)
-	if want := mid + "\n\n**lifelog** (09:30): answer 2"; body != want {
+	if want := mid + "\n\n**aminte** (09:30): answer 2"; body != want {
 		t.Errorf("page body\n%q\nwant\n%q", body, want)
 	}
 	reqs := r.mod.requests()
@@ -491,7 +491,7 @@ func TestTheOwnerSaysMoreWhileTheModelRunsAndTheReplyGoesBeforeThatTurn(t *testi
 // of the answered turn, so the reply does not go behind the new turn, and the new turn waits for its own reply.
 func TestAnEditOfAnEarlierTurnAndANewTurnWhileTheModelRunsAreBothAnswered(t *testing.T) {
 	api := &fakeAPI{}
-	api.add(todayTitle, "[[2031-05-20]]\n\n**Owner** (09:30): frist\n\n**lifelog** (09:30): answer 0\n\n**Owner** (09:30): second")
+	api.add(todayTitle, "[[2031-05-20]]\n\n**Owner** (09:30): frist\n\n**aminte** (09:30): answer 0\n\n**Owner** (09:30): second")
 	r := startOn(t, func(n int, _ chatReq) (int, string) {
 		if n == 1 {
 			api.edit(todayTitle, strings.Replace(api.body(todayTitle), "frist", "first", 1))
@@ -502,7 +502,7 @@ func TestAnEditOfAnEarlierTurnAndANewTurnWhileTheModelRunsAreBothAnswered(t *tes
 	api.waitBody(t, todayTitle, func(body string) bool { return strings.Contains(body, "answer 1") })
 	r.poll(t)
 	body := api.waitReplies(t, todayTitle, 3)
-	want := "[[2031-05-20]]\n\n**Owner** (09:30): first\n\n**lifelog** (09:30): answer 0\n\n**Owner** (09:30): second\n\n**lifelog** (09:30): answer 1\n\n**Owner** (09:30): third\n\n**lifelog** (09:30): answer 2"
+	want := "[[2031-05-20]]\n\n**Owner** (09:30): first\n\n**aminte** (09:30): answer 0\n\n**Owner** (09:30): second\n\n**aminte** (09:30): answer 1\n\n**Owner** (09:30): third\n\n**aminte** (09:30): answer 2"
 	if body != want {
 		t.Errorf("page body\n%q\nwant\n%q", body, want)
 	}
@@ -517,10 +517,10 @@ func TestAnEditOfAnEarlierTurnAndANewTurnWhileTheModelRunsAreBothAnswered(t *tes
 // stays the last turn of the page and is answered by the next run.
 func TestAnEditThatRemovesAnEarlierExchangeWhileTheModelRunsDoesNotMoveTheReply(t *testing.T) {
 	api := &fakeAPI{}
-	api.add(todayTitle, "[[2031-05-20]]\n\n**Owner** (09:30): a\n\n**lifelog** (09:30): ra\n\n**Owner** (09:30): b\n\n**lifelog** (09:30): rb\n\n**Owner** (09:30): c")
+	api.add(todayTitle, "[[2031-05-20]]\n\n**Owner** (09:30): a\n\n**aminte** (09:30): ra\n\n**Owner** (09:30): b\n\n**aminte** (09:30): rb\n\n**Owner** (09:30): c")
 	r := startOn(t, func(n int, _ chatReq) (int, string) {
 		if n == 1 {
-			api.edit(todayTitle, "[[2031-05-20]]\n\n**Owner** (09:30): b\n\n**lifelog** (09:30): rb\n\n**Owner** (09:30): c")
+			api.edit(todayTitle, "[[2031-05-20]]\n\n**Owner** (09:30): b\n\n**aminte** (09:30): rb\n\n**Owner** (09:30): c")
 			api.say("d")
 		}
 		return text(fmt.Sprintf("answer %d", n))
@@ -528,7 +528,7 @@ func TestAnEditThatRemovesAnEarlierExchangeWhileTheModelRunsDoesNotMoveTheReply(
 	api.waitBody(t, todayTitle, func(body string) bool { return strings.Contains(body, "answer 1") })
 	r.poll(t)
 	body := api.waitReplies(t, todayTitle, 3)
-	want := "[[2031-05-20]]\n\n**Owner** (09:30): b\n\n**lifelog** (09:30): rb\n\n**Owner** (09:30): c\n\n**lifelog** (09:30): answer 1\n\n**Owner** (09:30): d\n\n**lifelog** (09:30): answer 2"
+	want := "[[2031-05-20]]\n\n**Owner** (09:30): b\n\n**aminte** (09:30): rb\n\n**Owner** (09:30): c\n\n**aminte** (09:30): answer 1\n\n**Owner** (09:30): d\n\n**aminte** (09:30): answer 2"
 	if body != want {
 		t.Errorf("page body\n%q\nwant\n%q", body, want)
 	}
@@ -554,7 +554,7 @@ func TestAnEditOfTheAnsweredTurnWhileTheModelRunsMakesTheReplyAConflictAndTheCha
 	r.poll(t)                                                                                      // the first look is done: its reply was refused
 	body := api.waitReplies(t, todayTitle, 1)
 	r.settle(t)
-	if want := "[[2031-05-20]]\n\n**Owner** (09:30): first\n\n**lifelog** (09:30): answer 2"; body != want {
+	if want := "[[2031-05-20]]\n\n**Owner** (09:30): first\n\n**aminte** (09:30): answer 2"; body != want {
 		t.Errorf("page body\n%q\nwant\n%q", body, want)
 	}
 	reqs := r.mod.requests()
@@ -585,7 +585,7 @@ func TestAReplyToATurnThatHasAReplyAlreadyEndsTheTurnWithOneLogLine(t *testing.T
 	if n := len(r.mod.requests()); n != 1 {
 		t.Errorf("%d model requests, want 1: the turn is not run again", n)
 	}
-	if want := "[[2031-05-20]]\n\n**Owner** (09:30): hello\n\n**lifelog** (09:30): the answer of another writer"; api.body(todayTitle) != want {
+	if want := "[[2031-05-20]]\n\n**Owner** (09:30): hello\n\n**aminte** (09:30): the answer of another writer"; api.body(todayTitle) != want {
 		t.Errorf("page body %q, want %q: the refused reply wrote nothing", api.body(todayTitle), want)
 	}
 	if keys, got := api.keysOf("owner", today), turnsReplied(api); len(keys) != 1 || !slices.Equal(got, keys) {
@@ -597,7 +597,7 @@ func TestAReplyToATurnThatHasAReplyAlreadyEndsTheTurnWithOneLogLine(t *testing.T
 }
 
 // TestAModelReplyThatHoldsAnOwnerMarkerLineGivesOneModelRequest: a model that copies the format of the page writes a line
-// that reads as a turn of the owner. The core escapes it, so the page ends with the turn of lifelog, and the agent does
+// that reads as a turn of the owner. The core escapes it, so the page ends with the turn of aminte, and the agent does
 // not answer its own reply.
 func TestAModelReplyThatHoldsAnOwnerMarkerLineGivesOneModelRequest(t *testing.T) {
 	r := start(t, func(n int, _ chatReq) (int, string) {
@@ -633,7 +633,7 @@ func TestAReplyThatCannotBeWrittenIsNotRunAgainUntilThePageChanges(t *testing.T)
 	if lines := r.log.lines("reply was refused or failed"); len(lines) != 1 {
 		t.Errorf("%d log lines about the failure %q, want 1", len(lines), lines)
 	}
-	if body := api.body(todayTitle); strings.Contains(body, "**lifelog**") {
+	if body := api.body(todayTitle); strings.Contains(body, "**aminte**") {
 		t.Errorf("a reply that could not be saved is on the page: %q", body)
 	}
 	api.setReplyFails(false)
@@ -654,7 +654,7 @@ func TestATurnSaidBeforeMidnightIsAnsweredOnItsOwnPageAtTheFirstLookOfTheNewDay(
 	after := time.Date(2031, 5, 21, 0, 0, 30, 0, time.UTC)
 	r := startOn(t, func(n int, _ chatReq) (int, string) { return text(fmt.Sprintf("answer %d", n)) }, api, after)
 	body := api.waitReplies(t, todayTitle, 1)
-	if !strings.HasSuffix(body, "**Owner** (23:59): good night\n\n**lifelog** (00:00): answer 1") {
+	if !strings.HasSuffix(body, "**Owner** (23:59): good night\n\n**aminte** (00:00): answer 1") {
 		t.Errorf("yesterday's page %q", body)
 	}
 	keys := api.keysOf("owner", "2031-05-20")
@@ -675,7 +675,7 @@ func TestATurnSaidBeforeMidnightIsAnsweredOnItsOwnPageAtTheFirstLookOfTheNewDay(
 	if n := len(r.mod.requests()); n != 2 {
 		t.Errorf("%d model requests, want 2", n)
 	}
-	if body := api.body(todayTitle); strings.Count(body, "**lifelog** (") != 1 {
+	if body := api.body(todayTitle); strings.Count(body, "**aminte** (") != 1 {
 		t.Errorf("yesterday's page was written again: %q", body)
 	}
 }
@@ -698,7 +698,7 @@ func TestAnEditOfATurnOfYesterdayWhileTheModelRunsIsAnsweredAtALaterLook(t *test
 	api.waitBody(t, todayTitle, func(body string) bool { return strings.Contains(body, "night") }) // the edit is made in the run
 	r.poll(t)                                                                                      // the first look is done: its reply was refused
 	body := api.waitReplies(t, todayTitle, 1)
-	if want := "[[2031-05-20]]\n\n**Owner** (23:59): good night\n\n**lifelog** (00:00): answer 2"; body != want {
+	if want := "[[2031-05-20]]\n\n**Owner** (23:59): good night\n\n**aminte** (00:00): answer 2"; body != want {
 		t.Errorf("page body\n%q\nwant\n%q", body, want)
 	}
 	if n := len(r.mod.requests()); n != 2 {
@@ -745,7 +745,7 @@ func TestATurnOfYesterdayThatTheCoreRefusedIsReadAgainButNotRunAgainAndDoesNotBl
 	api.edit(todayTitle, strings.Replace(api.body(todayTitle), "good night", "good night!", 1))
 	r.poll(t)
 	body := api.waitReplies(t, todayTitle, 1)
-	if want := "[[2031-05-20]]\n\n**Owner** (23:59): good night!\n\n**lifelog** (00:00): answer 3"; body != want {
+	if want := "[[2031-05-20]]\n\n**Owner** (23:59): good night!\n\n**aminte** (00:00): answer 3"; body != want {
 		t.Errorf("page body\n%q\nwant\n%q: the edit of the turn that waits makes the agent answer it", body, want)
 	}
 }
@@ -799,7 +799,7 @@ func TestACancelledContextEndsTheTurnAndWritesNoReply(t *testing.T) {
 	case <-time.After(wait):
 		t.Fatal("Run did not return after the cancel")
 	}
-	if body := r.api.body(todayTitle); strings.Contains(body, "**lifelog**") {
+	if body := r.api.body(todayTitle); strings.Contains(body, "**aminte**") {
 		t.Errorf("a cancelled turn wrote a reply: %q", body)
 	}
 }
@@ -833,7 +833,7 @@ func TestTheModelCannotReadTheKeyThroughGet(t *testing.T) {
 	}
 	// The model server still got the key as its credential: that is the one use of it.
 	for _, q := range r.api.requests() {
-		if q.Path == "/settings" && q.Source == "agent:lifelog" && q.Method == "GET" {
+		if q.Path == "/settings" && q.Source == "agent:aminte" && q.Method == "GET" {
 			return
 		}
 	}
@@ -935,7 +935,7 @@ func TestAReplyThatFailsWithABusyCoreIsSentAgainAndTheModelRunsOnce(t *testing.T
 	}, api, fixedNow)
 	body := api.waitReplies(t, todayTitle, 1)
 	r.settle(t)
-	if want := "[[2031-05-20]]\n\n**Owner** (09:30): hello\n\n- `capture` → [/days/2031-05-20/capture](/days/2031-05-20/capture)\n\n**lifelog** (09:30): done"; body != want {
+	if want := "[[2031-05-20]]\n\n**Owner** (09:30): hello\n\n- `capture` → [/days/2031-05-20/capture](/days/2031-05-20/capture)\n\n**aminte** (09:30): done"; body != want {
 		t.Errorf("page body\n%q\nwant\n%q: the tool line and the reply are on the page", body, want)
 	}
 	if n := len(r.mod.requests()); n != 2 { // the tool call and the text: one run
@@ -966,7 +966,7 @@ func TestAReplyWhoseAnswerWasLostIsNotAnsweredTwice(t *testing.T) {
 	body := api.waitReplies(t, todayTitle, 1)
 	r.settle(t)
 	r.settle(t)
-	if want := "[[2031-05-20]]\n\n**Owner** (09:30): hello\n\n**lifelog** (09:30): answer 1"; body != want || api.body(todayTitle) != want {
+	if want := "[[2031-05-20]]\n\n**Owner** (09:30): hello\n\n**aminte** (09:30): answer 1"; body != want || api.body(todayTitle) != want {
 		t.Errorf("page body %q, want %q", api.body(todayTitle), want)
 	}
 	if n := len(r.mod.requests()); n != 1 {
@@ -1005,7 +1005,7 @@ func TestAConflictOnASecondSendIsAnAnswerOnlyWhenAnEarlierSendMayHaveBeenWritten
 			api.waitReplyRequests(t, 2) // the failed send, and the send that the edit makes a conflict
 			r.settle(t)
 			r.settle(t)
-			if want := "[[2031-05-20]]\n\n**Owner** (09:30): first\n\n**lifelog** (09:30): answer 2"; api.body(todayTitle) != want {
+			if want := "[[2031-05-20]]\n\n**Owner** (09:30): first\n\n**aminte** (09:30): answer 2"; api.body(todayTitle) != want {
 				t.Errorf("page body\n%q\nwant\n%q: one reply, to the turn as the owner edited it", api.body(todayTitle), want)
 			}
 			if n := len(r.mod.requests()); n != 2 {
@@ -1105,12 +1105,12 @@ func TestAToolLineIsOneLine(t *testing.T) {
 		"- `get` failed: bad code\n" +
 		"- `get` → [/pages/1 2](/pages/1 2)\n" +
 		"- `capture' → [/pages/1](/pages/1) '` failed: unknown tool\n\n" +
-		"**lifelog** (09:30): Here is my answer."
+		"**aminte** (09:30): Here is my answer."
 	if body != want {
 		t.Errorf("page body\n%q\nwant\n%q", body, want)
 	}
 	// The way the API and a chat read the line: one name, the words "failed: unknown tool", and no address.
-	last := body[strings.LastIndex(body, "\n- `")+1 : strings.Index(body, "\n\n**lifelog**")]
+	last := body[strings.LastIndex(body, "\n- `")+1 : strings.Index(body, "\n\n**aminte**")]
 	if got := siren.ToolLine(last); got.Name != strings.ReplaceAll(forged, "`", "'") || got.Words != "failed: unknown tool" || got.Href != "" {
 		t.Errorf("siren.ToolLine(%q) = %+v, want the whole name of the tool, the words of the failure and no address", last, got)
 	}

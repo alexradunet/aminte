@@ -24,7 +24,7 @@
 {{template "menu-dialogs" $menu}}
 </header>
 <section class="thread" aria-label="Conversation of {{$.Date $p.day}}">
-{{if $turns}}{{template "thread" (dict "v" $ "turns" $turns "day" $p.day)}}{{else if .Action "say"}}<div class="turns"><p class="empty">Nothing is said on this day yet. Write to the agent below. It answers here when it runs: start it with <code>lifelog serve --with agent</code>.</p></div>{{else}}<div class="turns"><p class="empty">Nothing was said on this day.</p></div>{{end}}
+{{if $turns}}{{template "thread" (dict "v" $ "turns" $turns "day" $p.day)}}{{else if .Action "say"}}<div class="turns"><p class="empty">Nothing is said on this day yet. Write to the agent below. It answers here when it runs: start it with <code>aminte serve --with agent</code>.</p></div>{{else}}<div class="turns"><p class="empty">Nothing was said on this day.</p></div>{{end}}
 </section>
 {{with .Action "say"}}<footer class="composer">{{template "form" (form . "button" "Say" "class" "chat-form" "plain" "1" "send" "1" "back" $.ReturnHere)}}
 <p class="hint"><kbd>Enter</kbd> sends · <kbd>Shift</kbd>+<kbd>Enter</kbd> a new line</p></footer>{{end}}
@@ -42,11 +42,11 @@
 {{define "thread"}}{{$v := .v}}<ol class="turns">
 {{with .day}}<li class="datesep">{{$v.LongDate .}}</li>{{end}}
 {{range .turns}}{{if eq .Who "text"}}<li class="turn text"><p class="free">{{.Text}}</p></li>
-{{else}}<li class="turn {{if eq .Who "owner"}}owner{{else}}agent{{end}}">{{template "avatar" .Who}}<div class="meta"><span class="from">{{if eq .Who "owner"}}You{{else}}lifelog{{end}}</span>{{with .Via}}<span class="via">· via {{.}}</span>{{end}}{{if .At}}<time datetime="{{.At}}">{{.At}}</time>{{end}}</div>
+{{else}}<li class="turn {{if eq .Who "owner"}}owner{{else}}agent{{end}}">{{template "avatar" .Who}}<div class="meta"><span class="from">{{if eq .Who "owner"}}You{{else}}aminte{{end}}</span>{{with .Via}}<span class="via">· via {{.}}</span>{{end}}{{if .At}}<time datetime="{{.At}}">{{.At}}</time>{{end}}</div>
 <div class="turn-card">{{with .Tools}}<ul class="tools">{{range .}}{{with toolChip .}}<li><b>{{.Name}}</b>{{if .Href}}{{template "card" ($v.CardOf .Href)}}{{else}}{{with .Words}} {{.}}{{end}}{{end}}</li>{{end}}{{end}}</ul>{{end}}
 <div class="words prose">{{markdown .Text}}</div></div></li>
 {{end}}{{end}}
-{{if waiting .turns}}<li class="turn agent">{{template "avatar" "agent"}}<div class="meta"><span class="from">lifelog</span></div><div class="thinking" role="status" aria-label="lifelog is answering"><i></i><i></i><i></i></div></li>{{end}}</ol>{{end}}
+{{if waiting .turns}}<li class="turn agent">{{template "avatar" "agent"}}<div class="meta"><span class="from">aminte</span></div><div class="thinking" role="status" aria-label="aminte is answering"><i></i><i></i><i></i></div></li>{{end}}</ol>{{end}}
 
 {{/* avatar is the small picture beside a turn, by who said it: hidden from a reader, since the meta line says who. */}}
 {{define "avatar"}}<span class="avatar" aria-hidden="true">{{if eq . "owner"}}{{icon "people"}}{{else}}{{icon "chat"}}{{end}}</span>{{end}}

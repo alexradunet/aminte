@@ -13,7 +13,7 @@ Earlier closed plans live in git history (`git log -- docs/plans`). The next pla
 | [160](160-the-lock.md) | The lock: a journal left open closes itself | P2 | M | owner word 2026-10-30; `ff0f1c7`; A `6d43b9e`, B `6f665f3`, review `c926d91` | DONE |
 | [159](159-the-class-of-an-action.md) | The class of an action: the browser places an action by what it does, not by where Siren lists it | P2 | L | owner word 2026-10-30; plan 157; `5046b38`; A `016adb5`, C `57016f9`, B1 `8c865ad`, B2 `1124bdf` | DONE (live 2026-10-30 at `9d0e15f`; not seen in a browser) |
 | [155](155-ticktick-the-first-connected-app.md) | TickTick: the first connected app, in this repo | P1 | M | owner word 2026-10-29; plan 154; `054138b`; live 2026-10-29 | DONE |
-| [156](156-browse-the-tasks-through-the-catalog.md) | Browse the tasks of TickTick inside lifelog, through the catalog | P2 | S | owner word 2026-10-29; plan 155; `b3d0a89`; built `9f1c584`; live 2026-10-30 | DONE |
+| [156](156-browse-the-tasks-through-the-catalog.md) | Browse the tasks of TickTick inside aminte, through the catalog | P2 | S | owner word 2026-10-29; plan 155; `b3d0a89`; built `9f1c584`; live 2026-10-30 | DONE |
 | [157](157-a-task-manager-feel-through-the-catalog.md) | A task manager's feel, through the catalog | P2 | M | owner word 2026-10-30; plan 156; `875fc5d`; built 2026-10-30; live 2026-10-30 | DONE |
 | [158](158-one-task-service-behind-tasks.md) | One task service behind Tasks | P2 | L | owner word 2026-10-30; plan 157; `53fcdd1` | DONE |
 | [154](154-connected-apps-through-the-catalog.md) | Connected apps through the catalog: no plan lines, and an extension may serve a catalog the core aggregates | P1 | L | owner word 2026-10-29; issue 0092; RFC 0025; plan 147; `860e9b3`; live 2026-10-29 | DONE |
@@ -68,7 +68,7 @@ Earlier closed plans live in git history (`git log -- docs/plans`). The next pla
 | [105](105-the-owners-shape-in-the-synthetic-fixture.md) | The owner's shape in the synthetic fixture: a calibrated workload for tests | P1 | L | owner request 2026-10-14; `bd16083` | TODO |
 | [104](104-the-chat-in-basm.md) | The chat in Basm: the conversation drawn as the Chat of the owner's design system | P2 | S | plan 103; owner decision 2026-10-14 | DONE |
 | [103](103-the-conversation-on-the-screen.md) | The conversation on the screen: a chat page, and a sidebar that follows the owner | P1 | M | issue 0072; owner decision 2026-10-14 | REJECTED (superseded by plan 116, RFC 0015) |
-| [102](102-a-conversation-with-lifelog.md) | A conversation with lifelog: the action `ask`, an agent inside the writer | P1 | M | RFC 0012; issue 0071; owner decisions 2026-10-14 | REJECTED (superseded by plan 116, RFC 0015) |
+| [102](102-a-conversation-with-aminte.md) | A conversation with aminte: the action `ask`, an agent inside the writer | P1 | M | RFC 0012; issue 0071; owner decisions 2026-10-14 | REJECTED (superseded by plan 116, RFC 0015) |
 | [101](101-the-calendar-holds-every-dated-thing.md) | The calendar holds every dated thing | P1 | M | issue 0070; owner decision 2026-10-13 | DONE |
 | [100](100-one-page-a-metric.md) | One page a metric: Record, every reading, and its own page | P1 | M | issue 0069; owner decision 2026-10-13 | DONE |
 | [099](099-rules-into-the-schema.md) | Rules into the schema: a Go copy deleted, a writer-held rule made a trigger | P1 | M | issue 0068 | DONE |
@@ -80,9 +80,9 @@ Earlier closed plans live in git history (`git log -- docs/plans`). The next pla
 | [093](093-words-phone-and-today.md) | Words, not data; the phone first; a richer Today | P1 | L | issue 0062; owner decisions 2026-10-12 | DONE |
 | [092](092-the-app-shell.md) | The app shell: the Almanac design system in the browser | P1 | L | issue 0061; owner decisions 2026-10-12 | DONE |
 | [091](091-the-browser-for-daily-use.md) | The browser for daily use: planning, the journal, navigation and editing | P1 | L | issue 0060; owner decisions 2026-10-12 | DONE |
-| [090](090-agentic-init.md) | `lifelog agentic-init`: the lifelog folder ready for any agent | P1 | M | issue 0059 | DONE |
+| [090](090-agentic-init.md) | `aminte agentic-init`: the aminte folder ready for any agent | P1 | M | issue 0059 | DONE |
 | [089](089-no-import-process.md) | No import process: the owner imports with an agent, through the catalog | P1 | L | RFC 0011; issue 0058 | DONE |
-| [088](088-the-writer-runs-the-facts-pass.md) | The writer runs the facts pass with a local model: `lifelog import run` | P1 | L | RFC 0010; issue 0057 | DONE |
+| [088](088-the-writer-runs-the-facts-pass.md) | The writer runs the facts pass with a local model: `aminte import run` | P1 | L | RFC 0010; issue 0057 | DONE |
 | [087](087-prepared-quantities-rounded-to-whole-units.md) | The owner rounds chosen prepared quantities to whole units | P2 | S | issue 0055 | DONE |
 | [086](086-rules-mark-the-ledger-and-status-reads-it-once.md) | The rules mark the ledger, and status reads it once | P2 | M | issue 0054 | DONE |
 | [085](085-rejected-names-are-skipped-and-tombstoned.md) | A rejected name is skipped, and its imported row tombstoned | P1 | M | RFC 0009; issue 0053 | DONE |

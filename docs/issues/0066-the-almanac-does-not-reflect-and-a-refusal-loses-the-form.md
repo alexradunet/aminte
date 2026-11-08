@@ -28,7 +28,7 @@ streak. The review found the gaps elsewhere. Each row is a fact of the code at `
 
 ## Reproduce
 
-1. Build `lifelog` at `8691164`; on a fresh file capture on 12 days across two years with the same month-day in
+1. Build `aminte` at `8691164`; on a fresh file capture on 12 days across two years with the same month-day in
    both, start a habit and check in, create a task due today.
 2. Open a page, open Edit, change the body in a second tab and save, then save the first tab: the 409 is a separate
    page with the draft in a box.

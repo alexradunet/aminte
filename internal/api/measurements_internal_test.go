@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	"lifelog/internal/core"
+	"aminte/internal/core"
 )
 
 // TestMetricsGroupByTheirCategories: a metric is listed under each category it is filed in, in the order of the

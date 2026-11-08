@@ -7,11 +7,11 @@ import (
 	"strings"
 	"testing"
 
-	"lifelog/client"
-	"lifelog/internal/api"
-	"lifelog/internal/api/apitest"
-	"lifelog/internal/core"
-	"lifelog/internal/db/dbtest"
+	"aminte/client"
+	"aminte/internal/api"
+	"aminte/internal/api/apitest"
+	"aminte/internal/core"
+	"aminte/internal/db/dbtest"
 )
 
 // TestSettingsAreTheOwnersFile: the owner saves the model and reads it back; the file is made with the mode 0600

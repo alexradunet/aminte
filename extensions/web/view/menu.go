@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"slices"
 
-	"lifelog/siren"
+	"aminte/siren"
 )
 
 // The head of a page draws the actions that no template places by name (docs/plans/159-the-class-of-an-action.md). An

@@ -20,7 +20,7 @@ import (
 
 	"modernc.org/sqlite"
 
-	"lifelog"
+	"aminte"
 )
 
 // minVersion is the writer's floor (connections.md: the WAL race fixed in 3.51.3).
@@ -45,7 +45,7 @@ var pragmas = []struct {
 func init() {
 	d := &sqlite.Driver{}
 	d.RegisterConnectionHook(checkConnection)
-	sql.Register("lifelog", d)
+	sql.Register("aminte", d)
 }
 
 // checkConnection runs on every new connection: the version floor always, trusted_schema on readers, the pragmas
@@ -174,14 +174,14 @@ func open(ctx context.Context, path string, keep bool) (*DB, error) {
 	}
 	path = abs
 	if _, err := os.Stat(path); err != nil {
-		return nil, fmt.Errorf("no database at %s (create one with `lifelog init`): %w", path, err)
+		return nil, fmt.Errorf("no database at %s (create one with `aminte init`): %w", path, err)
 	}
-	w, err := sql.Open("lifelog", dsn(path, false))
+	w, err := sql.Open("aminte", dsn(path, false))
 	if err != nil {
 		return nil, err
 	}
 	w.SetMaxOpenConns(1) // one writer; BEGIN IMMEDIATE serialises against other processes
-	r, err := sql.Open("lifelog", dsn(path, true))
+	r, err := sql.Open("aminte", dsn(path, true))
 	if err != nil {
 		return nil, errors.Join(err, w.Close())
 	}
@@ -192,7 +192,7 @@ func open(ctx context.Context, path string, keep bool) (*DB, error) {
 		return nil, errors.Join(err, r.Close(), w.Close())
 	}
 	if id != applicationID {
-		return nil, errors.Join(fmt.Errorf("%s is not a Lifelog database (application_id %#x)", path, id), r.Close(), w.Close())
+		return nil, errors.Join(fmt.Errorf("%s is not an Aminte database (application_id %#x)", path, id), r.Close(), w.Close())
 	}
 	var version int64
 	if err := r.QueryRowContext(ctx, "PRAGMA user_version").Scan(&version); err != nil {
@@ -210,7 +210,7 @@ func open(ctx context.Context, path string, keep bool) (*DB, error) {
 // Init creates a new life.db from the canonical DDL. It refuses an existing file.
 func Init(ctx context.Context, path string) error {
 	return initWith(path, func(w *sql.DB) error {
-		_, err := w.ExecContext(ctx, lifelog.Schema)
+		_, err := w.ExecContext(ctx, aminte.Schema)
 		return err
 	})
 }
@@ -220,7 +220,7 @@ func initWith(path string, apply func(*sql.DB) error) error {
 	if err != nil {
 		return err
 	}
-	w, err := sql.Open("lifelog", dsn(path, false))
+	w, err := sql.Open("aminte", dsn(path, false))
 	if err != nil {
 		return errors.Join(err, removeReservedDatabasePath(path, reserved))
 	}
@@ -302,7 +302,7 @@ func removeReservedDatabasePath(path string, reserved *os.File) error {
 func (d *DB) Close() error {
 	if !d.keep {
 		if _, err := d.W.ExecContext(context.Background(), "PRAGMA optimize"); err != nil {
-			log.Printf("lifelog: PRAGMA optimize skipped, no data is lost: %v", err)
+			log.Printf("aminte: PRAGMA optimize skipped, no data is lost: %v", err)
 		}
 	}
 	return errors.Join(d.R.Close(), d.W.Close())
@@ -363,7 +363,7 @@ func copyWith(from, to string, copy func(*sql.DB) error) error {
 	q := url.Values{}
 	q.Set("mode", "ro")
 	q.Add("_pragma", "trusted_schema(0)")
-	r, err := sql.Open("lifelog", sqliteFileURI(from, q))
+	r, err := sql.Open("aminte", sqliteFileURI(from, q))
 	if err != nil {
 		return errors.Join(err, removeReservedDatabasePath(to, reserved))
 	}

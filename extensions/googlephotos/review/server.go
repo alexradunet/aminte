@@ -20,8 +20,8 @@ import (
 	"sync"
 	"time"
 
-	"lifelog-googlephotos/google"
-	"lifelog-googlephotos/lifelog"
+	"aminte-googlephotos/aminte"
+	"aminte-googlephotos/google"
 )
 
 //go:embed html/pages.html
@@ -38,12 +38,12 @@ const (
 
 // Config is what a Server needs.
 type Config struct {
-	Auth    *google.Auth
-	Picker  *google.Picker
-	Lifelog *lifelog.Client
-	Zone    *time.Location   // the zone that gives the day of a photo
-	Now     func() time.Time // nil means time.Now
-	Log     *log.Logger      // nil means log.Default(); it never gets a token or the bytes of a photo
+	Auth   *google.Auth
+	Picker *google.Picker
+	Aminte *aminte.Client
+	Zone   *time.Location   // the zone that gives the day of a photo
+	Now    func() time.Time // nil means time.Now
+	Log    *log.Logger      // nil means log.Default(); it never gets a token or the bytes of a photo
 }
 
 // Server is the review page.
@@ -322,7 +322,7 @@ func (s *Server) list(ctx context.Context, sessionID string) error {
 		monthList = append(monthList, m)
 	}
 	sort.Strings(monthList)
-	bare, err := s.cfg.Lifelog.MonthsWithoutCover(ctx, monthList)
+	bare, err := s.cfg.Aminte.MonthsWithoutCover(ctx, monthList)
 	if err != nil {
 		return err
 	}
@@ -398,8 +398,8 @@ func (s *Server) choose(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	day := s.pending[0]
-	// The owner can set a cover in lifelog at the same time: read the day again before the write.
-	has, err := s.cfg.Lifelog.DayHasCover(ctx, day)
+	// The owner can set a cover in aminte at the same time: read the day again before the write.
+	has, err := s.cfg.Aminte.DayHasCover(ctx, day)
 	if err != nil {
 		s.fail(w, r, "read the day", err)
 		return
@@ -427,13 +427,13 @@ func (s *Server) choose(w http.ResponseWriter, r *http.Request) {
 	var preview []byte
 	switch mimeType {
 	case "image/jpeg", "image/png", "image/gif":
-	default: // lifelog cannot read this type: Google scales it down to a JPEG
+	default: // aminte cannot read this type: Google scales it down to a JPEG
 		if preview, _, err = s.cfg.Picker.Fetch(ctx, it.BaseURL, previewSize); err != nil {
 			s.fail(w, r, "download the preview", err)
 			return
 		}
 	}
-	title, err := s.cfg.Lifelog.AddCover(ctx, day, mimeType, original, preview)
+	title, err := s.cfg.Aminte.AddCover(ctx, day, mimeType, original, preview)
 	if err != nil {
 		s.fail(w, r, "keep the photo", err)
 		return

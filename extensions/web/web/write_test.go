@@ -144,7 +144,7 @@ func TestAWriteReachesTheCoreAsTheWriterUIWithTheFieldsOfTheAction(t *testing.T)
 	if w.method != http.MethodPost || w.uri != "/days/"+today+"/capture" {
 		t.Errorf("the write is %s %s, want POST /days/%s/capture", w.method, w.uri, today)
 	}
-	for name, want := range map[string]string{"Accept": "application/vnd.siren+json", "Lifelog-Source": "ui",
+	for name, want := range map[string]string{"Accept": "application/vnd.siren+json", "Aminte-Source": "ui",
 		"Authorization": "Bearer " + testToken, "Content-Type": "application/x-www-form-urlencoded"} {
 		if w.header.Get(name) != want {
 			t.Errorf("the write sends %s %q, want %q", name, w.header.Get(name), want)

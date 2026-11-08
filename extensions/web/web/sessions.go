@@ -17,7 +17,7 @@ import (
 
 // sessionCookie is the credential of the browser, set by POST /login. Its format and its key are fixed (newSessions), so a
 // cookie made earlier with the same token is still valid, and the owner logs in only once.
-const sessionCookie = "lifelog_session"
+const sessionCookie = "aminte_session"
 
 // loginMaxAge is one year: an installed app on a phone loses a session cookie when the system ends the app. The owner
 // ends the login by a new token.
@@ -58,7 +58,7 @@ type sessions struct {
 
 func newSessions(token []byte) *sessions {
 	m := hmac.New(sha256.New, token)
-	m.Write([]byte("lifelog session")) // the key is HMAC-SHA256(token, "lifelog session"): a cookie of the same format stays valid
+	m.Write([]byte("aminte session")) // the key is HMAC-SHA256(token, "aminte session"): a cookie of the same format stays valid
 	return &sessions{key: m.Sum(nil), state: map[string]*sessionState{}, ended: map[string]time.Time{}}
 }
 

@@ -32,7 +32,7 @@ The freeze is defined in [D13](decisions/D13-migrations-and-freeze.md). Each ite
 3. No [non-goal](architecture/non-goals.md) has the freeze as its "Reopen when": the owner decides each such row first —
    kept out, or reopened through an issue (snapshots: [D25](decisions/D25-snapshots.md)).
 4. The text the file will keep has been read once more as a stranger would: the comments inside the `CREATE`
-   statements, the `lifelog_meta` rows and the `link_kinds` notes ([threat model and the 2075 test](contract/threat-model.md)).
+   statements, the `aminte_meta` rows and the `link_kinds` notes ([threat model and the 2075 test](contract/threat-model.md)).
 5. The writer that will make the file reproduces every vector of [titles and wikilinks](contract/titles-and-wikilinks.md) and passes the
    four [integrity checks](contract/integrity-checks.md) on a copy.
 6. A program import ran on a copy and its counts are recorded; a second run wrote nothing ([imports](contract/imports.md)).

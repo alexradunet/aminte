@@ -7,11 +7,11 @@ import (
 	"sync"
 	"time"
 
-	"lifelog-ticktick/ticktick"
-	"lifelog/app"
+	"aminte-ticktick/ticktick"
+	"aminte/app"
 )
 
-// Serve runs the app under `lifelog serve --with ticktick`. It serves the task service on LIFELOG_LISTEN, polls once at the
+// Serve runs the app under `aminte serve --with ticktick`. It serves the task service on AMINTE_LISTEN, polls once at the
 // start and then every interval, and returns when ctx ends. When TickTick refuses the token, in the timer or in a
 // handler, it stops and returns ErrLoginAgain: the owner acts first.
 func Serve(ctx context.Context, p *Poller, lists []ticktick.Project, every time.Duration) error {

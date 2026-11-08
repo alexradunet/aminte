@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"lifelog-ticktick/ticktick"
+	"aminte-ticktick/ticktick"
 )
 
 func TestEntryOfMapsATaskToItsDayTextAndKey(t *testing.T) {
@@ -243,7 +243,7 @@ func TestA401EndsThePollAndTellsServe(t *testing.T) {
 	if !called {
 		t.Error("onLogin was not called")
 	}
-	if got := ErrLoginAgain.Error(); got != "login again: lifelog ticktick login" {
+	if got := ErrLoginAgain.Error(); got != "login again: aminte ticktick login" {
 		t.Errorf("the line = %q", got)
 	}
 }

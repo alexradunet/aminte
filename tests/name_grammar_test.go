@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
+	"aminte/text"
 	"golang.org/x/text/unicode/norm"
-	"lifelog/text"
 )
 
 // nameGrammar executes the contract's addressability vectors under docs overlays,

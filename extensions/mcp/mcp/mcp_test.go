@@ -14,8 +14,8 @@ import (
 
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"lifelog/client"
-	"lifelog/siren"
+	"aminte/client"
+	"aminte/siren"
 )
 
 // TestTheToolsAreTheActionsThatAreNotTheOwners: each action of the catalog is a tool exactly when it is not the
@@ -45,7 +45,7 @@ func TestTheToolsAreTheActionsThatAreNotTheOwners(t *testing.T) {
 		}
 	}()
 
-	session, err = mcpsdk.NewClient(&mcpsdk.Implementation{Name: "lifelog-test", Version: "0"}, nil).Connect(ctx, clientTransport, nil)
+	session, err = mcpsdk.NewClient(&mcpsdk.Implementation{Name: "aminte-test", Version: "0"}, nil).Connect(ctx, clientTransport, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

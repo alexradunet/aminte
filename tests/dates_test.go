@@ -6,10 +6,10 @@ import (
 	"sort"
 	"strings"
 
-	"lifelog/text"
+	"aminte/text"
 )
 
-// dates: time (lifelog_meta.instants and .days, D10) — instants, local days and their round-trip CHECKs, why `IS`
+// dates: time (aminte_meta.instants and .days, D10) — instants, local days and their round-trip CHECKs, why `IS`
 // and not `=`, the zone, and created_at written by the writer.
 func dates(s *S) {
 	exactTimeBoundaries(s)

@@ -8,12 +8,12 @@ import (
 	"strings"
 	"testing"
 
-	"lifelog/client"
-	"lifelog/internal/api"
-	"lifelog/internal/api/apitest"
-	"lifelog/internal/core"
-	"lifelog/internal/db/dbtest"
-	"lifelog/siren"
+	"aminte/client"
+	"aminte/internal/api"
+	"aminte/internal/api/apitest"
+	"aminte/internal/core"
+	"aminte/internal/db/dbtest"
+	"aminte/siren"
 )
 
 // The owner-only actions are refused to an agent and to an import, with 403 and the code forbidden. The full-text

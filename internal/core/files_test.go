@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"lifelog/internal/photo/phototest"
-	"lifelog/text"
+	"aminte/internal/photo/phototest"
+	"aminte/text"
 )
 
 func sha(c byte) string { return strings.Repeat(string(c), 64) }

@@ -13,7 +13,7 @@ import (
 func paths(t *testing.T) Paths {
 	t.Helper()
 	dir := t.TempDir()
-	return Paths{Dir: dir, Exe: filepath.Join(dir, "lifelog.exe"), DB: filepath.Join(dir, "life.db")}
+	return Paths{Dir: dir, Exe: filepath.Join(dir, "aminte.exe"), DB: filepath.Join(dir, "life.db")}
 }
 
 func read(t *testing.T, p Paths, name string) string {
@@ -26,8 +26,8 @@ func read(t *testing.T, p Paths, name string) string {
 }
 
 var allFiles = []string{
-	".agents/skills/lifelog-extension/SKILL.md", ".agents/skills/lifelog-import-notes/SKILL.md", ".agents/skills/lifelog-keep-photos/SKILL.md",
-	".claude/skills/lifelog-extension/SKILL.md", ".claude/skills/lifelog-import-notes/SKILL.md", ".claude/skills/lifelog-keep-photos/SKILL.md",
+	".agents/skills/aminte-extension/SKILL.md", ".agents/skills/aminte-import-notes/SKILL.md", ".agents/skills/aminte-keep-photos/SKILL.md",
+	".claude/skills/aminte-extension/SKILL.md", ".claude/skills/aminte-import-notes/SKILL.md", ".claude/skills/aminte-keep-photos/SKILL.md",
 	".codex/config.toml", ".mcp.json", ".pi/mcp.json", "AGENTS.md", "CLAUDE.md", "opencode.json",
 }
 
@@ -48,7 +48,7 @@ func TestInitWritesEveryFileWithThePaths(t *testing.T) {
 		t.Fatalf("files %v, want %v", got, allFiles)
 	}
 	agents := read(t, p, "AGENTS.md")
-	for _, want := range []string{"`" + p.DB + "`", "`" + p.Exe + "`", "`" + p.Dir + "`", "lifelog-import-notes", "## Privacy"} {
+	for _, want := range []string{"`" + p.DB + "`", "`" + p.Exe + "`", "`" + p.Dir + "`", "aminte-import-notes", "## Privacy"} {
 		if !strings.Contains(agents, want) {
 			t.Errorf("AGENTS.md lacks %q", want)
 		}
@@ -64,7 +64,7 @@ func TestInitWritesEveryFileWithThePaths(t *testing.T) {
 func TestPathsWithQuotesAndBackslashesStayValid(t *testing.T) {
 	dir := t.TempDir()
 	odd := filepath.Join(dir, `my "life" \ log`)
-	p := Paths{Dir: dir, Exe: `C:\Life "Log"\lifelog.exe`, DB: odd}
+	p := Paths{Dir: dir, Exe: `C:\Life "Log"\aminte.exe`, DB: odd}
 	files, err := Files(p)
 	if err != nil {
 		t.Fatal(err)
@@ -73,7 +73,7 @@ func TestPathsWithQuotesAndBackslashesStayValid(t *testing.T) {
 	if err := json.Unmarshal(files[".mcp.json"], &cfg); err != nil {
 		t.Fatalf(".mcp.json is not JSON: %v", err)
 	}
-	want := `command = "C:\\Life \"Log\"\\lifelog.exe"`
+	want := `command = "C:\\Life \"Log\"\\aminte.exe"`
 	if !strings.Contains(string(files[".codex/config.toml"]), want) {
 		t.Errorf("TOML command: want %s in\n%s", want, files[".codex/config.toml"])
 	}
@@ -165,8 +165,8 @@ func TestTheExtensionSkillNamesTheContract(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, dir := range skillDirs {
-		text := string(files[dir+"/lifelog-extension/SKILL.md"])
-		for _, want := range []string{"LIFELOG_URL", "LIFELOG_EXE", "LIFELOG_DB", "Lifelog-Source"} {
+		text := string(files[dir+"/aminte-extension/SKILL.md"])
+		for _, want := range []string{"AMINTE_URL", "AMINTE_EXE", "AMINTE_DB", "Aminte-Source"} {
 			if !strings.Contains(text, want) {
 				t.Errorf("%s: the skill does not name %s", dir, want)
 			}

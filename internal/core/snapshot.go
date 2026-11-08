@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"lifelog/internal/db"
+	"aminte/internal/db"
 )
 
 // TakeSnapshot is the owner's snapshot action (docs/plans/082-snapshot-in-the-catalog.md): a dated copy of the

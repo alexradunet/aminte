@@ -18,7 +18,7 @@ The same bypass works with `id`, `_rowid_` and `oid`, including a simultaneous c
 
 ## Rules involved
 
-The `places` comment and `lifelog_meta.edit_revisions` in [schema.sql](../schema/schema.sql),
+The `places` comment and `aminte_meta.edit_revisions` in [schema.sql](../schema/schema.sql),
 [place points](../decisions/D21-location-history.md), and [permanent identity](../decisions/D03-integer-ids.md).
 
 ## Resolution

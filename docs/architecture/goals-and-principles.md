@@ -15,8 +15,8 @@ and *canonical data being corrupted by uncontrolled writers*. A plan lives outsi
    (principle 4), so whatever is in the schema then stays.
 2. **The file explains its records.** Real tables, real column names, real types, real
    constraints. A stranger in 2075 should be able to read the stored facts and their interpretation limits
-   from `.schema` and `SELECT * FROM lifelog_meta`: each table's summary is *inside* its `CREATE`
-   statement, the only comments the file keeps, and `lifelog_meta` holds the few rules that span tables.
+   from `.schema` and `SELECT * FROM aminte_meta`: each table's summary is *inside* its `CREATE`
+   statement, the only comments the file keeps, and `aminte_meta` holds the few rules that span tables.
    Exact [writer conformance](../guides/building-a-writer.md) also requires the matching contract and vectors;
    the [2075 test](../contract/threat-model.md) checks the in-file summary, not that every algorithm is self-contained.
    See SQLite's "application file format" argument [R1](../research/references.md#r1).

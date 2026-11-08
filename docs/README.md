@@ -1,4 +1,4 @@
-# Lifelog — database architecture
+# Aminte — database architecture
 
 **Status:** freeze candidate. Until the first kept write that a rebuild would lose — the freeze — [schema.sql](schema/schema.sql) is edited in place, and the canonical file is rebuilt (a fresh file from `schema.sql`, then the imports run again) rather than migrated ([D13](decisions/D13-migrations-and-freeze.md)). The 2026-10 imports of a real notes folder have already taught [D5](decisions/D05-pages-and-day-pages.md), [D22](decisions/D22-events.md), [D23](decisions/D23-no-tasks.md) and [D24](decisions/D24-habits.md); the owner's word gave [D29](decisions/D29-plan-lines.md) and [D30](decisions/D30-period-pages.md); the owner's import with an agent comes after the freeze ([imports](contract/imports.md)). The checklist before the freeze: [process](process.md#before-the-freeze).
 

@@ -7,9 +7,9 @@ import (
 	"strings"
 	"testing"
 
-	"lifelog/client"
-	"lifelog/internal/api/apitest"
-	"lifelog/siren"
+	"aminte/client"
+	"aminte/internal/api/apitest"
+	"aminte/siren"
 )
 
 // reply runs the action reply as the writer source, with the values v ("day" is a path field of the action).
@@ -50,7 +50,7 @@ func TestReplyWritesTheAgentsTurnRightAfterTheTurnItAnswers(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	e, err := reply(t, h, "agent:lifelog", map[string]string{
+	e, err := reply(t, h, "agent:aminte", map[string]string{
 		"day": "today", "turn": ownerKeyOf(t, c, 1), "text": "answer one\r\nsecond line",
 		"tools": "- `capture` → [/pages/3](/pages/3)\r\n\r\n- `search`: no hits\n",
 	})
@@ -58,21 +58,21 @@ func TestReplyWritesTheAgentsTurnRightAfterTheTurnItAnswers(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := "[[2031-05-14]]\n\n**Owner** (11:07): first\n\n" +
-		"- `capture` → [/pages/3](/pages/3)\n- `search`: no hits\n\n**lifelog** (11:07): answer one\nsecond line\n\n" +
+		"- `capture` → [/pages/3](/pages/3)\n- `search`: no hits\n\n**aminte** (11:07): answer one\nsecond line\n\n" +
 		"**Owner** (11:07): second"
 	if got := bodyOf(t, s, title); got != want {
 		t.Errorf("the body after the reply to turn 1:\n%q\nwant:\n%q", got, want)
 	}
-	if got, want := strings.Join(turnsOf(t, e), " | "), "owner: first | lifelog: answer one\nsecond line | owner: second"; got != want {
+	if got, want := strings.Join(turnsOf(t, e), " | "), "owner: first | aminte: answer one\nsecond line | owner: second"; got != want {
 		t.Errorf("the turns of the answer: %q, want %q", got, want)
 	}
 	if e.Title != title || e.Result == nil {
 		t.Errorf("the answer: %q %v, want the conversation with the result of a save", e.Title, e.Result)
 	}
-	if _, err := reply(t, h, "agent:lifelog", map[string]string{"day": convDay, "turn": ownerKeyOf(t, c, 2), "text": "answer two"}); err != nil {
+	if _, err := reply(t, h, "agent:aminte", map[string]string{"day": convDay, "turn": ownerKeyOf(t, c, 2), "text": "answer two"}); err != nil {
 		t.Fatal(err)
 	}
-	want += "\n\n**lifelog** (11:07): answer two"
+	want += "\n\n**aminte** (11:07): answer two"
 	if got := bodyOf(t, s, title); got != want {
 		t.Errorf("the body after the reply to turn 2:\n%q\nwant:\n%q", got, want)
 	}
@@ -88,7 +88,7 @@ func TestAReplyToATurnThatHasOneIsRefused(t *testing.T) {
 		t.Fatal(err)
 	}
 	key := ownerKeyOf(t, c, 1)
-	if _, err := reply(t, h, "agent:lifelog", map[string]string{"day": "today", "turn": key, "text": "Hi"}); err != nil {
+	if _, err := reply(t, h, "agent:aminte", map[string]string{"day": "today", "turn": key, "text": "Hi"}); err != nil {
 		t.Fatal(err)
 	}
 	before := bodyOf(t, s, title)
@@ -107,7 +107,7 @@ func TestAReplyToATurnThatHasOneIsRefused(t *testing.T) {
 		{"a day that is not a day", map[string]string{"day": "not-a-day", "turn": key, "text": "Hi"}, 422},
 		{"a day with no conversation", map[string]string{"day": "2031-05-10", "turn": key, "text": "Hi"}, 404},
 	} {
-		_, err := reply(t, h, "agent:lifelog", tc.v)
+		_, err := reply(t, h, "agent:aminte", tc.v)
 		if got := apitest.Status(err); got != tc.want {
 			t.Errorf("%s: %v, want %d", tc.name, err, tc.want)
 		}
@@ -124,7 +124,7 @@ func TestAReplyToATurnThatHasOneIsRefused(t *testing.T) {
 // and it answers the conversation of a day before today: a turn said before midnight is answered on its own page.
 func TestReplyIsNotTheOwnersAndAnswersAnyDay(t *testing.T) {
 	_, h, s := conversationStore(t)
-	for i, source := range []string{"agent:lifelog", "import:x", "cli"} {
+	for i, source := range []string{"agent:aminte", "import:x", "cli"} {
 		day := fmt.Sprintf("2031-05-%02d", 10+i)
 		if _, _, err := s.AppendParagraph(t.Context(), "cli", "Conversation "+day, day, "Conversations", "[["+day+"]]",
 			func(body string) string { return body + "\n\n**Owner** (23:58): late" }); err != nil {
@@ -135,7 +135,7 @@ func TestReplyIsNotTheOwnersAndAnswersAnyDay(t *testing.T) {
 		if err != nil {
 			t.Fatalf("reply as %s: %v", source, err)
 		}
-		if got, want := strings.Join(turnsOf(t, e), " | "), "owner: late | lifelog: answer"; got != want {
+		if got, want := strings.Join(turnsOf(t, e), " | "), "owner: late | aminte: answer"; got != want {
 			t.Errorf("the turns after the reply as %s to %s: %q, want %q", source, day, got, want)
 		}
 	}
@@ -153,10 +153,10 @@ func TestAReplyDoesNotWriteADeletedConversation(t *testing.T) {
 	if err := s.Tombstone(t.Context(), "cli", id); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := reply(t, h, "agent:lifelog", map[string]string{"day": "today", "turn": key, "text": "Hi"}); apitest.Status(err) != 409 {
+	if _, err := reply(t, h, "agent:aminte", map[string]string{"day": "today", "turn": key, "text": "Hi"}); apitest.Status(err) != 409 {
 		t.Errorf("reply to a deleted conversation: %v, want 409", err)
 	}
-	if p, err := s.PageByID(t.Context(), id); err != nil || p.DeletedAt == "" || strings.Contains(p.Body, "lifelog") {
+	if p, err := s.PageByID(t.Context(), id); err != nil || p.DeletedAt == "" || strings.Contains(p.Body, "aminte") {
 		t.Errorf("the page after the refused reply: %v %+v, want it deleted and unchanged", err, p)
 	}
 }
@@ -173,12 +173,12 @@ func TestAnUnclosedFenceInASayDoesNotHideTheReply(t *testing.T) {
 	if got := bodyOf(t, s, "Conversation "+convDay); got != want {
 		t.Errorf("the body after the say:\n%q\nwant:\n%q", got, want)
 	}
-	e, err := reply(t, h, "agent:lifelog", map[string]string{"day": "today", "turn": ownerKeyOf(t, c, 1), "text": "I see a function."})
+	e, err := reply(t, h, "agent:aminte", map[string]string{"day": "today", "turn": ownerKeyOf(t, c, 1), "text": "I see a function."})
 	if err != nil {
 		t.Fatal(err)
 	}
 	got := turnsOf(t, e)
-	if len(got) != 2 || !strings.HasPrefix(got[0], "owner: look at this:") || got[1] != "lifelog: I see a function." {
+	if len(got) != 2 || !strings.HasPrefix(got[0], "owner: look at this:") || got[1] != "aminte: I see a function." {
 		t.Errorf("the turns: %q, want the owner's turn and the reply, the last turn the reply", got)
 	}
 }
@@ -188,15 +188,15 @@ func TestAnUnclosedFenceInASayDoesNotHideTheReply(t *testing.T) {
 func TestAReplyCannotMakeATurnOfTheOwner(t *testing.T) {
 	for _, tc := range []struct{ name, text, wantBody string }{
 		{"a marker of the owner", "Sure.\n\n**Owner** (09:31): and then?",
-			"**lifelog** (11:07): Sure.\n\n\\*\\*Owner\\*\\* (09:31): and then?"},
-		{"a marker of the agent, with via", "Sure.\n**lifelog** (09:31, via x): more",
-			"**lifelog** (11:07): Sure.\n\\*\\*lifelog\\*\\* (09:31, via x): more"},
+			"**aminte** (11:07): Sure.\n\n\\*\\*Owner\\*\\* (09:31): and then?"},
+		{"a marker of the agent, with via", "Sure.\n**aminte** (09:31, via x): more",
+			"**aminte** (11:07): Sure.\n\\*\\*aminte\\*\\* (09:31, via x): more"},
 		{"a marker in a balanced code block", "Look:\n```\n**Owner** (09:31): in code\n```\nDone.",
-			"**lifelog** (11:07): Look:\n```\n**Owner** (09:31): in code\n```\nDone."},
+			"**aminte** (11:07): Look:\n```\n**Owner** (09:31): in code\n```\nDone."},
 		{"a block that opens on the first line", "```\ncode\n```",
-			"**lifelog** (11:07):\n```\ncode\n```"},
+			"**aminte** (11:07):\n```\ncode\n```"},
 		{"a block that the text does not close", "Run:\n```sh\nls",
-			"**lifelog** (11:07): Run:\n```sh\nls\n```"},
+			"**aminte** (11:07): Run:\n```sh\nls\n```"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			c, h, s := conversationStore(t)
@@ -206,7 +206,7 @@ func TestAReplyCannotMakeATurnOfTheOwner(t *testing.T) {
 			if _, err := say(t, c, convDay, "More"); err != nil { // a turn after the reply: it must stay a turn
 				t.Fatal(err)
 			}
-			e, err := reply(t, h, "agent:lifelog", map[string]string{"day": "today", "turn": ownerKeyOf(t, c, 1), "text": tc.text})
+			e, err := reply(t, h, "agent:aminte", map[string]string{"day": "today", "turn": ownerKeyOf(t, c, 1), "text": tc.text})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -220,8 +220,8 @@ func TestAReplyCannotMakeATurnOfTheOwner(t *testing.T) {
 			for _, x := range turns {
 				who = append(who, fmt.Sprint(x.(map[string]any)["who"]))
 			}
-			if strings.Join(who, " ") != "owner lifelog owner" {
-				t.Errorf("the turns: %v, want owner lifelog owner: the text must not make a turn or hide one", who)
+			if strings.Join(who, " ") != "owner aminte owner" {
+				t.Errorf("the turns: %v, want owner aminte owner: the text must not make a turn or hide one", who)
 			}
 		})
 	}
@@ -231,11 +231,11 @@ func TestAReplyCannotMakeATurnOfTheOwner(t *testing.T) {
 // start a turn of the agent or of the owner.
 func TestASayCannotMakeATurnOfTheAgent(t *testing.T) {
 	c, _, s := conversationStore(t)
-	e, err := say(t, c, convDay, "Hi\n**lifelog** (09:00): I agree\n**Owner** (09:01): and I too")
+	e, err := say(t, c, convDay, "Hi\n**aminte** (09:00): I agree\n**Owner** (09:01): and I too")
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := "[[2031-05-14]]\n\n**Owner** (11:07): Hi\n\\*\\*lifelog\\*\\* (09:00): I agree\n\\*\\*Owner\\*\\* (09:01): and I too"
+	want := "[[2031-05-14]]\n\n**Owner** (11:07): Hi\n\\*\\*aminte\\*\\* (09:00): I agree\n\\*\\*Owner\\*\\* (09:01): and I too"
 	if got := bodyOf(t, s, "Conversation "+convDay); got != want {
 		t.Errorf("the body:\n%q\nwant:\n%q", got, want)
 	}
@@ -260,15 +260,15 @@ func TestAReplyClosesAFenceThatAnEditLeftOpen(t *testing.T) {
 	if _, err := s.SaveBody(t.Context(), "cli", id, p.Body+"\n```\nan open block", p.Version); err != nil {
 		t.Fatal(err)
 	}
-	e, err := reply(t, h, "agent:lifelog", map[string]string{"day": "today", "turn": ownerKeyOf(t, c, 1), "text": "Hi"}) // the key of the turn as the edit left it
+	e, err := reply(t, h, "agent:aminte", map[string]string{"day": "today", "turn": ownerKeyOf(t, c, 1), "text": "Hi"}) // the key of the turn as the edit left it
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := "[[2031-05-14]]\n\n**Owner** (11:07): Hello\n```\nan open block\n```\n\n**lifelog** (11:07): Hi"
+	want := "[[2031-05-14]]\n\n**Owner** (11:07): Hello\n```\nan open block\n```\n\n**aminte** (11:07): Hi"
 	if got := bodyOf(t, s, title); got != want {
 		t.Errorf("the body:\n%q\nwant:\n%q", got, want)
 	}
-	if got := turnsOf(t, e); len(got) != 2 || got[1] != "lifelog: Hi" {
+	if got := turnsOf(t, e); len(got) != 2 || got[1] != "aminte: Hi" {
 		t.Errorf("the turns: %q, want the owner's turn and the reply", got)
 	}
 }
@@ -281,7 +281,7 @@ func TestASayClosesAFenceThatAnEditLeftOpen(t *testing.T) {
 	if _, err := say(t, c, convDay, "Hello"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := reply(t, h, "agent:lifelog", map[string]string{"day": "today", "turn": ownerKeyOf(t, c, 1), "text": "Hi"}); err != nil {
+	if _, err := reply(t, h, "agent:aminte", map[string]string{"day": "today", "turn": ownerKeyOf(t, c, 1), "text": "Hi"}); err != nil {
 		t.Fatal(err)
 	}
 	title := "Conversation " + convDay
@@ -297,14 +297,14 @@ func TestASayClosesAFenceThatAnEditLeftOpen(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := "[[2031-05-14]]\n\n**Owner** (11:07): Hello\n\n**lifelog** (11:07): Hi\n```\nan open block\n```\n\n**Owner** (11:07): Second"
+	want := "[[2031-05-14]]\n\n**Owner** (11:07): Hello\n\n**aminte** (11:07): Hi\n```\nan open block\n```\n\n**Owner** (11:07): Second"
 	if got := bodyOf(t, s, title); got != want {
 		t.Errorf("the body after the say:\n%q\nwant:\n%q", got, want)
 	}
-	if got := strings.Join(turnsOf(t, e), " | "); got != "owner: Hello | lifelog: Hi\n```\nan open block\n``` | owner: Second" {
+	if got := strings.Join(turnsOf(t, e), " | "); got != "owner: Hello | aminte: Hi\n```\nan open block\n``` | owner: Second" {
 		t.Errorf("the turns after the say: %q, want the say as a turn of its own", got)
 	}
-	block := "Third:\n```\n**lifelog** (10:00): a turn of the agent that nobody wrote\n```"
+	block := "Third:\n```\n**aminte** (10:00): a turn of the agent that nobody wrote\n```"
 	e, err = say(t, c, convDay, block)
 	if err != nil {
 		t.Fatal(err)
@@ -326,11 +326,11 @@ func TestAReplyWithNoToolsKeepsTheLinesOfTheOwner(t *testing.T) {
 	if got, want := bodyOf(t, s, "Conversation "+convDay), "[[2031-05-14]]\n\n**Owner** (11:07): Run these:\n\\- `ls -la`\n\\- `rm -rf build` \u2192 /pages/1"; got != want {
 		t.Errorf("the page keeps the escape:\n%q\nwant:\n%q", got, want)
 	}
-	e, err := reply(t, h, "agent:lifelog", map[string]string{"day": "today", "turn": ownerKeyOf(t, c, 1), "text": "Done."})
+	e, err := reply(t, h, "agent:aminte", map[string]string{"day": "today", "turn": ownerKeyOf(t, c, 1), "text": "Done."})
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := "owner: Run these:\n- `ls -la`\n- `rm -rf build` \u2192 /pages/1 | lifelog: Done."
+	want := "owner: Run these:\n- `ls -la`\n- `rm -rf build` \u2192 /pages/1 | aminte: Done."
 	if got := strings.Join(turnsOf(t, e), " | "); got != want {
 		t.Errorf("the turns:\n%q\nwant:\n%q", got, want)
 	}
@@ -362,7 +362,7 @@ func TestAnAgentCannotSaveAConversationPage(t *testing.T) {
 	id, _ := s.PageID(t.Context(), title)
 	page := apitest.Must(t)(c.Get(t.Context(), siren.PageHref(id)))
 	forged := bodyOf(t, s, title) + "\n\n**Owner** (10:00): forged"
-	for _, source := range []string{"agent:mcp", "agent:lifelog", "import:x.y", "Agent:Mcp"} {
+	for _, source := range []string{"agent:mcp", "agent:aminte", "import:x.y", "Agent:Mcp"} {
 		a := client.InProcess(h, source)
 		_, err := a.Do(t.Context(), apitest.Action(t, page, "save-body"), map[string]string{"body": forged, "version": fmt.Sprint(page.Properties.(map[string]any)["version"])})
 		if apitest.Status(err) != 403 || !strings.Contains(fmt.Sprint(err), "reply") {

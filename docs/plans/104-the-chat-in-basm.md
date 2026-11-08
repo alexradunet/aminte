@@ -23,14 +23,14 @@ Avatar), `ui_kits/balaur/ChatScreen.jsx` and the chat rules of `basm/components.
 flowchart LR
   B["Basm: ChatMessage, ToolRow, MessageDraft, Avatar; basm/components.css"] --> T["conversation.html: portrait, thread, draft"]
   B --> C["app.css: the chat, in the app's tokens"]
-  B --> P["two portraits: balaur-01 (lifelog), soul-01 (the owner)"]
+  B --> P["two portraits: balaur-01 (aminte), soul-01 (the owner)"]
   T --> F["the chat page"]
   T --> S["the sidebar"]
 ```
 
 | Basm | here |
 |---|---|
-| ChatMessage: a framed pixel portrait, a wood nameplate under it, a parchment speech panel with a stepped tail; Balaur on the left, the owner on the right with the portrait mirrored | each turn: the owner's question on the right ("You · HH.MM"), lifelog's answer on the left ("Lifelog") |
+| ChatMessage: a framed pixel portrait, a wood nameplate under it, a parchment speech panel with a stepped tail; Balaur on the left, the owner on the right with the portrait mirrored | each turn: the owner's question on the right ("You · HH.MM"), aminte's answer on the left ("Aminte") |
 | ToolRow: a dark wood row in mono, `tool · name —`, set in under the portraits | each step: `tool · capture — /days/…`, the refusal in place of the href |
 | MessageDraft: the composer as an unsent message, dashed, solid while it is written; Enter sends, Shift+Enter breaks | the draft of the chat page and of the sidebar; the button sends without the script |
 | pending: thinking dots, the portrait breathing teal light | the waiting line while the model works |
@@ -57,7 +57,7 @@ flowchart LR
 | The chat's styles | `internal/api/html/app.css` |
 | `--teal`, `--indigo` | `internal/api/html/base.css`, `internal/api/tokens_test.go` |
 | The waiting line in Basm's markup; Enter sends a draft | `internal/api/html/app.js` |
-| The two portraits and their routes | `internal/api/html/portrait-lifelog.png`, `portrait-owner.png`, `internal/api/serve.go`, `internal/api/html.go` |
+| The two portraits and their routes | `internal/api/html/portrait-aminte.png`, `portrait-owner.png`, `internal/api/serve.go`, `internal/api/html.go` |
 
 ## Tests
 

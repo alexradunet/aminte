@@ -35,7 +35,7 @@ SQLite/filesystem I/O depend on a fake-clock scheduler.
 
 ## Resolution
 
-Resolved by `entities.revision` (`lifelog_meta.edit_revisions`): a monotonic edit token independent of the clock,
+Resolved by `entities.revision` (`aminte_meta.edit_revisions`): a monotonic edit token independent of the clock,
 advanced by the `*_touch` triggers and never decreased (`entities_revision_monotonic`). A save sends the `version` it
 read, and a newer one is refused with 409 `stale_version` (`API.md`). Which writes advance it was settled by
 [0041](0041-fresh-pages-read-as-edited.md) and [0042](0042-incoming-link-invalidates-an-open-edit.md).

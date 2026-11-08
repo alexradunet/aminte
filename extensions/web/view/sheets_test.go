@@ -14,7 +14,7 @@ import (
 	"strings"
 	"testing"
 
-	"lifelog-web/pixelart"
+	"aminte-web/pixelart"
 )
 
 // TestTheBaseSheetCarriesNoAppVocabulary keeps the two sheets apart: base.css styles ordinary HTML, and this

@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"lifelog/internal/core"
-	"lifelog/internal/db/dbtest"
-	"lifelog/siren"
+	"aminte/internal/core"
+	"aminte/internal/db/dbtest"
+	"aminte/siren"
 )
 
 // TestARequestPastItsDeadlineAnswers504: a route runs a query that does not end (a recursive query on the store's

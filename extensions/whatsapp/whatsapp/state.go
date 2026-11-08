@@ -17,14 +17,14 @@ import (
 
 	"go.mau.fi/whatsmeow/store"
 	"go.mau.fi/whatsmeow/store/sqlstore"
-	_ "modernc.org/sqlite" // the pure-Go driver, the one that lifelog pins: no cgo
+	_ "modernc.org/sqlite" // the pure-Go driver, the one that aminte pins: no cgo
 
-	"lifelog/app"
+	"aminte/app"
 )
 
 // ErrNotPaired is the error of a store with no device: run the login first. It is an error that the owner acts on
 // (app.OwnerActs): a restart does not pair the device.
-var ErrNotPaired = app.OwnerActs(errors.New("not paired: run lifelog whatsapp login"))
+var ErrNotPaired = app.OwnerActs(errors.New("not paired: run aminte whatsapp login"))
 
 // Prepare makes the state folder dir (app.StateDir("whatsapp")) with mode 0700 and returns the paths of the session
 // store and the state file of the conversation. A folder that exists gets mode 0700 too, because the store in it holds

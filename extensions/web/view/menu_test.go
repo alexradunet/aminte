@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"lifelog/siren"
+	"aminte/siren"
 )
 
 // TestAPageOfAnAppDrawsEachActionOnceByItsClass: an app names no template, so its actions are drawn by their class: the

@@ -1,6 +1,6 @@
 # 079 — Client contract hygiene: error codes, list pages, a connect timeout, one parameter
 
-> Dated implementation record. The schema is untouched; these are application fixes of `lifelog` for the clients
+> Dated implementation record. The schema is untouched; these are application fixes of `aminte` for the clients
 > [plan 078](078-network-server.md) lets in. No RFC: no decision changes.
 
 ## Status

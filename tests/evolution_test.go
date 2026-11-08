@@ -215,7 +215,7 @@ func uuid4() string {
 }
 
 // These isolated SQLite probes distinguish preserving rows from preserving old SQL.
-// They do not migrate any Lifelog database or define a pre-freeze migration path.
+// They do not migrate any Aminte database or define a pre-freeze migration path.
 func evolutionReaderCompatibility(s *S) {
 	c := s.connect(filepath.Join(s.dir, "compatibility.db"))
 	c.must("PRAGMA journal_mode=WAL")

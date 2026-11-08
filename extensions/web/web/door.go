@@ -8,7 +8,7 @@ import (
 	"net/url"
 	"strings"
 
-	"lifelog/siren"
+	"aminte/siren"
 )
 
 // The door of the browser. A browser logs in once with the owner's token and gets the session cookie (sessions.go). Every

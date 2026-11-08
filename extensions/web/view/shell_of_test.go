@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"lifelog/siren"
+	"aminte/siren"
 )
 
 // rootOf is the root of the API as a client reads it with ?embed=today,conversation: JSON, decoded into an entity.
@@ -19,7 +19,7 @@ func rootOf(t *testing.T, body string) *siren.Entity {
 	return e
 }
 
-const rootJSON = `{"class":["root"],"title":"Lifelog",
+const rootJSON = `{"class":["root"],"title":"Aminte",
  "properties":{"today":"2031-05-14","zone":"+14","utc_offset":50400,"recent":[]},
  "entities":[
   {"rel":["today"],"href":"/days/2031-05-14","title":"2031-05-14","class":["day"],
@@ -28,7 +28,7 @@ const rootJSON = `{"class":["root"],"title":"Lifelog",
   {"rel":["conversation"],"href":"/days/2031-05-14/conversation","title":"Conversation 2031-05-14","class":["conversation","page"],
    "properties":{"day":"2031-05-14","version":"7","turns":[
      {"who":"owner","at":"09:00","via":"whatsapp","text":"Hello"},
-     {"who":"lifelog","at":"09:01","text":"Hi","tools":["- ` + "`read_day`" + ` → /days/2031-05-14"],"refs":["/days/2031-05-14"]}]},
+     {"who":"aminte","at":"09:01","text":"Hi","tools":["- ` + "`read_day`" + ` → /days/2031-05-14"],"refs":["/days/2031-05-14"]}]},
    "actions":[{"name":"say","method":"POST","href":"/days/2031-05-14/say","fields":[{"name":"text","type":"textarea"}]}]}],
  "links":[{"rel":["self"],"href":"/"},{"rel":["app"],"href":"/with/notes","title":"Notes"},{"rel":["app"],"href":"/with/maps","title":"maps"},{"rel":["tasks"],"href":"/tasks","title":"Tasks"}]}`
 
@@ -67,7 +67,7 @@ func TestTheShellIsReadFromTheRoot(t *testing.T) {
 // and no column; a root with no day as today gives no shell; a zone that the database has is that zone, and a name
 // that is empty or Local is the zone of this machine.
 func TestTheShellKeepsWhatWasNotEmbedded(t *testing.T) {
-	bare := `{"class":["root"],"title":"Lifelog","properties":{"today":"2031-05-14","zone":"UTC","utc_offset":0},
+	bare := `{"class":["root"],"title":"Aminte","properties":{"today":"2031-05-14","zone":"UTC","utc_offset":0},
 	 "entities":[{"rel":["today"],"href":"/days/2031-05-14"},{"rel":["conversation"],"href":"/days/2031-05-14/conversation"}]}`
 	shell, err := ShellOf(rootOf(t, bare))
 	if err != nil || shell.Strip != nil || shell.Chat != nil || shell.Zone != time.UTC || shell.Tasks || len(shell.Apps) != 0 {

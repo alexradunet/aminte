@@ -30,7 +30,7 @@ Each row is a fact of the code at `acf70dd`.
 
 ## Reproduce
 
-1. Build `lifelog` at `acf70dd`. On a fresh file, register `weight` (kg), record 14 days and 20 readings of earlier
+1. Build `aminte` at `acf70dd`. On a fresh file, register `weight` (kg), record 14 days and 20 readings of earlier
    years, and capture a day page that says `[[weight]]`.
 2. Open `/metrics/weight`: 14 readings, Record at the end. Follow All readings: a second page.
 3. Follow `[[weight]]` from the day page: the generic Properties list, with no reading and no Record.

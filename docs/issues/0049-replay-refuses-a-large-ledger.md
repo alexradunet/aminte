@@ -20,7 +20,7 @@ from another artifact; the bound stays on the artifacts it was written for.
 ## Reproduce
 
 1. A workspace with a `ledger.md` of 5 MiB (a source of 100 000 files) and an approved, applied prepared batch.
-2. `lifelog import replay --to x.db --workspace … --dry-run`: clean. Without `--dry-run`: `422: workspace artifact
+2. `aminte import replay --to x.db --workspace … --dry-run`: clean. Without `--dry-run`: `422: workspace artifact
    exceeds byte limit`, nothing written.
 
 ## Rules involved

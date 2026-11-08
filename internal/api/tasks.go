@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
-	"lifelog/client"
-	"lifelog/internal/core"
-	"lifelog/siren"
+	"aminte/client"
+	"aminte/internal/core"
+	"aminte/siren"
 )
 
 // The task service (docs/plans/158-one-task-service-behind-tasks.md) is the one child of `serve --with` whose catalog

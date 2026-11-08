@@ -1,13 +1,13 @@
-# lifelog-web: the browser
+# aminte-web: the browser
 
-`lifelog-web` is the browser of `lifelog`. It draws the answers of the API as pages of HTML, serves the sheets, the
+`aminte-web` is the browser of `aminte`. It draws the answers of the API as pages of HTML, serves the sheets, the
 scripts, the fonts and the pictures of the pages, and streams a picture or a file of the core to the browser. It takes
 the forms of the pages and sends the writes to the core. It is the door of the browser: the login and the lock are here.
-It is an extension: a client of [API.md](../../API.md) in its own module, `lifelog-web`. It imports `lifelog/siren`,
-`lifelog/client`, `lifelog/app` and `lifelog/text` of the root module (a `replace` directive), and `lifelog/lifelogtest`
+It is an extension: a client of [API.md](../../API.md) in its own module, `aminte-web`. It imports `aminte/siren`,
+`aminte/client`, `aminte/app` and `aminte/text` of the root module (a `replace` directive), and `aminte/amintetest`
 in its tests. It opens no file of the life log and keeps no data of it.
 
-It is the only browser of `lifelog`. The core answers Siren JSON and bytes, and it holds no HTML, no CSS, no JavaScript
+It is the only browser of `aminte`. The core answers Siren JSON and bytes, and it holds no HTML, no CSS, no JavaScript
 and no picture of a page. The decisions of the browser are in this page, as the decisions of an extension live in its
 README ([plan 161](../../docs/plans/161-the-browser-as-an-extension.md)).
 
@@ -15,97 +15,97 @@ A person who wants no browser does not run it. A person who wants another interf
 
 ```mermaid
 flowchart LR
-  B["the browser"] -->|"HTML forms, the session cookie"| W["lifelog-web, on LIFELOG_WEB_LISTEN"]
-  W -->|"GET and POST, Accept: Siren JSON, bearer token, Lifelog-Source: ui"| C["lifelog serve, on 127.0.0.1"]
+  B["the browser"] -->|"HTML forms, the session cookie"| W["aminte-web, on AMINTE_WEB_LISTEN"]
+  W -->|"GET and POST, Accept: Siren JSON, bearer token, Aminte-Source: ui"| C["aminte serve, on 127.0.0.1"]
   C -->|"Siren JSON, or bytes of a picture or a file"| W
   W -->|"HTML drawn by the view, or the bytes unchanged"| B
-  C <-->|"the catalog of web, as /with/web"| A["the catalog of lifelog-web, on LIFELOG_LISTEN"]
+  C <-->|"the catalog of web, as /with/web"| A["the catalog of aminte-web, on AMINTE_LISTEN"]
 ```
 
 ## What is here
 
 This program is the whole of the browser. The pages (the read side), the forms (the write side), the login, the lock and
 the settings of the browser are here. The end-to-end test (`e2e_test.go`) runs this program under the real
-`lifelog serve --token-file F --with web`. The parity test (`web/parity_test.go`) shows that each action of
+`aminte serve --token-file F --with web`. The parity test (`web/parity_test.go`) shows that each action of
 `GET /actions` has its form ([tests](#tests)).
 
 ## Build and run
 
-From this folder, build the program beside `lifelog`, so that `lifelog` finds it:
+From this folder, build the program beside `aminte`, so that `aminte` finds it:
 
 ```
-go build -o <the folder of lifelog>/lifelog-web ./cmd/lifelog-web
+go build -o <the folder of aminte>/aminte-web ./cmd/aminte-web
 ```
 
 Run it as a child of the server, which gives it the address of the server and the token:
 
 ```
-lifelog serve --token-file F --with web
+aminte serve --token-file F --with web
 ```
 
-or, for a trial on a `life.db` that exists, as `lifelog web`. `lifelog` then opens a temporary server for the life of the
-program. That server checks no token. The program still needs `LIFELOG_TOKEN` in the environment for its login: any token
+or, for a trial on a `life.db` that exists, as `aminte web`. `aminte` then opens a temporary server for the life of the
+program. That server checks no token. The program still needs `AMINTE_TOKEN` in the environment for its login: any token
 of 32 characters or more, in one line, that does not start or end with a space or a tab.
 
 | environment | meaning |
 |---|---|
-| `LIFELOG_URL` | The address of the core, `http://127.0.0.1:PORT`. Required: the program refuses to start without it, with exit status 78, so `serve` does not start it again. |
-| `LIFELOG_TOKEN` | The token of the server. Required, 32 characters or more, one line, and no space or tab at its start or end; without it the program exits with status 78. It is the login of the browser and the bearer token of every request to the core. `serve --with` sets it from the token of the server. A new token ends every session of every browser. |
-| `LIFELOG_WEB_LISTEN` | The address of the door of the browser. A loopback address only (`127.0.0.1:7780` by default). Another address is refused with exit status 78. The proxy of the owner points to it and ends TLS. |
-| `LIFELOG_WEB_ORIGINS` | The browser origins that the guard of the writes trusts besides its own, separated by commas or spaces: `https://lifelog.example`. Each is a scheme, a host, an optional port and nothing else, in lower case. The origin that the proxy shows to the browser is the one to list: behind a proxy the `Origin` of a form is not the `Host` that web sees. |
-| `LIFELOG_LISTEN` | Set by `serve --with` only: the loopback address where this program serves its catalog ([the settings](#the-settings-of-the-browser)). Not set: there is no catalog, and the form "This browser" is not drawn, because the core has no `web-settings` action. |
+| `AMINTE_URL` | The address of the core, `http://127.0.0.1:PORT`. Required: the program refuses to start without it, with exit status 78, so `serve` does not start it again. |
+| `AMINTE_TOKEN` | The token of the server. Required, 32 characters or more, one line, and no space or tab at its start or end; without it the program exits with status 78. It is the login of the browser and the bearer token of every request to the core. `serve --with` sets it from the token of the server. A new token ends every session of every browser. |
+| `AMINTE_WEB_LISTEN` | The address of the door of the browser. A loopback address only (`127.0.0.1:7780` by default). Another address is refused with exit status 78. The proxy of the owner points to it and ends TLS. |
+| `AMINTE_WEB_ORIGINS` | The browser origins that the guard of the writes trusts besides its own, separated by commas or spaces: `https://aminte.example`. Each is a scheme, a host, an optional port and nothing else, in lower case. The origin that the proxy shows to the browser is the one to list: behind a proxy the `Origin` of a form is not the `Host` that web sees. |
+| `AMINTE_LISTEN` | Set by `serve --with` only: the loopback address where this program serves its catalog ([the settings](#the-settings-of-the-browser)). Not set: there is no catalog, and the form "This browser" is not drawn, because the core has no `web-settings` action. |
 
 A bad value of any of these is a refusal with exit status 78: the owner acts first, and `serve` does not start the program
 again. So is a settings file that is not JSON, and a state folder that cannot be made. A settings file that cannot be read
 now (a fault of the file system) ends the program with status 1, and `serve` starts it again after 10 seconds. When the
-unit of the service has `ProtectHome=read-only`, it must list `~/.config/lifelog-web` in `ReadWritePaths`, else the
+unit of the service has `ProtectHome=read-only`, it must list `~/.config/aminte-web` in `ReadWritePaths`, else the
 program cannot write its settings.
 
 ## Install
 
-The reference unit is [deploy/lifelog.service](../../deploy/lifelog.service), and
+The reference unit is [deploy/aminte.service](../../deploy/aminte.service), and
 [deploy/README.md](../../deploy/README.md) says how to ship a change. The unit has one home: this page does not copy its
 lines. The owner does these steps in this order:
 
 ```mermaid
 flowchart TD
-  B["build lifelog and lifelog-web into the install folder"] --> T["make the token file"]
+  B["build aminte and aminte-web into the install folder"] --> T["make the token file"]
   T --> U["change the unit: --token-file and --with web, the two Environment lines, ReadWritePaths; daemon-reload"]
   U --> R["restart the service; read its log"]
-  R --> P["point the proxy to LIFELOG_WEB_LISTEN"]
+  R --> P["point the proxy to AMINTE_WEB_LISTEN"]
 ```
 
-1. Build both programs into the folder where the unit's `ExecStart` runs `lifelog`. `serve` refuses to start without
-   `lifelog-web` beside `lifelog`, before the file opens.
+1. Build both programs into the folder where the unit's `ExecStart` runs `aminte`. `serve` refuses to start without
+   `aminte-web` beside `aminte`, before the file opens.
 
    ```
-   go build -o <install folder>/lifelog ./cmd/lifelog
-   go build -C extensions/web -o <install folder>/lifelog-web ./cmd/lifelog-web
+   go build -o <install folder>/aminte ./cmd/aminte
+   go build -C extensions/web -o <install folder>/aminte-web ./cmd/aminte-web
    ```
 
 2. Make the token file: one line of 32 characters or more, with no space or tab at its start or end ([the quick start](../../README.md) shows a line that makes it).
 3. Change the unit. `ExecStart` runs `serve --token-file F --snapshots D --with web`. The core listens on the loopback
    only, and the token turns on its check. A unit that still has `--public`, `--allow-origin`, `--tls-cert` or
    `--tls-key` fails, because `serve` refuses a flag that it does not know. Add
-   `Environment=LIFELOG_WEB_LISTEN=127.0.0.1:7780`, `Environment=LIFELOG_WEB_ORIGINS=` with the origin that the proxy shows
+   `Environment=AMINTE_WEB_LISTEN=127.0.0.1:7780`, `Environment=AMINTE_WEB_ORIGINS=` with the origin that the proxy shows
    to the browser, and the folder of the state of web in `ReadWritePaths` (needed when the unit has
    `ProtectHome=read-only`). The unit has no token: `serve` reads it from the token file and gives it to web as
-   `LIFELOG_TOKEN`.
-4. `systemctl daemon-reload`, then restart the service. The log (`journalctl -u lifelog.service -n 30`) must show these
-   lines: `lifelog: serving PATH on http://127.0.0.1:7777 (token required) (version V, user_version N)`,
-   `lifelog: with web: started (pid N)`, `lifelog-web: DATE TIME the browser is on http://127.0.0.1:7780` and
-   `lifelog: with web: a catalog of 1 actions on 127.0.0.1:PORT`. A line `ended with status 78: not started again` means a
+   `AMINTE_TOKEN`.
+4. `systemctl daemon-reload`, then restart the service. The log (`journalctl -u aminte.service -n 30`) must show these
+   lines: `aminte: serving PATH on http://127.0.0.1:7777 (token required) (version V, user_version N)`,
+   `aminte: with web: started (pid N)`, `aminte-web: DATE TIME the browser is on http://127.0.0.1:7780` and
+   `aminte: with web: a catalog of 1 actions on 127.0.0.1:PORT`. A line `ended with status 78: not started again` means a
    bad variable: web wrote the reason to the log, and the owner acts first.
-5. Point the local proxy to `LIFELOG_WEB_LISTEN` (`127.0.0.1:7780`). The proxy ends TLS and maps the name on the private
+5. Point the local proxy to `AMINTE_WEB_LISTEN` (`127.0.0.1:7780`). The proxy ends TLS and maps the name on the private
    network to web alone. The core stays on its own loopback address for the programs on the machine: the CLI, the MCP
    server and the connected apps.
 
-To go back, keep the programs of the last good build beside the new ones (for example `lifelog.prev` and
-`lifelog-web.prev`). A step back between two builds that are both after this move is the copy of the programs over the
+To go back, keep the programs of the last good build beside the new ones (for example `aminte.prev` and
+`aminte-web.prev`). A step back between two builds that are both after this move is the copy of the programs over the
 new ones and a restart of the service.
 
-A step back to a build before this move needs more, because the old `lifelog` refuses `--token-file` without
-`--public`: the old programs with the new unit leave the service down. The old `lifelog` also served the browser on
+A step back to a build before this move needs more, because the old `aminte` refuses `--token-file` without
+`--public`: the old programs with the new unit leave the service down. The old `aminte` also served the browser on
 `127.0.0.1:7777`, so the proxy goes back there. Do these steps in this order:
 
 ```mermaid
@@ -198,7 +198,7 @@ flowchart TD
   T -->|"urlencoded"| R["read, 20 MiB at most; back, feedback and new taken out; read GET /actions for the action at the path; the fields of the other button of a pick bar taken out"]
   T -->|"multipart: a file"| M["streamed to the core as it comes; back is read from the query of the address"]
   T -->|"any other type"| U["415"]
-  R --> C["POST to the core: the same path, Accept: Siren, bearer token, Lifelog-Source: ui"]
+  R --> C["POST to the core: the same path, Accept: Siren, bearer token, Aminte-Source: ui"]
   M --> C
   C --> A{"the answer"}
   A -->|"2xx with a Location"| D["303 to back, else to the Location, with the receipt of the toast"]
@@ -234,7 +234,7 @@ flowchart TD
   page it came from ([plan 131](../../docs/plans/131-the-pareto-pass.md)). A form of a file shows no "What you sent",
   because the text is in the body, which web does not read.
 - **The guard.** A write from an origin that is not trusted is refused before anything else (403 `cross_origin`): the
-  browser's own `Sec-Fetch-Site` and `Origin` headers, with `LIFELOG_WEB_ORIGINS` for the origin of the proxy.
+  browser's own `Sec-Fetch-Site` and `Origin` headers, with `AMINTE_WEB_ORIGINS` for the origin of the proxy.
 - **No retry.** Web sends a write once. A write that was sent may be done.
 
 ## The login and the lock
@@ -251,7 +251,7 @@ stateDiagram-v2
   Open --> LoggedOut: POST /logout
 ```
 
-- `POST /login` with the token sets the cookie `lifelog_session`: 16 random bytes and the HMAC-SHA256 of them, `HttpOnly`,
+- `POST /login` with the token sets the cookie `aminte_session`: 16 random bytes and the HMAC-SHA256 of them, `HttpOnly`,
   `SameSite=Strict`, for one year. The cookie holds no token. The key of the HMAC is derived from the token, so a session
   cookie set before the move to this program stays valid. A new token ends every session. A wrong token goes back to the
   form, and the log has one line and not the token.
@@ -297,7 +297,7 @@ stops the start (status 78), and a file that cannot be read now ends the program
 again: there is no read of the file that can fail while the program runs, so a session never meets a lock that cannot
 be read.
 
-With `LIFELOG_LISTEN`, the program serves a catalog on that address, and `lifelog serve --with web` merges it into its own:
+With `AMINTE_LISTEN`, the program serves a catalog on that address, and `aminte serve --with web` merges it into its own:
 
 | route | answer |
 |---|---|
@@ -307,7 +307,7 @@ With `LIFELOG_LISTEN`, the program serves a catalog on that address, and `lifelo
 
 The page `/settings` is the settings page of the core, and under its form a second form, "This browser": the action
 `web-settings` of the catalog of the core, with the values of this program. It posts to web, which sends it to the core,
-which sends it on to this catalog. Without the app (no `LIFELOG_LISTEN`) the form is not drawn. The settings page also
+which sends it on to this catalog. Without the app (no `AMINTE_LISTEN`) the form is not drawn. The settings page also
 links to the snapshot form under Backup ([the pages](#backup)).
 
 ## The view
@@ -562,7 +562,7 @@ a 45rem grid. To keep one, we would override most of it, and we would pin a file
 
 ## How the browser draws a page of an app
 
-`lifelog-web` draws the page of an app with its generic view. The view reads the shape of the entity and the `class` of
+`aminte-web` draws the page of an app with its generic view. The view reads the shape of the entity and the `class` of
 its actions ([API.md](../../API.md#action-classes)). It reads no name of an app. An app action has at most one class. The
 server refuses an app that sends two, and it drops a class that `siren.ActionClasses()` does not list, so an unknown
 class is the same as none. An author shapes the page with three rules. The contract of an author is
@@ -669,13 +669,13 @@ browser. It is rejected, for three reasons that hold for a page with no build st
 
 | path | what |
 |---|---|
-| `cmd/lifelog-web` | The program: the environment, the loopback door, the catalog, the drain on an interrupt. |
+| `cmd/aminte-web` | The program: the environment, the loopback door, the catalog, the drain on an interrupt. |
 | `web` | The handler: `web.New(web.Options{...})`. `web.go` the options and the routes; `door.go` the checks of every request, the login and the logout; `sessions.go` the sessions and their cookie; `lock.go` the lock; `page.go` the read; `write.go` the write; `feedback.go` the toast; `shell.go` the shell; `assets.go` the files and `/render`; `settings.go` the file of the settings and the PIN; `catalog.go` the catalog of this program. |
-| `view` | The templates, the sheets, the scripts, the fonts and the pictures of the pages. The view imports `lifelog/siren`, `lifelog/text` and `pixelart`, and no store (`TestTheViewImportsNoStore`). A form of a file puts `back` in the query of its address (`formView.ActionHref`), and the settings page draws the form "This browser". The OFL texts of the three fonts and `fonts/README.md` travel with `view/html/fonts`. |
+| `view` | The templates, the sheets, the scripts, the fonts and the pictures of the pages. The view imports `aminte/siren`, `aminte/text` and `pixelart`, and no store (`TestTheViewImportsNoStore`). A form of a file puts `back` in the query of its address (`formView.ActionHref`), and the settings page draws the form "This browser". The OFL texts of the three fonts and `fonts/README.md` travel with `view/html/fonts`. |
 | `pixelart` | The drawings of the five pictures. A test compares each picture of `view/html` with its drawing, pixel by pixel. |
 | `tools/pixelart` | Writes the five pictures to `view/html/` after a change to a drawing. Run it with `go run ./tools/pixelart` in this folder; a stale file fails the comparison of `pixelart`. |
 | `internal/formdoc` | Reads the forms of a page of HTML as a browser reads them. Only the tests import it. |
-| `e2e_test.go` | The end-to-end test against the real `lifelog serve --with web` ([tests](#tests)). |
+| `e2e_test.go` | The end-to-end test against the real `aminte serve --with web` ([tests](#tests)). |
 
 ## Tests
 
@@ -684,7 +684,7 @@ go vet ./... && go test ./...
 ```
 
 in this folder. The root of the repository does not run them: its `./...` does not build this module. A test of `web` uses
-`lifelog/lifelogtest`: a real core handler over a fresh synthetic file, in the process, and `Server.Connect` to register
+`aminte/amintetest`: a real core handler over a fresh synthetic file, in the process, and `Server.Connect` to register
 the catalog of web as the app `web`, as `serve --with web` does. No test opens the owner's `life.db`.
 
 The tests are in files by subject, next to the code that they hold:
@@ -710,9 +710,9 @@ asks web for `/actions` (for an action with a path field, `/actions?new=NAME&FIE
 link to it) and reads the forms of the HTML as a browser reads them. The page must hold a form with the method and the address
 of the action. No action is exempt. The test fails for an action without a form and for a path field with no synthetic value.
 
-**The end-to-end test** (`e2e_test.go`). It builds the real `lifelog` and `lifelog-web` into one folder, makes a synthetic
-`life.db` there, and starts the line of [the install](#install): `lifelog serve --addr 127.0.0.1:0 --token-file F --with web`,
-with `LIFELOG_WEB_LISTEN` and `LIFELOG_WEB_ORIGINS` (its own origin and one proxy origin) set, and `XDG_CONFIG_HOME` and `APPDATA` at a folder of the test (the state folder is `lifelog-web` in it). It reads
+**The end-to-end test** (`e2e_test.go`). It builds the real `aminte` and `aminte-web` into one folder, makes a synthetic
+`life.db` there, and starts the line of [the install](#install): `aminte serve --addr 127.0.0.1:0 --token-file F --with web`,
+with `AMINTE_WEB_LISTEN` and `AMINTE_WEB_ORIGINS` (its own origin and one proxy origin) set, and `XDG_CONFIG_HOME` and `APPDATA` at a folder of the test (the state folder is `aminte-web` in it). It reads
 the address of the core from the startup line of `serve`. Then it is a browser on the door of web alone: a cookie jar,
 `Accept: text/html`, and the fetch headers of a navigation. It checks, in order:
 
@@ -726,10 +726,10 @@ flowchart TD
   F --> G["/settings: the form This browser sets the ground, lock_after and a PIN; the file has the hash, not the PIN, mode 0600"]
   G --> H["the core lists web-settings as the owner's and refuses it to agent:x with 403"]
   H --> I["POST /lock, a locked write is 401 and writes nothing, a wrong PIN stays locked, the right PIN opens"]
-  I --> J["an interrupt of lifelog ends both programs, with status 0, within 25 seconds"]
+  I --> J["an interrupt of aminte ends both programs, with status 0, within 25 seconds"]
 ```
 
 It reads the stored state back through the API of the core with the bearer token, and it never trusts a page for what the file
 holds. Every wait polls a fact (a line of the log, a port, an exit) with a deadline. The test needs `go` and the sources of
-`lifelog` two folders up, else it is skipped; `-short` and Windows skip it too. It reads the clock of the real core, so a run
+`aminte` two folders up, else it is skipped; `-short` and Windows skip it too. It reads the clock of the real core, so a run
 that crosses midnight can fail once.

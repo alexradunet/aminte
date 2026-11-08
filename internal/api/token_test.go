@@ -9,11 +9,11 @@ import (
 	"strings"
 	"testing"
 
-	"lifelog/client"
-	"lifelog/internal/api"
-	"lifelog/internal/core"
-	"lifelog/internal/db/dbtest"
-	"lifelog/siren"
+	"aminte/client"
+	"aminte/internal/api"
+	"aminte/internal/core"
+	"aminte/internal/db/dbtest"
+	"aminte/siren"
 )
 
 const testToken = "synthetic-token-0123456789abcdefghij" // 36 characters
@@ -21,7 +21,7 @@ const testToken = "synthetic-token-0123456789abcdefghij" // 36 characters
 // listenAddr is the loopback address that the guarded handler of a test stands for: the one NetworkAuthority knows.
 var listenAddr = &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 7777}
 
-// tokenHandler is the handler of lifelog serve with a token, from the outside in: NetworkAuthority, RequireToken, the
+// tokenHandler is the handler of aminte serve with a token, from the outside in: NetworkAuthority, RequireToken, the
 // API on a fresh file. The store is for a probe of the file.
 func tokenHandler(t *testing.T) (http.Handler, *core.Store) {
 	t.Helper()
@@ -90,8 +90,8 @@ func TestRequireTokenAcceptsTheBearerAlone(t *testing.T) {
 		{"empty credential", "/days/2031-01-01", with(map[string]string{"Authorization": "Bearer "}), 401},
 		{"basic scheme", "/days/2031-01-01", with(map[string]string{"Authorization": "Basic " + testToken}), 401},
 		{"the token without a scheme", "/days/2031-01-01", with(map[string]string{"Authorization": testToken}), 401},
-		{"the token as the old cookie", "/days/2031-01-01", with(map[string]string{"Cookie": "lifelog_token=" + testToken}), 401},
-		{"the token as a session cookie", "/days/2031-01-01", with(map[string]string{"Cookie": "lifelog_session=" + testToken}), 401},
+		{"the token as the old cookie", "/days/2031-01-01", with(map[string]string{"Cookie": "aminte_token=" + testToken}), 401},
+		{"the token as a session cookie", "/days/2031-01-01", with(map[string]string{"Cookie": "aminte_session=" + testToken}), 401},
 		{"a route of an old login page", "/login", local, 401},
 		{"a file that an app would install", "/assets/icon.svg", local, 401},
 		{"the root", "/", local, 401},
@@ -112,7 +112,7 @@ func TestRequireTokenAcceptsTheBearerAlone(t *testing.T) {
 				t.Fatalf("the 401 is no entity: %v\n%.200s", err, rec.Body.String())
 			}
 			props, _ := body.Properties.(map[string]any)
-			if got := rec.Header().Get("WWW-Authenticate"); got != `Bearer realm="lifelog"` {
+			if got := rec.Header().Get("WWW-Authenticate"); got != `Bearer realm="aminte"` {
 				t.Errorf("WWW-Authenticate=%q", got)
 			}
 			if props["code"] != siren.CodeTokenRequired || props["message"] != "token required" || rec.Header().Get("Content-Type") != "application/vnd.siren+json" {
@@ -140,7 +140,7 @@ func TestRequireTokenAcceptsTheBearerAlone(t *testing.T) {
 	}
 }
 
-// TestAWrongHostIsRefusedBeforeTheToken: NetworkAuthority is the outer guard of lifelog serve, so a page that an
+// TestAWrongHostIsRefusedBeforeTheToken: NetworkAuthority is the outer guard of aminte serve, so a page that an
 // attacker serves under another name (DNS rebinding) is refused with 403 whether it sends the token or not, and a
 // request to the right Host without the token is 401. A target in absolute form is refused with the token too.
 func TestAWrongHostIsRefusedBeforeTheToken(t *testing.T) {

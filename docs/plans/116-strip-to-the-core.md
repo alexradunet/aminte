@@ -61,7 +61,7 @@ flowchart LR
 | 5 | the `places` table (point, radius, link_days), `locate`, the map link, the photo's position and its place matching, the folder import of photos; a photo keeps its own day | issue 0076, RFC 0016; D21 and D16 rewritten; cookbook place-of-a-photo removed |
 | 6 | `link_kinds` rows `about`, `located-in`, `parent-of`, `friend`, `family`, `related`; `link` and `unlink` keep `at` only | issue 0077, RFC 0017; D8 and D16 rewritten; cookbook inside-a-place removed |
 | 7 | the `habit_periods` table, `start-habit`, `stop-habit`, `check-in`, `/habits` | issue 0078, RFC 0018; D24 rewritten: a habit is a metric with a daily reading |
-| 8 | the `tasks` and `task_occurrences` tables, `lifelog_meta.planning`, the planning contract, the eleven task actions, `/tasks`, `/deadlines` | issue 0079, RFC 0019; D23 and D15 rewritten: planning is text in a page |
+| 8 | the `tasks` and `task_occurrences` tables, `aminte_meta.planning`, the planning contract, the eleven task actions, `/tasks`, `/deadlines` | issue 0079, RFC 0019; D23 and D15 rewritten: planning is text in a page |
 
 ## Tests
 
@@ -79,14 +79,14 @@ flowchart LR
   `internal/speech`, the Chat entry of the sidebar, the share target's file. `New` no longer takes an asker or a
   transcriber. Record: issue 0075, RFC 0015, a non-goals row; issues 0071 and 0072 closed the other way; the README
   bullets of plans 102, 103, 106 and 109 replaced by one. Checks: `go generate ./... && go vet ./... && go test ./...`
-  green. The service unit still sets `LIFELOG_MODEL_URL` and `LIFELOG_MODEL`: they are read by nothing now.
+  green. The service unit still sets `AMINTE_MODEL_URL` and `AMINTE_MODEL`: they are read by nothing now.
 - **Step 2 (read-only SQL).** Removed: `query` (`POST /query`), the CLI `query`, `core/query.go` with its statement
   allow-list and `Result`, and the ad hoc reader of `internal/db`. The tests that used `query` as a probe of what a
   surface wrote read the row from the file instead (`freshStore`, `scalar`). Record: README; API.md's `result`
   class is the dry run's shape alone. Checks: `go generate ./... && go vet ./... && go test ./...` green.
 - **Step 3 (readings from a table).** Removed: `readings-from-table` (`POST /measurements/from-table`), the CLI
   `readings` and `--column`, `core/tables.go` with the source `import:table`, the agentic skill
-  `lifelog-readings-from-table`. A reading is recorded one at a time with `record`. Record: README, API.md.
+  `aminte-readings-from-table`. A reading is recorded one at a time with `record`. Record: README, API.md.
   Checks: `go generate ./... && go vet ./... && go test ./...` green.
 - **Step 4 (the public listener).** Kept, by the owner's word (2026-10-15): the service unit runs `serve --public --token-file … --allow-origin
   https://balaur.ojos-sargas.ts.net`, and `tailscale serve` proxies the tailnet to it. Without `--public` the
@@ -114,7 +114,7 @@ flowchart LR
   entity model, the 2075 table (one question fewer) and the schema README edited; README and API.md say the current
   truth. Checks: `go generate ./... && go vet ./... && go test ./...` green.
 - **Step 8 (tasks).** Removed: the `tasks` and `task_occurrences` tables with their indexes and fourteen
-  triggers, `lifelog_meta.planning` and the task clauses of three other rows, the task clause of `ghost_pages`, the
+  triggers, `aminte_meta.planning` and the task clauses of three other rows, the task clause of `ghost_pages`, the
   planning contract, the cookbook recipe tasks, the three task queries of the integrity checks, the eleven task
   actions, `/tasks` and `/deadlines`, the due lists of Home, of a day, of a month and of a week, the Due count of
   the sidebar, the CLI's `tasks` and `due`, `page.task_project`, the `planning` suites and 83 mutants. A plan is
@@ -122,11 +122,11 @@ flowchart LR
   non-goals, the product concepts, the imports and integrity contracts, the 2075 table (three questions fewer),
   the entity model, the ghost-pages recipe, the schema README, the writer guide and AGENTS.md edited; README and
   API.md say the current truth. Checks: `go generate ./... && go vet ./... && go test ./...` green.
-- **The live file.** A one-off program, `dropcore` (kept at `~/.local/share/lifelog-ui/dropcore-bin` with its
+- **The live file.** A one-off program, `dropcore` (kept at `~/.local/share/aminte-ui/dropcore-bin` with its
   source beside it), brings `life.db` from the schema before RFC 0016 to the current `schema.sql` in one
   transaction: a place's point, a link of a removed kind (with a wikilink in its place), a habit's periods and every
   task with its occurrences become text in their pages (the tasks in a page `Tasks`); the four tables go;
-  `link_kinds` is made again without `symmetric`; every other rule, table text and `lifelog_meta` row is made equal
+  `link_kinds` is made again without `symmetric`; every other rule, table text and `aminte_meta` row is made equal
   to a fresh file, and the program refuses to commit on any difference. Tested on 2026-10-15 on a synthetic file
   made by the binary of `498cbb8`: 2 points, 7 links, 2 periods and 2 tasks became text, 9 entities kept, the four
   checks pass, and the binary of this plan reads the result. The owner runs it with the service stopped, after a

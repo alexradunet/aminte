@@ -20,10 +20,10 @@ import (
 	"testing"
 	"time"
 
-	"lifelog-web/web"
-	"lifelog/client"
-	"lifelog/lifelogtest"
-	"lifelog/siren"
+	"aminte-web/web"
+	"aminte/amintetest"
+	"aminte/client"
+	"aminte/siren"
 )
 
 const today = "2031-05-14"
@@ -31,10 +31,10 @@ const today = "2031-05-14"
 // testToken is the owner's token of the tests: 36 characters of no meaning.
 const testToken = "synthetic-token-synthetic-token-1234"
 
-// life is a lifelog server with a synthetic file, and web in front of it. web is a browser that has logged in: it sends
+// life is an aminte server with a synthetic file, and web in front of it. web is a browser that has logged in: it sends
 // its session cookie with each request. browser is the handler itself, for a test that needs no cookie, or another.
 type life struct {
-	core    *lifelogtest.Server
+	core    *amintetest.Server
 	api     *client.Client
 	web     http.Handler
 	browser *web.Browser
@@ -96,7 +96,7 @@ func login(t *testing.T, h http.Handler) string {
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 	for _, c := range rec.Result().Cookies() {
-		if c.Name == "lifelog_session" {
+		if c.Name == "aminte_session" {
 			return c.Name + "=" + c.Value
 		}
 	}
@@ -145,7 +145,7 @@ func emptyLife(t *testing.T) *life {
 // receipts only.
 func lifeStartingOn(t *testing.T, day string) *life {
 	t.Helper()
-	core := lifelogtest.New(t, day)
+	core := amintetest.New(t, day)
 	clk := newClock()
 	state := t.TempDir()
 	browser := newBrowser(t, core.URL, clk, state)
@@ -220,7 +220,7 @@ func richLife(t *testing.T) *life {
 	page := must(t)(l.api.Get(t.Context(), href(conv, "page")))
 	body, _ := page.Properties.(map[string]any)["body"].(string)
 	refs := []string{"/days/" + today, href(river, "self"), href(sam, "self"), "/metrics/Weight", "/search?q=heron", "/pages/999999", "/days/today"}
-	more := "\n\n" + toolLines(refs...) + "\n**lifelog** (09:30): You slept *well*.\n"
+	more := "\n\n" + toolLines(refs...) + "\n**aminte** (09:30): You slept *well*.\n"
 	must(t)(l.api.Do(t.Context(), act(t, page, "save-body"), map[string]string{"body": body + more}))
 
 	l.hrefs["river"], l.hrefs["sam"] = href(river, "self"), href(sam, "self")

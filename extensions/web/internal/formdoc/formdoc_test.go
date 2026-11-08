@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"testing"
 
-	"lifelog-web/internal/formdoc"
+	"aminte-web/internal/formdoc"
 )
 
 // TestAFormIsReadAsABrowserSendsIt: the default fields of a form are the ones a browser sends when the reader changes

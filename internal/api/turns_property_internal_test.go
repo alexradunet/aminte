@@ -17,7 +17,7 @@ import (
 // new turns. The seed is fixed; a failure prints the page.
 func TestAReplyAndASayMoveNoTurnThatWasThere(t *testing.T) {
 	const day = "2031-05-14"
-	pieces := []string{"```", "````", "~~~", "**Owner** (09:31): x", "**lifelog** (09:31): y", "**Owner** (09.31, via w): z", " **Owner** (09:31): s",
+	pieces := []string{"```", "````", "~~~", "**Owner** (09:31): x", "**aminte** (09:31): y", "**Owner** (09.31, via w): z", " **Owner** (09:31): s",
 		"- `get`", "- `x` \u2192 /pages/1", "", "text", "\r", "\r\n", "  ```", "```go", "[[" + day + "]]", "\t", "``", "\\- `y`", "\\\\- `y`", "\u00a0", "- `"}
 	rng := rand.New(rand.NewPCG(162, 3))
 	made := func(pieces []string, seps ...string) string {
@@ -55,7 +55,7 @@ func TestAReplyAndASayMoveNoTurnThatWasThere(t *testing.T) {
 		before := withKeys(ParseTurns(day, body))
 		var waiting []int // the owner turns that no turn of the agent follows
 		for i, turn := range before {
-			if turn.Who == "owner" && (i+1 == len(before) || before[i+1].Who != "lifelog") {
+			if turn.Who == "owner" && (i+1 == len(before) || before[i+1].Who != "aminte") {
 				waiting = append(waiting, i)
 			}
 		}
@@ -68,7 +68,7 @@ func TestAReplyAndASayMoveNoTurnThatWasThere(t *testing.T) {
 		if rng.IntN(2) == 0 {
 			tools = "- `search`: no hits"
 		}
-		block := paragraph("lifelog", "(09:09)", t2)
+		block := paragraph("aminte", "(09:09)", t2)
 		if tools != "" {
 			block = tools + "\n\n" + block
 		}
@@ -83,8 +83,8 @@ func TestAReplyAndASayMoveNoTurnThatWasThere(t *testing.T) {
 			continue
 		}
 		got := after[at+1]
-		if got.Who != "lifelog" || strings.Join(got.Tools, "\n") != tools {
-			t.Errorf("case %d: the turn after the answered turn is %+v, want lifelog with the tool lines %q, for %q", n, got, tools, body)
+		if got.Who != "aminte" || strings.Join(got.Tools, "\n") != tools {
+			t.Errorf("case %d: the turn after the answered turn is %+v, want aminte with the tool lines %q, for %q", n, got, tools, body)
 		}
 		same := append(slicesOf(after[:at+1]), slicesOf(after[at+2:])...)
 		if !reflect.DeepEqual(same, slicesOf(before)) {

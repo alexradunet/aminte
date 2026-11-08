@@ -19,7 +19,7 @@ data could not answer, a rule that is ambiguous or untestable. It is the evidenc
 | [0085](0085-a-resent-capture-appends-twice.md) | A capture that a client sends again appends its paragraph twice and records a second mood | resolved |
 | [0084](0084-a-range-out-of-order-is-a-plain-unit.md) | A scale's unit with its bounds out of order is the unit of a plain number for good | resolved |
 | [0083](0083-a-fault-of-a-savepoint-is-not-a-skipped-target.md) | The save recipe does not say that a fault of SAVEPOINT, ROLLBACK TO or RELEASE fails the save | resolved |
-| [0082](0082-the-meta-rows-name-removed-columns.md) | The lifelog_meta rows name the columns of the tasks that D23 removed | resolved |
+| [0082](0082-the-meta-rows-name-removed-columns.md) | The aminte_meta rows name the columns of the tasks that D23 removed | resolved |
 | [0081](0081-only-the-writer-keeps-a-place-a-place.md) | Only the writer keeps a place from becoming a person or a metric | resolved |
 | [0080](0080-a-filed-day-page-is-shown-nowhere.md) | A day page can be filed in a category, and Browse then shows it nowhere | resolved |
 | [0079](0079-tasks-cost-more-than-they-give.md) | Tasks and occurrences cost more than they give | resolved |
@@ -30,7 +30,7 @@ data could not answer, a rule that is ambiguous or untestable. It is the evidenc
 | [0074](0074-periods-cost-more-than-they-give.md) | Recorded periods cost more than they give | resolved |
 | [0073](0073-sessions-cost-more-than-they-give.md) | Sessions cost more than they give, and no data uses them | resolved |
 | [0072](0072-a-conversation-reads-as-a-page.md) | A conversation reads as a page, and it leaves the screen when the owner moves on | resolved |
-| [0071](0071-the-owner-cannot-talk-to-lifelog.md) | The owner cannot talk to lifelog: an agent works only from outside, and its conversation is lost | resolved |
+| [0071](0071-the-owner-cannot-talk-to-aminte.md) | The owner cannot talk to aminte: an agent works only from outside, and its conversation is lost | resolved |
 | [0070](0070-the-calendar-shows-only-the-journal.md) | The calendar shows only the journal | resolved |
 | [0069](0069-a-metric-is-three-pages.md) | A metric is three pages, and Record is under its readings | resolved |
 | [0068](0068-rules-the-writer-holds-alone.md) | The writer holds rules the database could hold, and repeats rules the database holds | resolved |
@@ -42,7 +42,7 @@ data could not answer, a rule that is ambiguous or untestable. It is the evidenc
 | [0062](0062-the-browser-still-shows-data-not-words.md) | The browser still shows data where it should show words, is heavy on a phone, and Today is thin | resolved |
 | [0061](0061-the-browser-does-not-feel-like-an-application.md) | The browser does not look or move like an application | resolved |
 | [0060](0060-the-browser-cannot-carry-daily-use.md) | The browser cannot carry daily planning, journaling, editing and navigation | resolved |
-| [0059](0059-an-agent-in-the-lifelog-folder-knows-nothing.md) | An agent opened in the lifelog folder knows nothing about it | resolved |
+| [0059](0059-an-agent-in-the-aminte-folder-knows-nothing.md) | An agent opened in the aminte folder knows nothing about it | resolved |
 | [0058](0058-the-import-machine-outweighs-the-backfill.md) | The import machinery is larger than the life log, for a backfill done once | resolved |
 | [0057](0057-the-import-loop-lives-outside-the-writer.md) | The import loop lives in scripts outside the writer, and it fails where no test sees it | resolved |
 | [0056](0056-proposed-names-fall-outside-the-table.md) | Proposed names fall outside the table of entities.md, and are proposed again | resolved |

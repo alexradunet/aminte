@@ -6,7 +6,7 @@
 // a navigation is activity on the server too. A prerendered page waits until it is shown. A text that is not saved is
 // lost when the page is replaced: the script keeps no copy of it.
 (() => {
-  const limit = Number(document.currentScript.dataset.minutes) * 60000, KEY = 'lifelog-last-input';
+  const limit = Number(document.currentScript.dataset.minutes) * 60000, KEY = 'aminte-last-input';
   if (!(limit > 0)) return;
   let mem = 0, sent = 0, gone = false; // mem is the time of the last input of this tab: the fallback when there is no storage
 

@@ -85,7 +85,7 @@ The suites change with the docs: the mutants of `named`, `links` and `journal` t
 counts in `tests/README.md` change; the `named` suite is about a person; the `diagrams` suite keeps the link map
 equal to `link_kinds`, which then has two rows; the `document` suite keeps every link resolving. The catalog has no
 `create-place`, `link` or `unlink`, `promote` takes `person` alone, and `TestTheTableOfTheSurfacesIsTheCatalog` holds.
-The boundary tests of `cmd/lifelog` hold. `go vet ./... && go test ./...` passes, and the end-to-end test of
+The boundary tests of `cmd/aminte` hold. `go vet ./... && go test ./...` passes, and the end-to-end test of
 `extensions/mcp` passes in its folder. No new SQLite behaviour is claimed.
 
 ## Outcome

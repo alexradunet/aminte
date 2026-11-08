@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"lifelog/internal/core"
+	"aminte/internal/core"
 )
 
 // The type of a file the owner keeps, named from its extension or its first bytes: what the api says of an original

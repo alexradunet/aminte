@@ -12,9 +12,9 @@ import (
 	"testing"
 	"time"
 
-	"lifelog/internal/core"
-	"lifelog/internal/db/dbtest"
-	"lifelog/siren"
+	"aminte/internal/core"
+	"aminte/internal/db/dbtest"
+	"aminte/siren"
 )
 
 // embedServer is the server of a synthetic file with the routes of a probe added, for the tests of embed. It is the
@@ -64,7 +64,7 @@ type probeKey struct{}
 func readProbe(t *testing.T, h *server, query string) *siren.Entity {
 	t.Helper()
 	req := httptest.NewRequest("GET", "/probe"+query, nil)
-	req.Host = "lifelog.test"
+	req.Host = "aminte.test"
 	req.Header.Set("Accept", sirenType)
 	req = req.WithContext(context.WithValue(req.Context(), probeKey{}, "from the request"))
 	rec := httptest.NewRecorder()
@@ -202,7 +202,7 @@ func TestEmbedReadsAsAnAgentInTheContextOfTheRequest(t *testing.T) {
 	})
 	got := readProbe(t, h, "?embed=item").Entities
 	props, _ := got[0].Properties.(map[string]any)
-	if props["source"] != "agent:embed" || props["host"] != "lifelog.test" || props["ctx"] != "from the request" {
+	if props["source"] != "agent:embed" || props["host"] != "aminte.test" || props["ctx"] != "from the request" {
 		t.Errorf("the embedded read: %v", props)
 	}
 	for _, l := range got[1:] {

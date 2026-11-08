@@ -1,4 +1,4 @@
-// Package formdoc reads the forms of a page of HTML as a browser reads them. It is for the tests of lifelog-web only:
+// Package formdoc reads the forms of a page of HTML as a browser reads them. It is for the tests of aminte-web only:
 // they must see the forms that the view draws, not the actions that the view was given, and they must send a form as a
 // browser sends it. No program imports it.
 //

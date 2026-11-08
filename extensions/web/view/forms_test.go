@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"lifelog/siren"
+	"aminte/siren"
 )
 
 // drawForm draws the action with the template form, as a page draws it, with the options of formOf.

@@ -21,41 +21,41 @@ import (
 	"testing"
 	"time"
 
-	"lifelog-googlephotos/lifelog"
-	"lifelog/client"
+	"aminte-googlephotos/aminte"
+	"aminte/client"
 )
 
-// buildLifelog builds the real lifelog of this repository into a temporary folder.
-func buildLifelog(t *testing.T) string {
+// buildAminte builds the real aminte of this repository into a temporary folder.
+func buildAminte(t *testing.T) string {
 	t.Helper()
 	goBin, err := exec.LookPath("go")
 	if err != nil {
-		t.Skipf("no go command to build lifelog: %v", err)
+		t.Skipf("no go command to build aminte: %v", err)
 	}
 	root, err := filepath.Abs(filepath.Join("..", "..", ".."))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := os.Stat(filepath.Join(root, "cmd", "lifelog")); err != nil {
-		t.Skipf("the lifelog sources are not at %s: %v", root, err)
+	if _, err := os.Stat(filepath.Join(root, "cmd", "aminte")); err != nil {
+		t.Skipf("the aminte sources are not at %s: %v", root, err)
 	}
-	bin := filepath.Join(t.TempDir(), "lifelog")
+	bin := filepath.Join(t.TempDir(), "aminte")
 	if runtime.GOOS == "windows" {
 		bin += ".exe"
 	}
-	out, err := exec.Command(goBin, "build", "-C", root, "-o", bin, "./cmd/lifelog").CombinedOutput()
+	out, err := exec.Command(goBin, "build", "-C", root, "-o", bin, "./cmd/aminte").CombinedOutput()
 	if err != nil {
-		t.Fatalf("build lifelog: %v\n%s", err, out)
+		t.Fatalf("build aminte: %v\n%s", err, out)
 	}
 	return bin
 }
 
-// startLifelog makes a new life.db in a temporary folder, serves it on a free loopback port, and stops it at the end.
-func startLifelog(t *testing.T, bin string) string {
+// startAminte makes a new life.db in a temporary folder, serves it on a free loopback port, and stops it at the end.
+func startAminte(t *testing.T, bin string) string {
 	t.Helper()
 	dbPath := filepath.Join(t.TempDir(), "life.db")
 	if out, err := exec.Command(bin, "init", dbPath).CombinedOutput(); err != nil {
-		t.Fatalf("lifelog init: %v\n%s", err, out)
+		t.Fatalf("aminte init: %v\n%s", err, out)
 	}
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -67,9 +67,9 @@ func startLifelog(t *testing.T, bin string) string {
 	}
 	var stderr bytes.Buffer
 	cmd := exec.Command(bin, "serve", "--db", dbPath, "--addr", addr)
-	// No variable of lifelog reaches the server: a LIFELOG_TOKEN of the developer would turn on the bearer check, and the
+	// No variable of aminte reaches the server: a AMINTE_TOKEN of the developer would turn on the bearer check, and the
 	// plain requests of this test send none.
-	cmd.Env = slices.DeleteFunc(os.Environ(), func(kv string) bool { return strings.HasPrefix(kv, "LIFELOG_") })
+	cmd.Env = slices.DeleteFunc(os.Environ(), func(kv string) bool { return strings.HasPrefix(kv, "AMINTE_") })
 	cmd.Stderr = &stderr
 	if err := cmd.Start(); err != nil {
 		t.Fatal(err)
@@ -95,7 +95,7 @@ func startLifelog(t *testing.T, bin string) string {
 	for time.Now().Before(deadline) {
 		select {
 		case err := <-exited:
-			t.Fatalf("lifelog serve ended: %v\n%s", err, stderr.String())
+			t.Fatalf("aminte serve ended: %v\n%s", err, stderr.String())
 		default:
 		}
 		if resp, err := http.Get(base + "/"); err == nil {
@@ -104,11 +104,11 @@ func startLifelog(t *testing.T, bin string) string {
 		}
 		time.Sleep(50 * time.Millisecond)
 	}
-	t.Fatalf("lifelog serve did not answer\n%s", stderr.String())
+	t.Fatalf("aminte serve did not answer\n%s", stderr.String())
 	return ""
 }
 
-// siren reads an entity of lifelog.
+// siren reads an entity of aminte.
 func sirenGet(t *testing.T, base, path string) map[string]any {
 	t.Helper()
 	req, err := http.NewRequest(http.MethodGet, base+path, nil)
@@ -195,18 +195,18 @@ var (
 	firstItem  = regexp.MustCompile(`name="item" value="([^"]+)"`)
 )
 
-// TestCoversFromGooglePhotosAgainstTheRealLifelog drives the review page like a browser, against a fake Google and
-// the real lifelog on a new life.db. The provenance (import:google-photos) is not asserted: the API shows no source.
-func TestCoversFromGooglePhotosAgainstTheRealLifelog(t *testing.T) {
+// TestCoversFromGooglePhotosAgainstTheRealAminte drives the review page like a browser, against a fake Google and
+// the real aminte on a new life.db. The provenance (import:google-photos) is not asserted: the API shows no source.
+func TestCoversFromGooglePhotosAgainstTheRealAminte(t *testing.T) {
 	if testing.Short() {
-		t.Skip("builds and runs lifelog")
+		t.Skip("builds and runs aminte")
 	}
-	base := startLifelog(t, buildLifelog(t))
+	base := startAminte(t, buildAminte(t))
 
 	const textDay, coveredDay, clashDay, heicDay = "2031-05-02", "2031-05-03", "2031-05-04", "2031-05-06"
 	capture(t, base, textDay, "Words of the day that stay.")
 	capture(t, base, coveredDay, "A day with its own cover.")
-	ll := lifelog.New(client.Remote(base, lifelog.Source, ""))
+	ll := aminte.New(client.Remote(base, aminte.Source, ""))
 	ctx := context.Background()
 	if title, err := ll.AddCover(ctx, coveredDay, "image/jpeg", jpegOf(t, 50), nil); err != nil || title != coveredDay+".jpg" {
 		t.Fatalf("set the cover of %s: %q, %v", coveredDay, title, err)

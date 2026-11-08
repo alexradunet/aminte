@@ -19,10 +19,10 @@ import (
 	"testing"
 	"time"
 
-	"lifelog-googlephotos/google"
-	"lifelog-googlephotos/lifelog"
-	"lifelog-googlephotos/review"
-	"lifelog/client"
+	"aminte-googlephotos/aminte"
+	"aminte-googlephotos/google"
+	"aminte-googlephotos/review"
+	"aminte/client"
 )
 
 // jpegOf makes a small synthetic JPEG. Two seeds give two different files.
@@ -169,7 +169,7 @@ func (g *fakeGoogle) fetched(path string) bool {
 	return false
 }
 
-// stack is the review page wired to a fake Google and a lifelog address.
+// stack is the review page wired to a fake Google and an aminte address.
 type stack struct {
 	rev       *review.Server
 	web       *httptest.Server
@@ -178,7 +178,7 @@ type stack struct {
 	client    *http.Client // does not follow redirects
 }
 
-func newStack(t *testing.T, g *fakeGoogle, lifelogURL string, connected bool) *stack {
+func newStack(t *testing.T, g *fakeGoogle, aminteURL string, connected bool) *stack {
 	t.Helper()
 	tokenPath := filepath.Join(t.TempDir(), "token.json")
 	if connected {
@@ -197,11 +197,11 @@ func newStack(t *testing.T, g *fakeGoogle, lifelogURL string, connected bool) *s
 		TokenPath: tokenPath,
 	}
 	rev := review.New(review.Config{
-		Auth:    auth,
-		Picker:  &google.Picker{Base: g.URL + "/v1", HTTP: hc, Tokens: auth},
-		Lifelog: lifelog.New(client.Remote(lifelogURL, lifelog.Source, "")),
-		Zone:    time.UTC,
-		Log:     log.New(io.Discard, "", 0),
+		Auth:   auth,
+		Picker: &google.Picker{Base: g.URL + "/v1", HTTP: hc, Tokens: auth},
+		Aminte: aminte.New(client.Remote(aminteURL, aminte.Source, "")),
+		Zone:   time.UTC,
+		Log:    log.New(io.Discard, "", 0),
 	})
 	web := httptest.NewServer(rev.Handler())
 	t.Cleanup(web.Close)

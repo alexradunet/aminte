@@ -25,7 +25,7 @@ flowchart LR
 ```
 
 - Removed from [schema.sql](../schema/schema.sql): the table `habit_periods` and its seven triggers,
-  `measurements_habit_binary`, the mention in `lifelog_meta.source`.
+  `measurements_habit_binary`, the mention in `aminte_meta.source`.
 - Removed pages: the cookbook recipe on habits; the habit rows of the day view and of metrics by category; the two
   habit queries of the integrity checks. [D24](../decisions/D24-habits.md) becomes "no periods".
 - Removed from the writer: `start-habit`, `stop-habit` and `check-in`, `register-metric`'s `habit_from`, `/habits`

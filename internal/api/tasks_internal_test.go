@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"lifelog/internal/core"
-	"lifelog/internal/db/dbtest"
-	"lifelog/siren"
+	"aminte/internal/core"
+	"aminte/internal/db/dbtest"
+	"aminte/siren"
 )
 
 func titlesOf(tasks []svcTask) []string {

@@ -24,8 +24,8 @@
   unverified: Chromium prerenders only on a secure context, so on a plain-HTTP origin the header is accepted and does
   nothing. Part E is on master: the stuck edge of the pick bar and the toast, a scroll-state query inside `@supports`,
   Chromium only. The screenshots of Parts A and C are not taken yet: the review server needs the
-  owner's hand (the session may not run `lifelog serve`). Live since 2026-10-28 21:00 (the binary installed on the
-  owner's word, the service restarted with its agent, the previous binary kept as `lifelog.prev`).
+  owner's hand (the session may not run `aminte serve`). Live since 2026-10-28 21:00 (the binary installed on the
+  owner's word, the service restarted with its agent, the previous binary kept as `aminte.prev`).
 - **Resolves:** the owner's words of 2026-10-28 (below). No issue.
 
 ## The owner's words (2026-10-28)

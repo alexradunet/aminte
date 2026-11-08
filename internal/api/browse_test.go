@@ -12,10 +12,10 @@ import (
 	"strings"
 	"testing"
 
-	"lifelog/client"
-	"lifelog/internal/api/apitest"
-	"lifelog/internal/core"
-	"lifelog/siren"
+	"aminte/client"
+	"aminte/internal/api/apitest"
+	"aminte/internal/core"
+	"aminte/siren"
 )
 
 // Browse (docs/plans/117-one-browse-view.md): one list with two filters, the kind and where it looks.

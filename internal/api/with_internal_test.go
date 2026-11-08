@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"lifelog/internal/core"
-	"lifelog/internal/db/dbtest"
+	"aminte/internal/core"
+	"aminte/internal/db/dbtest"
 )
 
 // TestASlowAppIsTheTimeoutOfTheRequest: an app that answers after forwardTimeout gives 504 timeout.

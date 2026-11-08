@@ -18,13 +18,13 @@ import (
 	waLog "go.mau.fi/whatsmeow/util/log"
 	"google.golang.org/protobuf/proto"
 
-	"lifelog-whatsapp/relay"
+	"aminte-whatsapp/relay"
 )
 
 // libraryLog is the log of whatsmeow: its warnings and errors only.
 func libraryLog() waLog.Logger { return waLog.Stdout("whatsmeow", "WARN", false) }
 
-// Login pairs the device of s as a linked device of the number of lifelog. It draws each QR code on out and returns
+// Login pairs the device of s as a linked device of the number of aminte. It draws each QR code on out and returns
 // when the owner of the phone scans it (nil), when the codes time out, or when ctx ends. A store that is paired
 // already is an error.
 func Login(ctx context.Context, s *Session, out io.Writer) error {
@@ -76,7 +76,7 @@ func Login(ctx context.Context, s *Session, out io.Writer) error {
 				case <-ctx.Done():
 					return ctx.Err()
 				case <-time.After(pairingWait):
-					return errors.New("pairing: the phone did not confirm the device in time; run lifelog whatsapp login again")
+					return errors.New("pairing: the phone did not confirm the device in time; run aminte whatsapp login again")
 				}
 			case "timeout":
 				return errors.New("pairing: nobody scanned the code in time")
@@ -97,7 +97,7 @@ func drawCode(out io.Writer, code string) error {
 		return err
 	}
 	var b strings.Builder
-	b.WriteString("\nOpen WhatsApp on the phone of lifelog, Linked devices, Link a device, and scan this.\n\n")
+	b.WriteString("\nOpen WhatsApp on the phone of aminte, Linked devices, Link a device, and scan this.\n\n")
 	for _, l := range lines {
 		b.WriteString("\x1b[30;107m" + l + "\x1b[0m\n")
 	}
@@ -178,13 +178,13 @@ func (c *Chat) Send(ctx context.Context, text string) error {
 func (c *Chat) handle(evt any) {
 	switch e := evt.(type) {
 	case *events.LoggedOut:
-		c.end(Ended{Reason: "logged out: the device was unlinked on the phone; run lifelog whatsapp login again"})
+		c.end(Ended{Reason: "logged out: the device was unlinked on the phone; run aminte whatsapp login again"})
 	case *events.StreamReplaced:
 		c.end(Ended{Reason: "another client took this session over; one relay runs on a session"})
 	case *events.TemporaryBan:
 		c.end(Ended{Reason: fmt.Sprintf("WhatsApp banned the number for %s (reason %v)", e.Expire, e.Code)})
 	case *events.ClientOutdated:
-		c.end(Ended{Reason: "WhatsApp refused this client as outdated: build lifelog-whatsapp with a newer whatsmeow"})
+		c.end(Ended{Reason: "WhatsApp refused this client as outdated: build aminte-whatsapp with a newer whatsmeow"})
 	case *events.ConnectFailure:
 		c.end(Ended{Reason: fmt.Sprintf("the connection failed: %v %s", e.Reason, e.Message), Retry: true})
 	case *events.Message:

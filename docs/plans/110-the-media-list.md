@@ -32,7 +32,7 @@ flowchart LR
 - **Newest day first.** A file's day is `entities.day` (the day given, a photo's EXIF day, else the day it was
   kept); a photo kept with its capture day unknown takes the day of the newest day page that shows it, else it has
   none and comes last.
-- **A file of another kind is kept as before, and listed in Files.** `add-file` (`POST /files`) and `lifelog file`
+- **A file of another kind is kept as before, and listed in Files.** `add-file` (`POST /files`) and `aminte file`
   change nothing. `GET /files` is the list of every file that is not media (a PDF, a text), the same rows in the same
   order, drawn as rows with the type in words. The media list's own copy of `add-file` carries `accept` on its file
   input, the three kinds; the catalog's does not.

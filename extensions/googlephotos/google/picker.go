@@ -15,7 +15,7 @@ import (
 // DefaultPickerBase is the Picker API.
 const DefaultPickerBase = "https://photospicker.googleapis.com/v1"
 
-// MaxPhoto is the largest photo read: the limit of lifelog for a picture.
+// MaxPhoto is the largest photo read: the limit of aminte for a picture.
 const MaxPhoto = 64 << 20
 
 const (

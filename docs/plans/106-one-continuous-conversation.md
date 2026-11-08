@@ -8,7 +8,7 @@
 - **Date / baseline:** 2026-10-14, `e2b930f` (master).
 - **Priority:** P1. **Effort:** M. **Risk:** MEDIUM: the model writes a summary into the owner's journal page with
   no approval step, as `agent:chat`, once a day. Nothing for the schema or the contract: a conversation stays a page
-  ([RFC 0012](../rfcs/0012-a-conversation-with-lifelog.md), option A). `ask` loses its `conversation` field on every
+  ([RFC 0012](../rfcs/0012-a-conversation-with-aminte.md), option A). `ask` loses its `conversation` field on every
   surface: a visible change, by the owner's word.
 - **Status:** DONE.
 - **Resolves:** no issue, no RFC. The owner's words are the incident.
@@ -25,7 +25,7 @@ The owner's answers to the three open questions:
 |---|---|
 | when compaction runs | at the first `ask` of a new day, in that request; no timer, no goroutine, no new catalog action |
 | the model's context at a new day | the journal page of the nearest earlier day within seven days, whole |
-| the chat screen above today's turns | one line from Lifelog: the previous day's conversation is summed up in that day's page, with a link to the transcript |
+| the chat screen above today's turns | one line from Aminte: the previous day's conversation is summed up in that day's page, with a link to the transcript |
 
 ## The design
 
@@ -67,7 +67,7 @@ sequenceDiagram
   in `internal/api/conversations.go`, the format's one home. It belongs to no turn, wherever the owner moved it. Its
   `[[day]]` is an ordinary wikilink: the transcript links the day page.
 - **The summary** goes on the journal page of day D through `capture` as `agent:chat`:
-  `**Conversation with lifelog** ([[Conversation D]]): ` and the model's words. The wikilink links the day page back to
+  `**Conversation with aminte** ([[Conversation D]]): ` and the model's words. The wikilink links the day page back to
   the transcript, so the day shows the conversation among its backlinks.
 - **The chain.** The conversations not yet compacted are always the newest ones: compaction goes oldest first and
   stops at the first failure, so an older page is never skipped and hidden behind a newer one. At most three a
@@ -104,7 +104,7 @@ sequenceDiagram
 | The trailer, the day of a title, `previous`, `memory`, today's conversation as `GET /conversations` | `internal/api/conversations.go`, `internal/api/serve.go`, `internal/api/siren.go`, `internal/api/html.go` |
 | `NewOn` exported: the chat tests fix the server's day | `internal/api/serve.go` (`export_test.go` removed) |
 | The compaction, the memory, the day's page; a request with no tools names none | `internal/chat/agent.go`, `internal/chat/model.go` |
-| `lifelog ask` takes the question alone | `cmd/lifelog/main.go` |
+| `aminte ask` takes the question alone | `cmd/aminte/main.go` |
 | The chat page without the list, the note, no composer on an earlier day; the sidebar without New | `internal/api/html/conversation.html`, `app.js`, `app.css`, `root.html`, `page.html` |
 | The classes and the result | `API.md`, `README.md` |
 
@@ -139,6 +139,6 @@ is summed up, since the compaction of the day before has just made the page that
 says so.
 
 - **Checks** (Linux, Debian 13, Go 1.27.2): `go generate ./... && go vet ./... && go test ./...` green; `gofmt`
-  clean; `go test -count=1 -shuffle=on ./internal/chat ./internal/api ./cmd/lifelog ./internal/mcp` green.
+  clean; `go test -count=1 -shuffle=on ./internal/chat ./internal/api ./cmd/aminte ./internal/mcp` green.
 - **Not run:** `staticcheck` and `govulncheck` (not installed here), the race check, a Windows run, the script in
   a real browser.

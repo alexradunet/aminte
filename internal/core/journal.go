@@ -8,7 +8,7 @@ import (
 	"regexp"
 	"strings"
 
-	"lifelog/text"
+	"aminte/text"
 )
 
 // CaptureWithKey appends an entry to a day page, creating or reviving it, with an optional mood (cookbook/capture.md).

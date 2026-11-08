@@ -13,8 +13,8 @@ import (
 	"slices"
 	"time"
 
-	"lifelog/internal/core"
-	"lifelog/siren"
+	"aminte/internal/core"
+	"aminte/siren"
 )
 
 // server is the API on one store. The store's clock is the server's one clock: today is core.Store.Today, and the words
@@ -25,13 +25,13 @@ type server struct {
 	with *Apps // the connected apps (with.go); shared with the other handler of the same serve
 }
 
-// NewWith returns the whole API as one handler: lifelog serve mounts it on a socket; the CLI and the temporary server
-// of lifelog NAME call it in-process. It trusts no browser origin other than its own. A test gives a store with a
+// NewWith returns the whole API as one handler: aminte serve mounts it on a socket; the CLI and the temporary server
+// of aminte NAME call it in-process. It trusts no browser origin other than its own. A test gives a store with a
 // fixed clock, so today is a fixed day and a time is written in fixed words.
 //
 // apps is the registry of the connected apps: their actions are in the catalog, and /with/NAME leads to them. serve
 // and the handler share one registry, so both see the same apps. A nil apps is a server with no connected app: the CLI
-// in-process and the temporary server of `lifelog NAME` have none.
+// in-process and the temporary server of `aminte NAME` have none.
 //
 // The guard refuses a write that a page of another origin sends through the browser of the owner. It trusts no
 // origin: a server that has no token must not take a form post from a page in the owner's browser. A program sends no
@@ -170,7 +170,7 @@ func (r redirect) Error() string { return "see " + r.to }
 // reads nothing of the request that the catalog does not list.
 type admitted struct {
 	act spec       // the action's row of the catalog
-	src string     // the writer (lifelog_meta.source); "" for a read that is not the owner's alone
+	src string     // the writer (aminte_meta.source); "" for a read that is not the owner's alone
 	v   url.Values // the fields, checked against act; nil for an action with a file field (parseFileForm)
 	id  int64      // the {id} of the path, when the row has a numeric one; else 0
 }
@@ -343,7 +343,7 @@ func logFault(r *http.Request, what string, err error) {
 	if route == "" {
 		route = r.Method
 	}
-	log.Printf("lifelog: %s: %s: %v", route, what, err)
+	log.Printf("aminte: %s: %s: %v", route, what, err)
 }
 
 // codeOf is the general code of a status, for an error that names no more specific one.
@@ -429,7 +429,7 @@ func sirenJSON(e *siren.Entity) ([]byte, error) {
 }
 
 // source is the writer of a request: its header, else "api". The name is not checked here. A client that is a browser
-// sends its own name (the extension lifelog-web sends "ui").
+// sends its own name (the extension aminte-web sends "ui").
 func source(r *http.Request) string {
 	if s := r.Header.Get(siren.SourceHeader); s != "" {
 		return s

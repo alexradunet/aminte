@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"lifelog/internal/api/apitest"
+	"aminte/internal/api/apitest"
 )
 
 // TestTheMonthIsACalendar: each day of a month, whether it has a live day page, its first line and its mood; the

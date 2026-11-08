@@ -1,0 +1,49 @@
+#!/bin/sh
+# aminte-snapshot: the nightly snapshot of life.db (docs/decisions/D25-snapshots.md).
+#
+# It runs `aminte snapshot --snapshots DIR` and tests the EXIT STATUS of that command. It never tests whether a file
+# exists: aminte names a snapshot that fails its restore check life-DATE.failed.db and exits 1, and a file that
+# exists can be a failed or a cut one. Only after a good snapshot does it prune: it keeps the newest good ones.
+#
+# Settings, from the environment (the unit sets them):
+#   AMINTE_SNAPSHOTS  the folder for the snapshots. Required. It must exist and lie outside any git work tree.
+#   AMINTE_BIN        the aminte program. Default: aminte, found through PATH.
+#   AMINTE_DB         the life.db to copy. Default: the life.db beside the program.
+#   AMINTE_KEEP       how many good snapshots to keep. Default: 14.
+set -eu
+
+dir=${AMINTE_SNAPSHOTS:?AMINTE_SNAPSHOTS names the folder for the snapshots}
+bin=${AMINTE_BIN:-aminte}
+keep=${AMINTE_KEEP:-14}
+
+case $keep in
+'' | *[!0-9]* | 0)
+	echo "aminte-snapshot: AMINTE_KEEP must be a number above 0, not '$keep'" >&2
+	exit 2
+	;;
+esac
+
+status=0
+if [ -n "${AMINTE_DB:-}" ]; then
+	"$bin" --db "$AMINTE_DB" snapshot --snapshots "$dir" || status=$?
+else
+	"$bin" snapshot --snapshots "$dir" || status=$?
+fi
+if [ "$status" -ne 0 ]; then
+	echo "aminte-snapshot: 'aminte snapshot' exited $status; nothing is pruned" >&2
+	exit 1
+fi
+
+# A good name is life-YYYY-MM-DD.db or life-YYYY-MM-DDTHHMMSS.db (the fallback when the day has a snapshot already).
+# The pattern does not match life-...failed.db, so a failed snapshot is never counted and never removed here.
+# In the C locale the names sort by time: for one day, "." comes before "T". The newest name comes first.
+good=$(ls -1 "$dir" | grep -E '^life-[0-9]{4}-[0-9]{2}-[0-9]{2}(T[0-9]{6})?\.db$' | LC_ALL=C sort -r || true)
+count=0
+for name in $good; do
+	count=$((count + 1))
+	if [ "$count" -gt "$keep" ]; then
+		rm -f -- "$dir/$name"
+		echo "aminte-snapshot: pruned $name"
+	fi
+done
+echo "aminte-snapshot: done; $count good snapshots found in $dir, the newest $keep kept"

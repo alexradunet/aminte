@@ -17,7 +17,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"lifelog/text"
+	"aminte/text"
 )
 
 // The save contract (contract/titles-and-wikilinks, cookbook/save-a-body, D19). Its vectors live in one place, the

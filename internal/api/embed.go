@@ -8,7 +8,7 @@ import (
 	"slices"
 	"strings"
 
-	"lifelog/siren"
+	"aminte/siren"
 )
 
 // Embedding (API.md, "Embedding"): GET ?embed=rel1,rel2 replaces each sub-entity that is a reference with one of those

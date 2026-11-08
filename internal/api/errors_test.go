@@ -9,12 +9,12 @@ import (
 	"strings"
 	"testing"
 
-	"lifelog/client"
-	"lifelog/internal/api"
-	"lifelog/internal/api/apitest"
-	"lifelog/internal/core"
-	"lifelog/internal/db"
-	"lifelog/internal/db/dbtest"
+	"aminte/client"
+	"aminte/internal/api"
+	"aminte/internal/api/apitest"
+	"aminte/internal/core"
+	"aminte/internal/db"
+	"aminte/internal/db/dbtest"
 )
 
 // codeOf is the code and status an error answer carries.

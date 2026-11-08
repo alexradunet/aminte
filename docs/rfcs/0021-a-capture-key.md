@@ -24,7 +24,7 @@ flowchart TD
 **A. A table that the writer keeps.** `capture_keys(id, source, import_key, page_id, recorded_at)` with
 `UNIQUE (source, import_key)`. The `id` is the integer key that [D3](../decisions/D03-integer-ids.md) gives every
 fact table. `page_id` references `entities(id)`: the day page of the capture. The CHECKs have
-the shape of `entities_import_key` and `entities_source`, and `recorded_at` follows `lifelog_meta.instants`. The
+the shape of `entities_import_key` and `entities_source`, and `recorded_at` follows `aminte_meta.instants`. The
 table is append-only: two triggers refuse an UPDATE and a DELETE, because a key that changes or goes away lets the
 capture be added again. A capture takes an optional `import_key`. The writer reads the key first. A row back means
 that the capture was added before, so the writer changes nothing and answers with the day. Without a row, the

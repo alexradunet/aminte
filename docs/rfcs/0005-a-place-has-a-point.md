@@ -33,7 +33,7 @@ track kept; a position near no known place is asked about once; Home and Work ar
   The owner does not want movements kept; the `at` link answers "where was I that day".
 
 **The photo's day and its page** (writer rules, no schema): a file's `pages.day` is the local day the file was made
-when the file says so — a photo's EXIF `DateTimeOriginal`, the camera's local clock, as `lifelog_meta.days` asks ("the
+when the file says so — a photo's EXIF `DateTimeOriginal`, the camera's local clock, as `aminte_meta.days` asks ("the
 local calendar of the device that captured it") — else the day it is kept. A file with a picture and a day of its own
 is appended once to that day's page as `![[title]]`, so the day shows it.
 

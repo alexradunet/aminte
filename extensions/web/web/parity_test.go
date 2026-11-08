@@ -13,8 +13,8 @@ import (
 	"strings"
 	"testing"
 
-	"lifelog-web/internal/formdoc"
-	"lifelog/siren"
+	"aminte-web/internal/formdoc"
+	"aminte/siren"
 )
 
 // pathValues are synthetic values for the path fields of the actions. A path field that is not here fails the test, so a

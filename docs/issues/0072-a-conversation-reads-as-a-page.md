@@ -16,20 +16,20 @@ title.
 
 ```mermaid
 flowchart LR
-  H["Home: Ask lifelog"] -- "POST /conversations" --> P["/pages/{id}: the transcript as prose"]
+  H["Home: Ask aminte"] -- "POST /conversations" --> P["/pages/{id}: the transcript as prose"]
   P -- "the owner opens a day" --> D["the day: no conversation on the screen"]
 ```
 
 ## Reproduce
 
-1. Build `lifelog` at `04b636d` with a model configured. Ask a question from Home.
+1. Build `aminte` at `04b636d` with a model configured. Ask a question from Home.
 2. The answer is the page `Conversation …`: prose, a Continue form, and the margin of a page.
 3. Open Today. No part of the screen shows the conversation.
 
 ## Rules involved
 
-- [Plan 102](../plans/102-a-conversation-with-lifelog.md): the action `ask` and the conversation page.
-- [README](../../README.md): "The app shell", "A conversation with lifelog".
+- [Plan 102](../plans/102-a-conversation-with-aminte.md): the action `ask` and the conversation page.
+- [README](../../README.md): "The app shell", "A conversation with aminte".
 
 ## Resolution
 

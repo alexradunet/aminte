@@ -55,10 +55,10 @@ Sources: [mattpocock/skills](https://github.com/mattpocock/skills) (`improve-cod
 - **Checks.** `go test -count=1 ./...` passes: 386 top-level tests in 51 s. The slowest are
   `TestRequestBufferLimits` (7.5 s) and `TestMultipartAggregateLimits` (3.3 s), both in `internal/api`.
 - **Coverage map** (`-short`, `-coverpkg` over `internal/...` and `cmd/...`, blocks merged): 87.2 % of statements.
-  A subprocess test adds nothing to it, so `cmd/lifelog/output.go` shows 26 % and `agentic.go` 0 %.
+  A subprocess test adds nothing to it, so `cmd/aminte/output.go` shows 26 % and `agentic.go` 0 %.
 - **Not run:** `deadcode`, `staticcheck` and `govulncheck` are not installed, and their modules are not all in the
   module cache (Part 0).
-- **Hidden state is already rare.** No `os.Getenv`, `os.Args` or `os.Stdout` outside `cmd/lifelog`; three clocks in
+- **Hidden state is already rare.** No `os.Getenv`, `os.Args` or `os.Stdout` outside `cmd/aminte`; three clocks in
   production code (Part 4).
 - **Plan 098 did a first pass** (dead code, one write style, the command table, `handler.go` split). This plan does
   not repeat it; it finds what came back and what plan 098 left shallow.
@@ -74,14 +74,14 @@ The module map, with the deletion test applied:
 | `internal/api`: views | 38 template functions and 23 view methods | the forms are deep; the render seam is shallow and the words are scattered | one view seam (Part 5) |
 | `internal/client` | `Get`, `Do`, `DoFiles`, `Catalog` → in-process or remote, multipart, numbers | deep | `tools.go` leaves (Part 6) |
 | `internal/mcp` | `Serve` (81 lines, 854 test lines) | shallow: its logic is in `client/tools.go` | takes `tools.go` (Part 6) |
-| `cmd/lifelog` | the command table | good; tested only by subprocess where it touches stdout, the environment or the executable | an `env` (Part 6) |
+| `cmd/aminte` | the command table | good; tested only by subprocess where it touches stdout, the environment or the executable | an `env` (Part 6) |
 | `internal/photo`, `internal/preview`, `internal/agentic`, `internal/scaletest` | 1 to 3 functions each | deep | keep; small fixes |
 
 The target:
 
 ```mermaid
 flowchart TD
-  CLI["cmd/lifelog: the command table and an env"] --> C["internal/client: transport only"]
+  CLI["cmd/aminte: the command table and an env"] --> C["internal/client: transport only"]
   MCP["internal/mcp: Serve and the tools"] --> C
   C --> CAT
   subgraph API["internal/api"]
@@ -138,7 +138,7 @@ Parts 3 to 6 touch different files and can go in parallel worktrees.
 |---|---|
 | With the owner's word: pinned tools, outside `go.mod`. `deadcode` v0.52.0 (`golang.org/x/tools`), `staticcheck` 2026.2.2 (v0.8.2), `govulncheck` v1.9.0. Record each version in the closing commit. | each one runs on the baseline; its findings go into Part 2 or get a written disposition |
 | `deadcode -test ./...` for `GOOS=linux` and `GOOS=windows`; only a name that both runs report is dead. | the list in the commit of Part 2 |
-| The coverage map includes the subprocess tests: build the test binary with `go build -cover`, set `GOCOVERDIR`, merge with `go tool covdata textfmt`. Write the commands in `tests/README.md` (a command, not CI configuration). | `cmd/lifelog/output.go` and `agentic.go` show their real coverage |
+| The coverage map includes the subprocess tests: build the test binary with `go build -cover`, set `GOCOVERDIR`, merge with `go tool covdata textfmt`. Write the commands in `tests/README.md` (a command, not CI configuration). | `cmd/aminte/output.go` and `agentic.go` show their real coverage |
 
 ## Part 1 — Defects (reproducer first)
 
@@ -164,7 +164,7 @@ row says otherwise.
 | `view.ActionFor`; the template function `depth`; the `formOf` options `primary` and `choices:`; the `due` icon; `calWords.Class` and the three `{{with $w.Class}}` branches; `isDayText` (it equals `core.IsDay`) | `api/html.go`, `api/assets.go`, `api/calendar.go`, `api/metric_view.go`, `html/month.html` |
 | Dead CSS: `ul.suggest`, `.margin .habit`, `.editor .preview`, `.count`, `.tag.done`, `.tag.notdone`, `svg.place-map`, `.done`, `.notdone`, `.group.depth-N`, the calendar's `.item.open` and `.item.done`, `.editor`, `.pick-main`, `.muted`; the tokens `--teal` and `--text-accent` (set, never read). Each selector is grepped in the templates and the Go first. | `html/app.css`, `html/base.css` |
 | `data-pages` and `data-action`: no script reads them since plan 108; only tests read them. | `html/layout.html`, the tests that read them |
-| `captureStdout`; `temporalCalendarKeys`; the `due` case of the flag table; `TestCommandInterruptPolicy`'s removed `import` commands; the `/import` and `approve` checks; the `"import, …"` exception of `reference_test.go` | `cmd/lifelog`, `tests/`, `api` tests |
+| `captureStdout`; `temporalCalendarKeys`; the `due` case of the flag table; `TestCommandInterruptPolicy`'s removed `import` commands; the `/import` and `approve` checks; the `"import, …"` exception of `reference_test.go` | `cmd/aminte`, `tests/`, `api` tests |
 | `core.Snapshot` (only cmd tests call it: fold into `TakeSnapshot`); `Store.RegisterMetric` (tests only; `CreateMetric` does the same); `ReadingsCount` (the week sums `ReadingsByDay`); `SeriesHistory` (`Series` with an empty `from`, which also removes `"0000-01-01"` from `trends.go`) | `internal/core`, `api/weeks.go`, `api/trends.go` |
 | `rangeUnit`'s `lo` and `hi`: only a test reads them. It becomes `isScale(unit) bool`; the comment that says the writer holds the range goes (`measurements_scale_range` holds it). | `core/habits.go`, `core/write.go` |
 | Joins that select nothing: `metricID` and `PreviewByTitle` join `entity_names` for no column. `reading_query_plan_test.go` keeps a copy of the SQL; it reads one shared constant. | `internal/core` |
@@ -184,7 +184,7 @@ required and the handler checks `version` only; `promote` marks `to` and the han
 |---|---|
 | `NewOn` holds one map from the action's name to its handler and mounts every route from the catalog: method, path, the owner guard from `spec.Owner`. A catalog row with no handler, or a handler with no row, panics at start. `ownerPath`, `ownerOnlyGet` and the two wrapping closures go. Routes that are not actions (assets, previews, `/styleguide`, `oldLists`) stay in a short list. | `api/serve.go`, `api/siren.go` |
 | One `h.fields(r, spec)` reads the form and refuses a missing required field that is not a path parameter; the handlers' own `required(v, …)` lists go. What `save-body` does with an empty body is the owner's decision (Part 8); until then the catalog row is changed to say what the handler does. | `api/pages.go`, `api/measurements.go`, `api/files.go`, `api/categories.go` |
-| One `writeError(w, r, err)`; one constant for the cross-origin refusal; `PublicAddress` uses `loopbackAuthority`'s parse; `api.Public(store, opts)` builds its handler, so the origins are given once. | `api/public.go`, `api/authority.go`, `api/editing.go`, `api/files.go`, `cmd/lifelog/serve.go` |
+| One `writeError(w, r, err)`; one constant for the cross-origin refusal; `PublicAddress` uses `loopbackAuthority`'s parse; `api.Public(store, opts)` builds its handler, so the origins are given once. | `api/public.go`, `api/authority.go`, `api/editing.go`, `api/files.go`, `cmd/aminte/serve.go` |
 | `fileForm` → `readFileForm` → `parseFileForm` becomes one function; the unknown-capture-day rule is computed once, in core's `keep`. | `api/files.go`, `core/files.go` |
 | Locality: `oldLists` and `toBrowse` to `browse.go`; `named.go` and `media.go` into the browse view; `MimeOf` unexported and its map named `extTypes`; `pageOf` serves `/titles` too; one prune loop in `feedback.go`. | `internal/api` |
 | A test loops every catalog row: it has a route, the route's guard matches `Owner`, and a POST without each required field is refused 422. `TestOwnerOnlyActionsPolicy` loops every `Owner` row, not three names. | `api` tests |
@@ -236,9 +236,9 @@ Estimate: about 250 lines of Go and templates, and about 60 of CSS (Part 2's).
 | what | where |
 |---|---|
 | `client/tools.go` and its test move into `internal/mcp`, unexported; the `keep` parameter (always `!a.Owner`) goes. `client` is transport only. The README layout row of `mcp` changes. | `internal/client`, `internal/mcp` |
-| `cmd/lifelog` gets an `env`: `stdout`, `stderr`, `getenv`, `executable`. `main()` passes the real ones in about 8 lines. Then `agentic_process_test`, `names_revision_process_test` and `TestPublicServeProcess` run in-process; only the drain-on-interrupt test stays a subprocess (AGENTS.md asks a process for that claim), and `TestMain` builds its binary once. The three copies of the startup-line parse and the two of `os.Executable` go. `--human` output is tested through a buffer. | `cmd/lifelog` |
-| The snapshot tests that call `core` and `db` and never the CLI move to `internal/core/snapshot_test.go`; one CLI case stays (`snapshot --to` inside a git work tree is refused before any write). `TestSnapshotRefusesAGitWorkTree` goes: `db.TestSnapshotDestinationErrors` covers it. | `cmd/lifelog`, `internal/core` |
-| **The agents' texts are tested against the catalog:** each MCP config of `agentic-init` parses to `mcp`, `agent:NAME` and the file; each backticked tool name in `templates/AGENTS.md` is a tool, and each owner-only name is an owner action. Today a rename breaks the agents' instructions and no test fails. | `internal/agentic`, `cmd/lifelog` tests |
+| `cmd/aminte` gets an `env`: `stdout`, `stderr`, `getenv`, `executable`. `main()` passes the real ones in about 8 lines. Then `agentic_process_test`, `names_revision_process_test` and `TestPublicServeProcess` run in-process; only the drain-on-interrupt test stays a subprocess (AGENTS.md asks a process for that claim), and `TestMain` builds its binary once. The three copies of the startup-line parse and the two of `os.Executable` go. `--human` output is tested through a buffer. | `cmd/aminte` |
+| The snapshot tests that call `core` and `db` and never the CLI move to `internal/core/snapshot_test.go`; one CLI case stays (`snapshot --to` inside a git work tree is refused before any write). `TestSnapshotRefusesAGitWorkTree` goes: `db.TestSnapshotDestinationErrors` covers it. | `cmd/aminte`, `internal/core` |
+| **The agents' texts are tested against the catalog:** each MCP config of `agentic-init` parses to `mcp`, `agent:NAME` and the file; each backticked tool name in `templates/AGENTS.md` is a tool, and each owner-only name is an owner action. Today a rename breaks the agents' instructions and no test fails. | `internal/agentic`, `cmd/aminte` tests |
 | One `phototest.HEIF(locations…)`, `WithExif` and `JPEG` for the three HEIF builders and the inline JPEGs of four test files. One JSON encoder with `SetEscapeHTML(false)` for the four copies. | `internal/photo`, `internal/preview`, tests |
 
 Estimate: about 250 lines.
@@ -248,8 +248,8 @@ Estimate: about 250 lines.
 | what | where |
 |---|---|
 | **`internal/db/dbtest.New(t)`** for the 29 inline Init-Open-Cleanup blocks and the 5 named copies (`core.fresh`, `api.freshStore`, `api.freshOn`, `mcp.mcpTestClient`, `cmd.commandClient`). It needs only `db`, so the in-package `core` tests use it too. | every package's tests |
-| **`internal/api/apitest`:** `Fresh(t, source)`, `Clients(t, h, source)` (in-process and remote), `Must` (a `t.Fatal`, not a panic), `Action`, `Href`, `Status(err)`. It replaces the 12 copies of the remote switch and the three `find`/`actionByName`/`cmdAction`, `must`, `href` copies. The 13 internal test files of `package api` cannot import it (a cycle) and use `dbtest`. | `internal/api`, `internal/mcp`, `cmd/lifelog` tests |
-| **One parity table** in `cmd/lifelog/parity_test.go`, the one package that sees the CLI, the client and MCP: surfaces `http`, `remote`, `cli`, `mcp`, each `(action, args) → (*api.Entity, error)`; rows for find, open-day, browse, create-place with a category, file-pages (accepted; refused for a day page, nothing written), rename alias, stale `save-body` (409), `save-body` with a 2^63−1 version, and `register-metric` refused to `agent:*` and absent from the MCP tools. The per-feature copies on each surface go: `api/names_parity_test.go`, `mcp/names_test.go`, `api/revision_parity_test.go`, `mcp/revision_test.go`, the `filed_where_made` and browse copies in `mcp` and `cmd`. Each surface keeps only what is its own: MCP schema, hints, arguments and cancellation; CLI flags, streaming and `snapshot --to`; the client's transport. | `cmd/lifelog`, `internal/api`, `internal/mcp` |
+| **`internal/api/apitest`:** `Fresh(t, source)`, `Clients(t, h, source)` (in-process and remote), `Must` (a `t.Fatal`, not a panic), `Action`, `Href`, `Status(err)`. It replaces the 12 copies of the remote switch and the three `find`/`actionByName`/`cmdAction`, `must`, `href` copies. The 13 internal test files of `package api` cannot import it (a cycle) and use `dbtest`. | `internal/api`, `internal/mcp`, `cmd/aminte` tests |
+| **One parity table** in `cmd/aminte/parity_test.go`, the one package that sees the CLI, the client and MCP: surfaces `http`, `remote`, `cli`, `mcp`, each `(action, args) → (*api.Entity, error)`; rows for find, open-day, browse, create-place with a category, file-pages (accepted; refused for a day page, nothing written), rename alias, stale `save-body` (409), `save-body` with a 2^63−1 version, and `register-metric` refused to `agent:*` and absent from the MCP tools. The per-feature copies on each surface go: `api/names_parity_test.go`, `mcp/names_test.go`, `api/revision_parity_test.go`, `mcp/revision_test.go`, the `filed_where_made` and browse copies in `mcp` and `cmd`. Each surface keeps only what is its own: MCP schema, hints, arguments and cancellation; CLI flags, streaming and `snapshot --to`; the client's transport. | `cmd/aminte`, `internal/api`, `internal/mcp` |
 | **One client conformance test:** in-process and remote give equal answers, with multipart, error entities and exact numbers. Then the feature tests of `api` run in-process only. | `internal/client` |
 | **Pure functions get table tests and the database tests shrink:** `backOf` (the open-redirect guard; a fuzz target), `browseQueryOf`, `browseActions`, `idsOf`, `toBrowse`, `errorEntity`, `paged`. `TestMultipartUnknownNameProjection` calls `parseFileForm`, not a copy of its loop. | `internal/api` |
 | **Test files named by subject:** `hygiene_test.go` → `errors_test.go` and `paging_test.go`; `browser_regression_test.go`, `old_lists_test.go`, `cli_regression_test.go`, `registration_policy_test.go` (→ `owner_test.go`), `filed_where_made_test.go` (three packages), `causes_test.go`, `judgment_test.go`, `counts_test.go`, `new_forms_test.go`, `new_metric_test.go` merge into their subjects; the CSS lint of `browser_view_test.go` and `tokens_test.go` become `sheets_test.go`; core's five integrity files and five `names_*` files become one each. The small suite files of `tests/` join their suites (`tests/README.md` changes with them). | every package's tests |
@@ -278,7 +278,7 @@ Each row changes an answer that a client sees, so each waits for the owner's wor
 | what | where |
 |---|---|
 | The README layout table gets a column "test it at": the seam where a test of that module attaches (`core.Store` on `dbtest.New`; `api.New` on a store with a fixed clock; the parity table for a surface; the pure view functions). | `README.md` |
-| `cmd/lifelog` gets a package comment, as every other package has one. | `cmd/lifelog/main.go` |
+| `cmd/aminte` gets a package comment, as every other package has one. | `cmd/aminte/main.go` |
 | With the owner's word: AGENTS.md keeps what an agent needs on every edit, and links the rest (the personas, the performance evidence, the engineering references, the conventions checklist that `docs/` already holds). An agent reads AGENTS.md in every session: 375 lines today. | `AGENTS.md`, `tests/README.md` |
 
 ## What this plan does not do
@@ -346,7 +346,7 @@ The rest the reviewers found goes to a later part:
 | finding | part |
 |---|---|
 | `core.refused` and `dryRun` lose a failed rollback that `db.Write` now joins; `Store.Capture`, `Store.CreatePage`, `Tx.SetPicture` and `Tx.SetPictureOf` return the result of a write that rolled back | 4 (`alone[T]`) |
-| `cmd/lifelog` and `core/snapshot.go` discard the error of `db.Close` | 6 (the cmd env), 4 |
+| `cmd/aminte` and `core/snapshot.go` discard the error of `db.Close` | 6 (the cmd env), 4 |
 | `writeEntity` drops the error of `Encode`; `refusedOnItsPage` drops the error of `Write` (`renderHTML` logged the URL path: Part 3 fixed it) | 5 (one render entry point) |
 | `errorEntity` sends the text of every 500 to the client | 3 (one `writeError`) |
 | `/weeks/0000-W01` answers 422 when a metric has a reading that week | 4 (`core.ParseDay`) |
@@ -486,9 +486,9 @@ and the short forms of a command line), `a97b95f` and `9ca5bab` (in the table be
   - The snapshot tests that call only core and db are in `internal/core/snapshot_test.go` (`5a5a22f`). One CLI case
     stays: `snapshot --to` in a git work tree is refused before anything opens (`79426e5`). The table of
     `LoopbackAddress` is beside its parse (`eb3a079`).
-  - Two tests in `cmd/lifelog` hold the agents' texts true to the program (`dd65bcf`). Each MCP config of
+  - Two tests in `cmd/aminte` hold the agents' texts true to the program (`dd65bcf`). Each MCP config of
     `agentic-init` starts this program with `mcp --agent NAME --db FILE`, and the program serves its tools on that
-    line. In AGENTS.md and the skills, each backticked tool name is a tool of `lifelog mcp`; the names that AGENTS.md
+    line. In AGENTS.md and the skills, each backticked tool name is a tool of `aminte mcp`; the names that AGENTS.md
     calls the owner's only are all the owner's actions, and no one is a tool; each command line and each flag is one
     that the CLI takes. A rename of a tool in a text fails the test.
 - `go test -count=1 -shuffle=on ./...` passes, and with the seed 1792181223 too.
@@ -497,7 +497,7 @@ Lines of Go, at `9849043` and at `7cc4d6d`:
 
 | package | production | tests |
 |---|---|---|
-| `cmd/lifelog` | 782 → 838 | 1597 → 1667 |
+| `cmd/aminte` | 782 → 838 | 1597 → 1667 |
 | `internal/client` | 428 → 267 | 410 → 322 |
 | `internal/mcp` | 81 → 243 | 854 → 940 |
 | `internal/agentic` | 193 → 195 | 197 → 157 |
@@ -505,7 +505,7 @@ Lines of Go, at `9849043` and at `7cc4d6d`:
 | `internal/photo/phototest` | 236 → 227 | 31 → 90 |
 | `internal/preview` | 181 → 181 | 213 → 197 |
 
-The production lines of `cmd/lifelog` grew by the env, `runArgs` with its usage error, and `errWriter`. The tests of
+The production lines of `cmd/aminte` grew by the env, `runArgs` with its usage error, and `errWriter`. The tests of
 `internal/core` grew by the snapshot tests that moved in: 5747 → 6125.
 
 Answers and texts that changed, each a defect fixed reproducer first or a change the step asked for:
@@ -513,26 +513,26 @@ Answers and texts that changed, each a defect fixed reproducer first or a change
 | step | what changed |
 |---|---|
 | `938cdbe` | an error of the Close of the file (its `PRAGMA optimize`) is joined to the error of the command: `main` writes it and exits 1, where it exited 0 |
-| `dd65bcf` | the skills say what keeping a photo does: lifelog does not read where a photo was taken; a photo with no EXIF date gets no day, and `--day` gives one (`--at PLACE` went); one `file` command keeps one file. Importing notes: no link kind `about`; a plain page is promoted, a place is linked `at`, and a day page links a person only by a `[[link]]` in its text |
+| `dd65bcf` | the skills say what keeping a photo does: aminte does not read where a photo was taken; a photo with no EXIF date gets no day, and `--day` gives one (`--at PLACE` went); one `file` command keeps one file. Importing notes: no link kind `about`; a plain page is promoted, a place is linked `at`, and a day page links a person only by a `[[link]]` in its text |
 | `e699655` | the description of `correct` ends "To remove a reading, retract it.", on the wire, in the form of `/actions` and in API.md |
 | `1e312eb` | `init`, `agentic-init`, `actions --human` and an answer with `--human` return the error of a failed write of their output, so `main` exits 1, where it exited 0 |
 | `ffac569` | `site/README.md` names the three tokens of the site that base.css does not have: `--text-accent`, `--wide` and `--gutter` |
 | `7cc4d6d` | AGENTS.md: the tools are the actions that are not the owner's, and two reads, `get_day` and `get` |
-| `a97b95f` | the AGENTS.md that `agentic-init` writes: MCP gives every action that is not the owner's; `lifelog agentic-init --force` writes a file anew; a link is the one row that is deleted; a tool's name is the action's name with `_` for `-` |
-| `9ca5bab` | the skills: a day page shows a photo when it has a picture, and a HEIC needs `--preview PICTURE`; the owner registers a new metric (`lifelog do register-metric`) before an agent records it |
+| `a97b95f` | the AGENTS.md that `agentic-init` writes: MCP gives every action that is not the owner's; `aminte agentic-init --force` writes a file anew; a link is the one row that is deleted; a tool's name is the action's name with `_` for `-` |
+| `9ca5bab` | the skills: a day page shows a photo when it has a picture, and a HEIC needs `--preview PICTURE`; the owner registers a new metric (`aminte do register-metric`) before an agent records it |
 
 Left for later:
 
 | finding | why it waits |
 |---|---|
-| `jsonFile` of `internal/agentic` keeps its own encoder | `agentic` imports no package of lifelog; an import of `api` would add the store and SQLite to it |
+| `jsonFile` of `internal/agentic` keeps its own encoder | `agentic` imports no package of aminte; an import of `api` would add the store and SQLite to it |
 | the tests of `internal/preview` keep `encodeJPEG` and `halves` | the rotation and scale tests look at a red half and a blue half, which the gradient of `phototest.JPEG` cannot show |
 | `heifWithLocations` of the tests of `internal/photo` stays | it builds `iloc` boxes that `phototest.HEIF` cannot |
-| no `TestMain` in `cmd/lifelog` | one subprocess test is left, and it builds its binary one time |
+| no `TestMain` in `cmd/aminte` | one subprocess test is left, and it builds its binary one time |
 | no test of the error of Close that `runContext` joins | a test of the CLI cannot make `PRAGMA optimize` fail on demand; `db.TestCloseReportsAFailedOptimize` holds Close |
 | an unknown command exits 1 with "unknown command", not with the usage and 2 | the behaviour before this part; `TestAnUnknownCommandIsAnErrorAndNotTheUsage` holds it |
-| the comment of `TestSnapshot`, now in `internal/core`, says "TestSnapshot is `lifelog snapshot`" | a move changes no line; the test calls `Store.TakeSnapshot` |
-| the test of the texts knows seven words that look like a tool and are not one (`lifelog`, `actions`, `day`, `text`, `created`, `skipped`, `at`); it does not check what each one is | a check of each would need the fields, the answers and the link kinds of the program in the test |
+| the comment of `TestSnapshot`, now in `internal/core`, says "TestSnapshot is `aminte snapshot`" | a move changes no line; the test calls `Store.TakeSnapshot` |
+| the test of the texts knows seven words that look like a tool and are not one (`aminte`, `actions`, `day`, `text`, `created`, `skipped`, `at`); it does not check what each one is | a check of each would need the fields, the answers and the link kinds of the program in the test |
 | the test of the texts does not count the arguments of a command line: `file PHOTO1 PHOTO2` passed the parse, and a read found it | the usage gives the count in words only |
 | the startup line of `serve` and the lines of `main` to stderr drop the error of their write | a line of the log at the edge of the process; no data is lost |
 | when a write fails and the action failed too, `show` returns the error of the write; `human` returns the error of `json.Marshal` even after a failed write | either way `main` exits 1 with a true error |
@@ -580,7 +580,7 @@ The row of `apitest` in Part 7 above names `Clients(t, h, source)`; the kit has 
   `must`, `mustEntity`, `find`, `actionByName`, `cmdAction`, `href`, `hrefOf`, `cmdHref`, `clientStatus` and the
   remote switches; `mcpTestClient` builds on `Fresh`, and `commandClient` went with the copies of the CLI. The 24
   internal test files of package `api` cannot import `apitest` (a cycle): they use `dbtest` and one `drawForm`.
-- **The parity table.** `cmd/lifelog/parity_test.go`, `TestParityOfTheSurfaces`: 14 rows on 8 columns, 112 cases in
+- **The parity table.** `cmd/aminte/parity_test.go`, `TestParityOfTheSurfaces`: 14 rows on 8 columns, 112 cases in
   parallel, about 2 s. A column is a surface and a writer: `http` as `api` and as `agent:parity`, `remote` as `ui` and
   as `agent:parity`, `cli` as `cli` and as `agent:parity`, and `mcp` and `mcp-remote` (the MCP server over the client
   in process and over a socket) as `agent:parity`. A row runs on a fresh file, and holds the answer and the state of
@@ -610,7 +610,7 @@ The row of `apitest` in Part 7 above names `Clients(t, h, source)`; the kit has 
   pages and an entity with no properties). The database tests that made the same assertions lost those cases, each
   mapped in `c3daa49`, `bc1c7c0` and `018f2af`. `TestMultipartUnknownNameProjection` calls `parseFileForm`, not a copy
   of its loop.
-- **The names.** A test of `internal/api`, `cmd/lifelog` and `internal/core` is in the file of the production file or
+- **The names.** A test of `internal/api`, `cmd/aminte` and `internal/core` is in the file of the production file or
   of the subject that it tests (`61480b2`, `d5b11da`, `bebcdf9`, `0114b8f`, `5ede95e`): no file that the row of Part 7
   names keeps its name, and the five `names_*` files and the five integrity files of core are one each.
   `TestEveryPageIsSemanticHTML` joined `TestEveryViewRenders` (one table of paths),
@@ -626,15 +626,15 @@ The row of `apitest` in Part 7 above names `Clients(t, h, source)`; the kit has 
   its client kept a connection with no request, and the shutdown of serve waits 5 s for one. It now closes its idle
   connections (`ea683ee`): 0.01 s in 20 of 20. `serveInProcess` read only the first line of the stderr of serve, so a
   second line would block serve until the cleanup (`4351ba0`, a defect fixed reproducer first).
-- **The checks at the end.** `go test -count=1 -shuffle=on ./...` passes (each package prints its seed; `cmd/lifelog`
+- **The checks at the end.** `go test -count=1 -shuffle=on ./...` passes (each package prints its seed; `cmd/aminte`
   had 1792190459246980868). A run with `-shuffle=1792190459` passes for every package too, but 1792190459 is another
   seed, so that run was not a replay. The reviewer of C6 replayed the seed 1792190459246980868, and it passes.
   (Corrected at the close of the plan: this line gave 1792190459 as the replay of the printed seed.) The commands of
-  the coverage map in `tests/README.md` work after Parts 6 and 7: `cmd/lifelog/output.go` has `listActions`, `show`,
-  `Write`, `human` and `indent` at 100.0 %, and `cmd/lifelog/agentic.go` has `agenticInit` at 72.7 %. `main` is at
+  the coverage map in `tests/README.md` work after Parts 6 and 7: `cmd/aminte/output.go` has `listActions`, `show`,
+  `Write`, `human` and `indent` at 100.0 %, and `cmd/aminte/agentic.go` has `agenticInit` at 72.7 %. `main` is at
   40.0 %, and only the process of `TestExecutableServeDrainsActiveRequest` runs it: the map counts the process. That
-  test builds the program with `-cover` itself; `cmd/lifelog` has no `TestMain`.
-- No answer on the wire changed. The one production change is in `cmd/lifelog`: `usageError.Unwrap`, which had no
+  test builds the program with `-cover` itself; `cmd/aminte` has no `TestMain`.
+- No answer on the wire changed. The one production change is in `cmd/aminte`: `usageError.Unwrap`, which had no
   caller, went (`23c82e1`).
 
 Times of `go test -count=1`, at `ef004ad` and at `08910c8`, on the same machine, two runs each:
@@ -644,9 +644,9 @@ Times of `go test -count=1`, at `ef004ad` and at `08910c8`, on the same machine,
 | `./...`, the wall time | 31.0 to 32.6 s | 31.1 to 32.2 s |
 | `-short ./...`, the wall time | 16.4 to 16.6 s | 12.8 s |
 | `internal/api`, in `./...` | 16.6 s | 6.8 to 7.1 s |
-| `cmd/lifelog`, in `./...` | 1.3 to 1.4 s | 3.8 to 3.9 s |
+| `cmd/aminte`, in `./...` | 1.3 to 1.4 s | 3.8 to 3.9 s |
 
-The suites of `tests/` with their mutants (about 26 s) set the wall time of `./...`. `cmd/lifelog` is slower by
+The suites of `tests/` with their mutants (about 26 s) set the wall time of `./...`. `cmd/aminte` is slower by
 the parity table.
 
 Lines of Go, at `ef004ad` and at `08910c8` (`wc -l` of the `.go` files of each folder; production is every file that
@@ -654,7 +654,7 @@ is not a `_test.go`):
 
 | package | production | tests |
 |---|---|---|
-| `cmd/lifelog` | 838 → 836 | 1667 → 2141 |
+| `cmd/aminte` | 838 → 836 | 1667 → 2141 |
 | `internal/api` | 6079 → 6079 | 11496 → 11068 |
 | `internal/api/apitest` | 0 → 98 | 0 → 117 |
 | `internal/client` | 267 → 267 | 322 → 500 |
@@ -666,7 +666,7 @@ is not a `_test.go`):
 | the other packages | 2426 → 2426 | 2231 → 2231 |
 | total | 12948 → 13082 | 30206 → 29977 |
 
-The tests of `cmd/lifelog` include 40 lines of the review fixes of Part 6. Without them, Part 7 has 269 lines of
+The tests of `cmd/aminte` include 40 lines of the review fixes of Part 6. Without them, Part 7 has 269 lines of
 tests less, and the kit adds 136 lines that are not tests. The plan estimated about 1,000 lines less: C1 to C3 (the
 kit and the parity table) removed 510 lines of tests, and C4 added 399 (the conformance test, the table tests and
 the fuzz target).
@@ -679,7 +679,7 @@ Left for later:
 | no test saves a body of 16 to 20 MiB now (`04bd2cf`) | the save costs seconds until the row above is fixed |
 | no test checks that the server stops reading a request at its limit: no test counts the bytes that the server reads (added at the close of the plan, from the review of C6) | the limit tests hold the status and that nothing is written; a count needs a request body that counts what the server reads, and no step asked for it |
 | `schema_adversarial_test.go`, `id_guards_test.go` and `name_grammar_test.go` (each a suite of the runner), `connection_fixture_test.go`, `identity_fixture_test.go` and `render_test.go` (each a Go test of its own), and `schema_bounds_test.go` (ten functions) keep their files | none is a small part of a suite of another file; to put two suites in one file is a choice of the grouping |
-| `usageError.Error` (`cmd/lifelog/main.go`), `redirect.Error` and `caught.WriteHeader` (`internal/api/serve.go`) are at 0 % in the coverage map | each one satisfies an interface (`error`, `http.ResponseWriter`) and no path calls it; for the closing record (done criterion 3). (Corrected at the close of the plan: a test calls `caught.WriteHeader`, and the map cannot show it; the closing record, done criterion 3, says why) |
+| `usageError.Error` (`cmd/aminte/main.go`), `redirect.Error` and `caught.WriteHeader` (`internal/api/serve.go`) are at 0 % in the coverage map | each one satisfies an interface (`error`, `http.ResponseWriter`) and no path calls it; for the closing record (done criterion 3). (Corrected at the close of the plan: a test calls `caught.WriteHeader`, and the map cannot show it; the closing record, done criterion 3, says why) |
 | `agenticInit` is at 72.7 %: its error branches and its line "a kept file has another text" have no test of the CLI | `internal/agentic` tests the kept file (`TestASecondRunKeepsTheOwnersEdits`); the line is one `Fprintln` |
 | the table of `TestNavMarksThePageTheBrowserIsOn` has the path `/import/prepared`, of the import process that plan 089 removed | the row asks that no link is marked, which holds for any path; no step of this part asked |
 
@@ -698,7 +698,7 @@ the close of the plan: the heading said `b8a5a8c`..`c6d3687`, which by this rule
 | D4 | `3d753bf..634633d` | a field of page titles is an input with a datalist; three hand forms use `form` |
 | D3, review fixes | `634633d..74c32b4` | `open-day` reads the word `today`; three small fixes |
 | D5 | `74c32b4..dae824f` | numbers and words: the left-overs of Part 5 |
-| D4, review fixes | `dae824f..264c03d` | the id of a datalist, the unit and the range of New metric, a flag, a refused form; the Latest tile of a metric and the usage of `lifelog file` |
+| D4, review fixes | `dae824f..264c03d` | the id of a datalist, the unit and the range of New metric, a flag, a refused form; the Latest tile of a metric and the usage of `aminte file` |
 | D5, review fixes | `264c03d..d0d0ba1` | the mean of a week, the line of the smallest readings, a blank search, the toast |
 | D4, second review fixes | `d0d0ba1..3b61d2c` | a fixed field, a field of page titles, `form` and `back`, a flag in README, Range |
 | D6 | `3b61d2c..c6d3687` | the view is a package of its own; the Siren types are a leaf package |
@@ -710,7 +710,7 @@ Part 8. No commit of Part 8 changes it.
   `Action` and `Field` with `LinkByRel` and `Field`, and the addresses of the resources that the API and the view both
   write (`PageHref`, `DayHref`, `MeasurementHref`, `MetricHref`, `MonthHref`, `MonthOf`, `WeekHref`, `WeekKey`,
   `YearHref`, `IsYear`, `BrowseHref`). It is under `internal/api`, not `internal/siren`: the types are the wire format
-  of this API, and its catalog is made of them. `client`, `mcp`, `cmd/lifelog` and `apitest` import the types from
+  of this API, and its catalog is made of them. `client`, `mcp`, `cmd/aminte` and `apitest` import the types from
   `siren`, not from `api` by an alias: an alias is a second name for one type. `api/siren.go`, which then held the
   catalog, is `api/catalog.go`.
 - **The view** (`452c2ea`). `internal/api/view`: the ten `view_*.go` files, `html/` and the internal tests of the view.
@@ -754,8 +754,8 @@ The answers that changed on the wire in Part 8, at `c7b5665` and at `c6d3687` (D
 | `0946bc5` | `GET /titles` | 200, the titles that start with a prefix | 404, as an unknown route |
 | `452c40e` | the answer of `tombstone-pages` | the properties `kind` ("pages"), `ids` and `count` | `ids` and `count` |
 | `3d753bf`, `d25c02f` | `GET /days/go` with no day, an empty day or the word `today`; `do open-day`; the MCP tool `open_day` | 422 "missing field day"; the word `today`, 422 | 303 to `/days/TODAY`, the day view of today |
-| `3d753bf` | `lifelog day ""` | the 404 of `GET /days/` | the day view of today |
-| `3d753bf` | `get_day` and `lifelog day` with a value that is not a day | the 422 of `GET /days/VALUE`: 'day "VALUE" is not a day (YYYY-MM-DD)' | 422 "day must be a day, YYYY-MM-DD" |
+| `3d753bf` | `aminte day ""` | the 404 of `GET /days/` | the day view of today |
+| `3d753bf` | `get_day` and `aminte day` with a value that is not a day | the 422 of `GET /days/VALUE`: 'day "VALUE" is not a day (YYYY-MM-DD)' | 422 "day must be a day, YYYY-MM-DD" |
 | `3d753bf`, `d25c02f` | the action `open-day` (in `GET /actions`, in the entities that offer it, in MCP) | "Open the day view of a local day (YYYY-MM-DD): its journal, …"; the field `day`, "Day", required | "… (YYYY-MM-DD), or of today when day is empty or today: its journal, …"; the field `day`, "Day (default today)", not required; `open_day` requires no argument, and `get_day` has its schema |
 | `634633d` | `GET /metrics` | `file-pages` and `register-metric` offer no options in `category` | the titles of the categories are the options of `category`, as on Browse and a page |
 | `634633d`, `9110fa2`, `9506a56`, `57971e1`, `61aecbd`, `3b61d2c` | the HTML of a field of page titles, of a flag and of three hand forms | as each commit's message gives it | a field of page titles with options is an input with a datalist, never a checkbox; a flag (0 and 1, not required) is one checkbox before its title; + Add of the categories, the pick bar and New metric are drawn by the template `form`; a form with an id sends `form`, and a refusal fills only the form that was sent; the number form requires its unit, and the score form requires its range (the pattern `[0-9]+-[0-9]+`) and calls it Range |
@@ -765,7 +765,7 @@ The answers that changed on the wire in Part 8, at `c7b5665` and at `c6d3687` (D
 | `e345d1b`, `e62207b` | the summary of a year and the Latest tile of a scale, on the page of a metric | "2 readings · 3 to 5 1-5"; "5 1-5" | "2 readings · 3 to 5 of 5"; "5 of 5" |
 | `285e05c`, `d0d0ba1` | the toast of `add-file` | "Filed under DAY."; "It was filed under DAY before." | "Its own day is DAY."; "Its page keeps the day DAY." |
 | `dae824f`, `72960d7` | `GET /search` with a `q` of only blanks | 422: the syntax error of FTS5 (ASCII blanks), or "a title prefix needs text and a limit" (a Unicode space) | 200, the empty search |
-| `264c03d` | the usage of `lifelog file` | "A photo is filed under its own day" | "Its own day is D, else a photo's EXIF date; a photo with neither has no day, another file the day it is kept" |
+| `264c03d` | the usage of `aminte file` | "A photo is filed under its own day" | "Its own day is D, else a photo's EXIF date; a photo with neither has no day, another file the day it is kept" |
 
 In the file, not on the wire: since `f42b50e` the writer writes NULL in `entities.import_key`, where it could write a
 key (production code gave none since plan 089; only `internal/scaletest` gave one).
@@ -775,7 +775,7 @@ is not a `_test.go`):
 
 | package | production | tests |
 |---|---|---|
-| `cmd/lifelog` | 836 → 838 | 2141 → 2194 |
+| `cmd/aminte` | 836 → 838 | 2141 → 2194 |
 | `internal/api` | 6079 → 3676 | 11068 → 9363 |
 | `internal/api/apitest` | 98 → 99 | 117 → 118 |
 | `internal/api/siren` | 0 → 128 | 0 → 0 |
@@ -820,7 +820,7 @@ Questions for the owner, each true at `c6d3687`:
 | MCP has two tools for one action: `open_day` and `get_day` | `get_day` is the name of a read; one of the two can go |
 | an `import:*` or `agent:*` client that sends `create-page` again gets 409 exists: the API has no import key of an entity | a client that sends again must find the page itself |
 | `TestInitApplyFailurePreservesReplacement` (`internal/db`) fails when the temporary folder is on ext4 (seen again with `TMPDIR` on the disk of this machine; also before this plan) | likely a new file takes the inode of the removed one, and the identity check of `removeReservedDatabasePath` cannot see it: a small defect of `db.Init` |
-| the owner's agent folders keep the old texts of the agents until the owner runs `lifelog agentic-init --force` | the texts changed in Part 6 (`dd65bcf`, `a97b95f`, `9ca5bab`); Part 8 does not change them |
+| the owner's agent folders keep the old texts of the agents until the owner runs `aminte agentic-init --force` | the texts changed in Part 6 (`dd65bcf`, `a97b95f`, `9ca5bab`); Part 8 does not change them |
 
 Left for later:
 
@@ -839,7 +839,7 @@ Part 9 (the owner's decisions, item 4).
 
 | step | range | what |
 |---|---|---|
-| E1 | `22c3023..9cc8199` | `SourceHeader` and `WriteJSON` move to `siren` (`59a7a9d`); the README layout table gets the column "test it at" (`fbcc2e1`); `cmd/lifelog` gets a package comment (`bb443b2`); AGENTS.md keeps the rules of every edit and links the rest (`9cc8199`) |
+| E1 | `22c3023..9cc8199` | `SourceHeader` and `WriteJSON` move to `siren` (`59a7a9d`); the README layout table gets the column "test it at" (`fbcc2e1`); `cmd/aminte` gets a package comment (`bb443b2`); AGENTS.md keeps the rules of every edit and links the rest (`9cc8199`) |
 | E1, review fixes | `9cc8199..4055079` | the conventions checklist of AGENTS.md links the homes of its rules, and the guide [building a writer](../guides/building-a-writer.md) is again as it was before `9cc8199` (`9877a20`); the README row of `internal/api` says that `apitest.FreshOn` fixes the clock and `apitest.Fresh` does not (`7e06aca`); the sentences of the performance evidence have one home in `tests/README.md` (`4055079`) |
 | E2 | `4055079..c7ba599` | four comments and a README row say what is true (`adf3960`); the test of the view's imports walks linux and windows (`a6e238b`); `agentic-init` writes its MCP configs with `siren.WriteJSON` (`c7ba599`) |
 
@@ -879,8 +879,8 @@ What each done criterion shows:
 1. **The baseline.** The message of each commit of the plan gives its checks. At `c7ba599`,
    `go generate ./... && go vet ./... && go test -count=1 ./...` passes in 32.3 s. `go test -count=1 -shuffle=on
    ./...` passes, two times. In the second run, with `-v`, 499 top-level tests run and 3 of them skip (two helpers
-   that a subprocess test starts, and `TestMermaidRender`, which needs `LIFELOG_MERMAID=1`), and each package prints
-   its seed: for example `cmd/lifelog` 1792205324591436177, `internal/api` 1792205324709533956 and `tests`
+   that a subprocess test starts, and `TestMermaidRender`, which needs `AMINTE_MERMAID=1`), and each package prints
+   its seed: for example `cmd/aminte` 1792205324591436177, `internal/api` 1792205324709533956 and `tests`
    1792205329449562585. A replay of the first two seeds passes. `gofmt -l` on the 203 `.go` files in git prints
    nothing. **Windows: not run.** No part of the plan ran its tests on Windows: the manual workflow
    `.github/workflows/windows-validation.yml` needs a push, and the owner decides the push. `GOOS=windows go vet
@@ -892,7 +892,7 @@ What each done criterion shows:
    process of `TestExecutableServeDrainsActiveRequest` and without `-short`: 562 functions, 91.1 % of the statements.
    (The 87.2 % of the audit was a map with `-short` and without the process: the two numbers have different methods.)
    Three functions are at 0.0 %, and each one stays:
-   - `usageError.Error` (`cmd/lifelog/main.go`) and `redirect.Error` (`internal/api/serve.go`) only satisfy `error`.
+   - `usageError.Error` (`cmd/aminte/main.go`) and `redirect.Error` (`internal/api/serve.go`) only satisfy `error`.
      `main` and `serve` take the error with `errors.As` and read its field (`err`, `to`): no path asks for its text.
      The build needs each method: `runArgs` returns a `usageError` as an `error`, and the handlers return a
      `redirect` as an `error`. A probe that deleted each method did not build.
@@ -921,7 +921,7 @@ What each done criterion shows:
 
 | package | production | tests |
 |---|---|---|
-| `cmd/lifelog` | 782 → 841 | 1590 → 2194 |
+| `cmd/aminte` | 782 → 841 | 1590 → 2194 |
 | `internal/agentic` | 193 → 192 | 197 → 157 |
 | `internal/api` | 5830 → 3660 | 9208 → 9332 |
 | `internal/api/apitest` | 0 → 99 | 0 → 117 |
@@ -978,7 +978,7 @@ the exact texts):
 | [5](#part-5-results-2026-10-16-a7e8165798a601) | a link target whose savepoint does not roll back fails the save (500); the first and the last day, week, month and year link only to pages, and `/weeks/9999-W52` answers 200; a line draws only the readings with a day and a number; the chart writes its numbers with `num`; the words and the markup of its table (one count, one help text, a required text area, `result-group`, the style page) |
 | [6](#part-6-results-2026-10-16-6bec68b7cc4d6d) | the CLI exits 1 when the Close of the file or the write of its output fails (it exited 0); the description of `correct` ends "To remove a reading, retract it."; the AGENTS.md and the skills that `agentic-init` writes |
 | [7](#part-7-results-2026-10-17-5a8c11808910c8) | none |
-| [8](#part-8-results-2026-10-17-c7b5665c6d3687) | the DDL's refusal where a Go copy of a DDL rule answered: a rename of a day page or to a date, `register-metric` and `add-file` with the title of a day page, a `redirect` link; `GET /titles` is a 404; the answer of `tombstone-pages` has no `kind`; `open-day`, `lifelog day` and `get_day` with no day, an empty day or `today` open today, and the field `day` is not required; a field of page titles is an input with a datalist, a flag is one checkbox, and three hand forms are drawn by `form`; `GET /metrics` offers the categories; a week whose sum overflows answers 200, and a line of ±1e308 draws each point; the titles of the reading links write their numbers with `num`; a scale reads "N of M"; the toast of `add-file` and the usage of `lifelog file` have new words; a search of only blanks answers 200, empty |
+| [8](#part-8-results-2026-10-17-c7b5665c6d3687) | the DDL's refusal where a Go copy of a DDL rule answered: a rename of a day page or to a date, `register-metric` and `add-file` with the title of a day page, a `redirect` link; `GET /titles` is a 404; the answer of `tombstone-pages` has no `kind`; `open-day`, `aminte day` and `get_day` with no day, an empty day or `today` open today, and the field `day` is not required; a field of page titles is an input with a datalist, a flag is one checkbox, and three hand forms are drawn by `form`; `GET /metrics` offers the categories; a week whose sum overflows answers 200, and a line of ±1e308 draws each point; the titles of the reading links write their numbers with `num`; a scale reads "N of M"; the toast of `add-file` and the usage of `aminte file` have new words; a search of only blanks answers 200, empty |
 | 9 | none |
 
 Left for later: the rows of the records that no later part did.
@@ -997,7 +997,7 @@ Left for later: the rows of the records that no later part did.
 | the tools of a day start with an empty line | 5 | the tools of a day are byte for byte as before Part 5; closed by plan 122, `24c953a` |
 | the + Add fold of the style page sends its POST to `/styleguide`, which answers 405 | 5 | the style page writes nothing; its comment says so |
 | the tests of `internal/preview` keep `encodeJPEG` and `halves`; the tests of `internal/photo` keep `heifWithLocations` | 6 | `phototest` cannot make a red half and a blue half, or the `iloc` boxes of these tests |
-| no `TestMain` in `cmd/lifelog` | 6 | one subprocess test is left, and it builds its binary one time |
+| no `TestMain` in `cmd/aminte` | 6 | one subprocess test is left, and it builds its binary one time |
 | no test of the error of Close that `runContext` joins | 6 | a test of the CLI cannot make `PRAGMA optimize` fail; `db.TestCloseReportsAFailedOptimize` holds Close |
 | an unknown command exits 1 with "unknown command", not with the usage and 2 | 6 | the behaviour before the plan; `TestAnUnknownCommandIsAnErrorAndNotTheUsage` holds it |
 | the test of the agents' texts knows seven words that look like a tool and are not one, and does not count the arguments of a command line | 6 | a check of each needs the fields, the answers and the link kinds in the test; the usage gives the count in words only |
@@ -1019,9 +1019,9 @@ For the owner:
 - The branch `plan-121-deep-modules` is not merged, and the program of the branch is not installed: the owner
   decides the merge, the build, the install, the restart of the service and the run of the Windows workflow.
 - When the new program is installed, the owner's agent folders keep the old agents' texts until the owner runs
-  `lifelog agentic-init --force` (the texts changed in Part 6). `--force` writes each file anew: an edit of the
+  `aminte agentic-init --force` (the texts changed in Part 6). `--force` writes each file anew: an edit of the
   owner's in one of these files goes, and the result of that file says `replaced`.
-- The `lifelog_meta` rows `instants`, `days` and `source` of `docs/schema/schema.sql` still name the columns of the
+- The `aminte_meta` rows `instants`, `days` and `source` of `docs/schema/schema.sql` still name the columns of the
   tasks that D23 removed (`completed_at` and `reminder_override_at` of a task; `tasks.anchor_day`,
   `tasks.repeat_until_day`, `task_occurrences.due_day` and `occurrence_key`; the `import_key` of `tasks` and
   `task_occurrences`). No table of tasks is in the schema. This is a text of the contract, to correct through

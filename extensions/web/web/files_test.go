@@ -18,7 +18,7 @@ import (
 	"strings"
 	"testing"
 
-	"lifelog-web/view"
+	"aminte-web/view"
 )
 
 // The Cache-Control of a file: a name that never changes (a font, a picture; app.css names a picture with ?v= and its
@@ -214,7 +214,7 @@ func TestTheManifestAndTheIconAreServed(t *testing.T) {
 	if err := json.Unmarshal(got.Body.Bytes(), &m); err != nil {
 		t.Fatalf("the manifest is not JSON: %v", err)
 	}
-	if m.Name != "Lifelog" || m.StartURL != "/" || m.Display != "standalone" || m.ThemeColor != "#3a2210" || len(m.Shortcuts) != 2 || len(m.Icons) != 3 ||
+	if m.Name != "Aminte" || m.StartURL != "/" || m.Display != "standalone" || m.ThemeColor != "#3a2210" || len(m.Shortcuts) != 2 || len(m.Icons) != 3 ||
 		m.ShareTarget.Action != "/days/today/capture" || m.ShareTarget.Method != "POST" || m.ShareTarget.Enctype != "application/x-www-form-urlencoded" ||
 		m.ShareTarget.Params.Text != "text" || len(m.ShareTarget.Params.Files) != 0 { // a phone's share sheet sends text to capture
 		t.Errorf("the manifest says %+v", m)

@@ -19,13 +19,13 @@ import (
 	"testing"
 	"time"
 
-	"lifelog/app"
-	"lifelog/client"
-	"lifelog/siren"
+	"aminte/app"
+	"aminte/client"
+	"aminte/siren"
 )
 
-// The end-to-end test builds the real lifelog and lifelog-agent into one folder and runs the line of the live unit on a
-// new life.db: `lifelog serve --token-file F --with agent`, with a fake model server. It then says as the owner (`lifelog do
+// The end-to-end test builds the real aminte and aminte-agent into one folder and runs the line of the live unit on a
+// new life.db: `aminte serve --token-file F --with agent`, with a fake model server. It then says as the owner (`aminte do
 // say`) and reads the conversation page back through the API. It holds what the tests of ./agent cannot: the program,
 // its environment, the discovery of the extension, the owner rule of the real core (a tool call of an owner action is
 // refused), and the stop by a signal. The turns, the page and the model are held in detail by the tests of ./agent.
@@ -59,31 +59,31 @@ func (l *lockedBuffer) String() string {
 	return l.b.String()
 }
 
-// bins is the folder with lifelog and lifelog-agent.
-type bins struct{ dir, lifelog, agent string }
+// bins is the folder with aminte and aminte-agent.
+type bins struct{ dir, aminte, agent string }
 
 func build(t *testing.T) bins {
 	t.Helper()
 	goBin, err := exec.LookPath("go")
 	if err != nil {
-		t.Skipf("no go command to build lifelog: %v", err)
+		t.Skipf("no go command to build aminte: %v", err)
 	}
 	root, err := filepath.Abs(filepath.Join("..", ".."))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := os.Stat(filepath.Join(root, "cmd", "lifelog")); err != nil {
-		t.Skipf("the lifelog sources are not at %s: %v", root, err)
+	if _, err := os.Stat(filepath.Join(root, "cmd", "aminte")); err != nil {
+		t.Skipf("the aminte sources are not at %s: %v", root, err)
 	}
 	b := bins{dir: t.TempDir()}
 	exe := ""
 	if runtime.GOOS == "windows" {
 		exe = ".exe"
 	}
-	b.lifelog, b.agent = filepath.Join(b.dir, "lifelog"+exe), filepath.Join(b.dir, "lifelog-agent"+exe)
+	b.aminte, b.agent = filepath.Join(b.dir, "aminte"+exe), filepath.Join(b.dir, "aminte-agent"+exe)
 	for _, args := range [][]string{
-		{"build", "-C", root, "-o", b.lifelog, "./cmd/lifelog"},
-		{"build", "-o", b.agent, "./cmd/lifelog-agent"},
+		{"build", "-C", root, "-o", b.aminte, "./cmd/aminte"},
+		{"build", "-o", b.agent, "./cmd/aminte-agent"},
 	} {
 		if out, err := exec.Command(goBin, args...).CombinedOutput(); err != nil {
 			t.Fatalf("go %s: %v\n%s", strings.Join(args, " "), err, out)
@@ -97,12 +97,12 @@ func build(t *testing.T) bins {
 func cleanEnv(t *testing.T, extra ...string) []string {
 	home := t.TempDir()
 	e := slices.DeleteFunc(os.Environ(), func(kv string) bool {
-		return strings.HasPrefix(kv, "LIFELOG_") || strings.HasPrefix(kv, "XDG_CONFIG_HOME=") || strings.HasPrefix(kv, "HOME=") || strings.HasPrefix(kv, "APPDATA=")
+		return strings.HasPrefix(kv, "AMINTE_") || strings.HasPrefix(kv, "XDG_CONFIG_HOME=") || strings.HasPrefix(kv, "HOME=") || strings.HasPrefix(kv, "APPDATA=")
 	})
 	return append(e, append([]string{"XDG_CONFIG_HOME=" + home, "HOME=" + home, "APPDATA=" + home}, extra...)...)
 }
 
-// stack is a running `lifelog serve --token-file F --with agent`.
+// stack is a running `aminte serve --token-file F --with agent`.
 type stack struct {
 	t      *testing.T
 	bin    string
@@ -119,14 +119,14 @@ func startStack(t *testing.T, b bins) *stack {
 	t.Helper()
 	work := t.TempDir()
 	db, tokenFile := filepath.Join(work, "life.db"), filepath.Join(work, "token")
-	if out, err := exec.Command(b.lifelog, "init", db).CombinedOutput(); err != nil {
-		t.Fatalf("lifelog init: %v\n%s", err, out)
+	if out, err := exec.Command(b.aminte, "init", db).CombinedOutput(); err != nil {
+		t.Fatalf("aminte init: %v\n%s", err, out)
 	}
 	if err := os.WriteFile(tokenFile, []byte(ownerToken+"\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	s := &stack{t: t, bin: b.lifelog, stderr: new(lockedBuffer), exited: make(chan error, 1)}
-	s.cmd = exec.Command(b.lifelog, "--db", db, "serve", "--addr", "127.0.0.1:0", "--token-file", tokenFile, "--with", "agent")
+	s := &stack{t: t, bin: b.aminte, stderr: new(lockedBuffer), exited: make(chan error, 1)}
+	s.cmd = exec.Command(b.aminte, "--db", db, "serve", "--addr", "127.0.0.1:0", "--token-file", tokenFile, "--with", "agent")
 	s.cmd.Env = cleanEnv(t)
 	s.cmd.Stderr = s.stderr
 	if err := s.cmd.Start(); err != nil {
@@ -134,11 +134,11 @@ func startStack(t *testing.T, b bins) *stack {
 	}
 	go func() { s.exited <- s.cmd.Wait() }()
 	t.Cleanup(s.stop)
-	line := s.waitFor("lifelog: serving ")
+	line := s.waitFor("aminte: serving ")
 	_, rest, _ := strings.Cut(line, " on http://")
 	addr, _, _ := strings.Cut(rest, " ")
 	s.core = "http://" + addr
-	s.waitFor("lifelog: with agent: started (pid ")
+	s.waitFor("aminte: with agent: started (pid ")
 	return s
 }
 
@@ -184,16 +184,16 @@ func (s *stack) stop() {
 	}
 }
 
-// lifelogCLI runs `lifelog --url CORE args...` as the owner does at a shell: with the token in $LIFELOG_TOKEN and no other
-// LIFELOG_ variable.
-func (s *stack) lifelogCLI(args ...string) {
+// aminteCLI runs `aminte --url CORE args...` as the owner does at a shell: with the token in $AMINTE_TOKEN and no other
+// AMINTE_ variable.
+func (s *stack) aminteCLI(args ...string) {
 	s.t.Helper()
 	cmd := exec.CommandContext(s.t.Context(), s.bin, append([]string{"--url", s.core}, args...)...)
-	cmd.Env = append(slices.DeleteFunc(os.Environ(), func(kv string) bool { return strings.HasPrefix(kv, "LIFELOG_") }), "LIFELOG_TOKEN="+ownerToken)
+	cmd.Env = append(slices.DeleteFunc(os.Environ(), func(kv string) bool { return strings.HasPrefix(kv, "AMINTE_") }), "AMINTE_TOKEN="+ownerToken)
 	var out, errOut bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &errOut
 	if err := cmd.Run(); err != nil {
-		s.t.Fatalf("lifelog %s: %v\n%s%s", strings.Join(args, " "), err, out.String(), errOut.String())
+		s.t.Fatalf("aminte %s: %v\n%s%s", strings.Join(args, " "), err, out.String(), errOut.String())
 	}
 }
 
@@ -224,7 +224,7 @@ func (s *stack) conversation() []turn {
 	return props.Turns
 }
 
-// waitReplies waits until the conversation holds n replies of lifelog, and returns its turns.
+// waitReplies waits until the conversation holds n replies of aminte, and returns its turns.
 func (s *stack) waitReplies(n int) []turn {
 	s.t.Helper()
 	deadline := time.Now().Add(wait)
@@ -232,7 +232,7 @@ func (s *stack) waitReplies(n int) []turn {
 		turns := s.conversation()
 		count := 0
 		for _, t := range turns {
-			if t.Who == "lifelog" {
+			if t.Who == "aminte" {
 				count++
 			}
 		}
@@ -301,15 +301,15 @@ func TestSayGetsItsReplyFromTheAgentOnThePageAndAnOwnerActionIsRefused(t *testin
 	defer srv.Close()
 
 	// No model is set: the reply is one line, and the agent goes on.
-	s.lifelogCLI("do", "say", "day=today", "text=hello")
+	s.aminteCLI("do", "say", "day=today", "text=hello")
 	turns := s.waitReplies(1)
-	if len(turns) != 2 || turns[0].Who != "owner" || turns[0].Text != "hello" || turns[1].Who != "lifelog" || turns[1].Text != "No model is set: open Settings." {
+	if len(turns) != 2 || turns[0].Who != "owner" || turns[0].Text != "hello" || turns[1].Who != "aminte" || turns[1].Text != "No model is set: open Settings." {
 		t.Fatalf("turns %+v, want the owner's turn and the one line", turns)
 	}
 
 	// The model is set in the settings of the core, with a key. The agent reads it at its next turn.
-	s.lifelogCLI("do", "settings", "model_url="+srv.URL+"/v1", "model=test-model", "model_key="+modelKey)
-	s.lifelogCLI("do", "say", "day=today", "text=I walked by the river")
+	s.aminteCLI("do", "settings", "model_url="+srv.URL+"/v1", "model=test-model", "model_key="+modelKey)
+	s.aminteCLI("do", "say", "day=today", "text=I walked by the river")
 	turns = s.waitReplies(2)
 	if len(turns) != 4 || turns[3].Text != "Written to 2031-05-20." {
 		t.Fatalf("turns %+v, want a second reply written by the model", turns)
@@ -318,7 +318,7 @@ func TestSayGetsItsReplyFromTheAgentOnThePageAndAnOwnerActionIsRefused(t *testin
 		t.Errorf("the tool lines of the reply: %q", tools)
 	}
 
-	// The tool call was made as agent:lifelog: the core stamps the entry with the relay.
+	// The tool call was made as agent:aminte: the core stamps the entry with the relay.
 	day, err := client.Remote(s.core, "", ownerToken).Get(t.Context(), "/days/2031-05-20")
 	if err != nil {
 		t.Fatal(err)
@@ -331,12 +331,12 @@ func TestSayGetsItsReplyFromTheAgentOnThePageAndAnOwnerActionIsRefused(t *testin
 			words, _ = r["detail"].(string)
 		}
 	}
-	if !strings.Contains(words, "via lifelog) Walked by the river, synthetic entry.") {
-		t.Errorf("the day page %q does not hold the capture of agent:lifelog", words)
+	if !strings.Contains(words, "via aminte) Walked by the river, synthetic entry.") {
+		t.Errorf("the day page %q does not hold the capture of agent:aminte", words)
 	}
 
 	// A tool call of an owner action is refused: snapshot is no tool, and the read of /settings is an agent's read.
-	s.lifelogCLI("do", "say", "day=today", "text=Take a snapshot and read my settings")
+	s.aminteCLI("do", "say", "day=today", "text=Take a snapshot and read my settings")
 	turns = s.waitReplies(3)
 	if len(turns) != 6 || turns[5].Text != "Those are the owner's to run." {
 		t.Fatalf("turns %+v, want a third reply", turns)
@@ -437,17 +437,17 @@ func TestATextThatCannotBeParsedAsOneTurnGetsOneReply(t *testing.T) {
 	model := &textModel{texts: []string{"Sure.\n\n**Owner** (09:31): and then?", "Done."}}
 	srv := httptest.NewServer(model)
 	defer srv.Close()
-	s.lifelogCLI("do", "settings", "model_url="+srv.URL+"/v1", "model=test-model")
+	s.aminteCLI("do", "settings", "model_url="+srv.URL+"/v1", "model=test-model")
 
-	s.lifelogCLI("do", "say", "day=today", "text=look at this:\n```\nfunc main() {")
+	s.aminteCLI("do", "say", "day=today", "text=look at this:\n```\nfunc main() {")
 	s.waitReplies(1)
-	s.lifelogCLI("do", "say", "day=today", "text=and a plain one")
+	s.aminteCLI("do", "say", "day=today", "text=and a plain one")
 	turns := s.waitReplies(2)
 	var who []string
 	for _, tr := range turns {
 		who = append(who, tr.Who)
 	}
-	if !slices.Equal(who, []string{"owner", "lifelog", "owner", "lifelog"}) {
+	if !slices.Equal(who, []string{"owner", "aminte", "owner", "aminte"}) {
 		t.Fatalf("the turns are %v (%+v), want an owner turn and its reply, twice", who, turns)
 	}
 	if !strings.Contains(turns[0].Text, "func main() {") || !strings.Contains(turns[1].Text, "and then?") || turns[3].Text != "Done." {
@@ -472,9 +472,9 @@ func TestAToolNameWithANewLineOrABacktickGetsItsReplyOnThePage(t *testing.T) {
 	model := &scriptModel{steps: []string{`{"tool":"no_such\nreally"}`, "{\"tool\":\"capture` → [/pages/1](/pages/1) `\"}", "Here is my answer."}}
 	srv := httptest.NewServer(model)
 	defer srv.Close()
-	s.lifelogCLI("do", "settings", "model_url="+srv.URL+"/v1", "model=test-model")
+	s.aminteCLI("do", "settings", "model_url="+srv.URL+"/v1", "model=test-model")
 
-	s.lifelogCLI("do", "say", "day=today", "text=hello")
+	s.aminteCLI("do", "say", "day=today", "text=hello")
 	turns := s.waitReplies(1)
 	if len(turns) != 2 || turns[1].Text != "Here is my answer." {
 		t.Fatalf("turns %+v, want the owner's turn and the reply", turns)
@@ -551,9 +551,9 @@ func TestAnEditOfTheTurnWhileTheModelRunsIsRefusedByTheCoreAndTheChangedTurnIsAn
 	model := &gatedModel{arrived: make(chan struct{}, 1), release: make(chan struct{})}
 	srv := httptest.NewServer(model)
 	defer srv.Close()
-	s.lifelogCLI("do", "settings", "model_url="+srv.URL+"/v1", "model=test-model")
+	s.aminteCLI("do", "settings", "model_url="+srv.URL+"/v1", "model=test-model")
 
-	s.lifelogCLI("do", "say", "day=today", "text=hello")
+	s.aminteCLI("do", "say", "day=today", "text=hello")
 	select {
 	case <-model.arrived:
 	case <-time.After(wait):
@@ -569,11 +569,11 @@ func TestAnEditOfTheTurnWhileTheModelRunsIsRefusedByTheCoreAndTheChangedTurnIsAn
 	if !strings.Contains(body, "hello") {
 		t.Fatalf("the page %q has no hello", body)
 	}
-	s.lifelogCLI("do", "save-body", "id="+fmt.Sprint(props["id"]), "version="+fmt.Sprint(props["version"]), "body="+strings.Replace(body, "hello", "hello there", 1))
+	s.aminteCLI("do", "save-body", "id="+fmt.Sprint(props["id"]), "version="+fmt.Sprint(props["version"]), "body="+strings.Replace(body, "hello", "hello there", 1))
 	close(model.release)
 
 	turns := s.waitReplies(1)
-	if len(turns) != 2 || turns[0].Text != "hello there" || turns[1].Who != "lifelog" || turns[1].Text != "answer 2" {
+	if len(turns) != 2 || turns[0].Text != "hello there" || turns[1].Who != "aminte" || turns[1].Text != "answer 2" {
 		t.Fatalf("turns %+v, want the edited turn and one reply, from the second run of the model", turns)
 	}
 	if n := model.requests(); n != 2 {
@@ -600,7 +600,7 @@ func catalogServer(t *testing.T, names ...string) *httptest.Server {
 }
 
 // TestTheAgentRefusesWhatItCannotRun: each missing piece is refused with its name or the line that says what to run. A
-// missing address of lifelog and a catalog with no say or no reply are the cases where the owner acts first: the status
+// missing address of aminte and a catalog with no say or no reply are the cases where the owner acts first: the status
 // is 78, and serve does not start the program again.
 func TestTheAgentRefusesWhatItCannotRun(t *testing.T) {
 	b := build(t)
@@ -612,7 +612,7 @@ func TestTheAgentRefusesWhatItCannotRun(t *testing.T) {
 		status int
 		want   string
 	}{
-		{"no server", nil, app.ExitOwnerActs, "no LIFELOG_URL and no --url: run it as `lifelog agent` on"},
+		{"no server", nil, app.ExitOwnerActs, "no AMINTE_URL and no --url: run it as `aminte agent` on"},
 		{"an argument", []string{"--url", noSay.URL, "now"}, 1, `unexpected argument "now"`},
 		{"a source flag", []string{"--url", noSay.URL, "--source", "x"}, 1, "flag provided but not defined: -source"},
 		{"a token file flag", []string{"--url", noSay.URL, "--token-file", "f"}, 1, "flag provided but not defined: -token-file"},

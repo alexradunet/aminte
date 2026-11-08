@@ -51,9 +51,9 @@ flowchart LR
 | what | where |
 |---|---|
 | Delete `Tx.MetricID`, `Tx.FillPersonDays`, `Tx.ReadingByKey`; `FileIn.RequireCaptureDayAgreement` and its two branches; the two unreachable checks of `photo.itemData`; the FuncMap entries `post` and `dueWords`; the CSS `.columns`, `.stack`, `.panel.flush`; `refusedView.Status` and `.Code`. | `internal/core`, `internal/photo`, `internal/api` |
-| Functions only tests reach: delete `Store.Counts`, `Tx.File`, `Tx.MaterializeTaskOccurrence` and move their tests to the production path or a `_test.go` helper. Delete the context-less `client.Get/Do/DoFiles/Catalog`, `mcp.New` and the CLI's `do`; the `…Context` variants take the plain names. | `internal/core`, `internal/client`, `internal/mcp`, `cmd/lifelog` |
+| Functions only tests reach: delete `Store.Counts`, `Tx.File`, `Tx.MaterializeTaskOccurrence` and move their tests to the production path or a `_test.go` helper. Delete the context-less `client.Get/Do/DoFiles/Catalog`, `mcp.New` and the CLI's `do`; the `…Context` variants take the plain names. | `internal/core`, `internal/client`, `internal/mcp`, `cmd/aminte` |
 | Unexport what only its package uses: `core.Now`, `FirstLine`, `RangeUnit`, `MetresPerDegreeLon`, `Store.DryRun`, `Store.PlaceOf`, `Tx.Savepoint`, `Tx.ByImportKey`, `Tx.MetricUnit`, `Tx.Lookup` and `PageRef`; `api.TokenMinLength`, `CookieName`; `preview.MaxEdge`, `MaxBytes`; `db.MinVersion`, `Schema`. `preview.ErrFormat` is matched with `errors.Is` in the api, or unexported. | the same packages |
-| Stale references: `docs/plans/033` in `main.go`; `docs/guides/importing.md` and `*.lifelog/` in `.gitignore`. The root's `untitled.md` and `lifelog.exe~` go. | `cmd/lifelog`, `.gitignore` |
+| Stale references: `docs/plans/033` in `main.go`; `docs/guides/importing.md` and `*.aminte/` in `.gitignore`. The root's `untitled.md` and `aminte.exe~` go. | `cmd/aminte`, `.gitignore` |
 
 ## Part 2 — One write style, one helper a rule
 
@@ -79,20 +79,20 @@ flowchart LR
 | Names: no free function named as a handler method; FuncMap `monthOf` and `title` renamed; `namedRow` and `weekHabit` use core's rows; `Key` is `ImportKey`; habit periods are `HabitPeriod`; an inclusive bound is `through`; `LinkKindsFrom` returns an empty list; every list read validates its limit. | `internal/api`, `internal/core` |
 | `db.copyWith` says why it does not use `dsn(…, true)`: `query_only` refuses `VACUUM INTO` (probed). | `internal/db/db.go` |
 | `sessions.go`, `periods.go`, `scope.go`, `feedback.go` in the package's style: blank lines, doc comments, short lines. | `internal/api` |
-| The CLI's output on an `io.Writer`; one JSON encoder for the CLI, MCP, `agentic` and `lifescale`. | `cmd/lifelog`, `internal/mcp`, `internal/agentic`, `tools/lifescale` |
-| Docs: the README layout table names `internal/scaletest` and `tools/lifescale`; the preview routes are among those the CLI and MCP do not carry; `snapshot_refused` is in the README's codes; API.md's field keys name `pages`; `tests/README.md` names every suite file; the usage and the error of `rename` agree. | `README.md`, `API.md`, `tests/README.md`, `cmd/lifelog` |
+| The CLI's output on an `io.Writer`; one JSON encoder for the CLI, MCP, `agentic` and `lifescale`. | `cmd/aminte`, `internal/mcp`, `internal/agentic`, `tools/lifescale` |
+| Docs: the README layout table names `internal/scaletest` and `tools/lifescale`; the preview routes are among those the CLI and MCP do not carry; `snapshot_refused` is in the README's codes; API.md's field keys name `pages`; `tests/README.md` names every suite file; the usage and the error of `rename` agree. | `README.md`, `API.md`, `tests/README.md`, `cmd/aminte` |
 
 ## Part 4 — The CLI's defects
 
 | what | where |
 |---|---|
-| `init PATH` honours PATH: one `dbPath` with the precedence `--db`, PATH, `$LIFELOG_DB`, beside the program; `init PATH --db OTHER` is refused. Used by `init`, the open path and `agentic-init`. | `cmd/lifelog` |
-| A failed restore check is an error on the API (status 409, the entity carries `snapshot` and `restore_check`); the shortcut is a plain wrapper; an internal error of `snapshot` is not flattened to 422. | `internal/api/handler.go`, `cmd/lifelog` |
-| Today is the server's: `capture` sends `today`, `habits` sends no day, `done`/`skip` send `today`. | `cmd/lifelog` |
-| `serve` builds no client; `serve --url` is refused before the file opens; `--snapshots` is refused outside `serve` and `snapshot`. | `cmd/lifelog` |
-| Shortcuts wrap actions: `page` wraps `find`; `day` and `habits` escape the day. The batch report of `file` groups photos by `core.DefaultRadius` with core's distance. | `cmd/lifelog` |
+| `init PATH` honours PATH: one `dbPath` with the precedence `--db`, PATH, `$AMINTE_DB`, beside the program; `init PATH --db OTHER` is refused. Used by `init`, the open path and `agentic-init`. | `cmd/aminte` |
+| A failed restore check is an error on the API (status 409, the entity carries `snapshot` and `restore_check`); the shortcut is a plain wrapper; an internal error of `snapshot` is not flattened to 422. | `internal/api/handler.go`, `cmd/aminte` |
+| Today is the server's: `capture` sends `today`, `habits` sends no day, `done`/`skip` send `today`. | `cmd/aminte` |
+| `serve` builds no client; `serve --url` is refused before the file opens; `--snapshots` is refused outside `serve` and `snapshot`. | `cmd/aminte` |
+| Shortcuts wrap actions: `page` wraps `find`; `day` and `habits` escape the day. The batch report of `file` groups photos by `core.DefaultRadius` with core's distance. | `cmd/aminte` |
 | A client error names the status and the content type, never the body. | `internal/client` |
-| Flags a command does not take are refused: by the command table of Part 9. | `cmd/lifelog` |
+| Flags a command does not take are refused: by the command table of Part 9. | `cmd/aminte` |
 
 ## Part 5 — The api's and core's defects
 

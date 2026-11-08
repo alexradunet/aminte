@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"lifelog/siren"
+	"aminte/siren"
 )
 
 // The connection to the core. Web asks the core for Siren JSON and for bytes, and it draws the HTML itself. The
@@ -34,7 +34,7 @@ const (
 	pageWriter = "ui"
 )
 
-// core is the connection to one lifelog server. It is safe for concurrent use.
+// core is the connection to one aminte server. It is safe for concurrent use.
 type core struct {
 	base       string // scheme://host[:port], without a path
 	token      string // sent as a bearer credential when it is not empty

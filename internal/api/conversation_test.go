@@ -8,12 +8,12 @@ import (
 	"testing"
 	"time"
 
-	"lifelog/client"
-	"lifelog/internal/api"
-	"lifelog/internal/api/apitest"
-	"lifelog/internal/core"
-	"lifelog/internal/db/dbtest"
-	"lifelog/siren"
+	"aminte/client"
+	"aminte/internal/api"
+	"aminte/internal/api/apitest"
+	"aminte/internal/core"
+	"aminte/internal/db/dbtest"
+	"aminte/siren"
 )
 
 const convDay = "2031-05-14"
@@ -210,7 +210,7 @@ func TestTheConversationOfADay(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.SaveBody(t.Context(), "cli", id, p.Body+"\n\n- `search`\n- `get`: no hits\n\n**lifelog** (11:08): Hello.", p.Version); err != nil {
+	if _, err := s.SaveBody(t.Context(), "cli", id, p.Body+"\n\n- `search`\n- `get`: no hits\n\n**aminte** (11:08): Hello.", p.Version); err != nil {
 		t.Fatal(err)
 	}
 	e = get()
@@ -220,7 +220,7 @@ func TestTheConversationOfADay(t *testing.T) {
 		t.Fatalf("the turns: %v, want two", turns)
 	}
 	reply, _ := turns[1].(map[string]any)
-	if reply["who"] != "lifelog" || reply["at"] != "11:08" || reply["text"] != "Hello." || fmt.Sprint(reply["tools"]) != "[- `search` - `get`: no hits]" {
+	if reply["who"] != "aminte" || reply["at"] != "11:08" || reply["text"] != "Hello." || fmt.Sprint(reply["tools"]) != "[- `search` - `get`: no hits]" {
 		t.Errorf("the reply: %v", reply)
 	}
 	if props["id"] == nil || props["version"] == nil || props["title"] != "Conversation "+convDay || props["body"] == nil {

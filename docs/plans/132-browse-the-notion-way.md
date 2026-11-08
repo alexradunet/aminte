@@ -89,7 +89,7 @@ flowchart LR
 - **core:** `TestFilePages`, `TestFilePagesRefusals`.
 - **api:** `TestFileMetricsAtOnce`, `TestAPagesCategoriesAreBadges`, `TestEveryListSelectsTheSameWay`,
   `TestBrowseActions`, and the Browse page tests in `internal/api/browse_test.go`.
-- **cmd/lifelog:** the parity row "file-pages with from", and `TestTheTableOfTheSurfacesIsTheCatalog`.
+- **cmd/aminte:** the parity row "file-pages with from", and `TestTheTableOfTheSurfacesIsTheCatalog`.
 - **view:** `TestTheCrumbsFollowThePath`, `TestPickedAndMoveHref`.
 
 ## Done when

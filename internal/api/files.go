@@ -13,10 +13,10 @@ import (
 	"strconv"
 	"strings"
 
-	"lifelog/internal/core"
-	"lifelog/internal/photo"
-	"lifelog/internal/preview"
-	"lifelog/siren"
+	"aminte/internal/core"
+	"aminte/internal/photo"
+	"aminte/internal/preview"
+	"aminte/siren"
 )
 
 const (
@@ -263,7 +263,7 @@ func textFields(act spec) []string {
 }
 
 // readOriginal hashes the original as it streams, and keeps its first megabyte for its metadata (photo.Read: a
-// JPEG's EXIF is in its first 64 KB; a HEIC has no metadata for lifelog); a picture the writer can read is held whole,
+// JPEG's EXIF is in its first 64 KB; a HEIC has no metadata for aminte); a picture the writer can read is held whole,
 // unless it passes maxPicture (it is then kept without a picture, as a HEIC is).
 func readOriginal(part *multipart.Part) (sum, typ string, picture []byte, meta photo.Meta, err error) {
 	h := sha256.New()

@@ -18,8 +18,8 @@ import (
 	"testing"
 	"time"
 
-	"lifelog/client"
-	"lifelog/siren"
+	"aminte/client"
+	"aminte/siren"
 )
 
 // token is the bearer token of the owner, as both clients of the rig send it.
@@ -51,7 +51,7 @@ type seen struct{ Method, Path, Source, Auth, Body string }
 // fakeAPI serves the catalog and a few pages, and answers every other path with an entity. A path that ends in /big
 // answers a title that is longer than the bound of a result. A page title is redirected to its page, as the real
 // API does. It keeps the rules of the real API that the agent depends on: every turn of the conversation has a key,
-// reply writes the paragraph of lifelog right after the owner turn that has the key that it names (404, 409 and 422 as
+// reply writes the paragraph of aminte right after the owner turn that has the key that it names (404, 409 and 422 as
 // the real API gives them), a line of the text that reads as a marker is escaped, and an agent may not save the body of
 // a conversation page (403).
 type fakeAPI struct {
@@ -137,7 +137,7 @@ func (f *fakeAPI) waitReplyRequests(t *testing.T, n int) {
 // waitReplies waits until the page holds n replies of the agent.
 func (f *fakeAPI) waitReplies(t *testing.T, title string, n int) string {
 	t.Helper()
-	return f.waitBody(t, title, func(body string) bool { return strings.Count(body, "\n**lifelog** (") >= n })
+	return f.waitBody(t, title, func(body string) bool { return strings.Count(body, "\n**aminte** (") >= n })
 }
 
 // setToday moves the local day of the server.
@@ -230,16 +230,16 @@ func (f *fakeAPI) loseNextAnswer() {
 	f.loseAnswers++
 }
 
-// otherReplies adds a reply to the end of a page, as another writer of lifelog turns would.
+// otherReplies adds a reply to the end of a page, as another writer of aminte turns would.
 func (f *fakeAPI) otherReplies(title, text string) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	p := f.find(title)
-	p.body, p.version = p.body+"\n\n**lifelog** (09:30): "+text, p.version+1
+	p.body, p.version = p.body+"\n\n**aminte** (09:30): "+text, p.version+1
 	f.notify()
 }
 
-// setModel changes the settings, as the owner would in lifelog.
+// setModel changes the settings, as the owner would in aminte.
 func (f *fakeAPI) setModel(url, name, key string) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -247,7 +247,7 @@ func (f *fakeAPI) setModel(url, name, key string) {
 }
 
 // marker is the start of a turn, as the real API reads it.
-var marker = regexp.MustCompile(`^\*\*(Owner|lifelog)\*\* \((\d\d[:.]\d\d)(?:, via ([a-z0-9_:.-]+))?\): ?`)
+var marker = regexp.MustCompile(`^\*\*(Owner|aminte)\*\* \((\d\d[:.]\d\d)(?:, via ([a-z0-9_:.-]+))?\): ?`)
 
 // fakeTurn is a turn of a page as the fake API reads it. at is the index of the paragraph that holds its marker (0 for
 // a paragraph before the first marker).
@@ -268,8 +268,8 @@ func turnsOf(day, body string) []*fakeTurn {
 		switch {
 		case m != nil:
 			who := "owner"
-			if m[1] == "lifelog" {
-				who = "lifelog"
+			if m[1] == "aminte" {
+				who = "aminte"
 			}
 			turns = append(turns, &fakeTurn{who: who, text: para[len(m[0]):], at: i})
 			stamps = append(stamps, who+"|"+m[2]+"|"+m[3])
@@ -293,7 +293,7 @@ func turnsOf(day, body string) []*fakeTurn {
 	return turns
 }
 
-// keysOf are the keys of the turns of one kind (owner, lifelog or text) of the conversation of a day, in the order of
+// keysOf are the keys of the turns of one kind (owner, aminte or text) of the conversation of a day, in the order of
 // the page, as GET /days/{day}/conversation gives them.
 func (f *fakeAPI) keysOf(who, day string) []string {
 	f.mu.Lock()
@@ -330,9 +330,9 @@ func (f *fakeAPI) conversation(day string) siren.Entity {
 }
 
 // markerLine is a line that the real API reads as the start of a turn.
-var markerLine = regexp.MustCompile(`(?m)^\*\*(Owner|lifelog)\*\* \(`)
+var markerLine = regexp.MustCompile(`(?m)^\*\*(Owner|aminte)\*\* \(`)
 
-// reply is the action reply of the real API: the paragraph of lifelog, with the tool lines before it, goes right
+// reply is the action reply of the real API: the paragraph of aminte, with the tool lines before it, goes right
 // before the marker of the turn that follows the owner turn that has the key, or at the end of the page. It gives the
 // status and the code of a refusal, and 0 when the reply is written. A key that no owner turn has is 409, as it is
 // for the real API: the page changed. The caller holds the lock.
@@ -384,12 +384,12 @@ func (f *fakeAPI) reply(day string, form url.Values) (int, string) {
 	}
 	end := len(paras)
 	for i := at + 1; i < len(paras); i++ {
-		if isMarker(paras[i], "Owner") || isMarker(paras[i], "lifelog") {
+		if isMarker(paras[i], "Owner") || isMarker(paras[i], "aminte") {
 			end = i
 			break
 		}
 	}
-	if end < len(paras) && isMarker(paras[end], "lifelog") {
+	if end < len(paras) && isMarker(paras[end], "aminte") {
 		return 409, "conflict"
 	}
 	text = markerLine.ReplaceAllString(text, `\*\*$1\*\* (`)
@@ -397,7 +397,7 @@ func (f *fakeAPI) reply(day string, form url.Values) (int, string) {
 	if f.now != nil {
 		clock = f.now()
 	}
-	block := "**lifelog** (" + clock.Format("15:04") + "): " + text
+	block := "**aminte** (" + clock.Format("15:04") + "): " + text
 	if len(tools) > 0 {
 		block = strings.Join(tools, "\n") + "\n\n" + block
 	}

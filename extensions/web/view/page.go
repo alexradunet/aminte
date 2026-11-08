@@ -1,7 +1,7 @@
 // Package view draws an entity of the API as a page of HTML for a browser: a template per class of entity, and the
 // generic template for any other class. It reads nothing: a page is a function of its entity, the facts of its
 // request and the refused form that it shows (Draw). It imports no store (core or db), and a test holds this. The handler
-// of the browser (lifelog-web/web) calls Draw, and serves the fonts, the manifest and the icons from Files.
+// of the browser (aminte-web/web) calls Draw, and serves the fonts, the manifest and the icons from Files.
 package view
 
 import (
@@ -16,8 +16,8 @@ import (
 	"slices"
 	"strings"
 
-	"lifelog/siren"
-	"lifelog/text"
+	"aminte/siren"
+	"aminte/text"
 )
 
 // The browser view is a template per class of entity (html/*.html), and the generic one for any other class:
@@ -248,7 +248,7 @@ func hereOf(u *url.URL) string {
 // DrawFailed is the page a browser gets when its view cannot be drawn: a 500 that names no internal cause. The
 // server's log has the cause.
 const DrawFailed = `<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><title>Error · Lifelog</title></head>
+<html lang="en"><head><meta charset="utf-8"><title>Error · Aminte</title></head>
 <body><p role="alert">This page cannot be drawn. The server's log has the cause.</p><p><a href="/">Home</a></p></body></html>
 `
 

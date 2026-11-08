@@ -1,8 +1,8 @@
 -- ============================================================
--- Lifelog schema v1: the single init file, edited in place until the freeze;
+-- Aminte schema v1: the single init file, edited in place until the freeze;
 -- numbered migrations begin only after the freeze (D13).
 -- Each table's rules are comments INSIDE its CREATE statement, so .schema shows them (a comment
--- outside a statement is not stored in the file); the rules that span tables: SELECT * FROM lifelog_meta;
+-- outside a statement is not stored in the file); the rules that span tables: SELECT * FROM aminte_meta;
 -- Every writer connection: SQLite >= 3.51.3; PRAGMA foreign_keys = ON;
 -- PRAGMA recursive_triggers = ON; PRAGMA synchronous = FULL; PRAGMA trusted_schema = OFF;
 -- and every write transaction starts with BEGIN IMMEDIATE (docs/contract/connections.md).
@@ -11,19 +11,19 @@ PRAGMA application_id = 0x4C494645;   -- 'LIFE' — recognizable to file(1) and 
 PRAGMA user_version  = 1;
 PRAGMA journal_mode  = WAL;           -- persistent; readers (Datasette) don't block the writer
 
-CREATE TABLE lifelog_meta (
+CREATE TABLE aminte_meta (
   -- the rules that span tables, readable with a SELECT by someone who has only this file;
   -- the rules of one table are comments inside its own CREATE statement
   -- rows are rules the owner adds or removes; deleting one removes the rule from the file itself
   key   TEXT PRIMARY KEY,
   value TEXT NOT NULL
 ) STRICT;
-INSERT INTO lifelog_meta(key, value) VALUES
-  ('schema',    'lifelog v1: the journal (one page per day), wiki, people, health metrics and the files kept as their text and a small picture, of one person: a life log, not a project manager; the rules of each table are comments inside its CREATE statement (.schema), the rules that span tables are these rows; this is an in-file reading summary: a conforming writer also needs the matching docs contract and vectors'),
+INSERT INTO aminte_meta(key, value) VALUES
+  ('schema',    'aminte v1: the journal (one page per day), wiki, people, health metrics and the files kept as their text and a small picture, of one person: a life log, not a project manager; the rules of each table are comments inside its CREATE statement (.schema), the rules that span tables are these rows; this is an in-file reading summary: a conforming writer also needs the matching docs contract and vectors'),
   ('instants',  'every *_at column is an exact 24-character ASCII UTC ISO-8601 TEXT instant, years 0000..9999 and hours 00..23, with milliseconds, e.g. 2026-06-09T21:14:03.482Z, written by the app, never by a SQLite default (CURRENT_TIMESTAMP has no milliseconds and is not ISO-8601; a trigger writes strftime(''%Y-%m-%dT%H:%M:%fZ'',''now'')); fixed width, so it sorts as text; supplied clock timestamps may coincide or regress and do not encode commit order; CHECK strftime(''%Y-%m-%dT%H:%M:%fZ'', x) IS x; created_at, on every table that has it, is when the row was written to life.db, never back-dated'),
   ('days',      'every *_day column (and day) is the LOCAL exact 10-character ASCII calendar date YYYY-MM-DD, years 0000..9999, where the thing happened for recorded facts, written by the app: the local calendar day of the device that captured it when the client names the date, and the local day of the writer''s own clock and zone when the client sends the word today or no day; never recomputed from an instant; CHECK explicit ASCII shape and date(x) IS x (IS, not =: a CHECK passes on NULL, and date(''2026-9-3'') is NULL)'),
   ('periods',   'a period page has a canonical key like a day page: a week 2026-W43 (ISO 8601: Monday first, week 1 holds 4 January), a month 2026-10, a quarter 2026-Q4 or a year 2026; its key is reserved, it has no alias, no rename and no day (day is NULL), it is never filed and never a category, and entities.period names its shape (D30)'),
-  ('deletes',   'life data is never deleted except links rows: an entity is a tombstone (entities.deleted_at); revival clears the tombstone, so lifecycle transitions are not retained history; a measurement is corrected by inserting a row; BEFORE DELETE triggers enforce it on entities and every domain row; ordinary active reads filter lifecycle tombstones; explicit historical and append-only audits retain them; the registries (link_kinds, lifelog_meta) are the owner''s administrative rows, deletable while nothing references them (each CREATE comment says so)'),
+  ('deletes',   'life data is never deleted except links rows: an entity is a tombstone (entities.deleted_at); revival clears the tombstone, so lifecycle transitions are not retained history; a measurement is corrected by inserting a row; BEFORE DELETE triggers enforce it on entities and every domain row; ordinary active reads filter lifecycle tombstones; explicit historical and append-only audits retain them; the registries (link_kinds, aminte_meta) are the owner''s administrative rows, deletable while nothing references them (each CREATE comment says so)'),
   ('source',    'entities, links and measurements: source names the original inserter of the row, not the last editor or an audit trail (ui, cli, api, agent:<name>, import:<name>; schema for the rows this file seeds); written at insert, never changed; import_key is unique per source on entities and on capture_keys, and per source and metric on measurements; a present import_key is 1 to 512 bytes without NUL'),
   ('edit_revisions', 'entities.revision is a monotonic integer edit token independent of updated_at; creation is not an edit (nothing advances a row whose creation transaction is its only write: it keeps revision 1 and the updated_at its insert wrote, its owned preferred name and typed detail row included); a later change of the row''s own content advances it: names, body, day, type, lifecycle, typed detail and the links it leaves (a link advances only the page it leaves, never the page it points at; a wikilink is derived from the body and advances nothing); no-ops do not, rollback restores it, exhaustion refuses; clients compare the token inside BEGIN IMMEDIATE, never a timestamp; exact increment counts are not meaningful'),
   ('typed_links', 'both endpoints of every retained link must satisfy link_kinds; a type change refuses invalid incoming or outgoing edges atomically; semantic integrity checks the registry independently of structural integrity'),
@@ -72,11 +72,11 @@ CREATE TABLE entities (
                 WHEN preferred_name_key GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]' THEN 'month'
                 WHEN preferred_name_key GLOB '[0-9][0-9][0-9][0-9]-q[0-9]' THEN 'quarter'
                 WHEN preferred_name_key GLOB '[0-9][0-9][0-9][0-9]-w[0-9][0-9]' THEN 'week' END) VIRTUAL,
-  created_at  TEXT NOT NULL CONSTRAINT entities_created_at CHECK (length(created_at) = 24 AND created_at GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9].[0-9][0-9][0-9]Z' AND substr(created_at,12,2) BETWEEN '00' AND '23' AND strftime('%Y-%m-%dT%H:%M:%fZ', created_at) IS created_at),   -- the write time (lifelog_meta.instants)
+  created_at  TEXT NOT NULL CONSTRAINT entities_created_at CHECK (length(created_at) = 24 AND created_at GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9].[0-9][0-9][0-9]Z' AND substr(created_at,12,2) BETWEEN '00' AND '23' AND strftime('%Y-%m-%dT%H:%M:%fZ', created_at) IS created_at),   -- the write time (aminte_meta.instants)
   updated_at  TEXT NOT NULL CONSTRAINT entities_updated_at CHECK (length(updated_at) = 24 AND updated_at GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9].[0-9][0-9][0-9]Z' AND substr(updated_at,12,2) BETWEEN '00' AND '23' AND strftime('%Y-%m-%dT%H:%M:%fZ', updated_at) IS updated_at),   -- kept by the *_touch triggers
   revision    INTEGER NOT NULL DEFAULT 1 CONSTRAINT entities_revision CHECK (revision >= 1), -- edit token, independent of the clock; overflow refuses the write
   deleted_at  TEXT     CONSTRAINT entities_deleted_at CHECK (deleted_at IS NULL OR length(deleted_at) = 24 AND deleted_at GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9].[0-9][0-9][0-9]Z' AND substr(deleted_at,12,2) BETWEEN '00' AND '23' AND strftime('%Y-%m-%dT%H:%M:%fZ', deleted_at) IS deleted_at),   -- the tombstone
-  source      TEXT NOT NULL CONSTRAINT entities_source CHECK (instr(source, char(0)) = 0 AND length(source) BETWEEN 1 AND 64 AND source NOT GLOB '*[^a-z0-9_:.-]*'),   -- the writer (lifelog_meta.source)
+  source      TEXT NOT NULL CONSTRAINT entities_source CHECK (instr(source, char(0)) = 0 AND length(source) BETWEEN 1 AND 64 AND source NOT GLOB '*[^a-z0-9_:.-]*'),   -- the writer (aminte_meta.source)
   import_key  TEXT CONSTRAINT entities_import_key CHECK (import_key IS NULL OR (instr(import_key, char(0)) = 0 AND length(CAST(import_key AS BLOB)) BETWEEN 1 AND 512)),   -- the sender's key, unique per source; NULL = sent once. Imported or not: source
   body        TEXT NOT NULL DEFAULT '',   -- CommonMark, including journal and file text
   UNIQUE (id, entity_type),
@@ -334,7 +334,7 @@ CREATE TABLE measurements (
   tz               TEXT CONSTRAINT measurements_tz CHECK (tz IS NULL OR (instr(tz, char(0)) = 0 AND length(tz) BETWEEN 1 AND 64 AND tz NOT GLOB '*[^A-Za-z0-9_/+-]*')),
   value            REAL,                        -- numeric only, by design (D7); NULL only on a correction: it RETRACTS the row it supersedes
   created_at       TEXT NOT NULL CONSTRAINT measurements_created_at CHECK (length(created_at) = 24 AND created_at GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9].[0-9][0-9][0-9]Z' AND substr(created_at,12,2) BETWEEN '00' AND '23' AND strftime('%Y-%m-%dT%H:%M:%fZ', created_at) IS created_at),
-  source           TEXT NOT NULL CONSTRAINT measurements_source CHECK (instr(source, char(0)) = 0 AND length(source) BETWEEN 1 AND 64 AND source NOT GLOB '*[^a-z0-9_:.-]*'),   -- the writer (lifelog_meta.source)
+  source           TEXT NOT NULL CONSTRAINT measurements_source CHECK (instr(source, char(0)) = 0 AND length(source) BETWEEN 1 AND 64 AND source NOT GLOB '*[^a-z0-9_:.-]*'),   -- the writer (aminte_meta.source)
   import_key       TEXT CONSTRAINT measurements_import_key CHECK (import_key IS NULL OR (instr(import_key, char(0)) = 0 AND length(CAST(import_key AS BLOB)) BETWEEN 1 AND 512)),   -- importer's dedup key, unique per (source, metric); 1 to 512 bytes, no NUL
   captured_with_id INTEGER REFERENCES entities(id),      -- provenance: the page (a day page) this reading was captured with
   supersedes_id    INTEGER REFERENCES measurements(id),  -- optional: corrects an earlier row
@@ -391,19 +391,19 @@ CREATE TABLE capture_keys (
   -- The keys of the captures this file has added, so that a capture a client sends again changes nothing (D28). A
   -- capture appends a paragraph to a day page and may record a Mood reading. It has no row of its own that could hold
   -- a key, and two equal captures can be two true facts, so the content cannot tell a retry from a repeat. The sender
-  -- gives the key, once for one capture, as for any row it may send twice (lifelog_meta.source). Read the key
+  -- gives the key, once for one capture, as for any row it may send twice (aminte_meta.source). Read the key
   -- first: a row back means the capture was added before, so change nothing and answer with the day of page_id.
   -- Otherwise add the capture, record its Mood reading with the same import_key, and insert this row, all in one
   -- BEGIN IMMEDIATE transaction. The key is unique per source (UNIQUE below), and 1 to 512 bytes without NUL
   -- (capture_keys_import_key): an empty key would make every later capture look added before.
   -- Append-only, as measurements are: a key that changed or went away would let its capture be added again
   -- (capture_keys_no_update, capture_keys_no_delete). page_id is the day page the capture was added to; recorded_at is
-  -- when the row was written (lifelog_meta.instants).
+  -- when the row was written (aminte_meta.instants).
   id          INTEGER PRIMARY KEY,
-  source      TEXT NOT NULL CONSTRAINT capture_keys_source CHECK (instr(source, char(0)) = 0 AND length(source) BETWEEN 1 AND 64 AND source NOT GLOB '*[^a-z0-9_:.-]*'),   -- the writer (lifelog_meta.source)
+  source      TEXT NOT NULL CONSTRAINT capture_keys_source CHECK (instr(source, char(0)) = 0 AND length(source) BETWEEN 1 AND 64 AND source NOT GLOB '*[^a-z0-9_:.-]*'),   -- the writer (aminte_meta.source)
   import_key  TEXT NOT NULL CONSTRAINT capture_keys_import_key CHECK (instr(import_key, char(0)) = 0 AND length(CAST(import_key AS BLOB)) BETWEEN 1 AND 512),   -- the sender's key, unique per source; 1 to 512 bytes, no NUL
   page_id     INTEGER NOT NULL REFERENCES entities(id),   -- the day page the capture was added to
-  recorded_at TEXT NOT NULL CONSTRAINT capture_keys_recorded_at CHECK (length(recorded_at) = 24 AND recorded_at GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9].[0-9][0-9][0-9]Z' AND substr(recorded_at,12,2) BETWEEN '00' AND '23' AND strftime('%Y-%m-%dT%H:%M:%fZ', recorded_at) IS recorded_at),   -- the write time (lifelog_meta.instants)
+  recorded_at TEXT NOT NULL CONSTRAINT capture_keys_recorded_at CHECK (length(recorded_at) = 24 AND recorded_at GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9].[0-9][0-9][0-9]Z' AND substr(recorded_at,12,2) BETWEEN '00' AND '23' AND strftime('%Y-%m-%dT%H:%M:%fZ', recorded_at) IS recorded_at),   -- the write time (aminte_meta.instants)
   UNIQUE (source, import_key)
 ) STRICT;
 CREATE TRIGGER capture_keys_no_update BEFORE UPDATE ON capture_keys
@@ -446,7 +446,7 @@ CREATE TABLE links (
   -- a thing in a plain page, never a day page: held by links_endpoint_types (D26).
   -- Rows are hard-deleted (the one such table, D11) and immutable otherwise (delete and
   -- re-insert). Backlinks need only to_id. Cycles are not prevented (D8).
-  -- Edit revisions (lifelog_meta.edit_revisions): a link is an edit of the page it leaves (from_id) and never of the
+  -- Edit revisions (aminte_meta.edit_revisions): a link is an edit of the page it leaves (from_id) and never of the
   -- page it points at, so another writer's open edit of that page stays current. A wikilink is derived from the
   -- body (D19), whose change already advanced its page, so adding or removing one advances nothing; its note is
   -- still an edit.
@@ -457,7 +457,7 @@ CREATE TABLE links (
   kind       TEXT NOT NULL REFERENCES link_kinds(kind) ON DELETE RESTRICT,  -- closed registry; a used kind is never deleted or replaced
   note       TEXT CONSTRAINT links_note CHECK (note IS NULL OR instr(note, char(0)) = 0),
   created_at TEXT NOT NULL CONSTRAINT links_created_at CHECK (length(created_at) = 24 AND created_at GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9].[0-9][0-9][0-9]Z' AND substr(created_at,12,2) BETWEEN '00' AND '23' AND strftime('%Y-%m-%dT%H:%M:%fZ', created_at) IS created_at),
-  source     TEXT NOT NULL CONSTRAINT links_source CHECK (instr(source, char(0)) = 0 AND length(source) BETWEEN 1 AND 64 AND source NOT GLOB '*[^a-z0-9_:.-]*'),   -- the writer (lifelog_meta.source)
+  source     TEXT NOT NULL CONSTRAINT links_source CHECK (instr(source, char(0)) = 0 AND length(source) BETWEEN 1 AND 64 AND source NOT GLOB '*[^a-z0-9_:.-]*'),   -- the writer (aminte_meta.source)
   UNIQUE (from_id, to_id, kind)
 ) STRICT;
 CREATE INDEX links_to ON links(to_id, kind);   -- backlinks, all or of one kind (from_id is served by the UNIQUE index)

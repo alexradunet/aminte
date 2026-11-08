@@ -104,14 +104,14 @@ same checks at `a6df908`; these are of the last commit of code:
 - `go generate ./... && go vet ./... && go test -count=1 ./...`: pass.
 - `go test -count=1 -shuffle=on -v ./...`: pass. 509 top-level tests run, and 3 of them skip
   (`TestFilesystemWriteFailureChild` and `TestCollationHelper`, which a subprocess test starts, and
-  `TestMermaidRender`, which needs `LIFELOG_MERMAID=1`). The seeds: `cmd/lifelog` 1792225688595860798,
+  `TestMermaidRender`, which needs `AMINTE_MERMAID=1`). The seeds: `cmd/aminte` 1792225688595860798,
   `internal/api` 1792225688648095474, `internal/core` 1792225689479476097, `internal/db` 1792225689834609485,
   `tests` 1792225693801563652.
 - `staticcheck ./...`: nothing. `deadcode -test ./...` with `GOOS=linux` and with `GOOS=windows`: nothing.
   `GOOS=windows go vet ./...`: pass.
 - `gofmt -l` on every `.go` file in git: nothing.
 - `govulncheck ./...`, in its text mode: "No vulnerabilities found."
-- `LIFELOG_MERMAID=1 go test ./tests -run TestMermaidRender`: not run (no `mmdc` on this machine), and it does not
+- `AMINTE_MERMAID=1 go test ./tests -run TestMermaidRender`: not run (no `mmdc` on this machine), and it does not
   read `docs/plans/`.
 
 For the owner, besides [121's list](121-deep-modules-for-agents.md#the-closing-record-2026-10-17):

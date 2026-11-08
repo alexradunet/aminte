@@ -14,7 +14,7 @@ import (
 	"image/jpeg"
 	_ "image/png"
 
-	"lifelog/internal/photo"
+	"aminte/internal/photo"
 )
 
 const (

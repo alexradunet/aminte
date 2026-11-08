@@ -15,7 +15,7 @@ a fact of the code at `ef29fe6`.
 Two checks in `photo.itemData` cannot run. Two template helpers, three CSS classes and two struct fields are never
 read. Twelve more functions are reachable only from tests (`Store.Counts`, `Tx.File`, `Tx.MaterializeTaskOccurrence`,
 the context-less `client.Get/Do/DoFiles/Catalog`, `mcp.New`, the CLI's `do`). The root holds an empty `untitled.md`
-and a 28 MB `lifelog.exe~`. Comments cite `docs/plans/033` and `.gitignore` cites `docs/guides/importing.md`; neither
+and a 28 MB `aminte.exe~`. Comments cite `docs/plans/033` and `.gitignore` cites `docs/guides/importing.md`; neither
 exists.
 
 **One rule, several copies.** The same check is written again where it is needed instead of called:
@@ -43,9 +43,9 @@ exists.
 
 | what | where it differs |
 |---|---|
-| `lifelog init PATH` | PATH is ignored when `$LIFELOG_DB` is set; `o.dbExplicit` is set and never read |
+| `aminte init PATH` | PATH is ignored when `$AMINTE_DB` is set; `o.dbExplicit` is set and never read |
 | every flag is global | `--dry-run` is honoured by `file` only; `habits --day D` shows today; `day --public` is ignored, where the README promises a refusal |
-| a failed restore check | exit 1 from `lifelog snapshot`; 200 from the API, so `do snapshot` and the browser report success |
+| a failed restore check | exit 1 from `aminte snapshot`; 200 from the API, so `do snapshot` and the browser report success |
 | "today" | the CLI's `capture`, `habits`, `done` compute it on the client; `day` and MCP `get_day` ask the server |
 | an id | MCP alone turns `1e6` into an integer; the API's parsers refuse it |
 | the agentic template | tells an agent to use the CLI, which writes as `cli`, so the owner-only refusal and the `agent:NAME` provenance are bypassed; its shell lines omit `--db` |
@@ -66,10 +66,10 @@ exists.
 ## Reproduce
 
 1. `go run golang.org/x/tools/cmd/deadcode@v0.52.0 -test ./...` at `ef29fe6`: three functions.
-2. `LIFELOG_DB=/x/life.db lifelog init /y/life.db`: `/x/life.db` is created or refused; `/y` is never touched.
+2. `AMINTE_DB=/x/life.db aminte init /y/life.db`: `/x/life.db` is created or refused; `/y` is never touched.
 3. On a fresh file: create a task, read it, edit it twice with the first version: the second answer is `409 stale_version`
    on a task but `409 conflict` on a session edited the same way.
-4. `lifelog get /pages/1/preview` on a file page with a picture: stderr shows the picture's bytes.
+4. `aminte get /pages/1/preview` on a file page with a picture: stderr shows the picture's bytes.
 5. `grep -c '&core.Error{' internal/api/*.go`.
 
 ## Rules involved

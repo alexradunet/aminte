@@ -2,7 +2,7 @@
 
 These conventions are part of the schema's meaning but too long or too procedural for a constraint or a
 comment. Every rule that fits in the file is there instead: a table's in its `CREATE` statement, a rule that
-spans tables — time, identity, provenance, deletion — in a row of `lifelog_meta` ([schema](../schema/README.md)).
+spans tables — time, identity, provenance, deletion — in a row of `aminte_meta` ([schema](../schema/README.md)).
 
 | page | what it holds |
 |---|---|

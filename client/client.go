@@ -1,5 +1,5 @@
 // Package client is the hypermedia client of the API. The CLI and the Go extensions share it: the extensions import it
-// from the root module. It speaks HTTP to the API, either to a running `lifelog serve` or to the same handler
+// from the root module. It speaks HTTP to the API, either to a running `aminte serve` or to the same handler
 // in-process, so every surface goes through one code path. It is transport only: what a surface makes of an answer
 // (the tools of a model, the output of the CLI) is that surface's own.
 package client
@@ -20,7 +20,7 @@ import (
 	"strings"
 	"time"
 
-	"lifelog/siren"
+	"aminte/siren"
 )
 
 type Client struct {
@@ -32,7 +32,7 @@ type Client struct {
 
 // InProcess calls h directly; no socket is opened.
 func InProcess(h http.Handler, source string) *Client {
-	return &Client{hc: &http.Client{Transport: handlerTransport{h}}, base: "http://lifelog.local", source: source}
+	return &Client{hc: &http.Client{Transport: handlerTransport{h}}, base: "http://aminte.local", source: source}
 }
 
 // Remote calls a running server, e.g. http://127.0.0.1:7777, with token as the owner's bearer credential when the
@@ -44,7 +44,7 @@ func Remote(base, source, token string) *Client {
 	return &Client{hc: &http.Client{Transport: remoteTransport(headerTimeout)}, base: strings.TrimRight(base, "/"), source: source, token: token}
 }
 
-// As is a copy of c that writes as source (the Lifelog-Source header). It shares the transport, the base and the
+// As is a copy of c that writes as source (the Aminte-Source header). It shares the transport, the base and the
 // token. A connected app has one transport: a new transport for each request would leak idle connections.
 func (c *Client) As(source string) *Client {
 	cp := *c

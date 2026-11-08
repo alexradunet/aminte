@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"lifelog/text"
+	"aminte/text"
 )
 
 func TestMarkdownLinksWhatNamesAPage(t *testing.T) {

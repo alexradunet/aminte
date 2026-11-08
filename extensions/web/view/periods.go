@@ -4,8 +4,8 @@ package view
 // views, read from the entity's properties.
 
 import (
+	"aminte/siren"
 	"fmt"
-	"lifelog/siren"
 	"strconv"
 	"strings"
 )

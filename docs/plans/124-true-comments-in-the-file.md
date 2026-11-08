@@ -29,12 +29,12 @@ and that the parsed tables are equal (their columns, constraints, foreign keys a
 
 ```mermaid
 flowchart LR
-  P["a one-off program, tested on copies made from the old schema.sql"] --> S["owner: stop lifelog.service"]
+  P["a one-off program, tested on copies made from the old schema.sql"] --> S["owner: stop aminte.service"]
   S --> N["owner: snapshot"]
   N --> D["owner: the program with --dry-run, then without it"]
-  D --> I["owner: lifelog get /integrity"]
+  D --> I["owner: aminte get /integrity"]
   I --> B["install the new binary"]
-  B --> T["owner: start lifelog.service"]
+  B --> T["owner: start aminte.service"]
 ```
 
 ## Done when
@@ -47,5 +47,5 @@ flowchart LR
 ## Results
 
 The commits: `786f1d7` (the two comments, and the document suite's witness that no stored text names a link kind
-the registry does not have). The program `meta124-bin` (`/home/cico/.local/share/lifelog-oneoff/meta124/`) applied
+the registry does not have). The program `meta124-bin` (`/home/cico/.local/share/aminte-oneoff/meta124/`) applied
 plans 124 and 125 together: [plan 125](125-a-range-is-a-true-range.md#results) gives the run.

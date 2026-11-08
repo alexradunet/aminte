@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
-	"lifelog-ticktick/ticktick"
-	"lifelog/client"
-	"lifelog/siren"
+	"aminte-ticktick/ticktick"
+	"aminte/client"
+	"aminte/siren"
 )
 
 const (
@@ -62,7 +62,7 @@ func entryOf(t ticktick.Task, names map[string]string) (entry, bool) {
 func Sync(ctx context.Context, tt *ticktick.Client, lf *client.Client, st *State, now time.Time) (int, error) {
 	actions, err := lf.Catalog(ctx)
 	if err != nil {
-		return 0, fmt.Errorf("the catalog of lifelog: %w", err)
+		return 0, fmt.Errorf("the catalog of aminte: %w", err)
 	}
 	var capture siren.Action
 	for _, a := range actions {
@@ -71,7 +71,7 @@ func Sync(ctx context.Context, tt *ticktick.Client, lf *client.Client, st *State
 		}
 	}
 	if capture.Name == "" {
-		return 0, errors.New("the catalog of lifelog has no capture action")
+		return 0, errors.New("the catalog of aminte has no capture action")
 	}
 	lists, err := tt.Projects(ctx)
 	if err != nil {
@@ -141,13 +141,13 @@ func Sync(ctx context.Context, tt *ticktick.Client, lf *client.Client, st *State
 	return written, nil
 }
 
-// write sends one capture. It reports whether lifelog had the entry already. An error never holds the words of the
-// entry or of lifelog's answer.
+// write sends one capture. It reports whether aminte had the entry already. An error never holds the words of the
+// entry or of aminte's answer.
 func write(ctx context.Context, lf *client.Client, capture siren.Action, e entry) (already bool, err error) {
 	res, err := lf.Do(ctx, capture, map[string]string{"day": e.day, "text": e.text, "import_key": e.key})
 	var ce *client.Error
 	if errors.As(err, &ce) {
-		return false, fmt.Errorf("lifelog answered %d %s", ce.Status, ce.Code())
+		return false, fmt.Errorf("aminte answered %d %s", ce.Status, ce.Code())
 	}
 	if err != nil {
 		return false, err

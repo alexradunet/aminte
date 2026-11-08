@@ -1,16 +1,16 @@
-# lifelog-mcp
+# aminte-mcp
 
-`lifelog-mcp` is the MCP server of lifelog. It serves the action catalog of the API (`GET /actions`) as MCP tools on
+`aminte-mcp` is the MCP server of aminte. It serves the action catalog of the API (`GET /actions`) as MCP tools on
 stdio, for a model or a coding agent.
 
-It is a client of the lifelog HTTP API ([API.md](../../API.md)) and a Go module of its own, `lifelog-mcp`, as
+It is a client of the aminte HTTP API ([API.md](../../API.md)) and a Go module of its own, `aminte-mcp`, as
 [the contract of an extension](../README.md#what-an-extension-is) says. It uses the standard library and the
-[MCP Go SDK](https://github.com/modelcontextprotocol/go-sdk). `lifelog` does not change when it does.
+[MCP Go SDK](https://github.com/modelcontextprotocol/go-sdk). `aminte` does not change when it does.
 
 ```mermaid
 flowchart LR
-  M["MCP client: a model or a coding agent"] -->|"stdio"| S["lifelog-mcp"]
-  S -->|"HTTP, Lifelog-Source: agent:NAME"| A["lifelog API"]
+  M["MCP client: a model or a coding agent"] -->|"stdio"| S["aminte-mcp"]
+  S -->|"HTTP, Aminte-Source: agent:NAME"| A["aminte API"]
 ```
 
 - Each action of the catalog that is not [owner-only](../../API.md#reaching-a-server) is one tool. The tool name is the
@@ -24,29 +24,29 @@ flowchart LR
 ## Build
 
 ```
-go build -o lifelog-mcp ./cmd/lifelog-mcp
+go build -o aminte-mcp ./cmd/aminte-mcp
 ```
 
-From the repository root: `go build -C extensions/mcp -o ../../lifelog-mcp ./cmd/lifelog-mcp`. Put `lifelog-mcp`
-beside `lifelog`.
+From the repository root: `go build -C extensions/mcp -o ../../aminte-mcp ./cmd/aminte-mcp`. Put `aminte-mcp`
+beside `aminte`.
 
 ## Run
 
 | line | what happens |
 |---|---|
-| `lifelog mcp [--agent NAME] [--db FILE]` | `lifelog` finds `lifelog-mcp` beside itself, serves the file on a temporary loopback server, and runs the extension against it ([extensions/README.md](../README.md)). |
-| `lifelog-mcp [--agent NAME] --url URL` | It talks to a running `lifelog serve` at `URL` (default `$LIFELOG_URL`). With neither, it refuses and exits 78: a guessed address could be another file's server. |
+| `aminte mcp [--agent NAME] [--db FILE]` | `aminte` finds `aminte-mcp` beside itself, serves the file on a temporary loopback server, and runs the extension against it ([extensions/README.md](../README.md)). |
+| `aminte-mcp [--agent NAME] --url URL` | It talks to a running `aminte serve` at `URL` (default `$AMINTE_URL`). With neither, it refuses and exits 78: a guessed address could be another file's server. |
 
-`--agent` defaults to `mcp`. `$LIFELOG_TOKEN` is sent as a bearer token when it is set (a server that has a token needs it).
+`--agent` defaults to `mcp`. `$AMINTE_TOKEN` is sent as a bearer token when it is set (a server that has a token needs it).
 
 An MCP client starts it with a line such as:
 
 ```
-<path>/lifelog mcp --agent claude --db <path>/life.db
+<path>/aminte mcp --agent claude --db <path>/life.db
 ```
 
 ## Tests
 
 `go vet ./... && go test ./...` in this folder. The tests of `mcp/` run on a fake catalog. `e2e_test.go` builds the
-real `lifelog` and `lifelog-mcp` into one folder, and runs `lifelog mcp --agent test` through the command transport of
+real `aminte` and `aminte-mcp` into one folder, and runs `aminte mcp --agent test` through the command transport of
 the SDK. It needs the `go` command and the sources of the repository.

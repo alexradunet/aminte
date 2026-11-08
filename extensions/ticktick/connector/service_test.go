@@ -9,11 +9,11 @@ import (
 	"testing"
 	"time"
 
-	"lifelog/client"
-	"lifelog/siren"
+	"aminte/client"
+	"aminte/siren"
 )
 
-// serviceEnv is the task service on a server, with a fake TickTick and a fake lifelog behind it.
+// serviceEnv is the task service on a server, with a fake TickTick and a fake aminte behind it.
 type serviceEnv struct {
 	tick  *fakeTick
 	life  *fakeLife
@@ -491,7 +491,7 @@ func TestSyncPollsAndAnswersTheCount(t *testing.T) {
 	}
 }
 
-func TestSyncAnswersALifelogFaultWithoutItsWordsOrItsCause(t *testing.T) {
+func TestSyncAnswersAAminteFaultWithoutItsWordsOrItsCause(t *testing.T) {
 	env := newServiceEnv(t)
 	env.tick.add("t1", "p-home", "Pay rent")
 	env.tick.finish("t1", now.Add(-time.Hour))

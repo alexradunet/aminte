@@ -14,8 +14,8 @@ import (
 	"strings"
 	"testing"
 
-	"lifelog/internal/core"
-	"lifelog/siren"
+	"aminte/internal/core"
+	"aminte/siren"
 )
 
 // TestErrorEntity: each error becomes one error entity, with the status, the code and the message. An error that

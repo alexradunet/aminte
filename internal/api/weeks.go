@@ -11,9 +11,9 @@ import (
 	"strconv"
 	"time"
 
-	"lifelog/internal/core"
-	"lifelog/siren"
-	"lifelog/text"
+	"aminte/internal/core"
+	"aminte/siren"
+	"aminte/text"
 )
 
 var weekPattern = regexp.MustCompile(`^(\d{4})-W(\d{2})$`)

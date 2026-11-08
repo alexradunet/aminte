@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"lifelog-web/internal/formdoc"
+	"aminte-web/internal/formdoc"
 )
 
 // formTextPostingTo returns the HTML of the form of page that posts to action.

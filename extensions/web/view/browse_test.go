@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"lifelog/siren"
+	"aminte/siren"
 )
 
 // The folds of Browse (docs/plans/118-fold-and-find.md, rules 1 to 3), on props written by hand in the shape a

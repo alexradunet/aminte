@@ -24,7 +24,7 @@ does not write. The task manager stays unreachable from the agent and the browse
 **B. Cut plan lines; keep period pages; an extension may serve a catalog that the core aggregates.** A plan lives
 outside the file. What the owner did in the app comes back as an entry of the day: the app writes it with `capture`
 and an `import_key` as `import:NAME` ([imports](../contract/imports.md)), so a second run writes nothing. The agent,
-the CLI and the browser reach the app through the one catalog: an extension run under `lifelog serve --with NAME`
+the CLI and the browser reach the app through the one catalog: an extension run under `aminte serve --with NAME`
 may serve its own Siren API on the loopback address the server gives it; the server reads its `GET /actions` once per
 start and lists its actions in its own catalog as `NAME-action`, at `/with/NAME/...`, and re-issues each request to
 the child. The CLI's `do`, the MCP tools and the browser's forms are generated from the catalog, so the app reaches
@@ -34,15 +34,15 @@ with a key, made with `create-page`, the home of a review.
 
 ```mermaid
 flowchart LR
-  B["the browser, the CLI's do, the MCP tools: all from GET /actions"] -->|"GET /actions; POST /with/NAME/..."| L["lifelog serve"]
-  L -->|"re-issues the request on the loopback address it gave the child"| A["lifelog-NAME, a child of serve --with: its own Siren catalog"]
+  B["the browser, the CLI's do, the MCP tools: all from GET /actions"] -->|"GET /actions; POST /with/NAME/..."| L["aminte serve"]
+  L -->|"re-issues the request on the loopback address it gave the child"| A["aminte-NAME, a child of serve --with: its own Siren catalog"]
   A -->|"capture with import_key, as import:NAME"| L
   A -->|"the third party's own API"| T["the app outside this repo"]
 ```
 
 Removed from [schema.sql](../schema/schema.sql): the generated column `entities.has_box` and the index
 `entities_plans`; "a plan or" from the comment of `entities` that names a period page. No table, CHECK, trigger or
-`lifelog_meta` row exists for a plan line, so the totals of [the schema page](../schema/README.md) do not change.
+`aminte_meta` row exists for a plan line, so the totals of [the schema page](../schema/README.md) do not change.
 
 Removed or rewritten pages: [plan lines](../contract/plan-lines.md) and [plan a project](../cookbook/plan-a-project.md)
 go. [D29](../decisions/D29-plan-lines.md) is rewritten in place as "no plan lines: a plan lives outside the file"
@@ -55,12 +55,12 @@ token; [D30](../decisions/D30-period-pages.md) and [D22](../decisions/D22-events
 
 Removed from the writer: the actions `plan`, `tick`, `carry` and `schedule`, the resource `plans`, the parser, the
 Plans page, the box glyphs and the tick forms of every body, the plan blocks of a day, a week, a month, a year and a
-period page, the `lifelog plan` line, the `plans` icon. The MCP tools and the forms follow the catalog. The README's
+period page, the `aminte plan` line, the `plans` icon. The MCP tools and the forms follow the catalog. The README's
 table of the surfaces loses five rows.
 
 Added to the writer: the merged catalog, the `/with/{name}` routes, two error codes (`unavailable`, 503: the app is not
 running; `upstream`, 502: the app answered something that is not an entity), one rail entry per connected app, and a
-small public package `lifelog/app` a connector in Go imports to listen where the server says and to serve a catalog
+small public package `aminte/app` a connector in Go imports to listen where the server says and to serve a catalog
 from a few handlers. The protocol is written in [the contract of an extension](../../extensions/README.md) and in
 [API.md](../../API.md), so a connector in any language works.
 
@@ -92,9 +92,9 @@ decisions without a gap. One SQLite behaviour is claimed and must be executed be
 generated column named by the WHERE of a partial index cannot be dropped while the index exists, and is dropped once
 the index is gone, with the rows unchanged (a probe of the `evolution` suite). The catalog has no `plan`, `tick`,
 `carry`, `schedule` or `plans`, and `TestTheTableOfTheSurfacesIsTheCatalog` holds on the static catalog. The
-boundary tests of `cmd/lifelog` hold with one named exception: the file that re-issues a request to a child may call
+boundary tests of `cmd/aminte` hold with one named exception: the file that re-issues a request to a child may call
 `client.Remote`, and `ticktick` joins the words the core never says. An end-to-end test runs the real
-`lifelog serve --with` on a test app of this repo that serves a tiny catalog: its action is in `GET /actions`, the
+`aminte serve --with` on a test app of this repo that serves a tiny catalog: its action is in `GET /actions`, the
 CLI's `do` runs it, an agent is refused its owner-only action, the browser draws its form, and a stopped app answers
 503. `go vet ./... && go test ./...` passes, and the end-to-end test of `extensions/mcp` passes in its folder.
 

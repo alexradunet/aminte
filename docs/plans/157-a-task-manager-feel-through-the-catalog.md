@@ -17,13 +17,13 @@
   -shuffle=on ./...`, `go mod tidy -diff` and `staticcheck` clean; in `extensions/whatsapp` `go test -race ./agent/...`
   passed (the sub-agent's run). Not done: screenshots. The session may not start a review server, so nobody has looked
   at the new view in a browser yet; the owner sees it live first. Linux only.
-  Live 2026-10-30: the owner rebuilt `~/.local/bin/lifelog`, `lifelog-ticktick` and `lifelog-whatsapp` and restarted
+  Live 2026-10-30: the owner rebuilt `~/.local/bin/aminte`, `aminte-ticktick` and `aminte-whatsapp` and restarted
   the service at 14:53:14; the log says `with ticktick: a catalog of 3 actions on 127.0.0.1:42919`, and the first poll
   wrote 0 entries.
 
 ## Context
 
-The owner (2026-10-30) asked how the pages of TickTick in lifelog can feel more like TickTick while they keep the
+The owner (2026-10-30) asked how the pages of TickTick in aminte can feel more like TickTick while they keep the
 rules. The answer (approved): copy how a task manager works, not how it looks. The pages keep the Hearthwood look. The
 core never says "task": every rule of the view reads the shape of a Siren answer, never a name of an app. The owner
 also asked whether WhatsApp can add tasks. It can (the agent's tools come from the merged catalog), but the agent
@@ -55,7 +55,7 @@ flowchart LR
   3. **Two panes.** On a wide screen the links of the entity, except `self`, are a side column, and the link of the
      page the browser is on is marked current. On a narrow screen they stay in the header, as today.
 - Tests: view tests with synthetic entities for each rule; an `inNamespace` test for the embedded actions; the test
-  app of `cmd/lifelog/testdata/withapp` embeds an item with a no-field action, and `with_app_test.go` posts its row's
+  app of `cmd/aminte/testdata/withapp` embeds an item with a no-field action, and `with_app_test.go` posts its row's
   form through `/with/testapp/...`.
 - Docs: `API.md` (the embedded link), `extensions/README.md` ("What the app serves": how the browser draws an app's
   page, so an author of a connector knows the three rules).
@@ -90,8 +90,8 @@ flowchart LR
    merges. 2. Part B on top of A. 3. Screenshots of the test app and the main session's review.
 - Root: `go vet ./... && go test ./...`, `staticcheck`, `govulncheck`, `-shuffle=on`. Each extension touched:
   `go vet ./... && go test ./...` and `go mod tidy -diff` in its folder (`extensions/mcp` too, since `siren` changes).
-- Live (the owner, with `!`): rebuild `~/.local/bin/lifelog`, `~/.local/bin/lifelog-ticktick` and
-  `~/.local/bin/lifelog-whatsapp`, restart the service, read its log.
+- Live (the owner, with `!`): rebuild `~/.local/bin/aminte`, `~/.local/bin/aminte-ticktick` and
+  `~/.local/bin/aminte-whatsapp`, restart the service, read its log.
 
 ## Decided by default
 

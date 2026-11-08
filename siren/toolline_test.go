@@ -3,7 +3,7 @@ package siren_test
 import (
 	"testing"
 
-	"lifelog/siren"
+	"aminte/siren"
 )
 
 // TestAToolLineIsABadge: the name of the tool, the words after it without the arrow and the mark of a link, and

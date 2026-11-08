@@ -15,10 +15,10 @@ import (
 	"testing"
 	"time"
 
-	"lifelog/app"
-	"lifelog/internal/api"
-	"lifelog/internal/api/apitest"
-	"lifelog/siren"
+	"aminte/app"
+	"aminte/internal/api"
+	"aminte/internal/api/apitest"
+	"aminte/siren"
 )
 
 // testChild is a connected app for a test: a home with a count, an action that adds an item, an owner action and a
@@ -157,7 +157,7 @@ func TestAWriteToAnAppIsForwardedAndItsAnswerIsInTheNamespace(t *testing.T) {
 	}
 }
 
-func TestLifelogRefusesWhatTheCatalogRefusesBeforeTheAppIsCalled(t *testing.T) {
+func TestAminteRefusesWhatTheCatalogRefusesBeforeTheAppIsCalled(t *testing.T) {
 	h, _, child := withServer(t)
 	for name, body := range map[string]string{"an unknown field": "text=hi&bogus=1", "a missing field": ""} {
 		rec := call(h, "POST", "/with/testapp/items", body, nil)

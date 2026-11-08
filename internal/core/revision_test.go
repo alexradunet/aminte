@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"lifelog/internal/photo/phototest"
+	"aminte/internal/photo/phototest"
 )
 
 func TestConditionalSaveRejectsEqualClockStaleToken(t *testing.T) {
@@ -261,7 +261,7 @@ func editedRows(t *testing.T, s *Store, day string) []string {
 
 // A row whose creation transaction is its only write is at revision 1 with updated_at equal to created_at, for every
 // kind of page and every way the writer creates one; the day view then does not call it edited. Creation is not an
-// edit: the owned preferred name and the typed detail row are part of it (lifelog_meta.edit_revisions).
+// edit: the owned preferred name and the typed detail row are part of it (aminte_meta.edit_revisions).
 func TestCreationIsNotAnEdit(t *testing.T) {
 	const day = "2026-10-04"
 	s := fresh(t)

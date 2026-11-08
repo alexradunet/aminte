@@ -2,9 +2,9 @@
 
 ## What this repo is
 
-**The product is `lifelog`, the Go application** ([README](README.md)): one binary at the repo root that writes
+**The product is `aminte`, the Go application** ([README](README.md)): one binary at the repo root that writes
 `life.db`, a lifetime-scale, single-user SQLite database, and serves it as a hypermedia API and a CLI.
-The browser is an extension, `lifelog-web`. Everything that names a third party (an MCP server, a coding agent's
+The browser is an extension, `aminte-web`. Everything that names a third party (an MCP server, a coding agent's
 setup, Google Photos) is an extension too: a separate program, a client of the API, found by name
 ([the four rings](#the-four-rings)).
 **The database it writes is specified on its own** in [`docs/`](docs/README.md) — goals, the canonical DDL
@@ -23,7 +23,7 @@ Any developer, in any language, may
 build an application around it; the contract they implement is `docs/` and nothing else.
 
 A writer is built against the docs ([building a writer](docs/guides/building-a-writer.md)): it implements the schema and
-never defines it. One writer per `life.db` file, many applications around the schema. `lifelog` is that writer for the
+never defines it. One writer per `life.db` file, many applications around the schema. `aminte` is that writer for the
 owner's file; it answers to `docs/` like any other writer would, and `docs/` never names it — the contract stays
 language-neutral, so a rule lives in the docs and the Go code cites it.
 
@@ -34,8 +34,8 @@ language-neutral, so a rule lives in the docs and the Go code cites it.
 | `docs/guides/` | for people building on the schema: [building a writer](docs/guides/building-a-writer.md) | the contract |
 | `docs/issues/`, `docs/rfcs/`, `docs/plans/` | the process records: incidents, proposals, execution plans ([how a change happens](docs/process.md)) | — |
 | `tests/` | the validation suites (Go tests): every *executed* claim of the docs, run against the DDL in `docs/` and through the writer's own extraction and save | the docs |
-| `cmd/`, `internal/`, `tools/`, `go.mod` | the product: `lifelog` (Go) — hypermedia API and CLI ([README](README.md)) | the docs |
-| `extensions/` | the extensions: one module each, a client of [API.md](API.md), run as `lifelog NAME` ([the contract of an extension](extensions/README.md)) | `API.md` and the contract of an extension; never `lifelog/internal` |
+| `cmd/`, `internal/`, `tools/`, `go.mod` | the product: `aminte` (Go) — hypermedia API and CLI ([README](README.md)) | the docs |
+| `extensions/` | the extensions: one module each, a client of [API.md](API.md), run as `aminte NAME` ([the contract of an extension](extensions/README.md)) | `API.md` and the contract of an extension; never `aminte/internal` |
 | `site/` | the public page of the project (GitHub Pages) | the README: it names only what the README names, and changes in the same commit as a command or a feature it shows |
 
 ## Engineering priorities and working agreement
@@ -53,7 +53,7 @@ fast feedback**. Safeguards should catch failures, not create ceremony.
   knobs or speculative extension points for hypothetical needs. Do not reorganize working code just for uniformity.
 - An extension is checked in its own folder: `go vet ./... && go test ./...` there. The root's `./...` does not
   build it, so it holds no HTML assertion: the tests of the browser are in `extensions/web`. Its end-to-end test builds
-  the real `lifelog` and runs the real line.
+  the real `aminte` and runs the real line.
 - Keep application engineering guidance here, and its rules for synthetic workloads and performance evidence in
   [tests/README.md](tests/README.md). Keep application decisions and the
   [engineering references](README.md#engineering-references) in [README.md](README.md). The database contract remains
@@ -86,7 +86,7 @@ not external services or private files.
 | additional analysis | Go or dependency changes; also before releases | `staticcheck ./...` and `govulncheck ./...` |
 | order dependence | changes to shared state, test helpers or concurrency | `go test -count=1 -shuffle=on ./...`; replay the reported seed with `-shuffle=<seed>` |
 | races | extended checks on Linux; particularly concurrency changes | `CGO_ENABLED=1 go test -race -count=1 -timeout 40m ./...` (the suites of `tests/` pass the default 10 minutes under the detector) |
-| diagrams | diagram changes | `LIFELOG_MERMAID=1 go test ./tests -run TestMermaidRender` |
+| diagrams | diagram changes | `AMINTE_MERMAID=1 go test ./tests -run TestMermaidRender` |
 
 - Run `gofmt` on changed Go files. `schema.go` at the root embeds `docs/schema/schema.sql`: there is no copy, and a change to the DDL is live in the binary at the next build.
   The baseline includes mutants: `-short` is feedback, not a substitute for completion checks. These budgets are
@@ -108,23 +108,23 @@ not external services or private files.
 
 ## The owner's live database in this folder
 
-- `life.db` and its `-wal`/`-shm` live in this folder, beside the built binary, and are gitignored. `./lifelog` with
-  no `--db` and no `LIFELOG_DB` uses that file: the folder of the program, [README](README.md). It is the owner's
+- `life.db` and its `-wal`/`-shm` live in this folder, beside the built binary, and are gitignored. `./aminte` with
+  no `--db` and no `AMINTE_DB` uses that file: the folder of the program, [README](README.md). It is the owner's
   real data. Never open it from a test, a query, a fixture, `sqlite3` or Datasette. Tests use `t.TempDir()` and
   synthetic data.
 - **Never run `git clean -x` here.** It deletes gitignored files, and `life.db` is one of them. A nightly
-  `lifelog snapshot` keeps checked copies outside the folder ([D25](docs/decisions/D25-snapshots.md)), so the worst
+  `aminte snapshot` keeps checked copies outside the folder ([D25](docs/decisions/D25-snapshots.md)), so the worst
   loss is one night.
-- A system service runs the installed `lifelog` against this file and, for each `--with NAME`, the installed
-  `lifelog-NAME` beside it (the reference unit has `web`, `agent` and `whatsapp`). A
-  local proxy exposes the door of `lifelog-web` (`LIFELOG_WEB_LISTEN`) on the owner's private network, and
+- A system service runs the installed `aminte` against this file and, for each `--with NAME`, the installed
+  `aminte-NAME` beside it (the reference unit has `web`, `agent` and `whatsapp`). A
+  local proxy exposes the door of `aminte-web` (`AMINTE_WEB_LISTEN`) on the owner's private network, and
   it does not point to the core. The CLI in this folder and that service are the same writer on one file, which
-  [connections](docs/contract/connections.md) allows; so is the temporary server that `lifelog NAME` opens for an
+  [connections](docs/contract/connections.md) allows; so is the temporary server that `aminte NAME` opens for an
   extension. Do not start a second writer stack on it, and do not point a reader at it while the service writes.
-- The service runs the installed binary, not `./lifelog`. A change is live only after `go build -o <install path>
-  ./cmd/lifelog` and a service restart. Ship a change to an extension with the one
-  build line of [deploy/README.md](deploy/README.md#ship-a-change) and a restart. Ship `lifelog`, `lifelog-agent` and
-  `lifelog-whatsapp` together. Report the install paths, the restart and the service's own log lines (those of each
+- The service runs the installed binary, not `./aminte`. A change is live only after `go build -o <install path>
+  ./cmd/aminte` and a service restart. Ship a change to an extension with the one
+  build line of [deploy/README.md](deploy/README.md#ship-a-change) and a restart. Ship `aminte`, `aminte-agent` and
+  `aminte-whatsapp` together. Report the install paths, the restart and the service's own log lines (those of each
   `--with` child too) when you ship a change.
 
 ## The one hard rule: no migrations until the schema freeze
@@ -164,16 +164,16 @@ A thing lives in the innermost ring that can hold it ([plan 135](docs/plans/135-
 ```mermaid
 flowchart TB
   subgraph R0["ring 0: the file"]
-    S["schema.sql: the tables, CHECKs, triggers and lifelog_meta. The domain model and every rule about the data."]
+    S["schema.sql: the tables, CHECKs, triggers and aminte_meta. The domain model and every rule about the data."]
   end
   subgraph R1["ring 1: the writer, in Go"]
     C["internal/core, db, photo, preview, and text (a public package: the read-only grammar of titles and wikilinks): transactions, and only what SQLite cannot say"]
   end
   subgraph R2["ring 2: the catalog and its surfaces"]
-    K["internal/api and cmd/lifelog: one catalog, one Siren handler, the CLI's do, all generated from the catalog. It holds no HTML, CSS, JavaScript or picture. siren, client and app are public packages of this ring (app: the shell of an extension program, and the package a connected app serves its catalog with)."]
+    K["internal/api and cmd/aminte: one catalog, one Siren handler, the CLI's do, all generated from the catalog. It holds no HTML, CSS, JavaScript or picture. siren, client and app are public packages of this ring (app: the shell of an extension program, and the package a connected app serves its catalog with)."]
   end
   subgraph R3["ring 3: extensions, in any language"]
-    X["extensions/NAME, the program lifelog-NAME: a client of API.md, run as lifelog NAME. lifelog-web is the browser. An extension names the third party. It may serve a catalog of its own, which ring 2 aggregates under /with/NAME (plan 154), or it is the one task service, which ring 2 serves under /tasks (plan 158)."]
+    X["extensions/NAME, the program aminte-NAME: a client of API.md, run as aminte NAME. aminte-web is the browser. An extension names the third party. It may serve a catalog of its own, which ring 2 aggregates under /with/NAME (plan 154), or it is the one task service, which ring 2 serves under /tasks (plan 158)."]
   end
   S --> C --> K --> X
 ```
@@ -186,13 +186,13 @@ flowchart TD
   R -->|"no"| E["ring 3: an extension; the browser is one; its own catalog, if it has one, is merged by ring 2; the task service is served by ring 2 under /tasks"]
 ```
 
-Three tests of `cmd/lifelog` (`boundary_test.go`) keep the rings, and a change preserves them: **the core names no
+Three tests of `cmd/aminte` (`boundary_test.go`) keep the rings, and a change preserves them: **the core names no
 third party** (no Go source of `internal/` or `cmd/` holds a product's or a company's name: the list is in the test,
 and a new one is added in the change that moves the thing out), **the core dials only its own server** (outside
 `client`, no Go source of `internal/`, `cmd/` or `siren/` makes an HTTP client or dials a socket), and **the core holds
 no presentation** (no `.html`, `.css`, `.js` or picture file under `internal/` or `cmd/`, and no import of
 `html/template` in the Go sources of the core and its public packages). Go enforces the fourth: an extension never
-imports `lifelog/internal`. The core dials its own server and the children that `serve --with`
+imports `aminte/internal`. The core dials its own server and the children that `serve --with`
 started, and only in the files that `remoteAllowed` names in `boundary_test.go`. The list of
 third parties has `ticktick`, so the core never says it: the connector `extensions/ticktick` names it. The browser is an
 extension, by the owner's word (2026-10-31, [plan 161](docs/plans/161-the-browser-as-an-extension.md)): ring 3 holds
@@ -200,7 +200,7 @@ extension, by the owner's word (2026-10-31, [plan 161](docs/plans/161-the-browse
 
 - **Ordinary Go first.** Follow [Go Code Review Comments](https://go.dev/wiki/CodeReviewComments): clear names,
   early error returns, cohesive packages, explicit dependencies and small public surfaces. Keep supporting packages
-  under `internal/`, except `siren`, `client`, `app` and `text`, the packages the Go extensions import (`app`: the shell of an extension program, and the package a connected app serves its catalog with; `text`: the read-only grammar of titles and wikilinks that a UI needs, the Go reference of [titles and wikilinks](docs/contract/titles-and-wikilinks.md)), and `lifelogtest`, the kit for the tests of extensions only. Prefer the standard library; justify a dependency by the complexity or risk it removes.
+  under `internal/`, except `siren`, `client`, `app` and `text`, the packages the Go extensions import (`app`: the shell of an extension program, and the package a connected app serves its catalog with; `text`: the read-only grammar of titles and wikilinks that a UI needs, the Go reference of [titles and wikilinks](docs/contract/titles-and-wikilinks.md)), and `amintetest`, the kit for the tests of extensions only. Prefer the standard library; justify a dependency by the complexity or risk it removes.
 - **A rule about the data is a CHECK or a trigger, never Go.** When a write must be refused because of what the row
   says (a range, a shape, a state, a relation to another row), the refusal is written in `schema.sql`, with its
   decision, its mutant and its suite witness; the Go cites the constraint name and lets the file refuse. Go holds
@@ -229,24 +229,24 @@ extension, by the owner's word (2026-10-31, [plan 161](docs/plans/161-the-browse
   extensions (the browser, the MCP server) thin, using the shared API/action catalog rather than duplicating validation or
   business rules. Reuse the existing core operations; a new surface must not become a second implementation of a
   write.
-- **Every capability on every surface.** The owner's rule (2026-10-08): whatever `lifelog` can do is reachable through
-  the API, the CLI, the MCP server (the extension `lifelog-mcp`) and the browser (the extension `lifelog-web`) alike.
+- **Every capability on every surface.** The owner's rule (2026-10-08): whatever `aminte` can do is reachable through
+  the API, the CLI, the MCP server (the extension `aminte-mcp`) and the browser (the extension `aminte-web`) alike.
   The way to get there is the one catalog: a capability is a resource or an action of `GET /actions`, and so the CLI's
-  `do`, the MCP tools and the forms of `lifelog-web` carry it without further work; a shortcut on one surface
-  (`lifelog capture`, a dedicated view) wraps an action, never
+  `do`, the MCP tools and the forms of `aminte-web` carry it without further work; a shortcut on one surface
+  (`aminte capture`, a dedicated view) wraps an action, never
   replaces or extends it. A feature that exists on one surface only is a defect, not a convenience. The only
   differences allowed are the ones [API.md](API.md#reaching-a-server) names and tests assert: the owner-only actions
   (the ones the catalog marks `owner`), which an agent cannot use.
-  `lifelog actions --human` prints each action with its route, its CLI line, its MCP tool, its owner mark and its
+  `aminte actions --human` prints each action with its route, its CLI line, its MCP tool, its owner mark and its
   shortcut, so no page keeps a copy of the list and a new action adds no row. `TestActionsHumanShowsTheSurfacesOfEachAction`
   holds that listing, and `TestEachShortcutNamesAnActionOfTheCatalog` holds that a shortcut wraps a real action. Each
   surface holds its own parity ([plan 161](docs/plans/161-the-browser-as-an-extension.md)): the parity of the browser
-  is held by `extensions/web/web/parity_test.go`, which shows that each action has its form in `lifelog-web`.
+  is held by `extensions/web/web/parity_test.go`, which shows that each action has its form in `aminte-web`.
 - **One way to do a thing.** The owner's rule (2026-10-18, [plan 131](docs/plans/131-the-pareto-pass.md)): each thing
   has one action, one route, one MCP tool and one form, drawn where its resource is (a page's actions on the page, a
   day's on the day, a list's on the list). A link may lead to that form; nothing draws it a second time. Do not add an
   action, a field, a flag, a route, a tool or an alias that does what another already does: extend the one that
-  exists, or replace it and delete the old one in the same change. A view of `lifelog-web` that only repeats another
+  exists, or replace it and delete the old one in the same change. A view of `aminte-web` that only repeats another
   view's data (a second calendar, a second list of the same rows) needs the owner's word first. The rule binds
   `extensions/web`.
 - **Contexts and ownership.** Pass the operation's `context.Context` explicitly, first, through blocking calls and SQL.
@@ -260,7 +260,7 @@ extension, by the owner's word (2026-10-31, [plan 161](docs/plans/161-the-browse
   contents in diagnostics; do not expose internal errors indiscriminately to clients. A check or a repair reports a
   finding only about what it examined: a run that did not finish (a deadline, a cancelled context, a busy file) is
   an error, never a finding or a result. An error status has its code in `siren`, its line in [API.md](API.md) and
-  its first words in the view of `lifelog-web` (`alertOf`, in `extensions/web/view`); a new status adds the three together, and `codeOf` never answers
+  its first words in the view of `aminte-web` (`alertOf`, in `extensions/web/view`); a new status adds the three together, and `codeOf` never answers
   `internal` for a status it knows. `siren.Codes()` is the one list of the codes, and
   `TestEveryErrorCodeIsInTheContractAndTheStatusTable` holds that list, API.md and `codeOf` equal, and `TestAnErrorCodePicksItsWords` (in `extensions/web/view`) holds `alertOf`.
 - **Resources and transactions.** Close rows, files and response bodies and call cancellation functions with clear
@@ -329,8 +329,8 @@ won>.`
   tests for process exits or interruption claims. Do not describe process-interruption tests as power-loss proof.
 - **Client parity is a first-class contract.** Run shared behavioral scenarios through applicable CLI, HTTP and
   MCP entry points, including in-process and remote dispatch where relevant (the MCP surface is held by the
-  end-to-end test of `extensions/mcp`, which runs the real `lifelog mcp`; the browser surface is held by the
-  end-to-end test and the parity test of `extensions/web`, which run the real `lifelog`). Verify the same domain outcomes, validation
+  end-to-end test of `extensions/mcp`, which runs the real `aminte mcp`; the browser surface is held by the
+  end-to-end test and the parity test of `extensions/web`, which run the real `aminte`). Verify the same domain outcomes, validation
   and persisted state, allowing only intentional presentation, provenance and permission differences. Assert those
   differences too: owner-only actions must remain unavailable to agents. Include a small set of real transport/process
   smoke tests; direct handler calls alone do not prove adapter wiring. Keep most exhaustive cases at their owning layer
@@ -351,7 +351,7 @@ won>.`
 
 - **One home per rule.** A table's rule is its constraint/trigger and a comment inside its `CREATE`
   statement in `schema.sql` (comments outside are not stored in the file); a rule that spans tables is a
-  `lifelog_meta` row (keep them few); `docs/contract/` holds only what the DDL cannot (the wikilink grammar and
+  `aminte_meta` row (keep them few); `docs/contract/` holds only what the DDL cannot (the wikilink grammar and
   vectors, connection settings, integrity checks, imports); `docs/decisions/` says *why* and cites constraint names
   instead of restating the rule; `docs/cookbook/` shows it in use. Do not restate a rule in a second place — that
   includes this file, an application's docs and code comments: link the page instead.
@@ -372,7 +372,7 @@ won>.`
 - **Suites change with the docs, never to make them pass.** The suites are grouped by subject
   (`tests/README.md`). If a suite must change because the docs legitimately changed, change it in
   the same edit and say so in the commit message — a suite loosened to pass proves nothing, and
-  `tests/` is validation, not a migration runner. A new cross-table rule needs a `lifelog_meta` key and
+  `tests/` is validation, not a migration runner. A new cross-table rule needs a `aminte_meta` key and
   a row in the 2075 table of the [threat model](docs/contract/threat-model.md); a new rule of any kind gets a mutant in
   `tests/mutants_test.go`.
 - **Current truth and nothing else** in every folder of `docs/` except `issues/`, `rfcs/` and `plans/`, which are
@@ -389,24 +389,24 @@ won>.`
 ## Conventions every writer and every DDL change preserves
 
 Their homes are in `docs/`; this list is the checklist, not the rule. Each item names only the homes of its rules: a
-table and a `lifelog_meta` key are in [schema.sql](docs/schema/schema.sql).
+table and a `aminte_meta` key are in [schema.sql](docs/schema/schema.sql).
 
-- **Time**: `lifelog_meta.instants` and `.days`, [D10](docs/decisions/D10-time-model.md).
+- **Time**: `aminte_meta.instants` and `.days`, [D10](docs/decisions/D10-time-model.md).
 - **Identity and provenance**: the tables `entities` and `entity_names`, the typed extensions and
-  `lifelog_meta.source`; [a person](docs/cookbook/person.md); [imports](docs/contract/imports.md).
+  `aminte_meta.source`; [a person](docs/cookbook/person.md); [imports](docs/contract/imports.md).
   Review owned names, direct typed foreign keys, stable identity and provenance together.
-- **No deletes**: `lifelog_meta.deletes`, [D11](docs/decisions/D11-tombstones.md).
+- **No deletes**: `aminte_meta.deletes`, [D11](docs/decisions/D11-tombstones.md).
 - **Append-only facts**: [D7](docs/decisions/D07-measurements.md),
   [correct a measurement](docs/cookbook/correct-a-measurement.md).
-- **Imports**: [imports](docs/contract/imports.md), `lifelog_meta.writers`.
+- **Imports**: [imports](docs/contract/imports.md), `aminte_meta.writers`.
 - **CHECKs**: [the schema page](docs/schema/README.md), [D13](docs/decisions/D13-migrations-and-freeze.md),
-  `lifelog_meta.sqlite`.
-- **Links**: the table `link_kinds`, `lifelog_meta.typed_links`, [D8](docs/decisions/D08-entities-and-links.md).
+  `aminte_meta.sqlite`.
+- **Links**: the table `link_kinds`, `aminte_meta.typed_links`, [D8](docs/decisions/D08-entities-and-links.md).
 - **Names and journal identity**: [titles and wikilinks](docs/contract/titles-and-wikilinks.md),
   [D5](docs/decisions/D05-pages-and-day-pages.md). Check preferred-name changes, retained aliases and journal
   reservations against those rules. Spans and sessions follow [D22](docs/decisions/D22-events.md);
   habits follow [D24](docs/decisions/D24-habits.md).
-- **Connections**: [connection setup](docs/contract/connections.md), `lifelog_meta.writers` and `.sqlite`.
+- **Connections**: [connection setup](docs/contract/connections.md), `aminte_meta.writers` and `.sqlite`.
 - **The wikilink save contract**: [titles and wikilinks](docs/contract/titles-and-wikilinks.md),
   [save a body](docs/cookbook/save-a-body.md), [D19](docs/decisions/D19-wikilink-save-contract.md).
 - **Integrity**: [integrity checks](docs/contract/integrity-checks.md).

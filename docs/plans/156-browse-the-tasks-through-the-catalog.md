@@ -1,4 +1,4 @@
-# 156 — Browse the tasks of TickTick inside lifelog, through the catalog
+# 156 — Browse the tasks of TickTick inside aminte, through the catalog
 
 > Dated implementation record. Tests use temporary folders and synthetic data. The owner's live `life.db` is never
 > opened by a test, and no test calls TickTick: a fake stands for it.
@@ -9,24 +9,24 @@
 - **Priority:** P2. **Effort:** S. **Risk:** LOW: nothing of the file or the core changes; the connector serves more resources.
 - **Status:** IN REVIEW (owner). Built 2026-10-29 on master (`9f1c584`) by a sub-agent in a worktree, reviewed before the
   merge. Checks in `extensions/ticktick`: `gofmt -l .` printed nothing; `go vet ./... && go test ./...` passed (the
-  end-to-end test on the real `lifelog serve --with ticktick` included); `go mod tidy -diff` empty; `staticcheck ./...`
-  clean; `govulncheck ./...` found no vulnerability. In the root: `go test ./cmd/lifelog -run With` passed. Two small
+  end-to-end test on the real `aminte serve --with ticktick` included); `go mod tidy -diff` empty; `staticcheck ./...`
+  clean; `govulncheck ./...` found no vulnerability. In the root: `go test ./cmd/aminte -run With` passed. Two small
   choices: the helper that answers a GET route is `respond`, because `write` is the name of the capture sender in
   `sync.go`; the task page links its list only when the list is one that TickTick reported (the Inbox has no page).
-  Live 2026-10-30: the owner rebuilt `~/.local/bin/lifelog-ticktick` and restarted the service at 12:55:26; the log says
+  Live 2026-10-30: the owner rebuilt `~/.local/bin/aminte-ticktick` and restarted the service at 12:55:26; the log says
   `with ticktick: a catalog of 3 actions on 127.0.0.1:41639`, and the first poll wrote 0 entries.
 
 ## Context
 
-The owner (2026-10-29) asks: "Can we make an interface directly in lifelog to navigate the tasks from ticktick
+The owner (2026-10-29) asks: "Can we make an interface directly in aminte to navigate the tasks from ticktick
 directly in app? The app should use the agnostic api." Plan 154 gives the mechanism: a connected app serves a Siren
-catalog, lifelog forwards `/with/NAME/...` and draws any answer with the `generic` template
+catalog, aminte forwards `/with/NAME/...` and draws any answer with the `generic` template
 (`internal/api/view/html/layout.html` (the `generic` template): title, links, properties, embedded entities as links, every action as
-a form). Plan 155 gives `lifelog-ticktick` with a home (`/`), `GET /tasks/{id}` and three actions.
+a form). Plan 155 gives `aminte-ticktick` with a home (`/`), `GET /tasks/{id}` and three actions.
 
 Today the browser at `/with/ticktick/` shows counts and the tasks due today or before, nothing else. To navigate,
 the connector must serve the graph: home → lists → tasks → one task, and the done tasks. **Nothing in the core
-changes**: ring 2 already draws and forwards any entity, the CLI reads it with `lifelog get /with/ticktick/... --url`,
+changes**: ring 2 already draws and forwards any entity, the CLI reads it with `aminte get /with/ticktick/... --url`,
 and the MCP reaches it through the same catalog. The core still names no third party.
 
 ```mermaid
@@ -73,25 +73,25 @@ push. No issue and no RFC: the file and the contract do not change; it is a chan
 - `GET /done` lists the done tasks of the window newest first and skips an older one; the empty answer when the fake
   has no `/task/completed`.
 - A task links its list; a done task found through `Completed` has no `complete-task`.
-- `e2e_test.go`: one read through the real `lifelog serve --with ticktick`: `GET /with/ticktick/lists/ID` as
+- `e2e_test.go`: one read through the real `aminte serve --with ticktick`: `GET /with/ticktick/lists/ID` as
   `Accept: text/html` is 200, holds the task titles as links to `/with/ticktick/tasks/...` and a form posting to
   `/with/ticktick/tasks` with the list filled (proves the generic view is enough, no core change).
 - In `extensions/ticktick`: `gofmt`, `go vet ./... && go test ./...`. The root baseline does not build it, so the root
-  is untouched; run `go test ./cmd/lifelog -run With` once to be sure nothing of the handshake moved.
+  is untouched; run `go test ./cmd/aminte -run With` once to be sure nothing of the handshake moved.
 
 ## Part 3: docs
 
 - `extensions/ticktick/README.md`: a section "Browse the tasks" with the diagram above; the rows `GET /lists/{id}`,
-  `GET /done`, `GET /tasks/{id}`; how to reach them: the rail link "TickTick" in the browser, `lifelog get
+  `GET /done`, `GET /tasks/{id}`; how to reach them: the rail link "TickTick" in the browser, `aminte get
   /with/ticktick/ --url http://127.0.0.1:7777` on the CLI, the MCP through the same server; the Inbox limit.
 - Plan 156 status line. Nothing in `README.md`, `API.md` or `docs/`: the core does not change.
 
 ## Part 4: live (the owner runs it with `!`)
 
 ```
-go build -C extensions/ticktick -o ~/.local/bin/lifelog-ticktick ./cmd/lifelog-ticktick
-sudo systemctl restart lifelog
-journalctl -u lifelog -n 5     # with ticktick: a catalog of 3 actions on 127.0.0.1:PORT
+go build -C extensions/ticktick -o ~/.local/bin/aminte-ticktick ./cmd/aminte-ticktick
+sudo systemctl restart aminte
+journalctl -u aminte -n 5     # with ticktick: a catalog of 3 actions on 127.0.0.1:PORT
 ```
 
 Then open the rail link "TickTick", one list, one task; complete one task from its page and see the Done entry

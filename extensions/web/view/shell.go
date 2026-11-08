@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"lifelog-web/pixelart"
-	"lifelog/siren"
-	"lifelog/text"
+	"aminte-web/pixelart"
+	"aminte/siren"
+	"aminte/text"
 )
 
 // The shell is the frame of every page a browser gets (docs/plans/092-the-app-shell.md): the sidebar, with today's
@@ -41,7 +41,7 @@ type Chat struct {
 	Say     siren.Action
 }
 
-// Turn is one turn of a conversation as a page draws it. Who is owner, lifelog or text. A tool line is as the page
+// Turn is one turn of a conversation as a page draws it. Who is owner, aminte or text. A tool line is as the page
 // writes it, with its "- " mark: the thread draws each as a badge, with the thing its address names (cards.go). Via is
 // the writer that relayed the turn, "" with none.
 type Turn struct {
@@ -275,7 +275,7 @@ func (v *view) Streak() int {
 // from the entity's links. Chat is the conversation of any day. Browse is the one list of the record (docs/plans/117-one-browse-view.md, rule 7). Key is
 // the access key of an item, "" for none: t is Today.
 var navItems = []navEntry{
-	{"Lifelog", "/", "", []string{"/"}, "home", ""},
+	{"Aminte", "/", "", []string{"/"}, "home", ""},
 	{"Today", "/days/today", "today", []string{"/days/today"}, "day", "t"},
 	{"This week", "/weeks/today", "week", []string{"/weeks"}, "day", ""},
 	{"Calendar", "/days", "calendar", []string{"/months", "/years", "/days"}, "day", ""},

@@ -19,13 +19,13 @@ import (
 	"testing"
 	"time"
 
-	"lifelog-ticktick/ticktick"
-	"lifelog/client"
-	"lifelog/siren"
+	"aminte-ticktick/ticktick"
+	"aminte/client"
+	"aminte/siren"
 )
 
-// The end-to-end test builds the real lifelog and lifelog-ticktick into one folder and runs
-// `lifelog serve --with ticktick` on a new life.db, with a fake TickTick. It holds the whole line: the handshake, the
+// The end-to-end test builds the real aminte and aminte-ticktick into one folder and runs
+// `aminte serve --with ticktick` on a new life.db, with a fake TickTick. It holds the whole line: the handshake, the
 // merged catalog, the capture with its import_key, the forwarding to the app and the exit rule. The live TickTick
 // and its login have no test.
 
@@ -203,31 +203,31 @@ func (f *fakeTick) byTitle(title string) (ticktick.Task, bool) {
 	return ticktick.Task{}, false
 }
 
-// bins is the folder with lifelog and lifelog-ticktick.
-type bins struct{ dir, lifelog string }
+// bins is the folder with aminte and aminte-ticktick.
+type bins struct{ dir, aminte string }
 
 func build(t *testing.T) bins {
 	t.Helper()
 	goBin, err := exec.LookPath("go")
 	if err != nil {
-		t.Skipf("no go command to build lifelog: %v", err)
+		t.Skipf("no go command to build aminte: %v", err)
 	}
 	root, err := filepath.Abs(filepath.Join("..", ".."))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := os.Stat(filepath.Join(root, "cmd", "lifelog")); err != nil {
-		t.Skipf("the lifelog sources are not at %s: %v", root, err)
+	if _, err := os.Stat(filepath.Join(root, "cmd", "aminte")); err != nil {
+		t.Skipf("the aminte sources are not at %s: %v", root, err)
 	}
 	exe := ""
 	if runtime.GOOS == "windows" {
 		exe = ".exe"
 	}
 	b := bins{dir: t.TempDir()}
-	b.lifelog = filepath.Join(b.dir, "lifelog"+exe)
+	b.aminte = filepath.Join(b.dir, "aminte"+exe)
 	for _, args := range [][]string{
-		{"build", "-C", root, "-o", b.lifelog, "./cmd/lifelog"},
-		{"build", "-o", filepath.Join(b.dir, "lifelog-ticktick"+exe), "./cmd/lifelog-ticktick"},
+		{"build", "-C", root, "-o", b.aminte, "./cmd/aminte"},
+		{"build", "-o", filepath.Join(b.dir, "aminte-ticktick"+exe), "./cmd/aminte-ticktick"},
 	} {
 		if out, err := exec.Command(goBin, args...).CombinedOutput(); err != nil {
 			t.Fatalf("go %s: %v\n%s", strings.Join(args, " "), err, out)
@@ -236,7 +236,7 @@ func build(t *testing.T) bins {
 	return b
 }
 
-// server is a running `lifelog serve --with ticktick`.
+// server is a running `aminte serve --with ticktick`.
 type server struct {
 	t      *testing.T
 	b      bins
@@ -252,11 +252,11 @@ func startServer(t *testing.T, b bins, fake *httptest.Server) *server {
 	t.Helper()
 	config := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", config)
-	t.Setenv("LIFELOG_TOKEN", "")
+	t.Setenv("AMINTE_TOKEN", "")
 	// The children read the day of a completion in UTC, the zone of the tasks of the fake, so dayOf names the same
 	// day on a machine in any zone. Without it the test fails where the local day is not the day in UTC.
 	t.Setenv("TZ", "UTC")
-	state := filepath.Join(config, "lifelog-ticktick")
+	state := filepath.Join(config, "aminte-ticktick")
 	if err := os.MkdirAll(state, 0o700); err != nil {
 		t.Fatal(err)
 	}
@@ -267,18 +267,18 @@ func startServer(t *testing.T, b bins, fake *httptest.Server) *server {
 		}
 	}
 	db := filepath.Join(t.TempDir(), "life.db")
-	if out, err := exec.Command(b.lifelog, "init", db).CombinedOutput(); err != nil {
-		t.Fatalf("lifelog init: %v\n%s", err, out)
+	if out, err := exec.Command(b.aminte, "init", db).CombinedOutput(); err != nil {
+		t.Fatalf("aminte init: %v\n%s", err, out)
 	}
 	s := &server{t: t, b: b, stderr: new(lockedBuffer), exited: make(chan error, 1)}
-	s.cmd = exec.Command(b.lifelog, "--db", db, "serve", "--addr", "127.0.0.1:0", "--with", "ticktick")
+	s.cmd = exec.Command(b.aminte, "--db", db, "serve", "--addr", "127.0.0.1:0", "--with", "ticktick")
 	s.cmd.Stderr = s.stderr
 	if err := s.cmd.Start(); err != nil {
 		t.Fatal(err)
 	}
 	go func() { s.exited <- s.cmd.Wait() }()
 	t.Cleanup(s.stop)
-	line := s.waitFor("lifelog: serving ")
+	line := s.waitFor("aminte: serving ")
 	_, rest, _ := strings.Cut(line, " on http://")
 	addr, _, _ := strings.Cut(rest, " ")
 	s.base = "http://" + addr
@@ -324,12 +324,12 @@ func (s *server) stop() {
 
 func (s *server) client() *client.Client { return client.Remote(s.base, "", "") }
 
-// do runs the real command line: `lifelog do ACTION ARGS... --url BASE`.
+// do runs the real command line: `aminte do ACTION ARGS... --url BASE`.
 func (s *server) do(args ...string) string {
 	s.t.Helper()
-	out, err := exec.Command(s.b.lifelog, append(append([]string{"do"}, args...), "--url", s.base)...).CombinedOutput()
+	out, err := exec.Command(s.b.aminte, append(append([]string{"do"}, args...), "--url", s.base)...).CombinedOutput()
 	if err != nil {
-		s.t.Fatalf("lifelog do %v: %v\n%s", args, err, out)
+		s.t.Fatalf("aminte do %v: %v\n%s", args, err, out)
 	}
 	return string(out)
 }
@@ -386,9 +386,9 @@ func (s *server) body(day string) string {
 
 func dayOf(at time.Time) string { return at.UTC().Format("2006-01-02") }
 
-func TestTickTickOnTheRealLifelog(t *testing.T) {
+func TestTickTickOnTheRealAminte(t *testing.T) {
 	if testing.Short() {
-		t.Skip("the end-to-end test builds lifelog; -short skips it")
+		t.Skip("the end-to-end test builds aminte; -short skips it")
 	}
 	b := build(t)
 	for _, tc := range []struct {
@@ -403,7 +403,7 @@ func TestTickTickOnTheRealLifelog(t *testing.T) {
 		defer srv.Close()
 		s := startServer(t, b, srv)
 		s.waitFor("with ticktick: ended with status 78: not started again")
-		if !strings.Contains(s.stderr.String(), "login again: lifelog ticktick login") {
+		if !strings.Contains(s.stderr.String(), "login again: aminte ticktick login") {
 			t.Errorf("the log has no line that tells the owner to log in:\n%s", s.stderr)
 		}
 	})
@@ -443,7 +443,7 @@ func holdsTheWholeLine(t *testing.T, b bins, noCompleted bool) {
 		for _, a := range actions {
 			got[a.Name] = a.Href
 			if want := map[string]string{"add-task": "create", "complete-task": "toggle"}[a.Name]; want != "" && !slices.Equal(a.Class, []string{want}) {
-				t.Errorf("the catalog of lifelog: the class of %s = %v, want [%s]", a.Name, a.Class, want)
+				t.Errorf("the catalog of aminte: the class of %s = %v, want [%s]", a.Name, a.Class, want)
 			}
 			if strings.HasPrefix(a.Name, "ticktick-") {
 				t.Errorf("the catalog has the action %s: the service has no prefix", a.Name)
@@ -494,7 +494,7 @@ func holdsTheWholeLine(t *testing.T, b bins, noCompleted bool) {
 		}
 	})
 
-	t.Run("lifelog do add-task makes the task in the list", func(t *testing.T) {
+	t.Run("aminte do add-task makes the task in the list", func(t *testing.T) {
 		s.do("add-task", "title=Milk", "list=Home")
 		milk, ok := fake.byTitle("Milk")
 		if !ok || milk.ProjectID != "p-home" {

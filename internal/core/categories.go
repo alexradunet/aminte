@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	"lifelog/text"
+	"aminte/text"
 )
 
 // A category is a page, and anything is filed in it by a part-of link to that page; a category belongs to another

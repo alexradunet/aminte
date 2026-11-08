@@ -1,5 +1,5 @@
-// Package lifelog holds the one file that the Go packages cannot reach from their own folders.
-package lifelog
+// Package aminte holds the one file that the Go packages cannot reach from their own folders.
+package aminte
 
 import _ "embed"
 

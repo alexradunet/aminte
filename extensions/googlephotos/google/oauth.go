@@ -85,13 +85,13 @@ type Auth struct {
 	loaded bool
 }
 
-// DefaultTokenPath is os.UserConfigDir()/lifelog-gphotos/token.json.
+// DefaultTokenPath is os.UserConfigDir()/aminte-gphotos/token.json.
 func DefaultTokenPath() (string, error) {
 	dir, err := os.UserConfigDir()
 	if err != nil {
 		return "", fmt.Errorf("find the config folder: %w", err)
 	}
-	return filepath.Join(dir, "lifelog-gphotos", "token.json"), nil
+	return filepath.Join(dir, "aminte-gphotos", "token.json"), nil
 }
 
 func (a *Auth) now() time.Time {

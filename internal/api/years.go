@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"time"
 
-	"lifelog/internal/core"
-	"lifelog/siren"
+	"aminte/internal/core"
+	"aminte/siren"
 )
 
 // A year looks back over the calendar (docs/plans/097-the-almanac-reflects.md): its twelve months, with their written

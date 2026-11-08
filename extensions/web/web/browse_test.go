@@ -13,7 +13,7 @@ import (
 	"strings"
 	"testing"
 
-	"lifelog-web/view"
+	"aminte-web/view"
 )
 
 // pageIDOf is the id at the end of the address of a page, "/pages/7" or "/pages/7?x=y".

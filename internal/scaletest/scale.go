@@ -18,8 +18,8 @@ import (
 	"strings"
 	"time"
 
-	"lifelog/internal/core"
-	"lifelog/internal/db"
+	"aminte/internal/core"
+	"aminte/internal/db"
 )
 
 const Version = 1
@@ -136,7 +136,7 @@ func Run(ctx context.Context, options Options) (report *Result, err error) {
 	if options.Samples < 1 || options.Samples > 20 {
 		return nil, fmt.Errorf("samples must be between 1 and 20")
 	}
-	dir, err := os.MkdirTemp(options.Directory, "lifelog-scale-")
+	dir, err := os.MkdirTemp(options.Directory, "aminte-scale-")
 	if err != nil {
 		return nil, err
 	}

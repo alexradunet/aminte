@@ -8,8 +8,8 @@ test database included, is that file applied verbatim to a fresh file:
 sqlite3 life.db < docs/schema/schema.sql
 ```
 
-`PRAGMA application_id` marks the result as a Lifelog database. Each table's rules are comments inside its
-`CREATE` statement, so `.schema` prints them; the rules that span tables are the rows of `lifelog_meta`.
+`PRAGMA application_id` marks the result as an Aminte database. Each table's rules are comments inside its
+`CREATE` statement, so `.schema` prints them; the rules that span tables are the rows of `aminte_meta`.
 
 **10 tables + 1 FTS5 virtual table + 3 views** (`measurement_values`, `ghost_pages`, `entity_search_content`)
 **+ 42 triggers.** That is the entire system. Every `CHECK` is named (`CONSTRAINT <table>_<rule>`), so
@@ -30,7 +30,7 @@ What each one is for, and where it is explained. Its rules are in its `CREATE` s
 | `capture_keys` | the keys of the captures the file has added, so that a capture sent again changes nothing; append-only | [D28](../decisions/D28-capture-keys.md) | [capture](../cookbook/capture.md), [import a row once](../cookbook/import-a-row-once.md) |
 | `link_kinds` | the closed registry of link kinds and their endpoint types | [D8](../decisions/D08-entities-and-links.md) | [who may link what](../architecture/link-rules.md) |
 | `links` | the one graph between entities | [D8](../decisions/D08-entities-and-links.md), [D19](../decisions/D19-wikilink-save-contract.md) | [backlinks](../cookbook/backlinks.md), [save a body](../cookbook/save-a-body.md) |
-| `lifelog_meta` | the rules that span tables, as data | [D17](../decisions/D17-contract-as-data.md) | [threat model and the 2075 test](../contract/threat-model.md) |
+| `aminte_meta` | the rules that span tables, as data | [D17](../decisions/D17-contract-as-data.md) | [threat model and the 2075 test](../contract/threat-model.md) |
 | `entities_fts` | one derived search document per named identity | [D5](../decisions/D05-pages-and-day-pages.md) | [full-text search](../cookbook/full-text-search.md) |
 | `entity_search_content` | derived preferred spelling, combined names and body for the search document | [D5](../decisions/D05-pages-and-day-pages.md) | [full-text search](../cookbook/full-text-search.md) |
 | `measurement_values` | the read rule of measurements: corrections applied | [D7](../decisions/D07-measurements.md) | [a metric series](../cookbook/metric-series.md) |

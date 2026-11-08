@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"lifelog/internal/core"
-	"lifelog/text"
+	"aminte/internal/core"
+	"aminte/text"
 )
 
 // TestWrittenDaysMarksTheDaysWithAPage: writtenDays gives each day from the first through the last, in order, and

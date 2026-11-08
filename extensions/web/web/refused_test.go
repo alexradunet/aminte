@@ -1,7 +1,7 @@
 package web_test
 
 // The pages of a form that the core refused, and the pages of a status that web draws for it. The core is the real one
-// (lifelogtest). Three answers cannot come from it, so a fake core gives them: a busy file, a refusal of an owner-only
+// (amintetest). Three answers cannot come from it, so a fake core gives them: a busy file, a refusal of an owner-only
 // action (web always writes as the owner), and a version of more than 2^53. A POST of a form gets a page, whatever the
 // core accepts.
 
@@ -16,8 +16,8 @@ import (
 	"sync"
 	"testing"
 
-	"lifelog/client"
-	"lifelog/siren"
+	"aminte/client"
+	"aminte/siren"
 )
 
 // refererOnWeb is the Referer of a form that a browser sends from the page at path on the host of the tests.

@@ -1,6 +1,6 @@
 // Package siren is the hypermedia of the API: the Siren types that every answer is made of (an entity, its links, its
 // actions and their fields), the header that names the writer of a request, the JSON of an answer, and the addresses
-// of the resources that the API serves and that a UI links. The API (internal/api), the clients (client, cmd/lifelog),
+// of the resources that the API serves and that a UI links. The API (internal/api), the clients (client, cmd/aminte),
 // the extensions, including the browser, and core (for the codes of an error) import it. It imports only the standard
 // library, so a client of the types gets none of the server with them.
 package siren
@@ -15,9 +15,9 @@ import (
 	"time"
 )
 
-// SourceHeader names the writer of a request's rows (lifelog_meta.source). Without it a request writes as "api"; the
+// SourceHeader names the writer of a request's rows (aminte_meta.source). Without it a request writes as "api"; the
 // browser extension sends "ui".
-const SourceHeader = "Lifelog-Source"
+const SourceHeader = "Aminte-Source"
 
 // The prefixes of the writers that are not the owner: an agent (the MCP server) writes as AgentPrefix+name, an import
 // as ImportPrefix+name. The owner-only actions are refused to both (api.requireOwner).

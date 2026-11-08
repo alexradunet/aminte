@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"lifelog/internal/core"
-	"lifelog/siren"
+	"aminte/internal/core"
+	"aminte/siren"
 )
 
 // TestPaged: paged trims a read of limit+1 rows to the page, gives back limit and offset as properties, and adds the

@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"lifelog/text"
+	"aminte/text"
 
 	"modernc.org/sqlite"
 )
@@ -84,7 +84,7 @@ func pages(s *S) {
 		}
 		s.K(fmt.Sprintf("unsafe or device title %q rejected", t), c.addPage(t, nil, "", k) == 0)
 	}
-	for _, t := range []string{"CONSOLE", "CONSOLE.txt", "a.CON", "x.NUL", "COM10", "com10.x", "LPT0", "Com0.x", "CON1", "my.con.note", "Lifelog v1.2", "日本語 ノート", "C#", strings.Repeat("a", 240)} {
+	for _, t := range []string{"CONSOLE", "CONSOLE.txt", "a.CON", "x.NUL", "COM10", "com10.x", "LPT0", "Com0.x", "CON1", "my.con.note", "Aminte v1.2", "日本語 ノート", "C#", strings.Repeat("a", 240)} {
 		s.K(fmt.Sprintf("title %.14q accepted", t), c.add(t) != 0)
 	}
 	s.K("241 bytes rejected (é × 121 = 242 bytes)", c.add(strings.Repeat("é", 121)) == 0 && c.add(strings.Repeat("a", 241)) == 0)
@@ -261,13 +261,13 @@ func (c *C) tabOrErr(q string, args ...any) string {
 // collation, builds a file with a unique index on it, and exits.
 func collationChild(path string) ([]byte, error) {
 	cmd := exec.Command(os.Args[0], "-test.run=^TestCollationHelper$", "-test.count=1")
-	cmd.Env = append(os.Environ(), "LIFELOG_COLLATION_DB="+path)
+	cmd.Env = append(os.Environ(), "AMINTE_COLLATION_DB="+path)
 	return cmd.CombinedOutput()
 }
 
 // TestCollationHelper is the other program of the collation expectations in pages; on its own it does nothing.
 func TestCollationHelper(t *testing.T) {
-	p := os.Getenv("LIFELOG_COLLATION_DB")
+	p := os.Getenv("AMINTE_COLLATION_DB")
 	if p == "" {
 		t.Skip("run by the pages suite in its own process")
 	}

@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"lifelog/internal/api/apitest"
-	"lifelog/siren"
+	"aminte/internal/api/apitest"
+	"aminte/siren"
 )
 
 // TestSearchListsTitlesFirst: the search answers the pages whose title starts with the words before the pages whose

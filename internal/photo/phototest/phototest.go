@@ -11,7 +11,7 @@ import (
 	"image/jpeg"
 	"strings"
 
-	"lifelog/internal/photo"
+	"aminte/internal/photo"
 )
 
 type entry struct {

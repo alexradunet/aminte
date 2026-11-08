@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"lifelog/siren"
+	"aminte/siren"
 )
 
 // TestEveryErrorCodeIsInTheContractAndTheStatusTable: the code row of API.md (Errors), siren.Codes and codeOf agree.

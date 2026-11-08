@@ -43,8 +43,8 @@ flowchart LR
   B --> C["gofmt; go vet, go test ./..."]
   C --> D["screenshots on the review server, synthetic data: desktop and phone, light and dark"]
   D --> E["a counter-review of the diff"]
-  E --> F["deploy: keep lifelog.prev, build to the install path, restart the service, read its log line"]
-  F --> G["the owner looks: keep it, or swap lifelog.prev back"]
+  E --> F["deploy: keep aminte.prev, build to the install path, restart the service, read its log line"]
+  F --> G["the owner looks: keep it, or swap aminte.prev back"]
 ```
 
 - Parts 1 to 3 are one change (the sheets); parts 4 and 5 a second (Go, templates, a recipe). Part 6 is a mock-up
@@ -210,7 +210,7 @@ tiles; the owner picks, and the pick becomes plan 138. No code before the pick.
   Browse, the file form, the register-metric form; desktop and phone; light and dark; writing mode with the box
   focused.
 - A counter-review of the two diffs by a second agent, adversarial, with the real binary.
-- The deploy, with `lifelog.prev` kept and the service's log line reported.
+- The deploy, with `aminte.prev` kept and the service's log line reported.
 
 ## Done when
 

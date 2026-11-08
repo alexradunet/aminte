@@ -9,7 +9,7 @@
 - **Priority:** P1. **Effort:** M. **Risk:** LOW to MEDIUM: a browser change and one wider answer of the API. No
   table, no column, no trigger, no new action. The series answer of a metric grows with its page's properties, links
   and actions; a browser request of a live metric's page is redirected to its series.
-- **Status:** IN REVIEW (owner). Built and counter-reviewed on 2026-10-23; live since 2026-10-23 16:25 (the binary installed, the service restarted, the previous binary kept as lifelog.prev).
+- **Status:** IN REVIEW (owner). Built and counter-reviewed on 2026-10-23; live since 2026-10-23 16:25 (the binary installed, the service restarted, the previous binary kept as aminte.prev).
 - **Resolves:** the owner's words of 2026-10-23 (below). No issue: the file is right ([D27](../decisions/D27-a-metric-is-a-page.md)); the browser drew it twice.
 
 ## The owner's words (2026-10-23)

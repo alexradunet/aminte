@@ -3,7 +3,7 @@ package api
 import (
 	"testing"
 
-	"lifelog/siren"
+	"aminte/siren"
 )
 
 // TestTheActionsOfAnEmbeddedLinkAreInTheNamespace: an embedded link keeps its actions as the entity keeps its own: a

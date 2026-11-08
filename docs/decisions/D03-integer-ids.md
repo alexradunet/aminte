@@ -3,7 +3,7 @@
 **Status:** accepted
 
 - **Decision.** Every entity, fact and join table is keyed by `INTEGER PRIMARY KEY` (a rowid
-  alias). The registries — `lifelog_meta`, `link_kinds` — keep their natural key
+  alias). The registries — `aminte_meta`, `link_kinds` — keep their natural key
   (`key`, `kind`): an integer surrogate would only hide the name. No `AUTOINCREMENT`
   (extra CPU/IO/bookkeeping, "usually not needed" [R4](../research/references.md#r4)). No UUIDs.
 - **Alternatives.** UUIDv7/v4 TEXT keys: benchmarked *slower* (random TEXT keys scatter

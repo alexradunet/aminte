@@ -12,7 +12,7 @@ import (
 	"runtime/debug"
 	"strings"
 
-	"lifelog/internal/scaletest"
+	"aminte/internal/scaletest"
 )
 
 // report is what lifescale prints: what scaletest.Run measured, and where and how it ran.

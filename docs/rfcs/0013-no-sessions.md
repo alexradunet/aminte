@@ -29,7 +29,7 @@ flowchart LR
 
 - Removed from [schema.sql](../schema/schema.sql): the table `sessions`, its indexes and triggers;
   `measurements.session_id`, the index `measurements_session`, the triggers `measurements_supersede_scope` and
-  `measurements_session_live`; the `lifelog_meta` row `measurement_scope`; the session words of the rows `source` and
+  `measurements_session_live`; the `aminte_meta` row `measurement_scope`; the session words of the rows `source` and
   `edit_revisions`; the session-kind case of the ghost cleanup.
 - Removed pages: the contract pages on session time and measurement scope,
   the cookbook recipe on recorded sessions. [D22](../decisions/D22-events.md) keeps periods only.

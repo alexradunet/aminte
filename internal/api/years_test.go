@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"lifelog/internal/api/apitest"
+	"aminte/internal/api/apitest"
 )
 
 // weekToday is the local day of the year tests: a Monday, the first day of ISO week 42 of 2026.
@@ -77,7 +77,7 @@ func TestHomeLinksThisMonthAndThisYear(t *testing.T) {
 // said is a property as the client decodes it, written out: a number is a json.Number.
 func said(v any) string { return fmt.Sprint(v) }
 
-// TestTheEdgesOfTheCalendarLinkOnlyToPages: the days run from 0000-01-01 to 9999-12-31 (lifelog_meta.days), and a
+// TestTheEdgesOfTheCalendarLinkOnlyToPages: the days run from 0000-01-01 to 9999-12-31 (aminte_meta.days), and a
 // year has a page from 0001 to 9999. The first and the last day, month and year answer, and each of their links leads
 // to a page that answers: a link to a period that has no page is absent.
 func TestTheEdgesOfTheCalendarLinkOnlyToPages(t *testing.T) {

@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"lifelog/siren"
+	"aminte/siren"
 )
 
 // TestTheFormHelperHasNoLeadOption: the first create action of a head is its primary button, so the option lead is

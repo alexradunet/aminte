@@ -22,7 +22,7 @@ reused, and a decision that changes is rewritten in place (git is its history).
 | [D14](D14-ui-and-tools.md) | UI: thin custom app for capture/browse; off-the-shelf tools for exploration. | accepted |
 | [D15](D15-recurrence.md) | No recurrence table: a repeat lives in the owner's task manager. | accepted |
 | [D16](D16-places.md) | No places: a place is a plain page, and where a day was is the words of the day page. | accepted |
-| [D17](D17-contract-as-data.md) | The contract as data: `lifelog_meta`, comments inside the statements, in-DB guards. | accepted |
+| [D17](D17-contract-as-data.md) | The contract as data: `aminte_meta`, comments inside the statements, in-DB guards. | accepted |
 | [D18](D18-money.md) | Money: DEFERRED out of v1. The design is kept here for the day it returns. | deferred |
 | [D19](D19-wikilink-save-contract.md) | The wikilink save contract: one transaction, links follow the body, a bad target never blocks a save. | accepted |
 | [D20](D20-named-pages.md) | A person is a page: one id, and `[[Name]]` reaches it directly. | accepted |

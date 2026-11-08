@@ -26,7 +26,7 @@
   entity offers; every form works with no script; every change to the wire is an addition.
 - A value is drawn by its type, never by the name of its property: a string that is a day is a day, one that is an
   instant is an instant (`core.IsDay`, `core.IsInstant`).
-- A word for a time uses the clock of the server's day: the local zone of the machine that runs `lifelog serve`, the
+- A word for a time uses the clock of the server's day: the local zone of the machine that runs `aminte serve`, the
   zone `core.Today` reads. The exact instant stays in the page, in `<time datetime>` and its title.
 
 ```mermaid

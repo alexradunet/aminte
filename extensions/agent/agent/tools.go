@@ -1,8 +1,8 @@
 package agent
 
 import (
-	"lifelog/client/tools"
-	"lifelog/siren"
+	"aminte/client/tools"
+	"aminte/siren"
 )
 
 // toolsOf is the tool list of the catalog for this agent. tools.Of leaves out every owner action, and so say: a model

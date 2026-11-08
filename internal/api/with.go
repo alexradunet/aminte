@@ -13,12 +13,12 @@ import (
 	"sync"
 	"time"
 
-	"lifelog/client"
-	"lifelog/internal/core"
-	"lifelog/siren"
+	"aminte/client"
+	"aminte/internal/core"
+	"aminte/siren"
 )
 
-// A connected app (docs/plans/154-connected-apps-through-the-catalog.md) is a program that `lifelog serve --with NAME`
+// A connected app (docs/plans/154-connected-apps-through-the-catalog.md) is a program that `aminte serve --with NAME`
 // runs. It serves its own Siren catalog on a loopback address. This file puts its actions in the catalog of the
 // server, under the prefix NAME-, and forwards the requests to /with/NAME to it. The server names no app and no
 // domain: the catalog of the app is the whole interface.
@@ -66,7 +66,7 @@ func (a *Apps) Expect(name string) {
 // open must not stop the server. It is a variable so that a test can shorten it.
 var registerTimeout = 5 * time.Second
 
-// Register is the one handshake of a child of `serve --with`, and of the child of a test (lifelogtest): it makes the
+// Register is the one handshake of a child of `serve --with`, and of the child of a test (amintetest): it makes the
 // child at base (http://127.0.0.1:PORT) known as what its catalog says (extensions/README.md, "A catalog of its own"
 // and "A task service").
 //

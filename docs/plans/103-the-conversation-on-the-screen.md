@@ -40,7 +40,7 @@ stateDiagram-v2
   page.
 - **The turns.** The application's own transcript format (plan 102) is written and read in one place,
   `internal/api/conversations.go`: a turn starts at a line `**Owner** (HH.MM): `; its tool lines start with ``- ` ``;
-  its answer starts at `**lifelog:** ` or `**lifelog** did not answer: `. Text before the first turn is `preamble`.
+  its answer starts at `**aminte:** ` or `**aminte** did not answer: `. Text before the first turn is `preamble`.
   An edit by the owner that breaks the format is still shown: it stays in the turn's text.
 - **The chat page.** The conversations on the left, the thread in the middle (the owner's question, the tool lines
   small, the answer as rendered markdown), the composer at the bottom. No script is needed: the form posts, and the
@@ -90,7 +90,7 @@ stateDiagram-v2
 Built as designed above, with three changes found in the work.
 
 - **The script keeps one thing in the browser.** The rule of the script was "it keeps nothing". A sidebar that
-  follows the owner from page to page needs its state, so the rule is now narrower: one key, `lifelog.chat`, holds
+  follows the owner from page to page needs its state, so the rule is now narrower: one key, `aminte.chat`, holds
   open or closed and the current conversation's id, never its text. `TestTheScriptReadsTitlesRenderTheRootAndTheChatOnly`
   checks the key and the two new requests, and keeps every other refusal.
 - **The toggle is at the bottom right**, so it never covers the tools at the top of a page.

@@ -1,6 +1,6 @@
 # 080 — An API reference for client authors, kept true by a test
 
-> Dated implementation record. The schema is untouched; this is application documentation of `lifelog`'s wire
+> Dated implementation record. The schema is untouched; this is application documentation of `aminte`'s wire
 > shape, for the clients [plan 078](078-network-server.md) lets in.
 
 ## Status

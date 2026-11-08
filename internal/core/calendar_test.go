@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"lifelog/text"
+	"aminte/text"
 )
 
 // daysFrom are the days from from through through, as the stream gives the reads its days.

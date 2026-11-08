@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"lifelog/internal/api/apitest"
-	"lifelog/siren"
+	"aminte/internal/api/apitest"
+	"aminte/siren"
 )
 
 // TestMediaListsPicturesVideosAndRecordings: the media list of Browse is the files of the three kinds, newest day

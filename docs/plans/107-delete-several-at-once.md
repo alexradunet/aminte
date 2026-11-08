@@ -53,7 +53,7 @@ flowchart LR
 
 ## Done when
 
-- [x] `tombstone-pages` and `tombstone-tasks` are in `GET /actions`, so `lifelog do` and the MCP tools carry them.
+- [x] `tombstone-pages` and `tombstone-tasks` are in `GET /actions`, so `aminte do` and the MCP tools carry them.
 - [x] A missing id refuses the whole write; the live rows named beside it stay live (tested).
 - [x] Files and Tasks draw a box per row, a browser form returns to the list with the count, and a post with no box
       checked comes back with the refusal (tested).

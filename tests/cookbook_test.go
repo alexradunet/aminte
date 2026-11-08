@@ -24,8 +24,8 @@ func cookbook(s *S) {
 				stop("cookbook seed, a link of the kind %s: %s", kind, r)
 			}
 		}
-		dp := c.dayPage("2026-09-28", "Shipped the schema with [[Sam]] in [[Japan]]. [[Lifelog]]")
-		wp := c.page("Lifelog")
+		dp := c.dayPage("2026-09-28", "Shipped the schema with [[Sam]] in [[Japan]]. [[Aminte]]")
+		wp := c.page("Aminte")
 		cat := c.page("Biomarkers")
 		link(dp, wp, "wikilink")
 		pe := c.named("person", "Sam", M{"name": "Sam"})
@@ -37,7 +37,7 @@ func cookbook(s *S) {
 		c.metric("vitamin_d", "")
 		c.measure(w, "2026-09-29", 71.2)
 		c.measure(w, "2026-09-28", 70.9)
-		old := c.pageW("Sourdogh", nil, "Feed the starter. [[Lifelog]]")
+		old := c.pageW("Sourdogh", nil, "Feed the starter. [[Aminte]]")
 		link(old, wp, "wikilink")
 		return c, P{"include_deleted": 0, "old_id": old, "new_title": "Sourdough starter", "new_key": "sourdough starter", "found_id": wp, "target_id": wp, "target_ids": "[]", "day_page_id": dp, "mistaken_row_id": 2, "from_day": "2026-01-15", "to_day": "2026-09-10",
 			"day": "2026-09-29", "today": "2026-09-29", "page_id": wp, "person_id": pe, "entity_id": pe, "handle_title": "Bob Sample", "handle_key": "bob sample", "ghost_id": gh,

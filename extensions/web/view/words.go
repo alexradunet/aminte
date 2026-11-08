@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"lifelog/siren"
-	"lifelog/text"
+	"aminte/siren"
+	"aminte/text"
 )
 
 // The browser's words for a value (docs/plans/093-words-phone-and-today.md): a value is drawn by its type, never by

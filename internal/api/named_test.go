@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"lifelog/internal/api/apitest"
+	"aminte/internal/api/apitest"
 )
 
 // TestPeopleListCarriesItsMentions: the rows of the people list of Browse say how many pages link to each person and

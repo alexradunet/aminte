@@ -21,15 +21,15 @@ import (
 	"testing"
 	"time"
 
-	"lifelog-whatsapp/relay"
-	"lifelog/app"
-	"lifelog/client"
-	"lifelog/siren"
+	"aminte-whatsapp/relay"
+	"aminte/app"
+	"aminte/client"
+	"aminte/siren"
 )
 
-// The end-to-end test builds the real lifelog, lifelog-whatsapp and lifelog-agent into one folder. The connection to
+// The end-to-end test builds the real aminte, aminte-whatsapp and aminte-agent into one folder. The connection to
 // WhatsApp needs a real number, so it has no test. The relay is the part of the program that carries the words, and these
-// tests run it in the process with a fake chat against the real `lifelog serve`: a message of the chat becomes a say, and
+// tests run it in the process with a fake chat against the real `aminte serve`: a message of the chat becomes a say, and
 // a reply that an agent writes on the page reaches the chat. One test runs the real agent (`serve --with agent`) with a
 // fake model server, and two messages in a row. The tests of ./relay hold the rules on a fake catalog; these tests hold
 // the relay against the real writer. The program itself is run for what it refuses, for the pairing and for the start
@@ -44,40 +44,40 @@ const ownerToken = "e2e-token-e2e-token-e2e-token-e2e-token"
 // ownerNumber is the number of the owner in the fake chat.
 const ownerNumber = "40712345678"
 
-// built is the folder with lifelog, lifelog-whatsapp, lifelog-agent and a new life.db.
-type built struct{ dir, lifelog, ext, agent, db string }
+// built is the folder with aminte, aminte-whatsapp, aminte-agent and a new life.db.
+type built struct{ dir, aminte, ext, agent, db string }
 
 func build(t *testing.T) built {
 	t.Helper()
 	goBin, err := exec.LookPath("go")
 	if err != nil {
-		t.Skipf("no go command to build lifelog: %v", err)
+		t.Skipf("no go command to build aminte: %v", err)
 	}
 	root, err := filepath.Abs(filepath.Join("..", ".."))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := os.Stat(filepath.Join(root, "cmd", "lifelog")); err != nil {
-		t.Skipf("the lifelog sources are not at %s: %v", root, err)
+	if _, err := os.Stat(filepath.Join(root, "cmd", "aminte")); err != nil {
+		t.Skipf("the aminte sources are not at %s: %v", root, err)
 	}
 	b := built{dir: t.TempDir()}
 	exe := ""
 	if runtime.GOOS == "windows" {
 		exe = ".exe"
 	}
-	b.lifelog, b.ext, b.agent, b.db = filepath.Join(b.dir, "lifelog"+exe), filepath.Join(b.dir, "lifelog-whatsapp"+exe),
-		filepath.Join(b.dir, "lifelog-agent"+exe), filepath.Join(b.dir, "life.db")
+	b.aminte, b.ext, b.agent, b.db = filepath.Join(b.dir, "aminte"+exe), filepath.Join(b.dir, "aminte-whatsapp"+exe),
+		filepath.Join(b.dir, "aminte-agent"+exe), filepath.Join(b.dir, "life.db")
 	for _, args := range [][]string{
-		{"build", "-C", root, "-o", b.lifelog, "./cmd/lifelog"},
-		{"build", "-o", b.ext, "./cmd/lifelog-whatsapp"},
-		{"build", "-C", filepath.Join(root, "extensions", "agent"), "-o", b.agent, "./cmd/lifelog-agent"},
+		{"build", "-C", root, "-o", b.aminte, "./cmd/aminte"},
+		{"build", "-o", b.ext, "./cmd/aminte-whatsapp"},
+		{"build", "-C", filepath.Join(root, "extensions", "agent"), "-o", b.agent, "./cmd/aminte-agent"},
 	} {
 		if out, err := exec.Command(goBin, args...).CombinedOutput(); err != nil {
 			t.Fatalf("go %v: %v\n%s", args, err, out)
 		}
 	}
 	if out, err := b.run("init", b.db); err != nil {
-		t.Fatalf("lifelog init: %v\n%s", err, out)
+		t.Fatalf("aminte init: %v\n%s", err, out)
 	}
 	return b
 }
@@ -87,14 +87,14 @@ func build(t *testing.T) built {
 func env(t *testing.T, extra ...string) []string {
 	home := t.TempDir()
 	e := slices.DeleteFunc(os.Environ(), func(kv string) bool {
-		return strings.HasPrefix(kv, "LIFELOG_") || strings.HasPrefix(kv, "XDG_CONFIG_HOME=") || strings.HasPrefix(kv, "HOME=") || strings.HasPrefix(kv, "APPDATA=")
+		return strings.HasPrefix(kv, "AMINTE_") || strings.HasPrefix(kv, "XDG_CONFIG_HOME=") || strings.HasPrefix(kv, "HOME=") || strings.HasPrefix(kv, "APPDATA=")
 	})
 	return append(e, append([]string{"XDG_CONFIG_HOME=" + home, "HOME=" + home, "APPDATA=" + home}, extra...)...)
 }
 
 func (b built) run(args ...string) ([]byte, error) {
-	cmd := exec.Command(b.lifelog, args...)
-	cmd.Env = slices.DeleteFunc(os.Environ(), func(kv string) bool { return strings.HasPrefix(kv, "LIFELOG_") })
+	cmd := exec.Command(b.aminte, args...)
+	cmd.Env = slices.DeleteFunc(os.Environ(), func(kv string) bool { return strings.HasPrefix(kv, "AMINTE_") })
 	return cmd.Output()
 }
 
@@ -199,7 +199,7 @@ func waitTurns(t *testing.T, c *client.Client, n int) []turn {
 	return nil
 }
 
-// serveCore runs the real `lifelog serve --token-file F` on the new life.db, with the programs named by with beside it, and
+// serveCore runs the real `aminte serve --token-file F` on the new life.db, with the programs named by with beside it, and
 // gives the address. The server ends with the test.
 func serveCore(t *testing.T, b built, with ...string) string {
 	t.Helper()
@@ -211,7 +211,7 @@ func serveCore(t *testing.T, b built, with ...string) string {
 	for _, w := range with {
 		args = append(args, "--with", w)
 	}
-	serve := exec.Command(b.lifelog, args...)
+	serve := exec.Command(b.aminte, args...)
 	serve.Env = env(t)
 	stderr := &lockedBuffer{}
 	serve.Stderr = stderr
@@ -234,11 +234,11 @@ func serveCore(t *testing.T, b built, with ...string) string {
 			}
 		}
 	})
-	line := waitLog(t, stderr, done, "lifelog: serving ")
+	line := waitLog(t, stderr, done, "aminte: serving ")
 	_, rest, _ := strings.Cut(line, " on http://")
 	addr, _, _ := strings.Cut(rest, " ")
 	for _, w := range with {
-		waitLog(t, stderr, done, "lifelog: with "+w+": started (pid ")
+		waitLog(t, stderr, done, "aminte: with "+w+": started (pid ")
 	}
 	return "http://" + addr
 }
@@ -287,14 +287,14 @@ func startRelay(t *testing.T, core string, tick <-chan time.Time) *fakeChat {
 	return chat
 }
 
-// TestAMessageOfTheChatBecomesASayAndAReplyOnThePageReachesTheChat runs the real `lifelog serve --token-file F` on a new
-// life.db and the relay in the process, with a fake chat. The reply is written as lifelog-agent writes it: with reply,
-// as agent:lifelog.
+// TestAMessageOfTheChatBecomesASayAndAReplyOnThePageReachesTheChat runs the real `aminte serve --token-file F` on a new
+// life.db and the relay in the process, with a fake chat. The reply is written as aminte-agent writes it: with reply,
+// as agent:aminte.
 func TestAMessageOfTheChatBecomesASayAndAReplyOnThePageReachesTheChat(t *testing.T) {
 	b := build(t)
 	core := serveCore(t, b)
 	asOwner := client.Remote(core, "", ownerToken)
-	asAgent := client.Remote(core, siren.AgentPrefix+"lifelog", ownerToken)
+	asAgent := client.Remote(core, siren.AgentPrefix+"aminte", ownerToken)
 	chat := startRelay(t, core, nil)
 
 	// A message of the chat becomes a say as the owner, and the page names the relay.
@@ -320,7 +320,7 @@ func TestAMessageOfTheChatBecomesASayAndAReplyOnThePageReachesTheChat(t *testing
 	if _, err := asOwner.Do(t.Context(), action(t, asOwner, "say"), map[string]string{"day": "today", "text": "from the browser"}); err != nil {
 		t.Fatal(err)
 	}
-	if got := chat.next(t); got != "You wrote in lifelog: from the browser" {
+	if got := chat.next(t); got != "You wrote in aminte: from the browser" {
 		t.Errorf("the chat got %q, want the turn of the other surface, marked", got)
 	}
 	// The texts came in the order of the page, and each came once: the turn of the chat, which the page names with via, was
@@ -348,7 +348,7 @@ func TestAMessageOfTheChatBecomesASayAndAReplyOnThePageReachesTheChat(t *testing
 	if _, err := asOwner.Do(t.Context(), action(t, asOwner, "say"), map[string]string{"day": "today", "text": "after the edit"}); err != nil {
 		t.Fatal(err)
 	}
-	if got := chat.next(t); got != "You wrote in lifelog: after the edit" {
+	if got := chat.next(t); got != "You wrote in aminte: after the edit" {
 		t.Errorf("the chat got %q, want the next turn only", got)
 	}
 }
@@ -464,13 +464,13 @@ func TestTwoMessagesInARowGetTheirTwoRepliesOnThePhone(t *testing.T) {
 	for _, tr := range conversation(t, asOwner) {
 		order = append(order, tr.Who+": "+tr.Text)
 	}
-	if want := []string{"owner: first", "lifelog: answer 1", "owner: second", "lifelog: answer 2"}; !slices.Equal(order, want) {
+	if want := []string{"owner: first", "aminte: answer 1", "owner: second", "aminte: answer 2"}; !slices.Equal(order, want) {
 		t.Errorf("the page holds %q, want %q", order, want)
 	}
 }
 
 // TestTheTransportRefusesWhatItCannotRun: each missing piece is refused with its name or the line that says what to run.
-// A flag that the program does not take is a plain error (1). A missing address of lifelog is the owner's to mend (78).
+// A flag that the program does not take is a plain error (1). A missing address of aminte is the owner's to mend (78).
 func TestTheTransportRefusesWhatItCannotRun(t *testing.T) {
 	b := build(t)
 	missing := filepath.Join(b.dir, "missing", "life.db")
@@ -480,12 +480,12 @@ func TestTheTransportRefusesWhatItCannotRun(t *testing.T) {
 		status int
 		want   string
 	}{
-		{"the owner flag is gone", []string{b.lifelog, "whatsapp", "--owner", "123", "--db", b.db}, 1, "flag provided but not defined: -owner"},
-		{"the terminal flag is gone", []string{b.lifelog, "whatsapp", "--terminal", "--db", b.db}, 1, "flag provided but not defined: -terminal"},
-		{"the token file flag is gone", []string{b.lifelog, "whatsapp", "--token-file", "token", "--db", b.db}, 1, "flag provided but not defined: -token-file"},
-		{"no server", []string{b.ext}, app.ExitOwnerActs, "no LIFELOG_URL and no --url: run it as `lifelog whatsapp` on"},
-		{"no file", []string{b.lifelog, "whatsapp", "--db", missing}, app.ExitOwnerActs, "no LIFELOG_URL and no --url: run it as `lifelog whatsapp` on"},
-		{"a source flag", []string{b.lifelog, "whatsapp", "--source", "x", "--db", b.db}, 1, "flag provided but not defined: -source"},
+		{"the owner flag is gone", []string{b.aminte, "whatsapp", "--owner", "123", "--db", b.db}, 1, "flag provided but not defined: -owner"},
+		{"the terminal flag is gone", []string{b.aminte, "whatsapp", "--terminal", "--db", b.db}, 1, "flag provided but not defined: -terminal"},
+		{"the token file flag is gone", []string{b.aminte, "whatsapp", "--token-file", "token", "--db", b.db}, 1, "flag provided but not defined: -token-file"},
+		{"no server", []string{b.ext}, app.ExitOwnerActs, "no AMINTE_URL and no --url: run it as `aminte whatsapp` on"},
+		{"no file", []string{b.aminte, "whatsapp", "--db", missing}, app.ExitOwnerActs, "no AMINTE_URL and no --url: run it as `aminte whatsapp` on"},
+		{"a source flag", []string{b.aminte, "whatsapp", "--source", "x", "--db", b.db}, 1, "flag provided but not defined: -source"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			cmd := exec.Command(tc.line[0], tc.line[1:]...)
@@ -508,7 +508,7 @@ func TestTheTransportRefusesWhatItCannotRun(t *testing.T) {
 // check comes before the wait for the owner's number: no number is set here, and the exit is still 78.
 func TestServingWithoutAPairingExitsAsTheOwnerActs(t *testing.T) {
 	b := build(t)
-	cmd := exec.Command(b.lifelog, "whatsapp", "--db", b.db)
+	cmd := exec.Command(b.aminte, "whatsapp", "--db", b.db)
 	cmd.Env = env(t)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
@@ -517,13 +517,13 @@ func TestServingWithoutAPairingExitsAsTheOwnerActs(t *testing.T) {
 	if !errors.As(err, &ee) || ee.ExitCode() != app.ExitOwnerActs {
 		t.Fatalf("%v, want exit status %d; stderr %s", err, app.ExitOwnerActs, stderr.String())
 	}
-	if !strings.Contains(stderr.String(), "not paired: run lifelog whatsapp login") {
+	if !strings.Contains(stderr.String(), "not paired: run aminte whatsapp login") {
 		t.Errorf("stderr %q", stderr.String())
 	}
 }
 
-// TestServeWithWhatsappStartsTheTransportAndDoesNotStartItAgainWhenTheOwnerMustAct: `lifelog serve --with whatsapp`
-// runs lifelog-whatsapp as a child. The state folder is new, so the device is not paired: the child exits with 78,
+// TestServeWithWhatsappStartsTheTransportAndDoesNotStartItAgainWhenTheOwnerMustAct: `aminte serve --with whatsapp`
+// runs aminte-whatsapp as a child. The state folder is new, so the device is not paired: the child exits with 78,
 // and serve says that it does not start it again (the contract of extensions/README.md, "Run by serve"). A SIGTERM
 // ends serve with exit 0. The transport of a message under --with needs a paired session, so it has no test.
 func TestServeWithWhatsappStartsTheTransportAndDoesNotStartItAgainWhenTheOwnerMustAct(t *testing.T) {
@@ -531,7 +531,7 @@ func TestServeWithWhatsappStartsTheTransportAndDoesNotStartItAgainWhenTheOwnerMu
 		t.Skip("a SIGTERM cannot be sent to a process on Windows")
 	}
 	b := build(t)
-	cmd := exec.Command(b.lifelog, "serve", "--with", "whatsapp", "--db", b.db, "--addr", "127.0.0.1:0")
+	cmd := exec.Command(b.aminte, "serve", "--with", "whatsapp", "--db", b.db, "--addr", "127.0.0.1:0")
 	cmd.Env = env(t)
 	stderr := &lockedBuffer{}
 	cmd.Stderr = stderr

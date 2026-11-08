@@ -28,7 +28,7 @@ through the writer, records the numbers, and generates a fresh database from scr
 
 ```mermaid
 flowchart LR
-  L["the owner's live life.db"] -->|"lifelog query: aggregate SQL, counts only"| C["the calibration record"]
+  L["the owner's live life.db"] -->|"aminte query: aggregate SQL, counts only"| C["the calibration record"]
   C -->|"numbers pasted into Go"| G["internal/scaletest"]
   S["fixed seed"] --> G
   G -->|"the production writer, a fresh file in scratch"| F["the synthetic fixture"]
@@ -36,7 +36,7 @@ flowchart LR
   O --> T["tests: CLI, HTTP/HTML, MCP, benchmarks"]
 ```
 
-- **The live file is never opened by anything in this plan.** The calibration runs `./lifelog query` — the CLI,
+- **The live file is never opened by anything in this plan.** The calibration runs `./aminte query` — the CLI,
   the same writer as the service ([connections](../contract/connections.md) allows one writer on one file).
 - **Only aggregates cross into the repo**: counts, year spans, averages and maxima of lengths, proportions.
   No title, body, value, name, place, row date, preview byte or private text. The published record is a table of
@@ -46,7 +46,7 @@ flowchart LR
 - **Re-calibrating is deliberate.** The SQL is fixed in this plan. A new measurement is a new dated row here and
   new numbers in Go, in one commit.
 
-## The measured shape (2026-10-14, `./lifelog query`)
+## The measured shape (2026-10-14, `./aminte query`)
 
 | thing | live | per journal page (1,378 pages) |
 |---|---|---|

@@ -247,7 +247,7 @@ Nothing in this draft changes current truth. If accepted, implement through the 
 | Reliability | [D11](../decisions/D11-tombstones.md), [D12](../decisions/D12-no-revision-tables.md), [D13](../decisions/D13-migrations-and-freeze.md), [D17](../decisions/D17-contract-as-data.md); revision/tombstone coverage, semantic integrity and precise freeze/compatibility wording |
 
 Table-local rules belong in named constraints/triggers and comments inside their `CREATE` statements. Only genuine
-cross-table rules earn `lifelog_meta` entries and [2075 questions](../contract/threat-model.md). Grammar/time profiles
+cross-table rules earn `aminte_meta` entries and [2075 questions](../contract/threat-model.md). Grammar/time profiles
 and shared vectors belong in the contract, not solely in writer code. Update the cookbook, diagrams, overview totals,
 non-goals and validation suites together. No implementation-specific rule is to be copied into the language-neutral
 contract from one application's behavior.

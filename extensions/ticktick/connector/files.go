@@ -1,5 +1,5 @@
 // Package connector is the TickTick connected app: the sync from TickTick to the day pages, the catalog that the
-// browser, `lifelog do` and the MCP tools carry, and the loop that serve runs. It holds the files of its state folder.
+// browser, `aminte do` and the MCP tools carry, and the loop that serve runs. It holds the files of its state folder.
 package connector
 
 import (
@@ -11,18 +11,18 @@ import (
 	"path/filepath"
 	"time"
 
-	"lifelog/app"
+	"aminte/app"
 )
 
-// Name is the name of the app: the program lifelog-ticktick, the writer import:ticktick, the state folder
-// lifelog-ticktick.
+// Name is the name of the app: the program aminte-ticktick, the writer import:ticktick, the state folder
+// aminte-ticktick.
 const Name = "ticktick"
 
 // ErrLoginAgain says that TickTick refused the token, or that there is none. The owner must run
-// `lifelog ticktick login`; a program that meets it ends with app.ExitOwnerActs (78), because the error is app.OwnerActs.
-var ErrLoginAgain = app.OwnerActs(errors.New("login again: lifelog ticktick login"))
+// `aminte ticktick login`; a program that meets it ends with app.ExitOwnerActs (78), because the error is app.OwnerActs.
+var ErrLoginAgain = app.OwnerActs(errors.New("login again: aminte ticktick login"))
 
-// Dir is the state folder: os.UserConfigDir()/lifelog-ticktick.
+// Dir is the state folder: os.UserConfigDir()/aminte-ticktick.
 func Dir() (string, error) { return app.StateDir(Name) }
 
 // Config is config.json. A missing key has its default.

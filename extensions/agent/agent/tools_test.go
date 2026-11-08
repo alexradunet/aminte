@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"lifelog/siren"
+	"aminte/siren"
 )
 
 // TestAnActionWithAFileFieldAndReplyAreNotTools: the MCP server offers a file field as the path of a local file, which it

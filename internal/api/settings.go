@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"strings"
 
-	"lifelog/internal/core"
-	"lifelog/siren"
+	"aminte/internal/core"
+	"aminte/siren"
 )
 
 // settingsEntity is the settings resource. It holds the values, the key too: only the owner reads it

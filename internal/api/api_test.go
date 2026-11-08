@@ -14,10 +14,10 @@ import (
 	"testing"
 	"time"
 
-	"lifelog/client"
-	"lifelog/internal/api/apitest"
-	"lifelog/internal/core"
-	"lifelog/siren"
+	"aminte/client"
+	"aminte/internal/api/apitest"
+	"aminte/internal/core"
+	"aminte/siren"
 )
 
 // scalar reads one text value from the file: a probe, never the behaviour under test.
@@ -435,7 +435,7 @@ func TestOriginProtection(t *testing.T) {
 	_, h, s := apitest.Fresh(t, "cli")
 	postForm := func(path string, vals url.Values, headers map[string]string) *httptest.ResponseRecorder {
 		t.Helper()
-		req := httptest.NewRequest("POST", "http://lifelog.local"+path, strings.NewReader(vals.Encode()))
+		req := httptest.NewRequest("POST", "http://aminte.local"+path, strings.NewReader(vals.Encode()))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		for k, v := range headers {
 			req.Header.Set(k, v)
@@ -447,7 +447,7 @@ func TestOriginProtection(t *testing.T) {
 
 	sameOrigin := postForm("/days/2026-10-10/capture", url.Values{"text": {"same origin"}}, map[string]string{
 		"Accept":         "text/html,application/xhtml+xml",
-		"Origin":         "http://lifelog.local",
+		"Origin":         "http://aminte.local",
 		"Sec-Fetch-Site": "same-origin",
 	})
 	if sameOrigin.Code != http.StatusOK || sameOrigin.Header().Get("Location") != "/days/2026-10-10" {
@@ -462,7 +462,7 @@ func TestOriginProtection(t *testing.T) {
 	}
 
 	for _, method := range []string{"GET", "HEAD"} {
-		req := httptest.NewRequest(method, "http://lifelog.local/", nil)
+		req := httptest.NewRequest(method, "http://aminte.local/", nil)
 		req.Header.Set("Origin", "https://evil.example")
 		req.Header.Set("Sec-Fetch-Site", "cross-site")
 		rec := httptest.NewRecorder()

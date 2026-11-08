@@ -18,7 +18,7 @@
 
 | question | decision |
 |---|---|
-| a separate client, or the browser that `lifelog` serves | the browser that `lifelog` serves; no second web application |
+| a separate client, or the browser that `aminte` serves | the browser that `aminte` serves; no second web application |
 | JavaScript | a script makes a page better, but no page needs it: one hand-written file, embedded like the two sheets; no framework, no CDN, no build step |
 | moving between days | a month calendar, with the mood of each day, and a date to jump to |
 | Home | today at a glance: capture, what is due, today's habits, the last entries; the forms that make new things go into one closed section |

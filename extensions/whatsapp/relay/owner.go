@@ -6,7 +6,7 @@ import (
 	"log"
 	"time"
 
-	"lifelog/client"
+	"aminte/client"
 )
 
 // OwnerEvery is the time between two reads of the settings while no owner number is set.

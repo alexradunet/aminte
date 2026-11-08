@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"lifelog/internal/api/apitest"
+	"aminte/internal/api/apitest"
 )
 
 // TestAMultipartPostWithoutFileFieldsIsRefused: a multipart body to an action that takes no file is answered 415 with

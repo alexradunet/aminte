@@ -12,7 +12,7 @@
   `entities` and `measurements` is. The `id` is the integer key of every fact table ([D3](D03-integer-ids.md)). `capture_keys_source` and `capture_keys_import_key` have the
   shape of `entities_source` and `entities_import_key`: 1 to 512 bytes without NUL, so the empty key is refused
   and cannot make every later capture look added before. `capture_keys_recorded_at` is the instant of
-  `lifelog_meta.instants`. `page_id` is the day page that the capture was added to.
+  `aminte_meta.instants`. `page_id` is the day page that the capture was added to.
   A writer reads the key first. A row back means the capture was added before: it changes nothing and answers with
   the day of `page_id`. Without a row, it adds the paragraph, records the Mood reading with the same key
   (`measurements.import_key`) and inserts the key, all in one `BEGIN IMMEDIATE` transaction
@@ -22,7 +22,7 @@
   page draws it.
 - **Append-only.** `capture_keys_no_update` and `capture_keys_no_delete` refuse a change and a removal, as the
   triggers on `measurements` do. A key that changes or goes away lets its capture be added again. This follows
-  [D11](D11-tombstones.md): `lifelog_meta.deletes` says that life data is never deleted, and a key is the proof that
+  [D11](D11-tombstones.md): `aminte_meta.deletes` says that life data is never deleted, and a key is the proof that
   a capture happened. A key needs no tombstone, because it is never wrong: it says that a capture was added.
   A page tombstoned later does not undo its capture, so a resend still changes nothing.
 - **Shape of the table.** It is a `STRICT` table with an `INTEGER PRIMARY KEY`, as every sibling is. The unique pair adds one

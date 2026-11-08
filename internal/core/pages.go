@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"lifelog/text"
+	"aminte/text"
 )
 
 // saveBody is Store.SaveBody in t. A stale version is a conflict unless the body sent is the body the page holds:
@@ -85,7 +85,7 @@ func (t *Tx) CreatePerson(title, name, birth, death string) (int64, error) {
 // then extra for its typed row. It is the one check of the title for CreatePage and CreatePerson: the
 // title must be valid, and no page, live or deleted, may hold its key (the ExistsError names that page). day is the
 // day of a page (for a day page, its date), nil for a person. Creation is one write, so the new entity is
-// at revision 1 (lifelog_meta.edit_revisions). The caller syncs the wikilinks of the body after the typed row exists.
+// at revision 1 (aminte_meta.edit_revisions). The caller syncs the wikilinks of the body after the typed row exists.
 func (t *Tx) createNamed(typ, title, body string, day any, extra func(int64) error) (int64, error) {
 	if err := checkTitle("title", title); err != nil {
 		return 0, err

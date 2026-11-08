@@ -1,6 +1,6 @@
 package web_test
 
-// The pages of Tasks, as web draws them over the real core and a small task service (lifelogtest.Connect). The core
+// The pages of Tasks, as web draws them over the real core and a small task service (amintetest.Connect). The core
 // answers Siren JSON: the rows with their round buttons, the due chips, the side column and the quick-add. These tests
 // hold the HTML of that path from end to end, and the write of a round button through web.
 

@@ -12,11 +12,11 @@ a reading summary; they do not contain the complete Unicode/Markdown algorithms 
 compatibility follows [D13](../decisions/D13-migrations-and-freeze.md).
 
 1. **[schema.sql](../schema/schema.sql)** as the init DDL, applied to a new file verbatim — `PRAGMA application_id`
-   marks it as a Lifelog database.
+   marks it as an Aminte database.
 2. **The [storage contract](../contract/README.md)** as the writer's obligations, chiefly
    [connection setup](../contract/connections.md) (pragmas read back, `BEGIN IMMEDIATE`, the version floor) and
    [titles and wikilinks](../contract/titles-and-wikilinks.md) (titles, `title_key`, the save contract).
-3. **The [cookbook](../cookbook/README.md)** as the canonical reads and writes; `lifelog_meta` and the comments inside
+3. **The [cookbook](../cookbook/README.md)** as the canonical reads and writes; `aminte_meta` and the comments inside
    `.schema` as the in-file summary.
 4. **The test vectors** printed in [titles and wikilinks](../contract/titles-and-wikilinks.md) as a conformance suite: that
    page is the only copy of its vectors, and the suites in `tests/` read them from it. The [exact-time](../contract/exact-time.md)

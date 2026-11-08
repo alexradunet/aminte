@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"lifelog/internal/photo/phototest"
+	"aminte/internal/photo/phototest"
 )
 
 // streamStore is a store whose today is 2026-10-17, in UTC.

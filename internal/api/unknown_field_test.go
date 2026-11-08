@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"lifelog/internal/api/apitest"
+	"aminte/internal/api/apitest"
 )
 
 // send makes one request to the handler and gives back the status and the body.

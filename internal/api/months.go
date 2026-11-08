@@ -6,9 +6,9 @@ import (
 	"strconv"
 	"time"
 
-	"lifelog/internal/core"
-	"lifelog/siren"
-	"lifelog/text"
+	"aminte/internal/core"
+	"aminte/siren"
+	"aminte/text"
 )
 
 // A month is the calendar of the browser (docs/plans/091-the-browser-for-daily-use.md): each day of a month, whether

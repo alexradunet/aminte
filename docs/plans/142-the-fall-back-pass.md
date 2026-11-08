@@ -92,7 +92,7 @@ Add to `plan_test.go`, beside the vector tests:
 - **`lineNumber`**, a table: `1`, `1.0` and `1e0` are 1 (as today); `0`, `-1`, `1.5`, `NaN`, `Inf`, `2147483648`
   and `x` are refused.
 - **`CheckOrigin` refuses an upper-case letter** in the scheme or the host, with a message that says a browser sends
-  its origin in lower case. `public_test.go` adds the case to its table of origins; `cmd/lifelog` has a test of the
+  its origin in lower case. `public_test.go` adds the case to its table of origins; `cmd/aminte` has a test of the
   `--origin` flag (`TestPublicOptionsRefusals`): add the case there if the table is there.
 - **One home for the Monday of a week.** The week case of `periodWindow` calls `weekOf`; the formula and `jan4` go
   from `plans.go`. `TestPeriodWindowIsTheFirstAndTheLastDayOfAPeriod` holds.

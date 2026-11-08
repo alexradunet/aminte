@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"lifelog/internal/photo/phototest"
+	"aminte/internal/photo/phototest"
 )
 
 // browseFixture writes, through the writer, one of each kind in and out of the categories Family, Cousins (under

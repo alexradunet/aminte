@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"lifelog/siren"
+	"aminte/siren"
 )
 
 // TestAPageUnderWithIsDrawnByGeneric: a connected app names its own classes. A class that is also a class of this

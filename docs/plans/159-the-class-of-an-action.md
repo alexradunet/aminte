@@ -8,7 +8,7 @@
 - **Date / baseline:** 2026-10-30, `5046b38` (master), after [plan 157](157-a-task-manager-feel-through-the-catalog.md).
 - **Priority:** P2. **Effort:** L. **Risk:** LOW for the file: nothing of `schema.sql` changes. MEDIUM for the
   browser: the head of every page, the More section and the Facts change, and many view tests pin the old HTML.
-- **Status:** LIVE 2026-10-30 22:25 (`9d0e15f`, after the counter-review: `lifelog`, `lifelog-ticktick` and `lifelog-mcp` rebuilt, the service restarted). Not seen in a browser. B2 is on master (`d1fc733`, `1124bdf`). Part A is on master (`2474e75`, by a Sonnet sub-agent; `016adb5`, the review: `edit-task`
+- **Status:** LIVE 2026-10-30 22:25 (`9d0e15f`, after the counter-review: `aminte`, `aminte-ticktick` and `aminte-mcp` rebuilt, the service restarted). Not seen in a browser. B2 is on master (`d1fc733`, `1124bdf`). Part A is on master (`2474e75`, by a Sonnet sub-agent; `016adb5`, the review: `edit-task`
   of the task service of plan 158 is `edit`, and `reopen-task` is `toggle` as `complete-task` is). The owner
   picked the four elements of the mock-up and the order of B1, B2 and C (2026-10-30).
 - **Counter-review:** the review ran on Opus, because the Fable limit was reached. It found six fixes, and they are
@@ -198,7 +198,7 @@ TickTick list. The owner picked all four elements (2026-10-30).
   - The tests that pin `<details class="action"` change with the drawing, and say so in the commit message:
     `view_forms_test.go`, `view_page_test.go` (`TestTheMoreRowOfAPageOpensOneFormAtATime` becomes a test of the menu),
     `actions_page_test.go`, `snapshot_test.go`, `measurements_test.go`, `periods_test.go`, `view_strip_test.go`,
-    `view/forms_test.go`, `view/rows_test.go`, `cmd/lifelog/with_app_test.go`, `extensions/ticktick/e2e_test.go`.
+    `view/forms_test.go`, `view/rows_test.go`, `cmd/aminte/with_app_test.go`, `extensions/ticktick/e2e_test.go`.
 - README: the column "browser" of [every action on every surface](../../README.md#every-action-on-every-surface) names
   the menu where an action moves to it. The section of the browser says the menu.
 - Screenshots after B1 (the owner allows the review server, or runs it with `!`).
@@ -241,7 +241,7 @@ TickTick list. The owner picked all four elements (2026-10-30).
 - The nine texts of the templates move to their fields in the catalog: `create-person` `name` and `title`, `capture`
   `text`, `record` `metric`, `file-pages` `category` (two copies in `layout.html` today, one field in the catalog),
   `register-metric` `name`, `note` and `unit`, `edit-person` `name`. The `placeholder` option of the form helper goes.
-- The MCP extension puts a placeholder in the description of the tool's field as an example. `lifelog actions` shows it
+- The MCP extension puts a placeholder in the description of the tool's field as an example. `aminte actions` shows it
   after the field.
 - Docs: API.md, the field member. Tests: a field of the catalog with a placeholder draws it; the form helper has no
   `placeholder` option; the MCP tool's field describes the example.
@@ -258,7 +258,7 @@ TickTick list. The owner picked all four elements (2026-10-30).
 - Root: `go vet ./... && go test ./...`, `go test -count=1 -shuffle=on ./...`, `staticcheck ./...`, `govulncheck ./...`.
 - In `extensions/mcp`, `extensions/ticktick` and `extensions/whatsapp`: `go vet ./... && go test ./...` and
   `go mod tidy -diff`.
-- Live (the owner, with `!`): rebuild `~/.local/bin/lifelog` (the class of a task action comes from its own catalog of
+- Live (the owner, with `!`): rebuild `~/.local/bin/aminte` (the class of a task action comes from its own catalog of
   the task protocol, so the connector sends none), restart the service, read its log.
 
 ## Not taken

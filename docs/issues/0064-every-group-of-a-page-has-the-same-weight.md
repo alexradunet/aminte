@@ -26,9 +26,9 @@ follow the best practices, be adhd friendly and have full functionality". Each i
 
 ## Reproduce
 
-1. Build `lifelog` at `6d0b35e`; on a fresh file capture on 12 days with a mood, record two metrics on 14 days, start
+1. Build `aminte` at `6d0b35e`; on a fresh file capture on 12 days with a mood, record two metrics on 14 days, start
    two habits with check-ins, and create a one-off task due three days ago, one due today and a series every 3 days.
-2. `lifelog serve`; open `/days/today` at 1280 px and 390 px, light and dark; open "Record a reading"; open a place's
+2. `aminte serve`; open `/days/today` at 1280 px and 390 px, light and dark; open "Record a reading"; open a place's
    page.
 
 ## Rules involved

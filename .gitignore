@@ -10,9 +10,9 @@ life.db-shm
 *.settings.json
 
 # the built binary and editor/Windows backup files
-/lifelog
-/lifelog.exe
-/lifelog.prev
+/aminte
+/aminte.exe
+/aminte.prev
 *~
 
 # a real vault or export to import: never in git

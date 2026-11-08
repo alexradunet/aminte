@@ -1,4 +1,4 @@
-// Package web is the browser of lifelog: an HTTP handler that draws the answers of the core as pages of HTML. It is a
+// Package web is the browser of aminte: an HTTP handler that draws the answers of the core as pages of HTML. It is a
 // client of the API. It asks the core for Siren JSON with a bearer token and with the writer ui, and it draws the entity
 // with the view, in the shell. It opens no file of the life log and holds no state of the data. A picture or a file
 // that the core serves streams through it unchanged.
@@ -17,7 +17,7 @@ import (
 	"strings"
 	"time"
 
-	"lifelog/siren"
+	"aminte/siren"
 )
 
 // Options are what a Browser needs to start.

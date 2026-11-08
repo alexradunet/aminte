@@ -26,7 +26,7 @@ flowchart LR
 ```
 
 - Removed from [schema.sql](../schema/schema.sql): the tables `tasks` and `task_occurrences` with their indexes
-  and fourteen triggers; the `lifelog_meta` row `planning`; the task clauses of the rows `schema`, `source` and
+  and fourteen triggers; the `aminte_meta` row `planning`; the task clauses of the rows `schema`, `source` and
   `edit_revisions`; the task clause of the view `ghost_pages`.
 - Removed pages: the planning contract and the cookbook recipe on tasks; the three task queries of the integrity
   checks. [D23](../decisions/D23-no-tasks.md) becomes "no tasks" and [D15](../decisions/D15-recurrence.md) "no

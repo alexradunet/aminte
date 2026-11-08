@@ -21,7 +21,7 @@ type state struct {
 	// was removed leaves no key. nil is a first run: the relay adopts the page as it is, and sends no earlier turn. The
 	// file of an earlier version is a first run too: it has no seen.
 	Seen map[string][]string `json:"seen"`
-	// Said is the time of the last message of the owner that the relay said to lifelog. The chat gives a message
+	// Said is the time of the last message of the owner that the relay said to aminte. The chat gives a message
 	// that came while the relay was off, and the relay says it when it is newer than Said.
 	Said time.Time `json:"said"`
 	// SavedAt is a field of the state file of the agent that lived in this program: the time of its last save of the

@@ -81,8 +81,8 @@ func TestTheFormOfReplyIsOnTheCatalogPageAndWritesTheAgentsTurn(t *testing.T) {
 		t.Fatalf("the conversation has %d turns after the reply, want the question and the answer: %v", len(turns), turns)
 	}
 	answer, _ := turns[1].(map[string]any)
-	if answer["who"] != "lifelog" || answer["text"] != "You slept 7 hours." || fmt.Sprint(answer["tools"]) != "[- `search`: no hits]" {
-		t.Errorf("the second turn is %v, want the reply of lifelog with its tool line", answer)
+	if answer["who"] != "aminte" || answer["text"] != "You slept 7 hours." || fmt.Sprint(answer["tools"]) != "[- `search`: no hits]" {
+		t.Errorf("the second turn is %v, want the reply of aminte with its tool line", answer)
 	}
 
 	again := postForm(l.web, post, sent)

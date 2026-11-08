@@ -12,8 +12,8 @@ import (
 	"math/rand"
 	"testing"
 
-	"lifelog/internal/photo"
-	"lifelog/internal/photo/phototest"
+	"aminte/internal/photo"
+	"aminte/internal/photo/phototest"
 )
 
 // halves is a w×h picture, its left half red and its right half blue, with noise so it compresses like a photo.

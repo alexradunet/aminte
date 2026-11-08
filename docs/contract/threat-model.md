@@ -6,7 +6,7 @@
 |---|---|---|
 | The file is damaged or lost | `synchronous=FULL` and WAL on SQLite ≥ 3.51.3, on a local disk ([connection setup](connections.md)); the integrity checks find damage ([integrity checks](integrity-checks.md)); a dated snapshot, trusted once its restore check passes, is the second copy ([take a snapshot](../cookbook/take-a-snapshot.md), [D25](../decisions/D25-snapshots.md)) | what was written after the last snapshot; a snapshot on the same disk is lost with it, and a copy off the machine is the owner's business ([non-goals](../architecture/non-goals.md)); power loss is documented, not simulated [R67](../research/references.md#r67) |
 | A changed value inside the file (bit rot) | a data-checksumming filesystem (btrfs, ZFS), never `chattr +C`, a periodic `scrub` ([integrity checks](integrity-checks.md)) | structural integrity alone cannot detect an arbitrary changed value; FTS content comparison detects changes to indexed tokens, but other undetectable value changes remain |
-| A buggy writer, importer or agent | one writing application; triggers for append-only facts, no hard deletes and fixed kinds and retained name ownership; `ON CONFLICT … DO NOTHING`; `BEGIN IMMEDIATE`; the `source` of a row (`lifelog_meta.source`); the foreign-key and orphan checks ([D11](../decisions/D11-tombstones.md), [connection setup](connections.md), [integrity checks](integrity-checks.md)) | the pragmas are per connection, so the application asserts them at connect |
+| A buggy writer, importer or agent | one writing application; triggers for append-only facts, no hard deletes and fixed kinds and retained name ownership; `ON CONFLICT … DO NOTHING`; `BEGIN IMMEDIATE`; the `source` of a row (`aminte_meta.source`); the foreign-key and orphan checks ([D11](../decisions/D11-tombstones.md), [connection setup](connections.md), [integrity checks](integrity-checks.md)) | the pragmas are per connection, so the application asserts them at connect |
 | Instructions hidden in an imported source, read by an agent during an import ([imports](imports.md)) | the agent writes through the writer's operations only, so every write meets their checks; direct metric creation and snapshots are owner-only operations, refused to an agent; the agent works in a conversation with the owner, who says yes or no to each person and link; the agent is instructed to treat source text as data, not instructions; a snapshot before the import | instructions are not enforcement; a wrong but valid row can pass, and an agent that copies a note can change its text — the owner's review in the conversation, and the snapshot to restore, are what hold |
 | Another tool editing rows | exploration tools open the file read-only ([connection setup](connections.md), [D14](../decisions/D14-ui-and-tools.md)) | anything with write access to the file bypasses every control |
 | A stolen disk | the disk holding `life.db` is encrypted at rest ([D17](../decisions/D17-contract-as-data.md)) | a stolen *unlocked* machine has everything |
@@ -18,20 +18,20 @@ Out of scope: a hostile local user, malware running as the owner, and legal comp
 need the database itself encrypted ([non-goals](../architecture/non-goals.md)).
 
 **The 2075 test.** A stranger holds `life.db` without its application. `.schema` and
-`SELECT * FROM lifelog_meta` explain the stored records and the interpretation limits below. They are a
+`SELECT * FROM aminte_meta` explain the stored records and the interpretation limits below. They are a
 reading summary, not a complete replacement-writer specification: a [conforming writer](../guides/building-a-writer.md)
 also needs the matching contract, its pinned algorithms and its vectors.
 
-The table is executed as a presence check: each place named in the third column — a `lifelog_meta` key, or
+The table is executed as a presence check: each place named in the third column — a `aminte_meta` key, or
 a table, view or trigger whose `CREATE` statement `.schema` prints — must exist in a fresh database and its
-text must contain each phrase in the last column. **Every key of `lifelog_meta` must be used by some question**.
+text must contain each phrase in the last column. **Every key of `aminte_meta` must be used by some question**.
 This catches missing summaries; it does not prove that prose is unambiguous or that an independent reader
 can reconstruct the full Unicode or Markdown algorithms. Their
 behavioral vectors remain in the [storage contract](README.md).
 
 | # | Question | Where the answer is | The answer says |
 |---|---|---|---|
-| 1 | What is this, and where are its rules? | `schema` | `lifelog`, `CREATE statement`, `conforming writer`, `vectors` |
+| 1 | What is this, and where are its rules? | `schema` | `aminte`, `CREATE statement`, `conforming writer`, `vectors` |
 | 2 | How is an instant stored, and does it establish commit order? | `instants` | `UTC`, `ISO-8601`, `commit order` |
 | 3 | What is a `*_day` column? | `days` | `LOCAL`, `never recomputed`, `IS, not =` |
 | 4 | In which time zone was a reading taken? | `measurements` | `IANA` |

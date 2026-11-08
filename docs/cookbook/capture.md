@@ -16,9 +16,9 @@ INSERT INTO entity_names(entity_id, title, name_key)
 VALUES (:page_id, '2026-09-29', '2026-09-29');
 -- the entry, after a blank line when the page already has text
 UPDATE entities SET body = body || CASE WHEN body = '' THEN '' ELSE char(10, 10) END
-                        || 'Shipped the schema doc. Review pending. [[Lifelog]]'
+                        || 'Shipped the schema doc. Review pending. [[Aminte]]'
  WHERE id = :page_id;
--- the body names [[Lifelog]]: the link sync of cookbook/save-a-body.md runs here, inside this same transaction
+-- the body names [[Aminte]]: the link sync of cookbook/save-a-body.md runs here, inside this same transaction
 -- optional mood: the app requires a live metric and validates the value under D6
 -- before inserting; a missing metric or refused value rolls back the entire capture
 -- (docs/decisions/D06-mood-is-a-measurement.md)

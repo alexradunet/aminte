@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"lifelog/internal/db"
+	"aminte/internal/db"
 )
 
 // A local driver exercises database/sql's actual Scan, EOF and automatic Close paths.

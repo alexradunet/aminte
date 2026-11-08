@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"lifelog/client"
-	"lifelog/siren"
+	"aminte/client"
+	"aminte/siren"
 )
 
 // recorder is a test whose Fatal and Fatalf keep the message and stop the goroutine, as the real ones do, but do not

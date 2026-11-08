@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"lifelog/internal/photo"
+	"aminte/internal/photo"
 )
 
 // nothing is what photo.Read says of a photo whose metadata it cannot read.

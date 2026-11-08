@@ -11,14 +11,14 @@ import (
 	"regexp"
 	"time"
 
-	"lifelog/internal/db"
-	"lifelog/text"
+	"aminte/internal/db"
+	"aminte/text"
 
 	"modernc.org/sqlite"
 	sqlite3 "modernc.org/sqlite/lib"
 )
 
-// nowSQL is the instant format of lifelog_meta.instants, written by SQLite so every row of a statement agrees.
+// nowSQL is the instant format of aminte_meta.instants, written by SQLite so every row of a statement agrees.
 const nowSQL = "strftime('%Y-%m-%dT%H:%M:%fZ','now')"
 
 // nullIfEmpty is the SQL value of an optional text: NULL when the text is empty.
@@ -62,7 +62,7 @@ func (s *Store) Local() time.Time {
 	return s.now().In(zone)
 }
 
-// Today is the local calendar day of the store's clock (lifelog_meta.days).
+// Today is the local calendar day of the store's clock (aminte_meta.days).
 func (s *Store) Today() string { return s.Local().Format(time.DateOnly) }
 
 // Error carries an HTTP-shaped status so every surface reports the same failure the same way. Code, when set,
@@ -160,7 +160,7 @@ func jsonArray[T string | int64](list []T) string {
 	return string(b)
 }
 
-// checkDay refuses a value that is not a local day (lifelog_meta.days); what names the field.
+// checkDay refuses a value that is not a local day (aminte_meta.days); what names the field.
 func checkDay(what, s string) error {
 	if !text.IsDay(s) {
 		return Invalid("%s %q is not a day (YYYY-MM-DD)", what, s)

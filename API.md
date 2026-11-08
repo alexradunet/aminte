@@ -1,6 +1,6 @@
-# The lifelog API, for client authors
+# The aminte API, for client authors
 
-This page is what a client (a phone app, a browser, a script) needs to speak to `lifelog serve`: the entity every
+This page is what a client (a phone app, a browser, a script) needs to speak to `aminte serve`: the entity every
 answer is, every class of entity and the properties it carries, the errors, the pages, and how to reach a server. The
 database behind it is specified on its own in [docs/](docs/README.md); this page is only the application's wire shape.
 The test `TestAPIReferenceMatchesTheCode` in `internal/api` reads the property tables below and fails when the code
@@ -8,7 +8,7 @@ and this page disagree, so a property here is a property on the wire.
 
 ## Reaching a server
 
-- **Local:** `lifelog serve` listens on the loopback only, because `life.db` holds health data
+- **Local:** `aminte serve` listens on the loopback only, because `life.db` holds health data
   ([README](README.md#decisions)). The default is `127.0.0.1:7777`. `--addr` takes a numeric loopback IP, or `localhost`,
   with a numeric port, and nothing else; `localhost` binds to `127.0.0.1` with no DNS lookup, and the port 0 picks a free
   port, which the start line prints. A request must name a loopback IP, or `localhost` in any ASCII case, at the actual
@@ -16,24 +16,24 @@ and this page disagree, so a property here is a property on the wire.
   `Host` is 403. A forwarded header gives no trust, and a request target in absolute form is refused. A custom host
   name, a service-name port and a proxy are not supported. The guard covers reads, previews and writes. The CLI in
   process does not pass through it.
-- **A token:** `lifelog serve --token-file PATH` (one line of 32 characters or more; the command line never carries the
-  secret) or `$LIFELOG_TOKEN` turns on the check. A token that is shorter, has more than one line, or starts or ends
+- **A token:** `aminte serve --token-file PATH` (one line of 32 characters or more; the command line never carries the
+  secret) or `$AMINTE_TOKEN` turns on the check. A token that is shorter, has more than one line, or starts or ends
   with a space or a tab, and an empty `--token-file`, refuse the command before the listener opens. Every request then
   carries `Authorization: Bearer <token>`, else the answer is 401 `token_required`, with nothing of the database. The
   compare takes the same time for every value, and no route is exempt: there is no install file and no login page. The
   check of the `Host` comes first, so a wrong `Host` is 403 before a missing token is 401. With no token there is no
-  check, as on the temporary server of `lifelog NAME`. A token holder is the owner. The CLI and the MCP server with
-  `--url` send `$LIFELOG_TOKEN` as the bearer token. The start line says `(token required)`.
+  check, as on the temporary server of `aminte NAME`. A token holder is the owner. The CLI and the MCP server with
+  `--url` send `$AMINTE_TOKEN` as the bearer token. The start line says `(token required)`.
 - **Other devices:** the server answers no CORS preflight, and it trusts no browser origin: a write that a browser sends
   from another origin is 403 `cross_origin`, while a form of the same origin and a client that sends no browser origin
   header work. The core has no login, no cookie and no TLS. Another device, or a browser, reaches the API through a
-  program on this machine, such as `lifelog-web` ([extensions/web](extensions/web/README.md)).
-- **Provenance:** `Lifelog-Source: <name>` names the writer on every row the request writes (`[a-z0-9_:.-]{1,64}`,
+  program on this machine, such as `aminte-web` ([extensions/web](extensions/web/README.md)).
+- **Provenance:** `Aminte-Source: <name>` names the writer on every row the request writes (`[a-z0-9_:.-]{1,64}`,
   e.g. `app:phone`). Without it a request writes as `api`.
 - **Owner-only:** an action with `owner: true` in the catalog, and the reads `GET /settings` and `GET /snapshots/{name}`,
   are the owner's alone. A writer named `agent:…` or `import:…` is refused them (403 `forbidden`), whatever the token.
   The rule is held in the server, once, for the core and for every connected app. An owner action is never an MCP tool.
-  `lifelog actions --human` marks each one.
+  `aminte actions --human` marks each one.
 - **Limits:** a JSON or URL-encoded body of an action is 20 MiB of encoded data at most, and a JSON body is exactly one
   object. A multipart body has 64 parts at most, 16 MiB for each text field and 16 MiB of text in all (repeated fields
   count; an unknown name is refused (422) before its bytes are read), and at most one original and one preview part. A
@@ -81,7 +81,7 @@ another kind is 422.
 **Types** in the tables: `string`, `integer`, `number`, `boolean`, `day` (a local day, `YYYY-MM-DD`), `instant`
 (UTC, `2026-06-09T21:14:03.482Z`), `list`, `object`. A property marked *absent when empty* is left out of the JSON
 when it has no value. A `number` field is written in decimal digits; `mood`, `value` and `line` also take a sign, a point and an exponent (`-0.5`, `1e3`). `NaN`, `Inf`, a hexadecimal number and an underscore are refused.
-A request of an action names only the fields of the action; any other name is 422 `invalid`. A read of an action also takes `embed` ([embedding](#embedding)) and `new`. `new=NAME` allows the fields of the action NAME that are not path fields as query values, and a `new` that names no action is 422 `invalid`. `GET /actions?new=NAME`, with a value for each path field of NAME, fills the `href` of the action NAME ([the actions](#actions)); `GET /actions` takes any name, and a `new` that names no action fills nothing. On any other read, such as `GET /days/D`, `new` is for the client (`lifelog-web` opens a form with it): the core takes it and does nothing with it. A `POST` that names `new` is 422 `invalid`. A value outside a field's `options`, as `GET /actions` lists them, is 422 `invalid`. A multipart part with an unknown name is refused before its bytes are read.
+A request of an action names only the fields of the action; any other name is 422 `invalid`. A read of an action also takes `embed` ([embedding](#embedding)) and `new`. `new=NAME` allows the fields of the action NAME that are not path fields as query values, and a `new` that names no action is 422 `invalid`. `GET /actions?new=NAME`, with a value for each path field of NAME, fills the `href` of the action NAME ([the actions](#actions)); `GET /actions` takes any name, and a `new` that names no action fills nothing. On any other read, such as `GET /days/D`, `new` is for the client (`aminte-web` opens a form with it): the core takes it and does nothing with it. A `POST` that names `new` is 422 `invalid`. A value outside a field's `options`, as `GET /actions` lists them, is 422 `invalid`. A multipart part with an unknown name is refused before its bytes are read.
 
 ## Embedding
 
@@ -132,7 +132,7 @@ class is any other action.
 | `toggle` | It flips one state of the resource it is on. It has no field, or one field with two options. |
 
 A client may ignore a class: an action with a class works as an action with none. The placement of an action is the
-choice of each client. `lifelog-web` draws it by its class ([the browser and a page of an app](extensions/web/README.md#how-the-browser-draws-a-page-of-an-app)).
+choice of each client. `aminte-web` draws it by its class ([the browser and a page of an app](extensions/web/README.md#how-the-browser-draws-a-page-of-an-app)).
 A class that is not in the list is dropped from the action of a connected app. The task service sends no class: the server holds the class of the [task](#tasks) actions.
 
 ## Errors
@@ -142,18 +142,18 @@ An error is an entity of class `error` with `properties`:
 | property | type | meaning |
 |---|---|---|
 | `status` | integer | the HTTP status |
-| `code` | string | what went wrong, to branch on: `stale_version` (a save with an old `version`), `exists` (a title in use; the link `existing` names the page. When `create-person` meets a live plain page, the link `promote` is the address of that page with the promote form open and the fields filled), `cross_origin` (a write that a browser sends from another origin; the server trusts no origin), `token_required` (a server with a token, and a request without the right one), `snapshot_refused` (the snapshot folder refused it), `restore_check_failed` (the snapshot is written but fails its restore check), `busy` (503 with `Retry-After`: another writer holds the file; nothing was written, so a retry is safe), `unavailable` (503 with `Retry-After`: an app connected by `serve --with` is not running), `upstream` (502: the app answered something that is not an entity), `locked` (401: `lifelog-web`, the door of a browser, sends it when its lock holds that session shut; the core never sends it), or the status's general name: `bad_request`, `unauthorized`, `forbidden`, `not_found` (for a metric that does not exist, the link `register` is the address of the Metrics board with the form of `register-metric` open and the name filled), `conflict`, `too_large`, `unsupported_media` (415: a multipart body to an action that takes no file), `invalid` (422), `timeout`, `internal` |
+| `code` | string | what went wrong, to branch on: `stale_version` (a save with an old `version`), `exists` (a title in use; the link `existing` names the page. When `create-person` meets a live plain page, the link `promote` is the address of that page with the promote form open and the fields filled), `cross_origin` (a write that a browser sends from another origin; the server trusts no origin), `token_required` (a server with a token, and a request without the right one), `snapshot_refused` (the snapshot folder refused it), `restore_check_failed` (the snapshot is written but fails its restore check), `busy` (503 with `Retry-After`: another writer holds the file; nothing was written, so a retry is safe), `unavailable` (503 with `Retry-After`: an app connected by `serve --with` is not running), `upstream` (502: the app answered something that is not an entity), `locked` (401: `aminte-web`, the door of a browser, sends it when its lock holds that session shut; the core never sends it), or the status's general name: `bad_request`, `unauthorized`, `forbidden`, `not_found` (for a metric that does not exist, the link `register` is the address of the Metrics board with the form of `register-metric` open and the name filled), `conflict`, `too_large`, `unsupported_media` (415: a multipart body to an action that takes no file), `invalid` (422), `timeout`, `internal` |
 | `message` | string | the text, for a person; a fault of the server (500 `internal`) says only `internal error`, and the server's log has the cause |
 
 ## Connected apps
 
-`lifelog serve --with NAME` may run an app that serves a catalog of its own ([the contract of an
+`aminte serve --with NAME` may run an app that serves a catalog of its own ([the contract of an
 extension](extensions/README.md#a-catalog-of-its-own)). The server merges that catalog into its own. A client needs no
 code for an app: it follows `GET /actions`.
 
 ```mermaid
 flowchart LR
-  C["a client"] -->|"GET /actions"| L["lifelog serve"]
+  C["a client"] -->|"GET /actions"| L["aminte serve"]
   L -->|"the static catalog + NAME-action for each action of each app that runs"| C
   C -->|"any method on /with/NAME/..."| L
   L -->|"the same request, as the writer of the request"| A["the app NAME"]
@@ -161,7 +161,7 @@ flowchart LR
   L -->|"the entity with its hrefs and action names prefixed"| C
 ```
 
-- **The merged `GET /actions`.** The static catalog is the one that `lifelog actions --human` prints
+- **The merged `GET /actions`.** The static catalog is the one that `aminte actions --human` prints
   ([README](README.md#every-action-on-every-surface)). An action of an app is dynamic: it is there while the app runs. Its `name` is `NAME-action`, and its `href` starts
   with `/with/NAME`. It has the `owner`, `danger` and `fields` that the app gave. An app that does not run has no
   action in the list.
@@ -169,7 +169,7 @@ flowchart LR
   is checked as every action is: a field that the action does not name, a missing required field or a value outside
   `options` is 422 `invalid`, and an `owner` action is refused to an `agent:*` or `import:*` writer
   ([owner-only](#reaching-a-server)). In both cases the app is not called. A `GET` that matches no action goes to the app as it is, without `new`. Any other method that matches no action is 404.
-- **The writer** of the app's request is the writer of yours (`Lifelog-Source`). The app gets no cookie and no token.
+- **The writer** of the app's request is the writer of yours (`Aminte-Source`). The app gets no cookie and no token.
 - **The answer** is the entity of the app, with `/with/NAME` before each `href` and `NAME-` before each action name.
   The actions of an embedded link get the same prefixes.
   A link or an action whose `href` has a scheme or a host is dropped. A `POST` is answered 200 with the entity of the app, as for every write.
@@ -184,15 +184,15 @@ flowchart LR
 
 The server sends a request to the app once. There is no retry on any method.
 
-**Limits.** A running `serve` has the apps. The in-process CLI and the temporary server of `lifelog NAME` have none, so
-`lifelog do NAME-action` needs `--url`, and an agent reaches the apps with `lifelog mcp --url`. The MCP tool of
+**Limits.** A running `serve` has the apps. The in-process CLI and the temporary server of `aminte NAME` have none, so
+`aminte do NAME-action` needs `--url`, and an agent reaches the apps with `aminte mcp --url`. The MCP tool of
 `NAME-action` is `NAME_action`. An action with a field of the type `file` is refused
 when the catalog of the app is read; a multipart body is not forwarded.
 
 ## Tasks
 
-While a **task service** runs ([the contract of an extension](extensions/README.md#a-task-service)), `lifelog` builds
-the entities of Tasks under `/tasks`, and `lifelog-web` draws them. `lifelog` offers six actions. The service is not
+While a **task service** runs ([the contract of an extension](extensions/README.md#a-task-service)), `aminte` builds
+the entities of Tasks under `/tasks`, and `aminte-web` draws them. `aminte` offers six actions. The service is not
 an app: it has no `/with/NAME` and no action with a prefix. The file keeps no task
 ([D23](docs/decisions/D23-no-tasks.md)); the pages are made at each request.
 
@@ -206,7 +206,7 @@ an app: it has no `/with/NAME` and no action with a prefix. The file keeps no ta
 
 A task with no due day is last, and tasks with the same day keep the order of the service. A row is an embedded link
 with the chips `due`, `list` (on a page that mixes lists) and `done`, and the round button `complete-task` (`reopen-task`
-on a done row). `lifelog-web` draws the pages by the [rules of the generic view](extensions/web/README.md#how-the-browser-draws-a-page-of-an-app).
+on a done row). `aminte-web` draws the pages by the [rules of the generic view](extensions/web/README.md#how-the-browser-draws-a-page-of-an-app).
 
 | action | route | fields | |
 |---|---|---|---|
@@ -217,7 +217,7 @@ on a done row). `lifelog-web` draws the pages by the [rules of the generic view]
 | `delete-task` | `POST /tasks/items/{id}/delete` | `id` | `owner`, `danger` |
 | `sync-tasks` | `POST /tasks/sync` | none | |
 
-The actions are in `GET /actions` while a task service runs, and `lifelog actions --human --url URL` of the running server
+The actions are in `GET /actions` while a task service runs, and `aminte actions --human --url URL` of the running server
 lists them then (the CLI in process has no task service, as it has no app). They are
 checked as every action is: a field that the action does not name, a missing `title`, a `list` that is not a name, a
 `due` that is not a day (`YYYY-MM-DD`) or a blank `title` is 422 `invalid`, and `delete-task` is owner-only
@@ -983,9 +983,9 @@ closed before the turn, so the turn is read as a turn.
 `say` is for today: a `day` that is not the server's local today is 422 `say is for today: the agent answers today's
 conversation`, and writes nothing. A `text` that is empty or only blanks is 422 and writes nothing. The optional field
 `via` names the relay, the program that carries the owner's words (`[a-z0-9_:.-]{1,64}`); another value is 422.
-`say` answers at once and calls no model. When the agent runs (`lifelog-agent`, started by `serve --with agent`), it reads
+`say` answers at once and calls no model. When the agent runs (`aminte-agent`, started by `serve --with agent`), it reads
 the page, finds the turn of the owner that nobody has answered (the last turn is the owner's), and writes its reply on the
-page as `agent:lifelog`, with `reply`. A client reads the page to see the reply. `say` writes the turn of the owner. The owner may also edit the page with
+page as `agent:aminte`, with `reply`. A client reads the page to see the reply. `say` writes the turn of the owner. The owner may also edit the page with
 `save-body`, and the page reads the edit as it reads any text: text that the owner adds after a turn is part of that
 turn, and a marker line that the owner types outside a fenced block (`**Owner** (HH:MM): ...`) is a turn of the owner,
 as `say` would write it. An
@@ -1011,7 +1011,7 @@ The message says that the page stays a plain page. A plain page under the title 
 the `category` of a filing, `rename` of a plain page, and `say`). The plain page may be renamed: it keeps the title as
 a name that it had, `say` still files in it, and `promote` of it is 409 as well.
 
-`POST /days/{day}/reply` (the action `reply`; no owner action: the agent's writer `agent:lifelog` runs it, and so may
+`POST /days/{day}/reply` (the action `reply`; no owner action: the agent's writer `agent:aminte` runs it, and so may
 any writer): the agent's turn, written in one transaction on the conversation page of `day` (a local day or the word
 `today`, any day that has a page).
 
@@ -1032,7 +1032,7 @@ is then the first of its kind: a `reply` with the key that the agent read for th
 the page again. A key changes when the owner edits the words, the time or the relay of the turn: the
 agent then reads the page again, and answers the key that it finds.
 
-The reply is the paragraph `**lifelog** (HH:MM): text`, with the time of the server's clock in its zone, written right
+The reply is the paragraph `**aminte** (HH:MM): text`, with the time of the server's clock in its zone, written right
 after the owner turn that it answers: before the marker line of the next turn, or at the end of the page. A turn that the
 owner said while the agent worked stays after the reply and waits for its own. The page keeps LF line ends. A code fence
 that an edit left open before the reply is closed by a line of three backticks, so the reply is a turn. A turn is
@@ -1056,9 +1056,9 @@ turn of the owner with `say`. The page:
 - is titled `Conversation YYYY-MM-DD` (the day), is filed in the category `Conversations`, and starts with the line
   `[[YYYY-MM-DD]]`;
 - is read by lines. Line ends are LF; CRLF is read as LF;
-- has a turn from each marker line. A marker line starts with `**Owner** (HH:MM): ` or `**lifelog** (HH:MM): ` and is
+- has a turn from each marker line. A marker line starts with `**Owner** (HH:MM): ` or `**aminte** (HH:MM): ` and is
   outside a fenced code block (a line that starts with three backticks opens or closes a fence). `HH:MM` is the
-  server's local time; a marker written with the earlier separator, `(HH.MM)`, is read the same. `reply` writes `**lifelog**`, and `say` writes `**Owner**`. The brackets may also name the
+  server's local time; a marker written with the earlier separator, `(HH.MM)`, is read the same. `reply` writes `**aminte**`, and `say` writes `**Owner**`. The brackets may also name the
   writer that relayed the turn: `**Owner** (HH:MM, via whatsapp): `, where the name is `[a-z0-9_:.-]+`. `say` writes
   it when the request names `via`, and writes no such part without it;
 - runs a turn from its marker line to the line before the next marker line, or to the end of the page. The words of
@@ -1067,7 +1067,7 @@ turn of the owner with `say`. The page:
   of the words outside a fenced block that starts with a backslash, a dash, a space and a backtick is read without the
   backslash (the writer of the page put it there), also on the line of the marker. A fence that the last turn of the
   page leaves open is read as closed, with a line of three backticks at the end of its words;
-- has the tool lines of a `lifelog` turn right before its marker: one block of lines that each start with ``- ` ``, for
+- has the tool lines of a `aminte` turn right before its marker: one block of lines that each start with ``- ` ``, for
   example ``- `search`: no hits``, with at most one blank line between the block and the marker. They are not part of
   the turn before. Tool lines before an `Owner` marker are part of the text before it. A tool line names the address
   of what the agent touched as ``- `name` → [href](href)`` (or ``- `name` → href``); a client may draw it as a card.
@@ -1079,12 +1079,12 @@ turn of the owner with `say`. The page:
 |---|---|---|
 | `day` | day | the day of the conversation |
 | `turns[]` | list | the turns, in the order of the page; empty when the page does not exist |
-| `turns[].who` | string | `owner`, `lifelog`, or `text` for a free paragraph |
+| `turns[].who` | string | `owner`, `aminte`, or `text` for a free paragraph |
 | `turns[].key` | string | the name of the turn for `reply`: 16 hex digits, opaque; no two turns of one page have the same |
 | `turns[].at` | string | `HH:MM`, also for a marker written as `HH.MM`; absent for a free paragraph |
-| `turns[].via` | string | the relay named by `via`; absent when the owner wrote on a surface of lifelog |
+| `turns[].via` | string | the relay named by `via`; absent when the owner wrote on a surface of aminte |
 | `turns[].text` | string | the words of the turn, without the mark |
-| `turns[].tools` | list | the tool lines of a `lifelog` turn, as written, with the leading ``- ` ``; absent when none |
+| `turns[].tools` | list | the tool lines of a `aminte` turn, as written, with the leading ``- ` ``; absent when none |
 | `turns[].refs` | list | the addresses of the turn's tool lines (paths that start with `/`), in order, unique; absent when none |
 | `id` | integer | only when the page exists: its id, and then the rows of the page that follow |
 | `entity_type` | string | `page` |

@@ -5,23 +5,23 @@
       "Read(**/*.db-wal)",
       "Read(**/*.db-shm)",
       "Read(**/*.db-journal)",
-      "Read(**/*.lifelog/**)",
+      "Read(**/*.aminte/**)",
       "Read(import/**)",
       "Read(//**/*.db)",
       "Read(//**/*.db-wal)",
       "Read(//**/*.db-shm)",
       "Read(//**/*.db-journal)",
-      "Read(//**/*.lifelog/**)",
+      "Read(//**/*.aminte/**)",
       "Bash(sqlite3 *)",
       "Bash(datasette *)",
-      "Bash(lifelog *)",
-      "Bash(./lifelog *)",
-      "Bash(go run ./cmd/lifelog *)",
+      "Bash(aminte *)",
+      "Bash(./aminte *)",
+      "Bash(go run ./cmd/aminte *)",
       "PowerShell(sqlite3 *)",
       "PowerShell(datasette *)",
-      "PowerShell(lifelog *)",
-      "PowerShell(.\\lifelog *)",
-      "PowerShell(go run ./cmd/lifelog *)"
+      "PowerShell(aminte *)",
+      "PowerShell(.\\aminte *)",
+      "PowerShell(go run ./cmd/aminte *)"
     ]
   }
 }

@@ -6,12 +6,12 @@ import (
 	"strings"
 	"testing"
 
-	"lifelog/internal/api/apitest"
-	"lifelog/siren"
+	"aminte/internal/api/apitest"
+	"aminte/siren"
 )
 
 // The core is headless (docs/plans/161-the-browser-as-an-extension.md): it answers Siren JSON and bytes, to every
-// client, whatever the client accepts. The browser is the extension lifelog-web. The tests of this file hold what the
+// client, whatever the client accepts. The browser is the extension aminte-web. The tests of this file hold what the
 // core no longer does.
 
 // TestEveryAcceptGetsTheSirenAnswer: a read and a write answer Siren JSON for a client that accepts HTML, as for any
@@ -37,7 +37,7 @@ func TestEveryAcceptGetsTheSirenAnswer(t *testing.T) {
 	}
 }
 
-// TestTheWriterIsApiUnlessTheClientNamesIt: a request with no header Lifelog-Source writes as api, whatever it accepts.
+// TestTheWriterIsApiUnlessTheClientNamesIt: a request with no header Aminte-Source writes as api, whatever it accepts.
 // There is no default ui: the browser extension sends ui.
 func TestTheWriterIsApiUnlessTheClientNamesIt(t *testing.T) {
 	_, h, s := apitest.Fresh(t, "cli")
@@ -79,7 +79,7 @@ func TestTheRoutesOfTheBrowserAreGone(t *testing.T) {
 // takes the place of the header. (The login that set such a cookie is the browser extension's.)
 func TestACookieOpensNothingInTokenMode(t *testing.T) {
 	h, _ := tokenHandler(t)
-	for _, name := range []string{"lifelog_session", "lifelog_token", "session"} {
+	for _, name := range []string{"aminte_session", "aminte_token", "session"} {
 		rec := request(h, "GET", "/", "", map[string]string{"Host": "127.0.0.1:7777", "Cookie": name + "=" + testToken})
 		if rec.Code != http.StatusUnauthorized {
 			t.Errorf("the cookie %s: %d, want 401", name, rec.Code)

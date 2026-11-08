@@ -11,7 +11,7 @@ go test ./tests                                  # every suite and every mutant
 go test -short ./tests                           # the suites without the mutants
 go test ./tests -run 'TestSuites/pages' -v       # one suite, with its count of expectations
 go test ./tests -run 'TestMutants/.*facts' -v    # the mutants of one suite
-LIFELOG_MERMAID=1 go test ./tests -run TestMermaidRender   # + render every mermaid diagram (needs mmdc + a Chromium)
+AMINTE_MERMAID=1 go test ./tests -run TestMermaidRender   # + render every mermaid diagram (needs mmdc + a Chromium)
 ```
 
 The manually triggered [Windows validation workflow](../.github/workflows/windows-validation.yml) runs generation,
@@ -19,7 +19,7 @@ vet and the complete baseline, including mutants, on `windows-2025` using the Go
 It uses read-only repository permissions and does not publish a release.
 
 Needs Go ≥ 1.27 and nothing else: SQLite is the driver's own build (`modernc.org/sqlite`, pure Go, SQLite 3.53.4 with
-FTS5); the `writers` suite checks the floor of `lifelog_meta.sqlite` on it. The schema-evolution probes execute `ALTER TABLE …
+FTS5); the `writers` suite checks the floor of `aminte_meta.sqlite` on it. The schema-evolution probes execute `ALTER TABLE …
 DROP CONSTRAINT` on disposable files and need 3.53; they are not a migration runner. The full-file labels of
 `doc-save-contract` need the FTS5 of that build to write its pending terms at a `SAVEPOINT` or a `RELEASE`; each label
 fails loudly when the fault does not come. A writer needs only 3.51.3. The rendering test also needs
@@ -32,7 +32,7 @@ the document (a broken block makes a later step impossible) reports that as one 
 
 | file | suite | subject |
 |---|---|---|
-| `dates_test.go` | `dates` | instants, local days, the round-trip CHECKs and why `IS`, the zone (lifelog_meta.instants and .days, D10) |
+| `dates_test.go` | `dates` | instants, local days, the round-trip CHECKs and why `IS`, the zone (aminte_meta.instants and .days, D10) |
 | `schema_safeguards_test.go`, `schema_bounds_test.go` | `schema-safeguards` | NUL-free constrained text; the bounds of import keys, person names, units and notes, with the empty-key incident; a tombstone never precedes creation; `entities.body` last; the atomic Mood seed; no `OR IGNORE`/`OR REPLACE` in a trigger; immutable typed-detail identities and entity creation evidence; rowid-alias atomicity; Unicode search distinctions; cleanup excludes retained capture references |
 | `schema_adversarial_test.go` | `schema-adversarial` | Skipped duplicate validation limits; statement ABORT versus caller transaction rollback |
 | `graph_model_test.go` | `graph-model`, `FuzzGraphTransitions` | Independent directed graph model, NULL/empty notes, self-links, retry/edit/delete sequences, which endpoints a change advances (the page a link leaves, none for a wikilink's insert or delete), savepoint and transaction rollback, typed batch refusal and read-only reopen |
@@ -58,7 +58,7 @@ the document (a broken block makes a later step impossible) reports that as one 
 | `evolution_test.go` | `evolution` | named CHECKs, widening, partial dates, the tokenizer switch, reader compatibility, a generated column that leaves the file once the partial index that names it is dropped, comments inside statements (D13, D17, architecture/non-goals) |
 | `streak_test.go` | `streaks` | cookbook/streaks run literally on hand-checked days: a run of 3 ending today after a gap and an earlier run of 12 is 3; the run ends yesterday when today has no words; an empty page, a tombstone and an earlier run do not count; the look back stops at 3660 days (the run of 3661 days is one labelled bulk insert, compared with the rows of `dayPage`) |
 | `cookbook_test.go` | `cookbook` | measurement lifecycle and recorded-time cutoffs; every cookbook block prepares and runs, on a plain and on a hardened connection; every block that only reads runs on a reader (`mode=ro`, `trusted_schema=OFF`) |
-| `document_test.go` | `document` | the 2075 test, the `lifelog_meta` rows name only what the file has, the stored `CREATE` texts name only registered link kinds, the rules live in the file, the tree holds together (one record per decision, every relative link and anchor resolves, every page reachable from `docs/README.md`), the totals in `schema/README.md` |
+| `document_test.go` | `document` | the 2075 test, the `aminte_meta` rows name only what the file has, the stored `CREATE` texts name only registered link kinds, the rules live in the file, the tree holds together (one record per decision, every relative link and anchor resolves, every page reachable from `docs/README.md`), the totals in `schema/README.md` |
 | `diagrams_test.go` | `diagrams` | the mermaid diagrams of the docs say what the DDL says (keys, relationships, the link map, the correction story, the capture key) |
 | `wikilinks_test.go` | `doc-save-contract` | the save contract as the docs print it: the vector table of contract/titles-and-wikilinks, cookbook/save-a-body run literally (and equal to a writer's own save after 400 random edits), a full file at `SAVEPOINT` or `RELEASE` that fails the save (and the links a save loses when it goes on), cookbook/backlinks |
 | | `save-contract` | the save contract through a writer's own save against the DDL: invalid targets, the `SAVEPOINT` backstop, set equality, ordinary REDIRECT prose, revival, 400 random edits against a rebuild, 4 concurrent writers, every vector |
@@ -103,7 +103,7 @@ possible input or SQLite version correct.
 Every original probe still runs in the baseline. Exact-time vectors share one baseline and roll back a savepoint
 after each column probe, including a successful write under a mutant, so no case changes the next one's setup.
 
-**When the docs change.** A DDL change: run everything. A new rule that spans tables: a `lifelog_meta` key and a row
+**When the docs change.** A DDL change: run everything. A new rule that spans tables: a `aminte_meta` key and a row
 in the 2075 table of contract/threat-model (`document` fails until both exist); a table's own rule: a comment in its
 `CREATE` statement. A changed cookbook block or diagram: the suites that extract it will tell you. If a suite must
 change because the docs legitimately changed, change it in the same edit and say so in the commit message — a suite
@@ -128,8 +128,8 @@ it does not simulate disk exhaustion, sync failures, torn writes or power loss.
 
 ## The coverage map
 
-The coverage map shows which statements the tests of every package reach, the process of `lifelog` included. It is a
-map, not a score ([AGENTS.md](../AGENTS.md)). The tests of `cmd/lifelog` run the CLI in-process; only
+The coverage map shows which statements the tests of every package reach, the process of `aminte` included. It is a
+map, not a score ([AGENTS.md](../AGENTS.md)). The tests of `cmd/aminte` run the CLI in-process; only
 `TestExecutableServeDrainsActiveRequest` runs the program, because an interrupt needs a process. That test builds the
 program with `go build -cover` and gives it the coverage folder of its test binary as `GOCOVERDIR`. So one folder
 gets the coverage of every test binary and of the process, and `covdata` merges it:

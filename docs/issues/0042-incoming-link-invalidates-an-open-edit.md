@@ -23,7 +23,7 @@ it moved.
 
 ## Rules involved
 
-`lifelog_meta.edit_revisions` and the comment of `links` in [schema.sql](../schema/schema.sql),
+`aminte_meta.edit_revisions` and the comment of `links` in [schema.sql](../schema/schema.sql),
 [D12](../decisions/D12-no-revision-tables.md), [D19](../decisions/D19-wikilink-save-contract.md) (the body is the
 truth of the wikilinks), [D8](../decisions/D08-entities-and-links.md) (symmetric mirrors),
 [save a body](../cookbook/save-a-body.md), [issue 0012](0012-timestamps-allow-stale-overwrites.md).
@@ -35,7 +35,7 @@ A link is an edit of the page it leaves (`from_id`) and of no page it points at.
 wikilink is derived from the body and the body change already advanced its page (a wikilink's note is still an edit
 of the page that leaves it). A symmetric kind's mirror row is its own insert, delete or note update, so a
 friendship still advances both pages, which is right: it is on both. An incoming link never advances a page.
-`lifelog_meta.edit_revisions` and the `links` comment state the rule; this reverses the earlier rule that incident
+`aminte_meta.edit_revisions` and the `links` comment state the rule; this reverses the earlier rule that incident
 link changes advance both endpoints, on purpose.
 
 Tests: `TestIncomingLinkDoesNotInvalidateAnOpenEdit` (writer: a capture, a body save and a manual link into a page,

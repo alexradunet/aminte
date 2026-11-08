@@ -20,7 +20,7 @@ of the design drafts showed. Each item below is a fact of the code at `9713306`.
 
 ## Reproduce
 
-1. Build `lifelog` at `9713306` and serve a synthetic database.
+1. Build `aminte` at `9713306` and serve a synthetic database.
 2. On a day, press Ctrl K and type the start of a page's title.
 3. From the same day, make a new task.
 

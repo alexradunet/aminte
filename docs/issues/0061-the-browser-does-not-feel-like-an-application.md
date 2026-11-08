@@ -21,9 +21,9 @@ points stop the browser from feeling like an application. Each one is a fact of 
 
 ## Reproduce
 
-1. Build `lifelog` at `44b661b`; `lifelog init` on a fresh file; capture text on three days, create two tasks and
+1. Build `aminte` at `44b661b`; `aminte init` on a fresh file; capture text on three days, create two tasks and
    record a reading.
-2. `lifelog serve`; open `/days/today` at 1280 px. Then go to People, then to Calendar.
+2. `aminte serve`; open `/days/today` at 1280 px. Then go to People, then to Calendar.
 3. Open `/days/today` at 390 px and count the screens to the habits.
 
 ## Rules involved
@@ -36,7 +36,7 @@ points stop the browser from feeling like an application. Each one is a fact of 
 ## Resolution
 
 Resolved by [plan 092](../plans/092-the-app-shell.md), in three commits. The owner chose the Almanac direction of a
-design system built on the Siren entity (the artifact Lifelog Almanac). Every page is now in one shell: a sidebar with
+design system built on the Siren entity (the artifact Aminte Almanac). Every page is now in one shell: a sidebar with
 every section, today's date, the Due count and this month, which becomes a bar over the page on a phone. Each part of
 an entity has one component, and the day is drawn in two columns. The look is light first and dark by the system
 setting, with two embedded open fonts; a test holds the contrast of every named pair of colours.

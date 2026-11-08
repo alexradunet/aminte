@@ -7,8 +7,8 @@ import (
 	"slices"
 	"time"
 
-	"lifelog-web/view"
-	"lifelog/siren"
+	"aminte-web/view"
+	"aminte/siren"
 )
 
 // cardsPerColumn is how many of the newest addresses of today's conversation the chat column draws as cards. The column

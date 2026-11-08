@@ -71,7 +71,7 @@ flowchart LR
 | this month, this year | `/months/current`, `/years/current` | the links of the root and the shell |
 | a metric's whole history | no `from`, or `all_history=1` | no `from` |
 | the old lists | `/people`, `/places`, `/media`, `/files`, `/ghosts`, `/categories` answer 308 | 404 |
-| the folder of a snapshot | `serve --snapshots`, `snapshot --to` | `--snapshots` for both; `deploy/lifelog-snapshot` changes with it |
+| the folder of a snapshot | `serve --snapshots`, `snapshot --to` | `--snapshots` for both; `deploy/aminte-snapshot` changes with it |
 | the writer of MCP | `mcp --agent`, and a `--source` that it overrode in silence | `mcp --agent`; `--source` on `mcp` is refused |
 | put several things in a category on Metrics | Select, and New category | Select |
 
@@ -98,13 +98,13 @@ flowchart LR
 - A browser can run every catalog action from `/actions`, and a test holds it (no form posts to a `{`).
 - `README.md`, `API.md` and the counts of `tests/README.md` say what is true.
 - The report names every change that a deploy needs: the snapshot script at its install path, and the MCP configs
-  that `lifelog agentic-init` wrote.
+  that `aminte agentic-init` wrote.
 
 ## Before the deploy
 
-- `deploy/lifelog-snapshot` calls `lifelog snapshot --snapshots DIR`. Copy it to its install path in the same step as
+- `deploy/aminte-snapshot` calls `aminte snapshot --snapshots DIR`. Copy it to its install path in the same step as
   the binary, or the nightly snapshot fails.
-- A config written by `lifelog agentic-init` does not change (`mcp --agent NAME` stays).
+- A config written by `aminte agentic-init` does not change (`mcp --agent NAME` stays).
 
 ## The result (2026-10-18)
 
@@ -115,7 +115,7 @@ what was done and why:
   could put words in it. The server no longer moves a receipt (the root draws the day of today for a browser, and a
   metric's page is a page), so `move` and its redirect are gone.
 - **`mcp --agent` stays**, and `mcp` refuses `--source`, which it used to override in silence. The MCP configs that
-  `lifelog agentic-init` wrote keep working.
+  `aminte agentic-init` wrote keep working.
 - **`link` does not offer `part-of`**, but the catalog's `link` still takes it when a client names it, as the schema
   allows the link. Only the offer changed.
 - **A day's reading tile** is the metric and its last value of the day, with no unit and no line: both came from

@@ -1,6 +1,6 @@
 # Exact calendar days and UTC instants
 
-The storage rules are the named date/instant CHECKs and `lifelog_meta.days` / `.instants` in
+The storage rules are the named date/instant CHECKs and `aminte_meta.days` / `.instants` in
 [the schema](../schema/schema.sql); [D10](../decisions/D10-time-model.md) explains why. These boundary vectors
 are shared by writers and storage validation (executed). They are exact values, not partial or uncertain dates.
 

@@ -19,7 +19,7 @@ the two open questions:
 
 | question | decision |
 |---|---|
-| where speech becomes text | an endpoint of the OpenAI audio-transcriptions protocol that `lifelog` calls, named by the environment, as the chat model is; not the phone's keyboard, not a whisper binary beside `lifelog` |
+| where speech becomes text | an endpoint of the OpenAI audio-transcriptions protocol that `aminte` calls, named by the environment, as the chat model is; not the phone's keyboard, not a whisper binary beside `aminte` |
 | a look at the words before they are written | no: the words go straight onto the day page, in one request; a wrong word is fixed in the editor like any entry |
 
 Earlier the same day the owner confirmed that originals stay outside `life.db` and that a picture a day is the
@@ -31,9 +31,9 @@ preview of D9. A voice note follows: its words are kept, its bytes are not.
 flowchart LR
   B["browser capture box: text, mood, a voice note"] -->|"multipart"| A["POST /days/{day}/capture"]
   P["phone share sheet: a voice memo"] -->|"multipart, the manifest's share target"| A
-  C["lifelog capture --audio FILE"] -->|"multipart"| A
+  C["aminte capture --audio FILE"] -->|"multipart"| A
   M["MCP tool capture: text, mood"] -->|"form"| A
-  A -->|"audio part, held whole, at most 25 MiB"| T["transcriber: LIFELOG_TRANSCRIBE_URL /audio/transcriptions"]
+  A -->|"audio part, held whole, at most 25 MiB"| T["transcriber: AMINTE_TRANSCRIBE_URL /audio/transcriptions"]
   T -->|"words"| A
   A -->|"text, then the words after a blank line"| D["one entry on the day page; no files row"]
 ```
@@ -42,8 +42,8 @@ flowchart LR
   `file` field with `accept: audio/*`, an extension of the catalog's field shape a browser draws as the file input's
   `accept`, so a phone offers its recorder. The MCP tool `capture` is unchanged: a file field is sent by the CLI or a
   browser, the one difference the MCP surface already has for `add-file`.
-- **The transcriber is a process environment, as the chat model is.** `LIFELOG_TRANSCRIBE_URL` (a base URL ending
-  in `/v1`), `LIFELOG_TRANSCRIBE_MODEL` and optional `LIFELOG_TRANSCRIBE_KEY` name an endpoint of the OpenAI
+- **The transcriber is a process environment, as the chat model is.** `AMINTE_TRANSCRIBE_URL` (a base URL ending
+  in `/v1`), `AMINTE_TRANSCRIBE_MODEL` and optional `AMINTE_TRANSCRIBE_KEY` name an endpoint of the OpenAI
   audio-transcriptions protocol (`internal/speech`). Without them a capture with a note answers 503 `no_transcriber`
   and a capture without one is unchanged. A failure of the endpoint is 502 `transcriber`; a note with no words is
   422; a note over 25 MiB is 413, refused before the endpoint sees it. A refused capture writes nothing, the text
@@ -55,7 +55,7 @@ flowchart LR
   with the text. The manifest's share target becomes multipart too, with `files: [{name: audio, accept: [audio/*]}]`,
   so a phone's share sheet sends a voice memo straight into Capture; shared text still arrives as before.
 - **Rejected.** Dictation in the browser (the Web Speech API sends the speech to the browser's vendor, and the pages
-  fetch nothing from another host); a whisper binary `lifelog` runs as a subprocess (a second binary to install and
+  fetch nothing from another host); a whisper binary `aminte` runs as a subprocess (a second binary to install and
   keep working on Linux and Windows); a `transcribe` action that returns the words for a look first (a second round
   trip and a script, and the share-sheet path would still write directly).
 
@@ -67,8 +67,8 @@ flowchart LR
 | the `audio` field, `Field.Accept` | `internal/api/siren.go`, `internal/api/html/layout.html`, `API.md` |
 | `Transcriber`, `NoTranscriber`, the multipart reader, the entry | `internal/api/voice.go`, `internal/api/days.go`, `internal/api/serve.go` (`NewWith`) |
 | the share target | `internal/api/html/manifest.webmanifest` |
-| `lifelog capture --audio` | `cmd/lifelog/main.go` |
-| the tests | `internal/speech/speech_test.go`, `internal/api/voice_test.go`, `internal/api/shell_test.go`, `internal/client/tools_test.go`, `cmd/lifelog/main_test.go` |
+| `aminte capture --audio` | `cmd/aminte/main.go` |
+| the tests | `internal/speech/speech_test.go`, `internal/api/voice_test.go`, `internal/api/shell_test.go`, `internal/client/tools_test.go`, `cmd/aminte/main_test.go` |
 | the docs | `README.md`, `API.md` |
 
 ## Done when

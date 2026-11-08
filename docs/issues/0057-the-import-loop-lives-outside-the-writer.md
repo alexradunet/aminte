@@ -42,7 +42,7 @@ report folder holds the name, and the note is refused whole.
 ## Resolution
 
 Resolved by [plan 088](../plans/088-the-writer-runs-the-facts-pass.md) (RFC [0010](../rfcs/0010-the-writer-drives-a-local-model.md),
-option A): `lifelog import run` follows *status* and does each step that needs no judgement, asks a model on this
+option A): `aminte import run` follows *status* and does each step that needs no judgement, asks a model on this
 machine for the facts of one file at a time, and writes, checks and applies through the catalog. Its progress holds
 counts and paths; names and quotes stay in the workspace. A held name stays held and is proposed; a `kept_as_text`
 quote that is not in the file is dropped before the write. A model host that is not this machine is refused.

@@ -127,6 +127,6 @@ func imports(s *S) {
 	vac := ro.tryx("VACUUM INTO ?", filepath.ToSlash(cp))
 	cc := s.connect(cp)
 	s.K("contract/imports step 1: a read-only connection makes the copy (VACUUM INTO)",
-		vac == "OK" && cc.n("select count(*) from lifelog_meta") == ro.n("select count(*) from lifelog_meta") && cc.n("select count(*) from lifelog_meta") > 0, vac)
+		vac == "OK" && cc.n("select count(*) from aminte_meta") == ro.n("select count(*) from aminte_meta") && cc.n("select count(*) from aminte_meta") > 0, vac)
 	s.K("contract/imports step 1: the documented command opens the file read-only, with trusted_schema=OFF", strings.Contains(s.d.Page("contract/imports.md"), `sqlite3 -readonly -cmd "PRAGMA trusted_schema=OFF" life.db "VACUUM INTO`))
 }

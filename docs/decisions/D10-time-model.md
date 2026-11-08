@@ -2,7 +2,7 @@
 
 **Status:** accepted
 
-- **Decision.** The rules are `lifelog_meta.instants` and `lifelog_meta.days`, and the round-trip CHECK on every
+- **Decision.** The rules are `aminte_meta.instants` and `aminte_meta.days`, and the round-trip CHECK on every
   `*_at` and `*_day` column, with shared [exact-time boundary vectors](../contract/exact-time.md).
   `entities_provenance_fixed` protects initial recording time alongside import provenance: editing current content
   must not rewrite when the identity first entered the file.
@@ -26,7 +26,7 @@
   SQLite TEXT `length` and `GLOB` otherwise ignore its suffix (executed). Readers convert with a tz database, which keeps
   renamed zones (`Europe/Kiev` → `Europe/Kyiv`) as links. The standard way to write an instant with
   its zone is RFC 9557 [R69](../research/references.md#r69): `2026-06-09T21:14:03.482Z[Europe/Berlin]` — exactly `*_at` plus `tz`.
-  Provenance (`source`, `lifelog_meta.source`) is a column for the same reason as the zone: only the moment of writing
+  Provenance (`source`, `aminte_meta.source`) is a column for the same reason as the zone: only the moment of writing
   knows it, and with agents among the writers ([D3](D03-integer-ids.md)) it identifies the original inserting writer.
   It does not identify later editors of mutable content ([D12](D12-no-revision-tables.md)).
 - **Alternatives.**

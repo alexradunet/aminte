@@ -6,8 +6,8 @@ import (
 	"net/url"
 	"strings"
 
-	"lifelog/internal/core"
-	"lifelog/siren"
+	"aminte/internal/core"
+	"aminte/siren"
 )
 
 // Browse (docs/plans/117-one-browse-view.md): one list with two filters, the kind of the rows and where they are

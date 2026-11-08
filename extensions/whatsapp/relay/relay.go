@@ -11,9 +11,9 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"lifelog/app"
-	"lifelog/client"
-	"lifelog/siren"
+	"aminte/app"
+	"aminte/client"
+	"aminte/siren"
 )
 
 const (
@@ -82,7 +82,7 @@ func (r *Relay) Run(ctx context.Context) error {
 }
 
 // readCatalog finds the action say. Any other answer than a catalog with say is an error. A catalog with no say is an
-// error that the owner acts on (app.OwnerActs): the server is too old, or it is not a lifelog server, and a restart of
+// error that the owner acts on (app.OwnerActs): the server is too old, or it is not an aminte server, and a restart of
 // the relay does not help.
 func (r *Relay) readCatalog(ctx context.Context) error {
 	list, err := r.API.Catalog(ctx)
@@ -122,7 +122,7 @@ func (r *Relay) sayToPage(ctx context.Context, m Message) {
 	}
 	if err != nil {
 		r.logger.Printf("say: %v", err)
-		r.send(ctx, "I could not write your message to lifelog: "+firstLine(err.Error())+". Say it again.")
+		r.send(ctx, "I could not write your message to aminte: "+firstLine(err.Error())+". Say it again.")
 		return
 	}
 	if m.At.After(r.st.Said) {
@@ -238,10 +238,10 @@ func (r *Relay) forward(ctx context.Context, p *page) error {
 // forwarded is the text that the chat gets for a turn, and "" when it gets none.
 func forwarded(t turn) string {
 	switch {
-	case t.who == "lifelog":
+	case t.who == "aminte":
 		return t.text
 	case t.who == "owner" && t.via != Via:
-		return "You wrote in lifelog: " + t.text
+		return "You wrote in aminte: " + t.text
 	}
 	return ""
 }

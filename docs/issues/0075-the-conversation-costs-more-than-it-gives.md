@@ -34,7 +34,7 @@ recording the owner wants to keep is a file with its text ([D9](../decisions/D09
 
 ## Rules involved
 
-[RFC 0012](../rfcs/0012-a-conversation-with-lifelog.md) (the conversation), plan 109 (the voice note). No decision
+[RFC 0012](../rfcs/0012-a-conversation-with-aminte.md) (the conversation), plan 109 (the voice note). No decision
 of the schema: the conversation is pages filed by `part-of`, and the recording was never stored.
 
 ## Resolution

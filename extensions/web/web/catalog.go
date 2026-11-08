@@ -8,12 +8,12 @@ import (
 	"slices"
 	"strings"
 
-	"lifelog/app"
-	"lifelog/siren"
+	"aminte/app"
+	"aminte/siren"
 )
 
-// The catalog of this program (extensions/README.md, "A catalog of its own"). `lifelog serve --with web` gives the
-// program an address in LIFELOG_LISTEN, and the core merges this catalog into its own as /with/web: the action
+// The catalog of this program (extensions/README.md, "A catalog of its own"). `aminte serve --with web` gives the
+// program an address in AMINTE_LISTEN, and the core merges this catalog into its own as /with/web: the action
 // settings is web-settings there. The core holds the owner rule (owner: true), so an agent or an import never sets the
 // PIN, and the program does not check the writer.
 
@@ -26,7 +26,7 @@ var settingsAction = siren.Action{
 		"pin is the 4 to 8 digits that open a locked browser. " +
 		"A field that is left out stays as it is. An empty field clears that setting, but an empty pin keeps the stored PIN. " +
 		"lock_after other than off with no stored PIN and no new one is refused. " +
-		"The settings are in a file of lifelog-web. The file holds a salted hash of the PIN and never the PIN.",
+		"The settings are in a file of aminte-web. The file holds a salted hash of the PIN and never the PIN.",
 	Fields: []siren.Field{
 		{Name: "ground", Type: "text", Title: "Ground", Options: grounds},
 		{Name: "lock_after", Type: "text", Title: "Lock after idle minutes", Options: lockAfters},
@@ -37,7 +37,7 @@ var settingsAction = siren.Action{
 // maxSettingsBody is the largest body of the settings action. Its three fields are short.
 const maxSettingsBody = 4096
 
-// Catalog is the handler of the catalog of this program. Serve it on LIFELOG_LISTEN with lifelog/app.
+// Catalog is the handler of the catalog of this program. Serve it on AMINTE_LISTEN with aminte/app.
 func (b *Browser) Catalog() http.Handler {
 	return app.Catalog("This browser", b.home, []siren.Action{settingsAction},
 		map[string]func(*http.Request) (*siren.Entity, error){"settings": b.saveSettings})

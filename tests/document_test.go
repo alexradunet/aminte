@@ -13,14 +13,14 @@ import (
 )
 
 // document: the docs themselves — presence of the threat model's 2075 reading summaries in a fresh database
-// (each table's inside its CREATE statement, the cross-table ones in a few lifelog_meta rows, which name only what
+// (each table's inside its CREATE statement, the cross-table ones in a few aminte_meta rows, which name only what
 // the file has); the tree holds together (every decision D1..Dn in its own record, every relative link resolves,
 // every page is reachable from docs/README.md); the totals in schema/README.md match.
 func document(s *S) {
 	// ---- the 2075 test
 	c := s.fresh()
 	meta := map[string]string{}
-	for _, r := range c.rows("select key, value from lifelog_meta") {
+	for _, r := range c.rows("select key, value from aminte_meta") {
 		meta[val(r[0])] = val(r[1])
 	}
 	schema := map[string]string{}
@@ -55,7 +55,7 @@ func document(s *S) {
 			text.WriteString(meta[p] + " " + schema[p] + " ")
 			used[p] = true
 		}
-		s.K("Q"+r[1]+": every place named is a lifelog_meta key or a schema object", len(places) > 0 && len(missing) == 0, missing)
+		s.K("Q"+r[1]+": every place named is a aminte_meta key or a schema object", len(places) > 0 && len(missing) == 0, missing)
 		lower := strings.ToLower(text.String())
 		for _, p := range phrases {
 			if !strings.Contains(lower, p) {
@@ -70,9 +70,9 @@ func document(s *S) {
 			unused = append(unused, k)
 		}
 	}
-	s.K("every lifelog_meta key answers some question (no rule without a question)", len(unused) == 0, slices.Sorted(slices.Values(unused)))
+	s.K("every aminte_meta key answers some question (no rule without a question)", len(unused) == 0, slices.Sorted(slices.Values(unused)))
 	// A row names only what the file has (issue 0082): a word with an underscore is a column, a schema object or a
-	// lifelog_meta key of this file, or a pragma, which some row writes as PRAGMA x or x=VALUE.
+	// aminte_meta key of this file, or a pragma, which some row writes as PRAGMA x or x=VALUE.
 	known := map[string]bool{}
 	for k := range meta {
 		known[k] = true
@@ -101,7 +101,7 @@ func document(s *S) {
 			}
 		}
 	}
-	s.K("every name with an underscore in a lifelog_meta row is a column, a schema object, a key or a pragma of this file", len(stale) == 0, slices.Sorted(slices.Values(stale)))
+	s.K("every name with an underscore in a aminte_meta row is a column, a schema object, a key or a pragma of this file", len(stale) == 0, slices.Sorted(slices.Values(stale)))
 	// A stored CREATE text names only the link kinds of the file (issue 0082): a word of the shape x-of or x-in, the
 	// shape of part-of, is a registered kind.
 	kinds := map[string]bool{}
@@ -121,11 +121,11 @@ func document(s *S) {
 	s.K("import-a-row-once sends an imported body through the save contract (D19)", strings.Contains(s.d.Page("cookbook/import-a-row-once.md"), "run the link sync of [save a body](save-a-body.md)"))
 
 	// ---- the rules live in the file, once
-	s.K("lifelog_meta holds only the few cross-table rules (at most 12 keys)", len(meta) <= 12, slices.Sorted(maps.Keys(meta)))
+	s.K("aminte_meta holds only the few cross-table rules (at most 12 keys)", len(meta) <= 12, slices.Sorted(maps.Keys(meta)))
 	head := ddlHeader(s.ddl)
-	s.K("the DDL header before the first statement is a short pointer (<= 12 lines) naming lifelog_meta", strings.Count(head, "\n") <= 12 && strings.Contains(head, "lifelog_meta"))
+	s.K("the DDL header before the first statement is a short pointer (<= 12 lines) naming aminte_meta", strings.Count(head, "\n") <= 12 && strings.Contains(head, "aminte_meta"))
 	inner := regexp.MustCompile(`\n\s*--`)
-	for _, t := range []string{"entities", "entity_names", "people", "metrics", "measurements", "link_kinds", "links", "lifelog_meta"} {
+	for _, t := range []string{"entities", "entity_names", "people", "metrics", "measurements", "link_kinds", "links", "aminte_meta"} {
 		s.K(t+": its CREATE statement carries its rules as comments", inner.MatchString(schema[t]))
 	}
 	count := func(k string) int64 {

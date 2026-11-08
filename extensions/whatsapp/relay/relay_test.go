@@ -13,9 +13,9 @@ import (
 	"testing"
 	"time"
 
-	"lifelog/app"
-	"lifelog/client"
-	"lifelog/siren"
+	"aminte/app"
+	"aminte/client"
+	"aminte/siren"
 )
 
 // stateSeen reads the turns that the state file holds for each day: the number of turns that the relay has dealt with.
@@ -91,7 +91,7 @@ func TestATurnOfTheOwnerFromAnotherSurfaceGoesToTheChatMarked(t *testing.T) {
 	r.settle(t) // the first look: no page yet
 	r.api.ownerSaysElsewhere(today, "what did I do?")
 	r.poll(t)
-	if got := r.chat.next(t); got != "You wrote in lifelog: what did I do?" {
+	if got := r.chat.next(t); got != "You wrote in aminte: what did I do?" {
 		t.Errorf("sent %q", got)
 	}
 	r.api.agentReplies(today, "You walked.")
@@ -114,7 +114,7 @@ func TestAReplyPlacedBeforeANewerTurnOfTheOwnerReachesTheChat(t *testing.T) {
 	r.chat.say(t, "second")
 	r.api.waitBody(t, today, func(b string) bool { return strings.Contains(b, "second") })
 	r.settle(t) // the relay has dealt with the second turn
-	r.api.edit(today, "[[2031-05-20]]\n\n**Owner** (09:30, via whatsapp): first\n\n**lifelog** (09:31): reply to first\n\n**Owner** (09:30, via whatsapp): second")
+	r.api.edit(today, "[[2031-05-20]]\n\n**Owner** (09:30, via whatsapp): first\n\n**aminte** (09:31): reply to first\n\n**Owner** (09:30, via whatsapp): second")
 	r.poll(t)
 	if got := r.chat.next(t); got != "reply to first" {
 		t.Errorf("sent %q, want the reply that came before the newer turn", got)
@@ -138,10 +138,10 @@ func TestATurnOfAnotherSurfaceAndTheReplyBeforeItAreEachSentOnce(t *testing.T) {
 	r.settle(t)
 	r.api.ownerSaysElsewhere(today, "from the browser")
 	r.poll(t)
-	if got := r.chat.next(t); got != "You wrote in lifelog: from the browser" {
+	if got := r.chat.next(t); got != "You wrote in aminte: from the browser" {
 		t.Errorf("sent %q", got)
 	}
-	r.api.edit(today, "[[2031-05-20]]\n\n**Owner** (09:30, via whatsapp): first\n\n**lifelog** (09:31): reply to first\n\n**Owner** (09:30): from the browser")
+	r.api.edit(today, "[[2031-05-20]]\n\n**Owner** (09:30, via whatsapp): first\n\n**aminte** (09:31): reply to first\n\n**Owner** (09:30): from the browser")
 	r.poll(t)
 	if got := r.chat.next(t); got != "reply to first" {
 		t.Errorf("sent %q", got)
@@ -181,7 +181,7 @@ func TestAParagraphAddedAboveATurnIsPartOfTheTurnBeforeItAndThatTurnIsSentAgain(
 	r.api.agentReplies(today, "answer one")
 	r.api.ownerSaysElsewhere(today, "two")
 	r.poll(t)
-	for _, want := range []string{"You wrote in lifelog: one", "answer one", "You wrote in lifelog: two"} {
+	for _, want := range []string{"You wrote in aminte: one", "answer one", "You wrote in aminte: two"} {
 		if got := r.chat.next(t); got != want {
 			t.Errorf("sent %q, want %q", got, want)
 		}
@@ -212,7 +212,7 @@ func TestADeletedPageThatIsRevivedSendsNoEarlierTurnAgain(t *testing.T) {
 	r.api.edit(today, body)
 	r.api.ownerSaysElsewhere(today, "back again")
 	r.poll(t)
-	if got := r.chat.next(t); got != "You wrote in lifelog: back again" {
+	if got := r.chat.next(t); got != "You wrote in aminte: back again" {
 		t.Errorf("sent %q", got)
 	}
 	r.settle(t)
@@ -306,7 +306,7 @@ func TestAReplyAfterMidnightOnTheOldPageIsSentAndTheOldDayIsDropped(t *testing.T
 	}
 	api.ownerSaysElsewhere("2031-05-21", "good morning")
 	r.poll(t)
-	if got := r.chat.next(t); got != "You wrote in lifelog: good morning" {
+	if got := r.chat.next(t); got != "You wrote in aminte: good morning" {
 		t.Errorf("sent %q", got)
 	}
 	r.chat.none(t)
@@ -348,7 +348,7 @@ func TestAnEditOfTheWordsOfATurnGivesItANewKeyAndSendsItAgain(t *testing.T) {
 	api.ownerSaysElsewhere(today, "one")
 	api.agentReplies(today, "Teh answer.")
 	r.poll(t)
-	if got := r.chat.next(t); got != "You wrote in lifelog: one" {
+	if got := r.chat.next(t); got != "You wrote in aminte: one" {
 		t.Errorf("sent %q", got)
 	}
 	if got := r.chat.next(t); got != "Teh answer." {
@@ -387,7 +387,7 @@ func TestAnEditThatTakesTurnsAwayDoesNotHideTheNextTurnOfTheSameWords(t *testing
 	api.ownerSaysElsewhere(today, "two")
 	api.agentReplies(today, "Noted.")
 	r.poll(t)
-	if got := r.chat.next(t); got != "You wrote in lifelog: two" {
+	if got := r.chat.next(t); got != "You wrote in aminte: two" {
 		t.Errorf("sent %q", got)
 	}
 	if got := r.chat.next(t); got != "Noted." {
@@ -418,7 +418,7 @@ func TestAPageWithNoTurnsKeepsTheStateOfItsDay(t *testing.T) {
 func TestAnAnswerWithATurnThatHasNoKeyIsAnErrorAndAnAnswerWithKeysHasTheKeysOfItsTurns(t *testing.T) {
 	good := &siren.Entity{Properties: map[string]any{"day": today, "turns": []any{
 		map[string]any{"who": "owner", "key": "0123456789abcdef", "at": "09:30", "text": "hi"},
-		map[string]any{"who": "lifelog", "key": "fedcba9876543210", "at": "09:31", "text": "hello"},
+		map[string]any{"who": "aminte", "key": "fedcba9876543210", "at": "09:31", "text": "hello"},
 	}}}
 	p, err := pageFrom(good)
 	if err != nil || !slices.Equal(p.keys(), []string{"0123456789abcdef", "fedcba9876543210"}) || p.pending() {
@@ -462,7 +462,7 @@ func TestASayThatTheAPIRefusesTellsTheOwnerWithTheFirstLineOfTheReason(t *testin
 	r := startWith(t, api)
 	r.chat.say(t, "hello")
 	got := r.chat.next(t)
-	if !strings.HasPrefix(got, "I could not write your message to lifelog: ") || !strings.HasSuffix(got, ". Say it again.") || strings.Contains(got, "second line") {
+	if !strings.HasPrefix(got, "I could not write your message to aminte: ") || !strings.HasSuffix(got, ". Say it again.") || strings.Contains(got, "second line") {
 		t.Errorf("sent %q", got)
 	}
 	if _, ok, err := LastSaid(r.state); ok || err != nil {

@@ -4,7 +4,7 @@
 
 - **Context.** The incident or question that forced the decision ([an issue](../issues/README.md) or
   [a proposal](../rfcs/README.md)), and what was true then.
-- **Decision.** What the schema does, citing the constraints, triggers or `lifelog_meta` keys that carry it in
+- **Decision.** What the schema does, citing the constraints, triggers or `aminte_meta` keys that carry it in
   [schema.sql](../schema/schema.sql). The rule itself lives there or in the [storage contract](../contract/README.md);
   this record says *why*.
 - **Alternatives.** What else was considered, and why each was rejected.

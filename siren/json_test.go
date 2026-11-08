@@ -5,7 +5,7 @@ import (
 	"math"
 	"testing"
 
-	"lifelog/siren"
+	"aminte/siren"
 )
 
 // TestWriteJSONKeepsWhatABodySays: the one JSON writer of the API, the CLI and the MCP server. < > & stay as they

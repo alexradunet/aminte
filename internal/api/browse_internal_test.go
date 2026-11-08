@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"lifelog/internal/core"
+	"aminte/internal/core"
 )
 
 // fileKind is the part of a type before the '/'. A row that is not a file has no type and no kind. files_mime refuses

@@ -211,7 +211,7 @@ func seedIsAtomic(s *S) {
 
 var conflictShortcut = regexp.MustCompile(`(?i)\bOR\s+(IGNORE|REPLACE)\b`)
 
-// lifelog_meta.writers forbids OR IGNORE (it skips CHECK and NOT NULL violations silently) and OR REPLACE (a delete);
+// aminte_meta.writers forbids OR IGNORE (it skips CHECK and NOT NULL violations silently) and OR REPLACE (a delete);
 // the file's own triggers follow it.
 func triggersAvoidConflictShortcuts(s *S) {
 	triggers, offenders := 0, []string{}

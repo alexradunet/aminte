@@ -8,7 +8,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"lifelog/siren"
+	"aminte/siren"
 )
 
 // Action is the entity's action of that name as this page draws it, nil when it is not offered.

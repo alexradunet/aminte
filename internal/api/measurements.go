@@ -11,8 +11,8 @@ import (
 	"slices"
 	"strings"
 
-	"lifelog/internal/core"
-	"lifelog/siren"
+	"aminte/internal/core"
+	"aminte/siren"
 )
 
 // recordAction offers every live metric of ms by name, and the metric the view is of (and, when given, selects it).

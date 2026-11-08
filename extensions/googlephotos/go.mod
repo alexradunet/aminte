@@ -1,7 +1,7 @@
-module lifelog-googlephotos
+module aminte-googlephotos
 
 go 1.27.2
 
-require lifelog v0.0.0
+require aminte v0.0.0
 
-replace lifelog => ../..
+replace aminte => ../..

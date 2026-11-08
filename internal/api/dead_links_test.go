@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"lifelog/internal/api/apitest"
+	"aminte/internal/api/apitest"
 )
 
 // TestHomeAndADayLinkOnlyToServedPaths: every link and every sub-entity of Home, of the catalog and of a day leads to

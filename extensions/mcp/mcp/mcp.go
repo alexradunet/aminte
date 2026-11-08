@@ -1,5 +1,5 @@
 // Package mcp serves the API's action catalog as MCP tools over stdio: one narrow tool per action (small local
-// models do better with fixed tools than with free browsing), plus get to follow links. Every call goes through the lifelog API, and every result is the resource's Siren
+// models do better with fixed tools than with free browsing), plus get to follow links. Every call goes through the aminte API, and every result is the resource's Siren
 // entity, links and actions included.
 package mcp
 
@@ -11,9 +11,9 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"lifelog/client"
-	"lifelog/client/tools"
-	"lifelog/siren"
+	"aminte/client"
+	"aminte/client/tools"
+	"aminte/siren"
 )
 
 // Serve runs the MCP server on in and out, the stdin and the stdout of the process, until the client goes away. It
@@ -46,7 +46,7 @@ func New(ctx context.Context, c *client.Client, version string) (*mcp.Server, er
 	if err != nil {
 		return nil, err
 	}
-	s := mcp.NewServer(&mcp.Implementation{Name: "lifelog", Version: version}, &mcp.ServerOptions{
+	s := mcp.NewServer(&mcp.Implementation{Name: "aminte", Version: version}, &mcp.ServerOptions{
 		Instructions: instructions,
 	})
 	for _, t := range list {

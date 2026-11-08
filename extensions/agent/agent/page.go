@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"lifelog/siren"
+	"aminte/siren"
 )
 
 // page is the conversation of a day as the agent read it: the answer of GET /days/{day}/conversation. The page of the
@@ -17,7 +17,7 @@ type page struct {
 	turns   []turn
 }
 
-// turn is one turn of the page, as the API parsed it: who is owner, lifelog or text. The key names the turn for the
+// turn is one turn of the page, as the API parsed it: who is owner, aminte or text. The key names the turn for the
 // action reply. The API makes it from what the turn is, not from its place, so it does not move when a reply is written,
 // when the owner says a new turn or when an earlier turn is removed. It changes when the owner edits the turn.
 type turn struct{ who, key, text string }

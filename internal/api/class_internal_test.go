@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"lifelog/siren"
+	"aminte/siren"
 )
 
 // TestEveryActionClassIsInTheContract: the first column of the table of API.md (Action classes) and siren.ActionClasses

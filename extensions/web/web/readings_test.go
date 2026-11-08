@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"lifelog-web/internal/formdoc"
+	"aminte-web/internal/formdoc"
 )
 
 // recordFormSends returns what a browser sends with the record form of the page body, when the owner changes nothing.

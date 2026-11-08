@@ -10,7 +10,7 @@ import (
 	"modernc.org/sqlite"
 	sqlite3 "modernc.org/sqlite/lib"
 
-	"lifelog/text"
+	"aminte/text"
 )
 
 // IntegrityResult is the check groups of docs/contract/integrity-checks.md; OK when all checks of the data pass.

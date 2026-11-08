@@ -7,7 +7,7 @@ import (
 	"regexp"
 	"strings"
 
-	"lifelog/text"
+	"aminte/text"
 )
 
 // insertPage makes the page of a write that the caller chose to make: it refuses a conversation title (reservedTitle)

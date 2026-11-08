@@ -1,4 +1,4 @@
-// Package app is what a Go extension program is built with. A connected app is an extension that `lifelog serve --with
+// Package app is what a Go extension program is built with. A connected app is an extension that `aminte serve --with
 // NAME` runs and that serves its own Siren catalog on a loopback address; the server merges the actions into its own.
 // Catalog, Listen, Fail, Entity and Error serve that catalog, and never dial. Main, API, OwnerActs and ExitCode are the
 // shell that every extension program has: the signal, the last line, the exit status and the client of the API
@@ -15,7 +15,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"lifelog/siren"
+	"aminte/siren"
 )
 
 // ExitOwnerActs is the exit status of a connected app that cannot go on until the owner acts (for example, pairs a
@@ -24,19 +24,19 @@ import (
 const ExitOwnerActs = 78
 
 const (
-	listenEnv      = "LIFELOG_LISTEN"
+	listenEnv      = "AMINTE_LISTEN"
 	headerTimeout  = 10 * time.Second
 	shutdownDrain  = 10 * time.Second
 	sirenMediaType = "application/vnd.siren+json"
 )
 
-// Listen serves h on the loopback address that `serve` gives in LIFELOG_LISTEN, until ctx ends. Then it drains the
+// Listen serves h on the loopback address that `serve` gives in AMINTE_LISTEN, until ctx ends. Then it drains the
 // requests in progress for 10 seconds at most. It returns nil on a clean end. It refuses an address that is not a
 // loopback address: a connected app is reachable by the server alone (extensions/README.md).
 func Listen(ctx context.Context, h http.Handler) error {
 	addr := os.Getenv(listenEnv)
 	if addr == "" {
-		return fmt.Errorf("%s is not set: run this program under `lifelog serve --with <name>`", listenEnv)
+		return fmt.Errorf("%s is not set: run this program under `aminte serve --with <name>`", listenEnv)
 	}
 	host, _, err := net.SplitHostPort(addr)
 	if err != nil {
@@ -64,7 +64,7 @@ func Listen(ctx context.Context, h http.Handler) error {
 	return nil
 }
 
-// serverAlone lets in the calls of the server alone. The server calls the app on the address of LIFELOG_LISTEN, so the
+// serverAlone lets in the calls of the server alone. The server calls the app on the address of AMINTE_LISTEN, so the
 // Host of its request is that address. Any other Host is a request that is not the server's: for example a page whose
 // DNS name points at the loopback. A write of a browser from another site is refused too. The owner rule of an action
 // (owner: true) is held by the server, so a request that goes around the server must not reach the action.
@@ -76,7 +76,7 @@ func serverAlone(addr string, h http.Handler) http.Handler {
 	inner := guard.Handler(h)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Host != addr {
-			Fail(w, http.StatusForbidden, siren.CodeForbidden, "this app answers the lifelog server alone")
+			Fail(w, http.StatusForbidden, siren.CodeForbidden, "this app answers the aminte server alone")
 			return
 		}
 		inner.ServeHTTP(w, r)
@@ -192,14 +192,14 @@ func Entity(f func(*http.Request) (*siren.Entity, error)) http.HandlerFunc {
 	}
 }
 
-// StateDir is the state folder of a connected app: os.UserConfigDir()/lifelog-NAME. It creates the folder with mode
+// StateDir is the state folder of a connected app: os.UserConfigDir()/aminte-NAME. It creates the folder with mode
 // 0700 when it is missing. A unit with a read-only home lists this folder as writable (extensions/README.md).
 func StateDir(name string) (string, error) {
 	base, err := os.UserConfigDir()
 	if err != nil {
 		return "", err
 	}
-	dir := filepath.Join(base, "lifelog-"+name)
+	dir := filepath.Join(base, "aminte-"+name)
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return "", err
 	}

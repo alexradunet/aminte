@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"lifelog/internal/core"
+	"aminte/internal/core"
 )
 
 // TestIdsOf: the field ids of a bulk action. Each value is split on commas and white space, an id named twice counts

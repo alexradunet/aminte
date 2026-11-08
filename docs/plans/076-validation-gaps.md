@@ -16,7 +16,7 @@ Keep large generated databases outside git on explicitly selected scratch disk. 
 
 ### Static analysis and storage failures
 
-Reviewed development tools were installed in `/tmp/lifelog-analysis-tools`, outside application dependency files:
+Reviewed development tools were installed in `/tmp/aminte-analysis-tools`, outside application dependency files:
 Staticcheck **2026.2.1 / v0.8.1** and govulncheck **v1.8.0**, using Go **1.27.1**.
 The [Staticcheck release notes](https://staticcheck.dev/changes/2026.2/) establish Go 1.27 support;
 the [pinned release](https://github.com/dominikh/go-tools/releases/tag/2026.2.1) and
@@ -41,13 +41,13 @@ driver adapter and explicit newer-engine evolution exclusions. The appendix pres
 
 A manual Windows workflow runs generation, generated-copy verification, vet and the full baseline on `windows-2025`.
 Actions are pinned to reviewed commits with read-only repository permissions.
-The [first Windows run at 5543bc1](https://github.com/alexradunet/lifelogdb/actions/runs/37635367862)
+The [first Windows run at 5543bc1](https://github.com/alexradunet/aminte/actions/runs/37635367862)
 passed generation, vet and every package except two CLI snapshot assertions. Both compared the caller's short parent
 path (`RUNNER~1`) to the correctly resolved long path (`runneradmin`). Snapshot creation and restore succeeded;
 the tests must compare the exact dated leaf and filesystem identity, preserving all literal-name sentinels and
 symlink safety checks. No production path behavior changes.
 
-The [full Windows rerun at e44b8f5](https://github.com/alexradunet/lifelogdb/actions/runs/37644715040)
+The [full Windows rerun at e44b8f5](https://github.com/alexradunet/aminte/actions/runs/37644715040)
 passed generation, generated-copy verification, vet and every package, including **39 suites and 404 mutants**.
 The log confirms both repaired snapshot cases, all physical-destination symlink/junction cases and source-confinement
 symlink/junction cases actually ran and passed. Environment: Go **1.27.1 windows/amd64**, hosted runner image
@@ -147,14 +147,14 @@ all scratch copies were removed automatically, and its process exited zero. No g
 committed. Exact runner invocations from the repository root were:
 
 ```sh
-/tmp/lifelog-gap-lifescale -profile lifetime -seed 2075 -samples 5 -dir /var/tmp -storage 'AMD Ryzen 7 7840HS; Linux amd64; SKHynix HFS001TEJ9X115N NVMe; btrfs on encrypted /dev/mapper/root; warm writer-built fixture; concurrent repository validation' > /tmp/lifelog-gap-lifetime.json 2> /tmp/lifelog-gap-lifetime-progress.log
-/tmp/lifelog-gap-lifescale -profile small -previews -seed 2075 -samples 5 -dir /var/tmp -storage 'AMD Ryzen 7 7840HS; Linux amd64; SKHynix HFS001TEJ9X115N NVMe; btrfs on encrypted /dev/mapper/root; warm writer-built fixture; concurrent repository validation and stress fixture build' > /tmp/lifelog-gap-small-previews.json 2> /tmp/lifelog-gap-small-previews-progress.log
-/tmp/lifelog-gap-lifescale -profile stress -seed 2075 -samples 5 -dir /var/tmp -storage 'AMD Ryzen 7 7840HS; Linux amd64; SKHynix HFS001TEJ9X115N NVMe; btrfs on encrypted /dev/mapper/root; warm writer-built fixture; concurrent repository validation' > /tmp/lifelog-gap-stress.json 2> /tmp/lifelog-gap-stress-progress.log
-/tmp/lifelog-gap-lifescale -profile lifetime -previews -seed 2075 -samples 5 -dir /var/tmp -storage 'AMD Ryzen 7 7840HS; Linux amd64; SKHynix HFS001TEJ9X115N NVMe; btrfs on encrypted /dev/mapper/root; warm writer-built fixture; concurrent validation' > /tmp/lifelog-gap-lifetime-previews.json 2> /tmp/lifelog-gap-lifetime-previews-progress.log
+/tmp/aminte-gap-lifescale -profile lifetime -seed 2075 -samples 5 -dir /var/tmp -storage 'AMD Ryzen 7 7840HS; Linux amd64; SKHynix HFS001TEJ9X115N NVMe; btrfs on encrypted /dev/mapper/root; warm writer-built fixture; concurrent repository validation' > /tmp/aminte-gap-lifetime.json 2> /tmp/aminte-gap-lifetime-progress.log
+/tmp/aminte-gap-lifescale -profile small -previews -seed 2075 -samples 5 -dir /var/tmp -storage 'AMD Ryzen 7 7840HS; Linux amd64; SKHynix HFS001TEJ9X115N NVMe; btrfs on encrypted /dev/mapper/root; warm writer-built fixture; concurrent repository validation and stress fixture build' > /tmp/aminte-gap-small-previews.json 2> /tmp/aminte-gap-small-previews-progress.log
+/tmp/aminte-gap-lifescale -profile stress -seed 2075 -samples 5 -dir /var/tmp -storage 'AMD Ryzen 7 7840HS; Linux amd64; SKHynix HFS001TEJ9X115N NVMe; btrfs on encrypted /dev/mapper/root; warm writer-built fixture; concurrent repository validation' > /tmp/aminte-gap-stress.json 2> /tmp/aminte-gap-stress-progress.log
+/tmp/aminte-gap-lifescale -profile lifetime -previews -seed 2075 -samples 5 -dir /var/tmp -storage 'AMD Ryzen 7 7840HS; Linux amd64; SKHynix HFS001TEJ9X115N NVMe; btrfs on encrypted /dev/mapper/root; warm writer-built fixture; concurrent validation' > /tmp/aminte-gap-lifetime-previews.json 2> /tmp/aminte-gap-lifetime-previews-progress.log
 ```
 
 The scratch binary can be rebuilt from the recorded revision with
-`/home/alex/.local/share/mise/installs/go/1.27.1/bin/go build -o /tmp/lifelog-gap-lifescale ./tools/lifescale`.
+`/home/alex/.local/share/mise/installs/go/1.27.1/bin/go build -o /tmp/aminte-gap-lifescale ./tools/lifescale`.
 The four JSON reports retain individual timing samples, allocation counts, environment, settings, manifests and checks.
 These runs establish the stated synthetic envelope on this machine; they are not universal capacity or power-loss proof.
 
@@ -188,21 +188,21 @@ No assertion, production code or permanent fuzz setting changed.
 Successful commands (from the repository root unless `cd` selects another path):
 
 ```sh
-GOCACHE=/tmp/lifelog-analysis-tools/build-cache /home/alex/.local/share/mise/installs/go/1.27.1/bin/go test ./internal/photo -run '^$' -fuzz '^FuzzRead$' -fuzztime=30s -parallel=1
-GOCACHE=/tmp/lifelog-analysis-tools/build-cache /home/alex/.local/share/mise/installs/go/1.27.1/bin/go test ./internal/importer -run '^$' -fuzz '^FuzzSourceJSONIdentity$' -fuzztime=30s -parallel=1
-GOCACHE=/tmp/lifelog-analysis-tools/build-cache /home/alex/.local/share/mise/installs/go/1.27.1/bin/go test ./internal/importer -c -fuzz '^FuzzSourceJSONIdentity$' -o /tmp/lifelog-source-json-fuzz.test
+GOCACHE=/tmp/aminte-analysis-tools/build-cache /home/alex/.local/share/mise/installs/go/1.27.1/bin/go test ./internal/photo -run '^$' -fuzz '^FuzzRead$' -fuzztime=30s -parallel=1
+GOCACHE=/tmp/aminte-analysis-tools/build-cache /home/alex/.local/share/mise/installs/go/1.27.1/bin/go test ./internal/importer -run '^$' -fuzz '^FuzzSourceJSONIdentity$' -fuzztime=30s -parallel=1
+GOCACHE=/tmp/aminte-analysis-tools/build-cache /home/alex/.local/share/mise/installs/go/1.27.1/bin/go test ./internal/importer -c -fuzz '^FuzzSourceJSONIdentity$' -o /tmp/aminte-source-json-fuzz.test
 cd internal/importer
-GODEBUG=fuzzdebug=1 /tmp/lifelog-source-json-fuzz.test -test.run '^$' -test.fuzz '^FuzzSourceJSONIdentity$' -test.fuzztime=30s -test.parallel=1 -test.fuzzcachedir=/tmp/lifelog-source-json-fuzz-debug-cache
-GODEBUG=fuzzdebug=1 /tmp/lifelog-source-json-fuzz.test -test.run '^$' -test.fuzz '^FuzzSourceJSONIdentity$' -test.fuzztime=30s -test.fuzzminimizetime=0 -test.parallel=1 -test.fuzzcachedir=/tmp/lifelog-source-json-fuzz-no-min-cache
-GODEBUG=fuzzdebug=1 /tmp/lifelog-source-json-fuzz.test -test.run '^$' -test.fuzz '^FuzzSourceJSONIdentity$' -test.fuzztime=30s -test.fuzzminimizetime=100ms -test.parallel=1 -test.fuzzcachedir=/tmp/lifelog-source-json-fuzz-bounded-min-cache
+GODEBUG=fuzzdebug=1 /tmp/aminte-source-json-fuzz.test -test.run '^$' -test.fuzz '^FuzzSourceJSONIdentity$' -test.fuzztime=30s -test.parallel=1 -test.fuzzcachedir=/tmp/aminte-source-json-fuzz-debug-cache
+GODEBUG=fuzzdebug=1 /tmp/aminte-source-json-fuzz.test -test.run '^$' -test.fuzz '^FuzzSourceJSONIdentity$' -test.fuzztime=30s -test.fuzzminimizetime=0 -test.parallel=1 -test.fuzzcachedir=/tmp/aminte-source-json-fuzz-no-min-cache
+GODEBUG=fuzzdebug=1 /tmp/aminte-source-json-fuzz.test -test.run '^$' -test.fuzz '^FuzzSourceJSONIdentity$' -test.fuzztime=30s -test.fuzzminimizetime=100ms -test.parallel=1 -test.fuzzcachedir=/tmp/aminte-source-json-fuzz-bounded-min-cache
 # The 164 cached corpus files were copied into this scratch directory's
 # testdata/fuzz/FuzzSourceJSONIdentity/ before direct replay.
-cd /tmp/lifelog-source-json-replay-scevlf_r
-/tmp/lifelog-source-json-fuzz.test -test.run '^FuzzSourceJSONIdentity$' -test.timeout=20s -test.v
+cd /tmp/aminte-source-json-replay-scevlf_r
+/tmp/aminte-source-json-fuzz.test -test.run '^FuzzSourceJSONIdentity$' -test.timeout=20s -test.v
 ```
 
-Logs: `/tmp/lifelog-gap-fuzz-photo.log`, `/tmp/lifelog-gap-fuzz-source-json.log`
-and `/tmp/lifelog-source-json-fuzz-{debug,no-min,bounded-min,replay}.log`.
+Logs: `/tmp/aminte-gap-fuzz-photo.log`, `/tmp/aminte-gap-fuzz-source-json.log`
+and `/tmp/aminte-source-json-fuzz-{debug,no-min,bounded-min,replay}.log`.
 Every command exited zero. Counts are engine-reported executions, not unique
 admitted inputs; bounded and invalid-Unicode skips remain part of the target.
 These short campaigns extend evidence without proving exhaustive input coverage.
@@ -247,10 +247,10 @@ The successful retry reduced parallelism between independent subtests without ch
 tests, filtering cases or removing mutants. Its exact command was:
 
 ```sh
-PATH=/home/alex/.local/share/mise/installs/go/1.27.1/bin:$PATH TMPDIR=/var/tmp CGO_ENABLED=1 go test -race -count=1 -parallel=4 -timeout=40m -json ./tests > /tmp/lifelog-gap-contract-race.jsonl 2>&1
+PATH=/home/alex/.local/share/mise/installs/go/1.27.1/bin:$PATH TMPDIR=/var/tmp CGO_ENABLED=1 go test -race -count=1 -parallel=4 -timeout=40m -json ./tests > /tmp/aminte-gap-contract-race.jsonl 2>&1
 ```
 
-Together, the successful final-code application packages in `/tmp/lifelog-gap-final-race.log` and this complete
+Together, the successful final-code application packages in `/tmp/aminte-gap-final-race.log` and this complete
 contract retry provide race coverage for every tested package, including the new I/O regressions. Lifetime-preview
 generation ran concurrently with the retry; it is not an isolated performance measurement.
 
@@ -456,8 +456,8 @@ Run these commands, substituting the fresh temporary directory and source path:
 
 ```sh
 set -eu
-FLOOR_DIR=/tmp/lifelog-sqlite-floor-repeat
-REPO_DIR=/path/to/lifelog
+FLOOR_DIR=/tmp/aminte-sqlite-floor-repeat
+REPO_DIR=/path/to/aminte
 GO=/path/to/go1.27.1/bin/go
 python3 "$FLOOR_DIR/snapshot.py" "$REPO_DIR"
 GOMODCACHE="$FLOOR_DIR/modcache" "$GO" mod download -json modernc.org/sqlite@v1.46.2 modernc.org/libc@v1.70.0 modernc.org/memory@v1.11.0

@@ -18,12 +18,12 @@
 
 | question | decision |
 |---|---|
-| a separate client, or the browser that `lifelog` serves | the browser that `lifelog` serves, as in plan 091 |
+| a separate client, or the browser that `aminte` serves | the browser that `aminte` serves, as in plan 091 |
 | the direction | **Almanac**, of three drafts (Almanac, Notebook, Console): cool paper, ink blue, dates and numbers in mono, time as the spine |
 | the sidebar | as Almanac draws it: brand and date, search, New, two groups of sections, this month, the owner's links |
 | the theme | light first; dark follows the system setting (`prefers-color-scheme`) |
 
-The design system is the artifact **Lifelog Almanac** (private to the owner): its tokens in light and dark, 17
+The design system is the artifact **Aminte Almanac** (private to the owner): its tokens in light and dark, 17
 components, 14 icons, and a section "The Siren contract" that says which component draws each part of an entity.
 This plan builds the browser from it. Where this plan and the artifact differ, this plan wins and the artifact is
 updated after.
@@ -67,7 +67,7 @@ flowchart LR
 | **The shell reads three things on every HTML page:** today, the Due count (open occurrences overdue or due today) and the days of this month that have a page. The read is one function, `shell(ctx, today)`, beside the handler, and it runs only for `text/html`. | The sidebar is on every page, and these three are what "time is the spine" means. They are not a new capability: every client gets the same data from `GET /` (`due`) and `GET /months/{month}`. The README rule "a template reads only the properties the JSON carries" gets one sentence: the sidebar reads the root's Due count and this month. |
 | **The fonts are embedded files.** Atkinson Hyperlegible (400, 700, 400 italic) and IBM Plex Mono (400, 500), latin woff2, with the text of their licence (SIL Open Font License 1.1), in `internal/api/html/fonts/`. A README there names the source and the sha256 of each file. `GET /assets/fonts/{file}` serves them, by exact name from the embedded folder, with `Cache-Control: public, max-age=31536000, immutable`. | A font cannot be written into each page like a sheet: it is too big to send again on every page. The binary grows by about 100 KB (measured in Part 1). The route is presentation, like `/render`: it is not in the catalog. It has the same token and origin rules as every other route. |
 | **The sheets stay in the page.** `base.css` and `app.css` are still written into each page. | They are small, and a page then needs one request. |
-| **`capture`'s field `mood` gets `options` "1" to "5".** | So the browser draws it as a Segmented choice. It is an addition: the catalog carries the options (`GET /actions`, so `lifelog get /actions` too), and the MCP tool's schema gets the `enum` 1 to 5. The values that the API takes do not change: it refuses a mood out of range or with a fraction now (`internal/core`, "fractional mood"). |
+| **`capture`'s field `mood` gets `options` "1" to "5".** | So the browser draws it as a Segmented choice. It is an addition: the catalog carries the options (`GET /actions`, so `aminte get /actions` too), and the MCP tool's schema gets the `enum` 1 to 5. The values that the API takes do not change: it refuses a mood out of range or with a fraction now (`internal/core`, "fractional mood"). |
 | **No theme switch.** | The owner asked for light first; the system setting picks dark. A switch would need the browser to keep a choice, which no page does now. |
 | **Home and Today stay two pages.** The sidebar's Today is `/days/today`, drawn as the Almanac Today; the brand links Home (`/`), which keeps what plan 091 gave it. | The day view already has capture, the journal, Due, habits, mood and readings. No entity changes for it. |
 
@@ -121,7 +121,7 @@ flowchart LR
      public listener the route needs the token like every route.
    - **tokens:** a table test reads the token blocks of `base.css` and checks the contrast of each pair that a
      token's use names (text 4.5:1, field borders and the focus ring 3:1), in light and in dark.
-   - **mood options:** the `capture` action carries them through the API, `lifelog get /actions` and the MCP
+   - **mood options:** the `capture` action carries them through the API, `aminte get /actions` and the MCP
      tool's schema (`enum`); a capture with mood 4 and one with no mood still work, and mood 6 is still refused.
    - **views:** each view renders the synthetic database inside the shell; the current sidebar item for each
      section; the forms of plan 091 are all still there, and they are the same with the script removed;

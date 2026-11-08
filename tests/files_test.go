@@ -7,7 +7,7 @@ import (
 	"slices"
 	"strings"
 
-	"lifelog/internal/core"
+	"aminte/internal/core"
 )
 
 // files: a file the owner keeps is a page (schema.sql, D9) — one identity with owned names and a

@@ -6,9 +6,9 @@ import (
 	"strings"
 	"testing"
 
-	"lifelog/internal/api/apitest"
-	"lifelog/internal/core"
-	"lifelog/siren"
+	"aminte/internal/api/apitest"
+	"aminte/internal/core"
+	"aminte/siren"
 )
 
 // turnMaps are the turns of the answer of a conversation as the JSON client reads them.
@@ -73,7 +73,7 @@ func TestEveryTurnHasAKeyThatNamesIt(t *testing.T) {
 	e := apitest.Must(t)(c.Get(t.Context(), "/days/today/conversation"))
 	first, second, third := keyOf(t, e, "owner", 0), keyOf(t, e, "owner", 1), keyOf(t, e, "owner", 2)
 
-	if _, err := reply(t, h, "agent:lifelog", map[string]string{"day": "today", "turn": first, "text": "Done."}); err != nil {
+	if _, err := reply(t, h, "agent:aminte", map[string]string{"day": "today", "turn": first, "text": "Done."}); err != nil {
 		t.Fatal(err)
 	}
 	e = apitest.Must(t)(c.Get(t.Context(), "/days/today/conversation"))
@@ -116,7 +116,7 @@ func TestAReplyNamesItsTurnByItsKey(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := reply(t, h, "agent:lifelog", map[string]string{"day": "today", "turn": keyOf(t, a, "owner", 0), "text": "RA"}); err != nil {
+	if _, err := reply(t, h, "agent:aminte", map[string]string{"day": "today", "turn": keyOf(t, a, "owner", 0), "text": "RA"}); err != nil {
 		t.Fatal(err)
 	}
 	b, err := say(t, c, convDay, "B") // the agent reads the page and works on B
@@ -128,11 +128,11 @@ func TestAReplyNamesItsTurnByItsKey(t *testing.T) {
 	if _, err := say(t, c, convDay, "C"); err != nil {
 		t.Fatal(err)
 	}
-	e, err := reply(t, h, "agent:lifelog", map[string]string{"day": "today", "turn": keyB, "text": "RB"})
+	e, err := reply(t, h, "agent:aminte", map[string]string{"day": "today", "turn": keyB, "text": "RB"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, want := strings.Join(turnsOf(t, e), " | "), "owner: B | lifelog: RB | owner: C"; got != want {
+	if got, want := strings.Join(turnsOf(t, e), " | "), "owner: B | aminte: RB | owner: C"; got != want {
 		t.Errorf("the turns after the reply to B: %q, want %q: C waits for its own reply", got, want)
 	}
 
@@ -144,10 +144,10 @@ func TestAReplyNamesItsTurnByItsKey(t *testing.T) {
 		}
 	}
 	e = apitest.Must(t)(c.Get(t.Context(), "/days/today/conversation"))
-	if _, err := reply(t, h, "agent:lifelog", map[string]string{"day": "today", "turn": keyOf(t, e, "owner", 1), "text": "R2"}); err != nil {
+	if _, err := reply(t, h, "agent:aminte", map[string]string{"day": "today", "turn": keyOf(t, e, "owner", 1), "text": "R2"}); err != nil {
 		t.Fatal(err)
 	}
-	if got, want := bodyOf(t, s, title), "[["+convDay+"]]\n\n**Owner** (11:07): ok\n\n**Owner** (11:07): ok\n\n**lifelog** (11:07): R2"; got != want {
+	if got, want := bodyOf(t, s, title), "[["+convDay+"]]\n\n**Owner** (11:07): ok\n\n**Owner** (11:07): ok\n\n**aminte** (11:07): R2"; got != want {
 		t.Errorf("the body after the reply to the second turn:\n%q\nwant:\n%q", got, want)
 	}
 }
@@ -164,11 +164,11 @@ func TestAReplyWithAKeyThatIsNotOnThePageIsRefused(t *testing.T) {
 	}
 	e := apitest.Must(t)(c.Get(t.Context(), "/days/today/conversation"))
 	key := keyOf(t, e, "owner", 0)
-	e, err := reply(t, h, "agent:lifelog", map[string]string{"day": "today", "turn": key, "text": "Hi"})
+	e, err := reply(t, h, "agent:aminte", map[string]string{"day": "today", "turn": key, "text": "Hi"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	agentKey := keyOf(t, e, "lifelog", 0)
+	agentKey := keyOf(t, e, "aminte", 0)
 	editBody(t, s, func(body string) string { return strings.Replace(body, ": Hello", ": Hello again", 1) })
 	before := bodyOf(t, s, title)
 	edited := keyOf(t, apitest.Must(t)(c.Get(t.Context(), "/days/today/conversation")), "owner", 0)
@@ -186,7 +186,7 @@ func TestAReplyWithAKeyThatIsNotOnThePageIsRefused(t *testing.T) {
 		{"a key of blanks", map[string]string{"day": "today", "turn": "  ", "text": "Hi"}, 422},
 		{"a day with no conversation", map[string]string{"day": "2031-05-10", "turn": key, "text": "Hi"}, 404},
 	} {
-		_, err := reply(t, h, "agent:lifelog", tc.v)
+		_, err := reply(t, h, "agent:aminte", tc.v)
 		if got := apitest.Status(err); got != tc.want {
 			t.Errorf("%s: %v, want %d", tc.name, err, tc.want)
 		}
@@ -206,17 +206,17 @@ func TestAListOfCodeLinesShowsAsAListInTheTurn(t *testing.T) {
 		t.Fatal(err)
 	}
 	key := ownerKeyOf(t, c, 1)
-	e, err := reply(t, h, "agent:lifelog", map[string]string{"day": "today", "turn": key, "text": "Found:\n- `a.go` is here\n- `b.go`", "tools": "- `search`: 2 hits"})
+	e, err := reply(t, h, "agent:aminte", map[string]string{"day": "today", "turn": key, "text": "Found:\n- `a.go` is here\n- `b.go`", "tools": "- `search`: 2 hits"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, want := strings.Join(turnsOf(t, e), " | "), "owner: Files:\n- `main.go`\n- `util.go` | lifelog: Found:\n- `a.go` is here\n- `b.go`"; got != want {
+	if got, want := strings.Join(turnsOf(t, e), " | "), "owner: Files:\n- `main.go`\n- `util.go` | aminte: Found:\n- `a.go` is here\n- `b.go`"; got != want {
 		t.Errorf("the turns:\n%q\nwant:\n%q", got, want)
 	}
 	if got := keyOf(t, e, "owner", 0); got != key {
 		t.Errorf("the key of the owner's turn moved from %s to %s when the reply was written", key, got)
 	}
-	want := "[[2031-05-14]]\n\n**Owner** (11:07): Files:\n\\- `main.go`\n\\- `util.go`\n\n- `search`: 2 hits\n\n**lifelog** (11:07): Found:\n\\- `a.go` is here\n\\- `b.go`"
+	want := "[[2031-05-14]]\n\n**Owner** (11:07): Files:\n\\- `main.go`\n\\- `util.go`\n\n- `search`: 2 hits\n\n**aminte** (11:07): Found:\n\\- `a.go` is here\n\\- `b.go`"
 	if got := bodyOf(t, s, "Conversation "+convDay); got != want {
 		t.Errorf("the page:\n%q\nwant:\n%q", got, want)
 	}
@@ -256,7 +256,7 @@ func TestAReplyKeepsTheWordsAndTheKeyOfTheTurnItAnswers(t *testing.T) {
 					}
 					read := apitest.Must(t)(c.Get(t.Context(), "/days/today/conversation"))
 					key, words := keyOf(t, read, "owner", 0), turnMaps(t, read)[0]["text"]
-					e, err := reply(t, h, "agent:lifelog", map[string]string{"day": "today", "turn": key, "text": "Done.", "tools": tools})
+					e, err := reply(t, h, "agent:aminte", map[string]string{"day": "today", "turn": key, "text": "Done.", "tools": tools})
 					if err != nil {
 						t.Fatal(err)
 					}
@@ -274,8 +274,8 @@ func TestAReplyKeepsTheWordsAndTheKeyOfTheTurnItAnswers(t *testing.T) {
 					if tools != "" {
 						wantTools = "[" + tools + "]"
 					}
-					if got[1]["who"] != "lifelog" || got[1]["text"] != "Done." || fmt.Sprint(got[1]["tools"]) != wantTools {
-						t.Errorf("the reply: %v, want lifelog, Done. and the tools %s", got[1], wantTools)
+					if got[1]["who"] != "aminte" || got[1]["text"] != "Done." || fmt.Sprint(got[1]["tools"]) != wantTools {
+						t.Errorf("the reply: %v, want aminte, Done. and the tools %s", got[1], wantTools)
 					}
 					if later && (len(got) != 3 || got[2]["text"] != "And that") {
 						t.Errorf("the turns: %v, want the later turn after the reply", got)
@@ -316,7 +316,7 @@ func TestAnEditThatRemovesAnEqualTurnGivesItsKeyToTheLaterOne(t *testing.T) {
 		t.Fatal(err)
 	}
 	first := ownerKeyOf(t, c, 1)
-	if _, err := reply(t, h, "agent:lifelog", map[string]string{"day": "today", "turn": first, "text": "R1"}); err != nil {
+	if _, err := reply(t, h, "agent:aminte", map[string]string{"day": "today", "turn": first, "text": "R1"}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := say(t, c, convDay, "ok"); err != nil {
@@ -330,11 +330,11 @@ func TestAnEditThatRemovesAnEqualTurnGivesItsKeyToTheLaterOne(t *testing.T) {
 	if got := ownerKeyOf(t, c, 1); got != first {
 		t.Errorf("the turn that stays has the key %s, want the key %s of the turn that was removed", got, first)
 	}
-	_, err := reply(t, h, "agent:lifelog", map[string]string{"day": "today", "turn": second, "text": "R2"})
+	_, err := reply(t, h, "agent:aminte", map[string]string{"day": "today", "turn": second, "text": "R2"})
 	if apitest.Status(err) != 409 {
 		t.Errorf("a reply with the key that the second turn had: %v, want 409", err)
 	}
-	if _, err := reply(t, h, "agent:lifelog", map[string]string{"day": "today", "turn": first, "text": "R2"}); err != nil {
+	if _, err := reply(t, h, "agent:aminte", map[string]string{"day": "today", "turn": first, "text": "R2"}); err != nil {
 		t.Errorf("a reply with the key that the agent reads now: %v, want it written", err)
 	}
 

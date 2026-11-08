@@ -11,7 +11,7 @@ import (
 	"slices"
 	"testing"
 
-	"lifelog/internal/db"
+	"aminte/internal/db"
 )
 
 // TestNewOpensAFreshFileAndTheTestClosesIt: the file of New has a table of the DDL, the writer reads back the
@@ -38,7 +38,7 @@ func TestNewOpensAFreshFileAndTheTestClosesIt(t *testing.T) {
 		if err := d.R.QueryRow("PRAGMA trusted_schema").Scan(&trusted); err != nil || trusted != 0 {
 			t.Errorf("the readers' PRAGMA trusted_schema = %d, %v; want 0", trusted, err)
 		}
-		if _, err := d.R.Exec("INSERT INTO lifelog_meta(key, value) VALUES ('synthetic', 'row')"); err == nil {
+		if _, err := d.R.Exec("INSERT INTO aminte_meta(key, value) VALUES ('synthetic', 'row')"); err == nil {
 			t.Error("the readers accepted a write")
 		}
 	})

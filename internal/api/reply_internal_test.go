@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"lifelog/internal/core"
+	"aminte/internal/core"
 )
 
 // ownerKey is the key that the conversation gives to the n-th owner turn of the body (from 1); a key that no turn has
@@ -25,7 +25,7 @@ func ownerKey(day, body string, n int) string {
 // bytes of the page are; a turn that follows keeps its place.
 func TestInsertReplyPlacesTheBlockByTurns(t *testing.T) {
 	const day = "2031-05-14"
-	const block = "**lifelog** (09:08): R"
+	const block = "**aminte** (09:08): R"
 	for _, tc := range []struct {
 		name, body string
 		turn       int
@@ -35,8 +35,8 @@ func TestInsertReplyPlacesTheBlockByTurns(t *testing.T) {
 		{"a blank edge of the page is dropped", "[[2031-05-14]]\n\n**Owner** (09:07): A\n\n\n", 1, "[[2031-05-14]]\n\n**Owner** (09:07): A\n\n" + block},
 		{"a turn that follows keeps its place", "[[2031-05-14]]\n\n**Owner** (09:07): A\n\n**Owner** (09:08): B", 1,
 			"[[2031-05-14]]\n\n**Owner** (09:07): A\n\n" + block + "\n\n**Owner** (09:08): B"},
-		{"the second turn after a reply to the first", "[[2031-05-14]]\n\n**Owner** (09:07): A\n\n**lifelog** (09:07): R1\n\n**Owner** (09:08): B", 2,
-			"[[2031-05-14]]\n\n**Owner** (09:07): A\n\n**lifelog** (09:07): R1\n\n**Owner** (09:08): B\n\n" + block},
+		{"the second turn after a reply to the first", "[[2031-05-14]]\n\n**Owner** (09:07): A\n\n**aminte** (09:07): R1\n\n**Owner** (09:08): B", 2,
+			"[[2031-05-14]]\n\n**Owner** (09:07): A\n\n**aminte** (09:07): R1\n\n**Owner** (09:08): B\n\n" + block},
 		{"an edit of an earlier turn does not move the block", "[[2031-05-14]]\n\n**Owner** (09:07): A, edited\n\n\n\n**Owner** (09:08): B", 1,
 			"[[2031-05-14]]\n\n**Owner** (09:07): A, edited\n\n" + block + "\n\n**Owner** (09:08): B"},
 		{"the note of the owner after a turn stays in the turn", "[[2031-05-14]]\n\n**Owner** (09:07): A\n\nA note.\n\n**Owner** (09:08): B", 1,
@@ -63,8 +63,8 @@ func TestInsertReplyPlacesTheBlockByTurns(t *testing.T) {
 	}{
 		{"a turn the page does not have", "[[2031-05-14]]\n\n**Owner** (09:07): A", 2, 409},
 		{"a page with no turn", "[[2031-05-14]]", 1, 409},
-		{"a turn that has a reply", "[[2031-05-14]]\n\n**Owner** (09:07): A\n\n**lifelog** (09:07): R", 1, 409},
-		{"the reply is a turn of the agent, the second owner turn does not exist", "[[2031-05-14]]\n\n**Owner** (09:07): A\n\n**lifelog** (09:07): R", 2, 409},
+		{"a turn that has a reply", "[[2031-05-14]]\n\n**Owner** (09:07): A\n\n**aminte** (09:07): R", 1, 409},
+		{"the reply is a turn of the agent, the second owner turn does not exist", "[[2031-05-14]]\n\n**Owner** (09:07): A\n\n**aminte** (09:07): R", 2, 409},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			_, err := insertReply(day, tc.body, ownerKey(day, tc.body, tc.turn), block)

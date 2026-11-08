@@ -32,7 +32,7 @@ next plan).
 | **Wire shape.** `Task`, `TaskSpec`, `TaskOccurrence`, `OccurrenceChanges` and `TaskReminder` get JSON names (`snake_case`, absent when empty where the value is optional). Two readers: `Tasks(ctx, includeDeleted)` lists definitions by id; `Deadlines(ctx, from, through, includeDeleted)` merges every live task's window through `TaskOccurrences`, ordered by due day, key, task, bounded by the same 10,000. | `internal/core/tasks.go` |
 | **Resources.** `GET /tasks` (class `tasks`; `include_deleted`), `GET /tasks/{id}` (class `task`: the definition, its occurrences over `from`..`through`, default 30 days back to 90 days on, each with its resolved reminder), `GET /tasks/{id}/occurrences/{key}` (class `occurrence`: a persisted row, or a virtual slot of a live recurring task), `GET /deadlines` (class `deadlines`: every task's occurrences in the window, with `state` filter `open`/`done`/`skipped`/`all`, default `open`). The root links `tasks` and `deadlines`. | `internal/api/tasks.go`, `handler.go` |
 | **Actions** (the catalog, hence the CLI, MCP and the browser): `create-task` (label, project title, cadence, reminder defaults, a one-off's `due_day`, `import_key`), `edit-task` (version; label, project, reminder defaults), `stop-task` (version, `through`), `tombstone-task`, `revive-task`, `capture-occurrence` (task version; `key` = a slot day or `once`; due day, state, completed instant or `now`, reminder mode and instant, import key), `edit-occurrence` (both versions; the same fields), `tombstone-occurrence`, `revive-occurrence`, `deadlines` (GET with `from`, `through`, `state`). Each is offered only where legal: no edit on a tombstoned task, `revive` alone there; `capture-occurrence` on a live task; an occurrence's edits need a live task. All writes run as one `core.Tx` method each. | `internal/api/siren.go`, `tasks.go` |
-| **Shortcuts.** `lifelog tasks` (the list) and `lifelog due [--from D --to D]` (the deadlines); everything else is `lifelog do <action>`. | `cmd/lifelog/main.go` |
+| **Shortcuts.** `aminte tasks` (the list) and `aminte due [--from D --to D]` (the deadlines); everything else is `aminte do <action>`. | `cmd/aminte/main.go` |
 | **Docs.** README's planning bullet rewritten; `API.md` gains the four classes and the shapes; AGENTS.md carries the rule (already written). | `README.md`, `API.md` |
 
 ## Tests (with their subject; synthetic databases only)
@@ -43,7 +43,7 @@ next plan).
    task and its virtual slots, materialize one, mark one done with `now`, reschedule, stop the series, tombstone
    and revive; stale versions are 409 `stale_version`; a bad key 422; actions are offered only where legal.
 3. `internal/mcp`: the task tools exist with the catalog's fields and `get` follows a task link.
-4. `cmd/lifelog`: `tasks` and `due` print the entities; `do create-task` persists.
+4. `cmd/aminte`: `tasks` and `due` print the entities; `do create-task` persists.
 5. `internal/api`: the generic HTML view renders `/tasks`, `/tasks/{id}`, an occurrence and `/deadlines` with their
    forms; the reference test covers the new classes.
 

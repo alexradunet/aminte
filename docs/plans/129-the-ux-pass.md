@@ -46,8 +46,8 @@ flowchart LR
   A["a failing test for the part"] --> B["the change"]
   B --> C["gofmt; go generate, vet, test ./..."]
   C --> D["screenshots on the review server, synthetic data: desktop and phone, light and dark"]
-  D --> E["deploy: keep lifelog.prev, build to the install path, restart the service, read its log line"]
-  E --> F["the owner looks: keep it and go on, or swap lifelog.prev back"]
+  D --> E["deploy: keep aminte.prev, build to the install path, restart the service, read its log line"]
+  E --> F["the owner looks: keep it and go on, or swap aminte.prev back"]
 ```
 
 - The review server is a scratch build with a synthetic database on `127.0.0.1:7788`. The live `life.db` is never
@@ -131,7 +131,7 @@ The More of a page has five slab buttons (`page.html`); a metric's Links and Mor
 - The search view gets a link "Newest first" or "Best match" beside the heading of the words group, with the same `q`.
 - **Tests:** `TestSearchListsTitlesFirst` (no page in both groups); a new core test of `newest` on days built by hand;
   `TestCanonicalSearchRankLimitAndStableTie` stays green; a row for `search order=newest` in
-  `cmd/lifelog/parity_test.go`.
+  `cmd/aminte/parity_test.go`.
 
 ## Part 8 — A mention shows its sentence
 
@@ -196,17 +196,17 @@ flowchart TD
   the form's hidden fields). The CLI and MCP get the field from the catalog.
 - **Tests, first:** core: the same key twice gives one paragraph and one Mood reading; the contract suite
   (`tests/journal_test.go`): two captures with no key still append twice; API: a form sent again answers 303 to the
-  day with "Already added"; a capture row with a key in `cmd/lifelog/parity_test.go`; the MCP tool has the field.
-- **The live file.** A one-off program in `~/.local/share/lifelog-oneoff/capture-keys/`, on the pattern of `meta123`:
+  day with "Already added"; a capture row with a key in `cmd/aminte/parity_test.go`; the MCP tool has the field.
+- **The live file.** A one-off program in `~/.local/share/aminte-oneoff/capture-keys/`, on the pattern of `meta123`:
   it accepts only the new table, compares the whole schema with a new file made from `schema.sql`, and has
   `--dry-run`. The owner runs it with `!`: stop the service; a snapshot to a new folder outside the git tree; the dry
-  run; the run; `lifelog --db life.db get /integrity --human`. Then the binary is installed and the owner starts the
+  run; the run; `aminte --db life.db get /integrity --human`. Then the binary is installed and the owner starts the
   service.
 
 ## Tests and checks
 
 - Each part: `gofmt -l` on the changed files; `go generate ./... && go vet ./... && go test ./...`. Parts 7, 8 and 11
-  also `go test -count=1 -shuffle=on ./...`. Part 11 also `LIFELOG_MERMAID=1 go test ./tests -run TestMermaidRender`,
+  also `go test -count=1 -shuffle=on ./...`. Part 11 also `AMINTE_MERMAID=1 go test ./tests -run TestMermaidRender`,
   `staticcheck ./...` and `govulncheck ./...`.
 - Screenshots on the review server of the pages a part changes, desktop and phone, light and dark, with no console
   error.
@@ -238,16 +238,16 @@ Checks, on Linux, on the merged tree: `gofmt -l` (no output); `go generate ./...
 has no IPv6, before and after the change. The mutants: 273 of 273 killed. Screenshots on a review server with
 synthetic data (desktop and phone, light and dark, nine views): no console error.
 
-Not run: `LIFELOG_MERMAID=1 go test ./tests -run TestMermaidRender` (no `mmdc`), `staticcheck` and `govulncheck` (not
+Not run: `AMINTE_MERMAID=1 go test ./tests -run TestMermaidRender` (no `mmdc`), `staticcheck` and `govulncheck` (not
 installed), the race check, Windows.
 
 The deploy (2026-10-17, on the owner's machine):
 
-- **The live file.** A one-off program outside the repo, `~/.local/share/lifelog-oneoff/capture129/` (on the pattern
+- **The live file.** A one-off program outside the repo, `~/.local/share/aminte-oneoff/capture129/` (on the pattern
   of `meta123`), added `capture_keys` and its two triggers to `life.db`.
-- **The binary.** Built to `~/.local/bin/lifelog` (the same file as
-  `~/.local/share/lifelog-oneoff/lifelog-plan129`), with the previous binary kept as `lifelog.prev`.
-  `lifelog.service` restarted at 20:48:46 CEST. Its log line: "serving /home/cico/dev/lifelogdb/life.db on
+- **The binary.** Built to `~/.local/bin/aminte` (the same file as
+  `~/.local/share/aminte-oneoff/aminte-plan129`), with the previous binary kept as `aminte.prev`.
+  `aminte.service` restarted at 20:48:46 CEST. Its log line: "serving /home/cico/dev/aminte/life.db on
   http://127.0.0.1:7777 … (version 0.1.0, user_version 1)".
-- **The check.** The owner ran `lifelog --db life.db get /integrity --human` on the live file: `ok: true`,
+- **The check.** The owner ran `aminte --db life.db get /integrity --human` on the live file: `ok: true`,
   `integrity_check: ["ok"]`, no `schema_drift`. The owner looked at the live app and closed the plan.

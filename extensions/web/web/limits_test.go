@@ -23,7 +23,7 @@ import (
 	"testing"
 	"time"
 
-	"lifelog/lifelogtest"
+	"aminte/amintetest"
 )
 
 // limitsToken is the token of the web of these tests: 36 characters of no meaning.
@@ -39,7 +39,7 @@ type limitsBrowser struct {
 
 func newLimitsBrowser(t *testing.T) *limitsBrowser {
 	t.Helper()
-	core := lifelogtest.New(t, "2031-05-14")
+	core := amintetest.New(t, "2031-05-14")
 	asked := &atomic.Int64{}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		asked.Add(1)
@@ -55,7 +55,7 @@ func newLimitsBrowser(t *testing.T) *limitsBrowser {
 	rec := httptest.NewRecorder()
 	web.ServeHTTP(rec, req)
 	for _, c := range rec.Result().Cookies() {
-		if c.Name == "lifelog_session" {
+		if c.Name == "aminte_session" {
 			return &limitsBrowser{web: web, cookie: c.Name + "=" + c.Value, asked: asked}
 		}
 	}
@@ -224,7 +224,7 @@ func FuzzBackOf(f *testing.F) {
 	for _, tc := range backOfCases {
 		f.Add(tc.back)
 	}
-	base, err := url.Parse("http://lifelog.local/days/2026-09-29")
+	base, err := url.Parse("http://aminte.local/days/2026-09-29")
 	if err != nil {
 		f.Fatal(err)
 	}

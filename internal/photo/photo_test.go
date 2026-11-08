@@ -3,8 +3,8 @@ package photo_test
 import (
 	"testing"
 
-	"lifelog/internal/photo"
-	"lifelog/internal/photo/phototest"
+	"aminte/internal/photo"
+	"aminte/internal/photo/phototest"
 )
 
 func TestReadsAJPEG(t *testing.T) {

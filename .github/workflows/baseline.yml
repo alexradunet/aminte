@@ -1,7 +1,7 @@
 name: Baseline
 
 # The baseline of AGENTS.md on Linux, on every push and pull request: gofmt, go vet and the full tests, at the root
-# and in each extension (an extension's end-to-end test builds the real lifelog). The loop runs every folder of
+# and in each extension (an extension's end-to-end test builds the real aminte). The loop runs every folder of
 # extensions/ that has a go.mod: a new extension needs no edit here. The Windows baseline stays a manual run
 # (windows-validation.yml).
 on:

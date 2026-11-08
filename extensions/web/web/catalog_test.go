@@ -18,13 +18,13 @@ import (
 	"testing"
 	"time"
 
-	"lifelog-web/web"
-	"lifelog/siren"
+	"aminte-web/web"
+	"aminte/siren"
 )
 
 // saveSettings posts the form to the catalog of web, as the core forwards the action.
 func saveSettings(l *life, form url.Values) *httptest.ResponseRecorder {
-	return request(l.browser.Catalog(), http.MethodPost, "/settings", form.Encode(), map[string]string{"Lifelog-Source": "ui"})
+	return request(l.browser.Catalog(), http.MethodPost, "/settings", form.Encode(), map[string]string{"Aminte-Source": "ui"})
 }
 
 // settingsFile is the file in the state folder of l, read as the keys it holds.
@@ -314,7 +314,7 @@ func TestTheSettingsPageHasTheFormOfThisBrowser(t *testing.T) {
 	}
 	// The core's own owner rule: an agent is refused, and the file is as it was.
 	agent := request(l.core.Handler, http.MethodPost, "/with/web/settings", url.Values{"ground": {"oak"}}.Encode(),
-		map[string]string{"Lifelog-Source": "agent:test", "Accept": "application/vnd.siren+json"})
+		map[string]string{"Aminte-Source": "agent:test", "Accept": "application/vnd.siren+json"})
 	if agent.Code != http.StatusForbidden || settingsFile(t, l)["ground"] != "firelight" {
 		t.Errorf("an agent set the ground: %d, ground %q", agent.Code, settingsFile(t, l)["ground"])
 	}

@@ -81,7 +81,7 @@ flowchart LR
    page. Search's Days group agrees with the README: a day is "found in the Calendar and by Search".
 3. **A random thing is a GET action that answers 303**, as `open-day` (`GET /days/go`) and `find` (`GET /pages`) do. It
    writes nothing, so it is a GET, not a POST. The in-process and remote clients already follow a 303
-   (`rowOpenDay` in `cmd/lifelog/parity_test.go`).
+   (`rowOpenDay` in `cmd/aminte/parity_test.go`).
 4. **The title suggestions come from a resource**, as the shell's month does: the root gets a property
    `recent_titles`. The id of the datalist follows the id rule of the README (action, then field): `search-q`. This is
    not the dropped "titles after `[[`" of the body editor.
@@ -222,7 +222,7 @@ expected values checked by hand.
 - **View:** `TestEveryViewRenders` draws a card, a slim card, a gap, the zoom with one `aria-current`, the random
   buttons, the search groups and the datalist, and still finds no `<script`. `view/shell_test.go`: `/days` marks
   Calendar.
-- **Parity** (`cmd/lifelog/parity_test.go`): `random-day`, `random-page kind=person` and `search kind=person` on the
+- **Parity** (`cmd/aminte/parity_test.go`): `random-day`, `random-page kind=person` and `search kind=person` on the
   CLI, HTTP, MCP and remote MCP; the MCP tool list.
 - `reference_test.go` keeps `API.md` equal to the code.
 - After each part: `gofmt -l`, then `go generate ./... && go vet ./... && go test ./...`. After parts 2, 5 and 6 also
@@ -273,7 +273,7 @@ vCPU, a virtio disk and ext4) passed its known answers; `stream_page`, a page of
 with 20 readings a day, took 51 to 65 ms in its 5 samples (`search_rare`: 73 to 81 ms). The days query therefore stays
 a merge of the two indexes; the step-back recursive query was not needed.
 
-Not run: `LIFELOG_MERMAID=1 go test ./tests -run TestMermaidRender` (no `mmdc`), `staticcheck` and `govulncheck` (not
+Not run: `AMINTE_MERMAID=1 go test ./tests -run TestMermaidRender` (no `mmdc`), `staticcheck` and `govulncheck` (not
 installed), the race check, Windows.
 
 Open, for the owner:

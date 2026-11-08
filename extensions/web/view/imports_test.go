@@ -8,19 +8,19 @@ import (
 )
 
 // TestTheViewImportsNoStore: the view draws what it is given and reads no store. It is in the module of an extension,
-// so it can import only the public packages of lifelog: of those, siren and text. Of the packages of this module, the
+// so it can import only the public packages of aminte: of those, siren and text. Of the packages of this module, the
 // view and the packages that it imports, at any depth, are the view and pixelart. Pixelart is a leaf that draws
-// pictures and imports nothing of lifelog; the view reads the names of the icon sheet from it.
+// pictures and imports nothing of aminte; the view reads the names of the icon sheet from it.
 // go/build reads the import lines of the files that a build for one system takes; the tests are not among them. The
 // walk is done for linux and for windows, because a file for one system only (a name that ends in _windows.go, a
 // build line) is not in the build for the other.
 func TestTheViewImportsNoStore(t *testing.T) {
-	const module, view = "lifelog-web/", "lifelog-web/view"
+	const module, view = "aminte-web/", "aminte-web/view"
 	root, err := filepath.Abs("..") // the folder of the module
 	if err != nil {
 		t.Fatal(err)
 	}
-	publicPackages := map[string]bool{"lifelog/siren": true, "lifelog/text": true}
+	publicPackages := map[string]bool{"aminte/siren": true, "aminte/text": true}
 	for _, goos := range []string{"linux", "windows"} {
 		t.Run(goos, func(t *testing.T) {
 			ctx := build.Default
@@ -40,19 +40,19 @@ func TestTheViewImportsNoStore(t *testing.T) {
 					switch {
 					case strings.HasPrefix(imp, module):
 						walk(imp)
-					case imp == "lifelog" || strings.HasPrefix(imp, "lifelog/"):
+					case imp == "aminte" || strings.HasPrefix(imp, "aminte/"):
 						if !publicPackages[imp] {
-							t.Errorf("%s imports %s: the view may import only siren and text of lifelog", path, imp)
+							t.Errorf("%s imports %s: the view may import only siren and text of aminte", path, imp)
 						}
 						seen[imp] = true
 					}
 				}
 			}
 			walk(view)
-			want := map[string]bool{view: true, "lifelog-web/pixelart": true, "lifelog/siren": true, "lifelog/text": true}
+			want := map[string]bool{view: true, "aminte-web/pixelart": true, "aminte/siren": true, "aminte/text": true}
 			for path := range seen {
 				if !want[path] {
-					t.Errorf("the view imports %s: it may import only siren and text of lifelog, and pixelart", path)
+					t.Errorf("the view imports %s: it may import only siren and text of aminte, and pixelart", path)
 				}
 			}
 			for path := range want {

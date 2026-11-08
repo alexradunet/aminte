@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"lifelog/siren"
+	"aminte/siren"
 )
 
 func drawApp(t *testing.T, e *siren.Entity, path string) string {

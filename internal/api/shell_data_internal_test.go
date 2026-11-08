@@ -13,9 +13,9 @@ import (
 	"testing"
 	"time"
 
-	"lifelog/internal/core"
-	"lifelog/internal/db/dbtest"
-	"lifelog/siren"
+	"aminte/internal/core"
+	"aminte/internal/db/dbtest"
+	"aminte/siren"
 )
 
 const dataToday = "2031-05-14"
@@ -180,7 +180,7 @@ func TestAConversationNamesItsRefsAndTheEarlierDays(t *testing.T) {
 	}
 	older := lines("2031-01-01", "2031-01-02", "2031-01-03", "2031-01-04", "2031-01-05", "2031-01-06", "2031-01-07", "2031-01-08")
 	newer := lines("2031-01-03", "2031-02-01", "2031-02-02") + "- `failed_tool` failed: not_found\n"
-	page(dataToday, "**Owner** (09:00): Show me.\n\n"+older+"\n**lifelog** (09:01): Here.\n\n**Owner** (09:02): More.\n\n"+newer+"\n**lifelog** (09:03): And more.\n")
+	page(dataToday, "**Owner** (09:00): Show me.\n\n"+older+"\n**aminte** (09:01): Here.\n\n**Owner** (09:02): More.\n\n"+newer+"\n**aminte** (09:03): And more.\n")
 	for _, day := range []string{"2031-05-01", "2031-05-10", "2031-05-12", "2031-05-13", "2031-04-29"} {
 		page(day, "")
 	}

@@ -8,8 +8,8 @@ import (
 	"net/http"
 	"strings"
 
-	"lifelog/internal/core"
-	"lifelog/siren"
+	"aminte/internal/core"
+	"aminte/siren"
 )
 
 // tokenMinLength is the shortest token that RequireToken accepts.
@@ -32,12 +32,12 @@ func CheckToken(t string) error {
 }
 
 // RequireToken is next behind the owner's token: a request without the header "Authorization: Bearer TOKEN" gets
-// 401 with the code token_required and "WWW-Authenticate: Bearer realm=\"lifelog\"". The token is the only credential:
+// 401 with the code token_required and "WWW-Authenticate: Bearer realm=\"aminte\"". The token is the only credential:
 // there is no cookie, no login page and no exempt route. The compare is of two digests, so it takes the same time for
 // every value, also for a value of another length. It refuses a token that CheckToken refuses.
 //
-// lifelog serve puts it inside NetworkAuthority, so a request with a wrong Host gets 403 before it gets 401. The
-// in-process client and the temporary server of `lifelog NAME` do not use it.
+// aminte serve puts it inside NetworkAuthority, so a request with a wrong Host gets 403 before it gets 401. The
+// in-process client and the temporary server of `aminte NAME` do not use it.
 func RequireToken(token string, next http.Handler) (http.Handler, error) {
 	if err := CheckToken(token); err != nil {
 		return nil, err
@@ -50,7 +50,7 @@ func RequireToken(token string, next http.Handler) (http.Handler, error) {
 			next.ServeHTTP(w, r)
 			return
 		}
-		w.Header().Set("WWW-Authenticate", `Bearer realm="lifelog"`)
+		w.Header().Set("WWW-Authenticate", `Bearer realm="aminte"`)
 		writeError(w, r, &core.Error{Status: http.StatusUnauthorized, Msg: "token required", Code: siren.CodeTokenRequired})
 	}), nil
 }

@@ -12,9 +12,9 @@ import (
 	"strings"
 	"testing"
 
+	"aminte/internal/photo/phototest"
+	"aminte/text"
 	"golang.org/x/text/unicode/norm"
-	"lifelog/internal/photo/phototest"
-	"lifelog/text"
 )
 
 func TestStableRenameKeepsIdentityAndOldReferences(t *testing.T) {

@@ -11,7 +11,7 @@ without the owner. For this owner the import is a backfill done once, and the ow
 in a conversation, approving each step as it happens. The process costs more than the life log itself and fails
 outside its own checks. No table or column is in question: `import_key` and `source` serve every writer that may
 send a row twice. Two texts change with the process: the freeze of [D13](../decisions/D13-migrations-and-freeze.md)
-and the `lifelog_meta` row `evolution`, which are defined by what an import workspace can replay.
+and the `aminte_meta` row `evolution`, which are defined by what an import workspace can replay.
 
 ## Options
 
@@ -64,5 +64,5 @@ guide. No new SQLite behaviour is claimed.
 
 Accepted 2026-10-09: option C, as the owner decided. Implemented by [plan 089](../plans/089-no-import-process.md).
 It rewrites [D13](../decisions/D13-migrations-and-freeze.md) (the freeze) and [D11](../decisions/D11-tombstones.md)
-(what an import revives) in place, with the `lifelog_meta.evolution` row and [imports](../contract/imports.md); it
+(what an import revives) in place, with the `aminte_meta.evolution` row and [imports](../contract/imports.md); it
 replaces the commands of RFC [0010](0010-the-writer-drives-a-local-model.md) and of plans 083–088.

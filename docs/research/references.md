@@ -221,7 +221,7 @@ the gaps are intentional.
   The WAL-reset bug (3.7.0 – 3.51.2, fixed in 3.51.3 and 3.53.0; backports 3.44.6 and 3.50.7): two or more
   connections, a write racing a checkpoint, a lost transaction. Also: checkpoint starvation by
   readers that never let go, "WAL does not work over a network filesystem", the conditions for
-  read-only access. → [connection setup](../contract/connections.md), `lifelog_meta.sqlite`.
+  read-only access. → [connection setup](../contract/connections.md), `aminte_meta.sqlite`.
 - <a id="r66"></a>**[R66]** SQLite: *How To Corrupt An SQLite Database File* —
   <https://www.sqlite.org/howtocorrupt.html> Network filesystems, files copied while open, broken
   POSIX locks, `immutable` on a changing file. → [connection setup](../contract/connections.md).

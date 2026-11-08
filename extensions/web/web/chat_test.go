@@ -13,7 +13,7 @@ import (
 	"strings"
 	"testing"
 
-	"lifelog/siren"
+	"aminte/siren"
 )
 
 // chatScriptTag is the one script element that a page of the shell carries.
@@ -90,7 +90,7 @@ func TestTheConversationViewIsTheChatScreen(t *testing.T) {
 	l := emptyLife(t)
 	l.earlierConversations(t, "2031-05-01", "2031-05-10", "2031-05-12", "2031-05-13") // the oldest is not one of the last three
 	l.do(t, "/days/"+today+"/conversation", "say", map[string]string{"text": "How did I **sleep**? See [[Sleep notes]]."})
-	chatAppend(t, l, "\n\n- `search_pages` words=sleep\n- `read_day` failed: not_found\n\n**lifelog** (09:30): You slept *well*.\n")
+	chatAppend(t, l, "\n\n- `search_pages` words=sleep\n- `read_day` failed: not_found\n\n**aminte** (09:30): You slept *well*.\n")
 	l.do(t, "/days/today/conversation", "say", map[string]string{"text": "And last night?", "via": "whatsapp"})
 	page, body := chatPageOf(t, l)
 	body = strings.Replace(body, "**Owner**", "A note the owner typed.\n\n**Owner**", 1) // text before the first marker is a text turn
@@ -104,7 +104,7 @@ func TestTheConversationViewIsTheChatScreen(t *testing.T) {
 		`the day view</a>`, `aria-label="Categories"`, `<summary>Edit</summary>`, `aria-label="Links"`, `aria-label="Backlinks"`, `class="danger">Delete`, `<section class="thread"`,
 		`<li class="turn text">`, "A note the owner typed.",
 		`<li class="turn owner">`, `<span class="from">You</span><time datetime="`, `How did I <strong>sleep</strong>?`, `<a href="/pages?title=Sleep+notes" class="wikilink">Sleep notes</a>`,
-		`<li class="turn agent">`, `<span class="from">lifelog</span>`, `<li><b>search_pages</b> words=sleep</li>`, `<li><b>read_day</b> failed: not_found</li>`, `You slept <em>well</em>.`,
+		`<li class="turn agent">`, `<span class="from">aminte</span>`, `<li><b>search_pages</b> words=sleep</li>`, `<li><b>read_day</b> failed: not_found</li>`, `You slept <em>well</em>.`,
 		`<li class="turn owner">`, `<span class="from">You</span><span class="via">· via whatsapp</span><time datetime="`, "And last night?",
 		`<div class="thinking" role="status"`, `<footer class="composer">`}
 	at := 0
@@ -149,7 +149,7 @@ func TestTheConversationViewIsTheChatScreen(t *testing.T) {
 		t.Error("the composer lacks its keyboard rule")
 	}
 	// The agent has answered last: the three dots are gone.
-	chatAppend(t, l, "\n\n**lifelog** (09:40): Last night you slept 7 hours.\n")
+	chatAppend(t, l, "\n\n**aminte** (09:40): Last night you slept 7 hours.\n")
 	if strings.Contains(pageAt(t, l.web, "/days/"+today+"/conversation"), `class="thinking"`) {
 		t.Error("the screen waits for an agent that has answered")
 	}
@@ -159,13 +159,13 @@ func TestTheConversationViewIsTheChatScreen(t *testing.T) {
 func TestADayWithNoTurnsSaysWhereTheAgentAnswers(t *testing.T) {
 	l := emptyLife(t)
 	view := pageAt(t, l.web, "/days/"+today+"/conversation")
-	for _, want := range []string{`class="empty"`, "It answers here when it runs", "<code>lifelog serve --with agent</code>", `<textarea name="text"`} {
+	for _, want := range []string{`class="empty"`, "It answers here when it runs", "<code>aminte serve --with agent</code>", `<textarea name="text"`} {
 		if !strings.Contains(view, want) {
 			t.Errorf("the empty conversation lacks %q", want)
 		}
 	}
 	// The transport of WhatsApp answers nothing: the agent is an extension of its own (plan 162).
-	if strings.Contains(view, "lifelog whatsapp") {
+	if strings.Contains(view, "aminte whatsapp") {
 		t.Error("the empty conversation tells the owner to start the transport of WhatsApp, which answers nothing")
 	}
 	if strings.Contains(view, `class="turn `) || strings.Contains(view, `aria-label="Facts"`) || strings.Contains(view, "<summary>Edit</summary>") {
@@ -250,7 +250,7 @@ func TestTheConversationDrawsACardForEachThingTheAgentTouched(t *testing.T) {
 	l, refs := chatCardsLife(t)
 	l.do(t, "/days/"+today+"/conversation", "say", map[string]string{"text": "What did I touch?"})
 	seven := []string{"/pages/999999", "/days/2031-05-02", "/days/2031-05-03", "/days/2031-05-04", "/days/2031-05-05", "/days/2031-05-06", "/days/2031-05-07"}
-	chatAppend(t, l, "\n\n"+toolLines(refs...)+"\n**lifelog** (09:30): Here they are.\n\n"+toolLines(seven...)+"\n**lifelog** (09:31): And a week.\n\n"+toolLines("/days/today")+"\n**lifelog** (09:32): And today, by the word.\n")
+	chatAppend(t, l, "\n\n"+toolLines(refs...)+"\n**aminte** (09:30): Here they are.\n\n"+toolLines(seven...)+"\n**aminte** (09:31): And a week.\n\n"+toolLines("/days/today")+"\n**aminte** (09:32): And today, by the word.\n")
 
 	page := pageAt(t, l.web, "/days/"+today+"/conversation")
 	cards := chatCardsOf(page)
@@ -310,7 +310,7 @@ func TestTheConversationDrawsACardForEachThingTheAgentTouched(t *testing.T) {
 func TestTheColumnDrawsTheCards(t *testing.T) {
 	l, refs := chatCardsLife(t)
 	l.do(t, "/days/"+today+"/conversation", "say", map[string]string{"text": "Show me"})
-	chatAppend(t, l, "\n\n"+toolLines(append(slices.Clone(refs), "/pages/999999")...)+"\n**lifelog** (09:30): Here.\n")
+	chatAppend(t, l, "\n\n"+toolLines(append(slices.Clone(refs), "/pages/999999")...)+"\n**aminte** (09:30): Here.\n")
 	column := chatColumnRE.FindString(pageAt(t, l.web, "/browse"))
 	cards := chatCardsOf(column)
 	var kinds []string

@@ -4,7 +4,7 @@
 
 - **Decision.** No revision or history tables. The temporal metadata is row-level: `created_at`
   (on every table that has it), `updated_at`, the tombstone, `source`,
-  and the append-only facts. `lifelog_meta.edit_revisions` supplies clock-independent stale-edit
+  and the append-only facts. `aminte_meta.edit_revisions` supplies clock-independent stale-edit
   protection without retaining any previous body or typed value. The token moves only with the page's own
   content: creating a page, with its owned name and typed row, is not an edit (`entity_names_touch_insert`), so a
   fresh page is never shown as edited, and a link is an edit of the page it leaves, never of the page it points

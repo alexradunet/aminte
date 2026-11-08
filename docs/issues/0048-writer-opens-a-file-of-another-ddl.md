@@ -16,13 +16,13 @@ import redone from the plan.
 
 Expected: a writer that refuses a file of an unsupported version ([issue 0036](0036-writer-opens-unsupported-schema-versions.md))
 should also refuse, before the freeze, a file whose DDL is not the one it embeds — a hash of the canonical DDL in
-`lifelog_meta`, or an equally cheap check — with the one sentence that says what to do: rebuild it from the schema and
+`aminte_meta`, or an equally cheap check — with the one sentence that says what to do: rebuild it from the schema and
 replay ([imports](../contract/imports.md)). After the freeze `user_version` carries this.
 
 ## Reproduce
 
-1. Build the writer at a commit before a `schema.sql` change; `lifelog init --db x.db`.
-2. Build it at the commit after; `lifelog do integrity-check --db x.db`: an SQL error, not a refusal to open.
+1. Build the writer at a commit before a `schema.sql` change; `aminte init --db x.db`.
+2. Build it at the commit after; `aminte do integrity-check --db x.db`: an SQL error, not a refusal to open.
 
 ## Rules involved
 

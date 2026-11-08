@@ -6,7 +6,7 @@ import (
 	"slices"
 	"strings"
 
-	"lifelog/text"
+	"aminte/text"
 )
 
 // journal: the journal (D5, D15, D22, D23) — the day page and its CHECK, capture that appends to it
@@ -50,9 +50,9 @@ func journal(s *S) {
 	}
 	_, e := c.runBlock(s.d.Block("capture"), p, sync)
 	row := c.tab("select n.title,e.day,e.body from entities e join entity_names n on n.entity_id=e.id and n.name_key=e.preferred_name_key where e.id=?", p["page_id"])
-	s.K("cookbook/capture run literally on a new day creates the day page with the entry", e == nil && row == "2026-09-29|2026-09-29|Shipped the schema doc. Review pending. [[Lifelog]]", e, row)
+	s.K("cookbook/capture run literally on a new day creates the day page with the entry", e == nil && row == "2026-09-29|2026-09-29|Shipped the schema doc. Review pending. [[Aminte]]", e, row)
 	s.K("...links it to what the entry names, and attaches the mood to it",
-		c.n("select count(*) from links l join entity_names n on n.entity_id=l.to_id where l.from_id=? and n.name_key='lifelog'", p["page_id"]) == 1 &&
+		c.n("select count(*) from links l join entity_names n on n.entity_id=l.to_id where l.from_id=? and n.name_key='aminte'", p["page_id"]) == 1 &&
 			c.tab("select captured_with_id from measurements") == val(p["page_id"]))
 	var moodInsert string
 	for _, st := range statements(s.d.Block("capture")) {
@@ -89,7 +89,7 @@ func journal(s *S) {
 	c.must(upd[0], P{"page_id": p["page_id"]})
 	body := c.str("select body from entities where id=?", p["page_id"])
 	s.K("a second capture that day appends after a blank line, in the same page", strings.Count(body, "Review pending.") == 2 &&
-		strings.Contains(body, "[[Lifelog]]\n\nShipped") && c.n("select count(*) from entities where day=?", "2026-09-29") == 1)
+		strings.Contains(body, "[[Aminte]]\n\nShipped") && c.n("select count(*) from entities where day=?", "2026-09-29") == 1)
 	c = s.fresh()
 	a := c.capture("first", "2026-09-30")
 	b := c.capture("met [[Ana]]", "2026-09-30")

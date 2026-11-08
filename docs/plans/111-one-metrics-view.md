@@ -68,9 +68,9 @@ flowchart LR
 | The `show=habits` lens in the metrics resource | `internal/api/measurements.go`, `habits.go` |
 | The redirect of the HTML of `/habits` | `internal/api/serve.go`, `html.go` |
 | The tab leaves the sidebar | `internal/api/html.go` (`Habits` row of the sidebar list) |
-| Links to the lens | `day.html`, `week.html`, `root.html`, `metrics.html`; `cmd/lifelog/main.go` (the CLI link at line 190: check what it opens) |
+| Links to the lens | `day.html`, `week.html`, `root.html`, `metrics.html`; `cmd/aminte/main.go` (the CLI link at line 190: check what it opens) |
 | The docs | `README.md`, `API.md` (state that `/habits` HTML redirects), `docs/plans/README.md` |
-| The tests | `internal/api/browser_view_test.go`, `shell_test.go`, `day_view_test.go`, `html_test.go`, `cmd/lifelog/main_test.go` |
+| The tests | `internal/api/browser_view_test.go`, `shell_test.go`, `day_view_test.go`, `html_test.go`, `cmd/aminte/main_test.go` |
 
 ## Tests
 

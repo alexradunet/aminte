@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-// instructions are what the model reads first. The first part is the text of the MCP server of lifelog
+// instructions are what the model reads first. The first part is the text of the MCP server of aminte
 // (extensions/mcp/mcp/mcp.go). The second part is for a chat that the owner reads on a screen or a phone. %[1]s is the
 // local day of the machine, and %[2]s is the day of the conversation page that the model reads.
 const instructions = "life.db is a personal life log: a journal of day pages (one per local day, titled YYYY-MM-DD), " +

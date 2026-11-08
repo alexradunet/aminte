@@ -45,7 +45,7 @@ The commits after `af93c8d`, the commit of this page:
 The checks at `59a48ad`, on Linux: the baseline with `-count=1`, `-shuffle=on`, `staticcheck`, `deadcode -test` (linux
 and windows), `GOOS=windows go vet` and `gofmt`: all clean. The mutants are 261.
 
-The owner's file gets plans 124 and 125 in one run of `meta124-bin` (`/home/cico/.local/share/lifelog-oneoff/meta124/`):
+The owner's file gets plans 124 and 125 in one run of `meta124-bin` (`/home/cico/.local/share/aminte-oneoff/meta124/`):
 the comments of the tables `entities` and `people` and of the trigger `measurements_scale_range` by the
 `writable_schema` procedure of plan 124, and the new trigger `metrics_range_order`. The program first checks that no
 metric of the file has a unit that the new trigger refuses. Its `OLD.sql` is `schema.sql` at `cdb7b8e`, and its
@@ -58,7 +58,7 @@ The change of the live file, 2026-10-17, run by the owner with `!` commands, for
    places in the list (`seq`) differed, while their texts were equal. The owner started the service again; the program
    then compared the indexes by name, with their flags and columns, and left out `seq`, which holds no fact of an
    index. A refusal now prints both lists in full. Its tests made the case first.
-2. `systemctl stop lifelog.service`; a snapshot with the installed binary of `cdb7b8e`:
+2. `systemctl stop aminte.service`; a snapshot with the installed binary of `cdb7b8e`:
    `/home/cico/life/snapshots/2026-10-17-plan-124-125-b/life-2026-10-17.db`, its restore check ok.
 3. `meta124-bin … --dry-run`: equal to `OLD.sql`; no metric with a unit that `metrics_range_order` refuses; the texts of
    `entities`, `people` and `measurements_scale_range` set; `schema_version` 172, was 171; `metrics_range_order` made;
@@ -66,7 +66,7 @@ The change of the live file, 2026-10-17, run by the owner with `!` commands, for
    rolled back.
 4. `meta124-bin …`: the same, committed; opened again: equal to `NEW.sql`; `integrity_check` ok; `foreign_key_check`
    no rows; the trial write ok. A second run refused (the file is no longer `OLD.sql`) and changed nothing.
-5. `lifelog get /integrity`: ok.
-6. The binary of `7d7d672` (the merge of plan 125) installed at `/home/cico/.local/bin/lifelog`, the one before it kept
-   as `lifelog.prev`, with the service stopped.
-7. `systemctl start lifelog.service`: "serving /home/cico/dev/lifelogdb/life.db on http://127.0.0.1:7777" at 14:16:54.
+5. `aminte get /integrity`: ok.
+6. The binary of `7d7d672` (the merge of plan 125) installed at `/home/cico/.local/bin/aminte`, the one before it kept
+   as `aminte.prev`, with the service stopped.
+7. `systemctl start aminte.service`: "serving /home/cico/dev/aminte/life.db on http://127.0.0.1:7777" at 14:16:54.

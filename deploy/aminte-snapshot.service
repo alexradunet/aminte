@@ -1,0 +1,16 @@
+# Reference copy. Compare it with the installed unit before you replace it (deploy/README.md).
+[Unit]
+Description=Aminte nightly snapshot of life.db
+# A failure starts the unit below, which writes it to the journal.
+OnFailure=aminte-snapshot-failed.service
+
+[Service]
+Type=oneshot
+# Replace OWNER and the paths. The user must be the user of aminte.service.
+User=OWNER
+Environment=AMINTE_BIN=/home/OWNER/.local/bin/aminte
+Environment=AMINTE_DB=/home/OWNER/aminte/life.db
+Environment=AMINTE_SNAPSHOTS=/home/OWNER/snapshots
+ExecStart=/usr/local/bin/aminte-snapshot
+# A stuck snapshot ends as a failure, and so starts OnFailure.
+TimeoutStartSec=30min

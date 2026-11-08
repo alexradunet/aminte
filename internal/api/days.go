@@ -10,9 +10,9 @@ import (
 	"strconv"
 	"time"
 
-	"lifelog/internal/core"
-	"lifelog/siren"
-	"lifelog/text"
+	"aminte/internal/core"
+	"aminte/siren"
+	"aminte/text"
 )
 
 // recentDays is how many of the newest day pages the root shows.
@@ -111,10 +111,10 @@ func (h *server) root(r *http.Request) (*siren.Entity, error) {
 		record, action("register-metric", nil, nil), action("snapshot", nil, nil)}
 	_, offset := now.Zone()
 	e := &siren.Entity{
-		Class: []string{"root"}, Title: "Lifelog",
+		Class: []string{"root"}, Title: "Aminte",
 		Properties: map[string]any{"today": today, "zone": now.Location().String(), "utc_offset": offset, "recent": recent},
 		Entities:   []siren.Link{link("today", siren.DayHref(today), "Today"), link("conversation", conversationHref(today), "Chat")},
-		Links: []siren.Link{link("self", "/", "Lifelog"), link("today", siren.DayHref(today), "Today"), link("days", "/days", "Days"),
+		Links: []siren.Link{link("self", "/", "Aminte"), link("today", siren.DayHref(today), "Today"), link("days", "/days", "Days"),
 			link("browse", siren.BrowseHref(nil), "Browse"), link("people", siren.BrowseKindHref("person"), "People"),
 			link("media", siren.BrowseKindHref("media"), "Media"), link("files", siren.BrowseKindHref("document"), "Documents"),
 			link("metrics", "/metrics", "Metrics"), link("ghosts", siren.GhostsHref(), "Ghost pages"), link("actions", "/actions", "All actions"),
