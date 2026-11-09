@@ -13,7 +13,7 @@ import (
 var (
 	// railAsideRE is the rail of a page: the aside, with the bottom bar and the More sheet inside it.
 	railAsideRE = regexp.MustCompile(`(?s)<aside class="rail">.*?</aside>`)
-	// railBarRE is the bottom bar of a phone: the sections of every day, Chat and More. Group 1 is its content.
+	// railBarRE is the bottom bar of a phone: the sections of every day and More. Group 1 is its content.
 	railBarRE = regexp.MustCompile(`(?s)<nav aria-label="Sections">(.*?)</nav>`)
 	// railSheetRE is the sheet that More opens. Group 1 is its content.
 	railSheetRE = regexp.MustCompile(`(?s)<div class="rail-more" id="sections" popover>(.*?)</aside>`)
@@ -63,8 +63,8 @@ func TestTheRailMarksTodayOnTodaysDay(t *testing.T) {
 	}
 }
 
-// TestTheBottomBarAndTheMoreSheetOfAPhone: the sections of every day (Today, This week, Calendar, Metrics, Browse), Chat
-// and More are one list, the bottom bar of a phone. The owner's links are the popover sheet that More opens and Close
+// TestTheBottomBarAndTheMoreSheetOfAPhone: the sections of every day (Today, This week, Calendar, Metrics, Browse) and
+// More are one list, the bottom bar of a phone. The owner's links are the popover sheet that More opens and Close
 // hides, with no script. Each link is drawn once, and More is marked when the page is in the sheet.
 func TestTheBottomBarAndTheMoreSheetOfAPhone(t *testing.T) {
 	l := emptyLife(t)
@@ -73,7 +73,7 @@ func TestTheBottomBarAndTheMoreSheetOfAPhone(t *testing.T) {
 	if bar == nil || sheet == nil {
 		t.Fatalf("no bottom bar or no sheet:\n%s", railAsideRE.FindString(body))
 	}
-	if got, want := railLinksOf(bar[1]), `/days/today /weeks/today /days /metrics /browse /days/today/conversation popovertarget="sections"`; got != want {
+	if got, want := railLinksOf(bar[1]), `/days/today /weeks/today /days /metrics /browse popovertarget="sections"`; got != want {
 		t.Errorf("the bottom bar: %s, want %s", got, want)
 	}
 	if !strings.Contains(bar[1], `<a href="/browse" aria-current="page">`) || strings.Contains(bar[1], `class="here"`) {
@@ -132,7 +132,7 @@ func TestTheAccessKeysAreInThePage(t *testing.T) {
 }
 
 // TestTheSectionsAreTheSameOnEveryPageAndTheRightOneIsMarked: the sections of every day are Today, This week, Calendar,
-// Metrics, Browse and Chat, in the rail of a desktop and in the bottom bar of a phone (one list, which the sheet does
+// Metrics and Browse, in the rail of a desktop and in the bottom bar of a phone (one list, which the sheet does
 // not repeat). There is no group of the record. Browse is marked on every list of Browse, Metrics on the board and
 // under it.
 func TestTheSectionsAreTheSameOnEveryPageAndTheRightOneIsMarked(t *testing.T) {
@@ -155,7 +155,7 @@ func TestTheSectionsAreTheSameOnEveryPageAndTheRightOneIsMarked(t *testing.T) {
 				marked = append(marked, m[3])
 			}
 		}
-		if want := "Today=/days/today This week=/weeks/today Calendar=/days Metrics=/metrics Browse=/browse Chat=/days/today/conversation"; strings.Join(got, " ") != want {
+		if want := "Today=/days/today This week=/weeks/today Calendar=/days Metrics=/metrics Browse=/browse"; strings.Join(got, " ") != want {
 			t.Errorf("%s: the sections are %v, want %s", c.path, got, want)
 		}
 		if strings.Join(marked, " ") != c.current {
@@ -167,22 +167,14 @@ func TestTheSectionsAreTheSameOnEveryPageAndTheRightOneIsMarked(t *testing.T) {
 	}
 }
 
-// TestTheRailHasChatAndSettings: Chat is a section of the rail and goes to the conversation of today. Settings is
-// beside Snapshot in the line of the owner. Each is marked on its own page.
-func TestTheRailHasChatAndSettings(t *testing.T) {
+// TestTheRailHasSettings: Settings is beside Snapshot in the line of the owner, and it is marked on its own page.
+func TestTheRailHasSettings(t *testing.T) {
 	l := emptyLife(t)
 	body := pageAt(t, l.web, "/browse")
-	for _, want := range []string{`<a href="/days/today/conversation"><span class="icon icon-chat" aria-hidden="true"></span>Chat</a>`,
-		` · <a href="/settings">Settings</a> · <a href="/actions?new=snapshot">Snapshot</a>`} {
+	for _, want := range []string{` · <a href="/settings">Settings</a> · <a href="/actions?new=snapshot">Snapshot</a>`} {
 		if !strings.Contains(body, want) {
 			t.Errorf("the rail lacks %s", want)
 		}
-	}
-	if !strings.Contains(pageAt(t, l.web, "/days/today/conversation"), `<a href="/days/today/conversation" aria-current="page">`) {
-		t.Error("Chat is not marked on the conversation")
-	}
-	if !strings.Contains(pageAt(t, l.web, "/days/"+today+"/conversation"), `<a href="/days/today/conversation" aria-current="page">`) {
-		t.Error("Chat is not marked on the conversation of a day by its date")
 	}
 	if !strings.Contains(pageAt(t, l.web, "/settings"), `<a href="/settings" aria-current="page">Settings</a>`) {
 		t.Error("Settings is not marked on /settings")

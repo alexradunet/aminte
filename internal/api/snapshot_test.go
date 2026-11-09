@@ -164,7 +164,7 @@ func TestASnapshotIsDownloadedByTheOwner(t *testing.T) {
 	d := dbtest.New(t)
 	dir := t.TempDir()
 	clock := func() time.Time { return time.Date(2026, 10, 2, 14, 30, 5, 0, time.UTC) }
-	h := api.NewWith(&core.Store{DB: d, SnapshotDir: dir, Clock: clock, Zone: time.UTC, SettingsPath: filepath.Join(t.TempDir(), "life.settings.json")}, nil)
+	h := api.NewWith(&core.Store{DB: d, SnapshotDir: dir, Clock: clock, Zone: time.UTC}, nil)
 	owner := client.InProcess(h, "cli")
 	e := apitest.Must(t)(owner.Do(t.Context(), apitest.Action(t, apitest.Must(t)(owner.Get(t.Context(), "/")), "snapshot"), nil))
 	if got := apitest.Href(e, "download"); got != "/snapshots/life-2026-10-02.db" {

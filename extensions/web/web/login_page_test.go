@@ -22,7 +22,7 @@ import (
 func TestTheLoginPageIsABarePageAndAPageOfTheShellIsNot(t *testing.T) {
 	l := emptyLife(t)
 	shell := ask(l.web, http.MethodGet, "/browse")
-	for _, want := range []string{`<div class="shell">`, `<aside class="rail">`, `<script src="/assets/chat.js" defer></script>`, `<body data-ground="boards">`} {
+	for _, want := range []string{`<div class="shell">`, `<aside class="rail">`, menuScriptTag, `<body data-ground="boards">`} {
 		if !strings.Contains(shell.Body.String(), want) {
 			t.Errorf("a page of the shell lacks %s", want)
 		}

@@ -94,9 +94,7 @@ func TestEveryActionOfAnEntityIsDrawnOnce(t *testing.T) {
 		{"a month", "/months/2026-09"},
 		{"a year", "/years/2026"},
 		{"the integrity page", "/integrity"},
-		{"the settings", "/settings"},
 		{"a search", "/search?q=ran"},
-		{"the conversation of a day", "/days/today/conversation"},
 	} {
 		t.Run(row.name, func(t *testing.T) {
 			e := must(t)(l.api.Get(t.Context(), row.path))
@@ -235,16 +233,9 @@ func TestEveryActionFormSendsToItsAction(t *testing.T) {
 			t.Errorf("the page of today has no form of %s: %+v", name, a)
 		}
 	}
-	// The chat column is the popover #chat, up to the end of its form and its hint: it posts to the day of today, and not to
-	// an action of this day.
-	chatColumn := regexp.MustCompile(`(?s)<div class="chat compact" id="chat".*?</form>\s*<p class="hint">.*?</p>\s*</div>`)
-	besideChat := chatColumn.ReplaceAllString(body, "")
-	if besideChat == body {
-		t.Fatal("the page of today has no chat column: the test cuts nothing")
-	}
-	forms := regexp.MustCompile(`<form method="POST" action="([^"]*)"`).FindAllStringSubmatch(besideChat, -1)
+	forms := regexp.MustCompile(`<form method="POST" action="([^"]*)"`).FindAllStringSubmatch(body, -1)
 	if len(forms) < 2 {
-		t.Errorf("the page of today has %d POST forms beside the chat column, want the capture and the record at least", len(forms))
+		t.Errorf("the page of today has %d POST forms, want the capture and the record at least", len(forms))
 	}
 	for _, m := range forms {
 		if !posts[m[1]] {

@@ -24,17 +24,15 @@ The database it writes is specified independently of it, so another program — 
 
 ```
 go build -o aminte ./cmd/aminte   # Go >= 1.27, no cgo
-for d in extensions/*/; do go build -C "$d" -o "$PWD/" ./cmd/...; done   # every extension, beside aminte: aminte-web, aminte-mcp, aminte-agent, aminte-whatsapp, aminte-ticktick, ...
+for d in extensions/*/; do go build -C "$d" -o "$PWD/" ./cmd/...; done   # every extension, beside aminte: aminte-web, aminte-mcp, aminte-ticktick, ...
 aminte init                               # life.db beside the program; --db PATH or $AMINTE_DB names another
 aminte agentic-init                       # AGENTS.md, skills and MCP configs here, for a coding agent opened here
 
 aminte capture "Ran 5k with [[Sam]] #running" --mood 4
-aminte do settings model_url=http://HOST/v1 model=ID   # the model of the agent: kept in life.settings.json, beside life.db
 aminte day --human
 mkdir -p ~/life && (umask 077; head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n' > ~/life/token)   # a token file: 64 characters
 aminte serve                              # the API on http://127.0.0.1:7777: Siren JSON, this machine only
 aminte serve --token-file ~/life/token --with web   # the browser too, on http://127.0.0.1:7780: log in with the token
-aminte serve --token-file ~/life/token --with web --with agent --with whatsapp   # and the agent that answers, and the WhatsApp transport, beside them
 aminte mcp --agent lmstudio               # MCP on stdio (the extension aminte-mcp); rows are written as agent:lmstudio
 aminte snapshot --snapshots ~/snapshots --human  # life-YYYY-MM-DD.db and its restore check
 aminte file memo.m4a --text memo.txt     # keep a file: its text, the original hashed and never stored
@@ -54,8 +52,8 @@ New-Item -ItemType Directory -Force $HOME\life | Out-Null
 
 To run `aminte serve` as a system service with a nightly snapshot, see [deploy/](deploy/README.md): the unit files
 and the snapshot script, as a reference to compare with the installed copies before you replace them. The reference
-unit runs `serve ... --with web --with agent --with whatsapp`, so it needs `aminte-web`, `aminte-agent` and
-`aminte-whatsapp` beside `aminte` ([ship a change](deploy/README.md#ship-a-change)).
+unit runs `serve ... --with web`, so it needs `aminte-web` beside `aminte`
+([ship a change](deploy/README.md#ship-a-change)).
 
 An import is done by a program that loads rows itself ([imports](docs/contract/imports.md)), or by a coding agent
 with the owner, in a conversation: the agent reads a source with its own tools and writes through the catalog's MCP
@@ -134,15 +132,16 @@ what was decided and why. The behaviour is in the page that the link names, and 
   `--url`, a command uses the `life.db` beside the executable, and `aminte init` with no path makes it there; a
   missing file is still refused. `aminte agentic-init` is a setup command of the machine, not a catalog action: it
   writes files beside the program for a coding agent ([extensions/agentic](extensions/agentic/README.md)).
-- **Owner-only actions.** An action that the catalog marks `owner` is the owner's alone, because an agent must not speak
-  as the owner (`say`), read the key of the model (`settings`) or hold the write lock (`integrity-check`).
+- **Owner-only actions.** An action that the catalog marks `owner` is the owner's alone, because an agent must not, for
+  example, hold the write lock (`integrity-check`).
   [API.md](API.md#reaching-a-server) holds the refusal and the owner reads that are not actions, and
   `aminte actions --human` marks each owner action.
 - **No conversation inside the writer** ([plan 116](docs/plans/116-strip-to-the-core.md),
-  [RFC 0015](docs/rfcs/0015-no-conversation.md)). The owner's decision (2026-10-15): `ask` and the voice note are
-  removed, with the model and transcriber endpoints they needed. The core calls no model. A recording is kept as a
-  file with its text ([D9](docs/decisions/D09-binary-files.md)), and a conversation is a plain page that an agent writes
-  to (the decision "The conversation of a day", below).
+  [RFC 0015](docs/rfcs/0015-no-conversation.md), [RFC 0026](docs/rfcs/0026-no-agent-inside-and-no-whatsapp.md)). The
+  owner's decisions (2026-10-15, 2026-11-09): no model, no chat, no transport of a messaging app. The core and its
+  extensions call no model. An AI agent works with `aminte` from the outside, through the CLI (`--source agent:NAME`)
+  or the MCP server (`aminte mcp --agent NAME`), as the writer `agent:NAME`. A recording is kept as a file with its
+  text ([D9](docs/decisions/D09-binary-files.md)).
 - **Renames select a preferred name on the same identity**, retaining direct aliases as
   [titles and wikilinks](docs/contract/titles-and-wikilinks.md) ("Renames") requires and
   [rename a page](docs/cookbook/rename-a-page.md) writes; `aminte rename` and the API's `rename` action run it.
@@ -154,18 +153,6 @@ what was decided and why. The behaviour is in the page that the link names, and 
   `serve --snapshots DIR` names, or beside `life.db`, named by the local day and never overwritten. `aminte snapshot
   [--snapshots DIR]` runs the action in-process, and with `--url` the server's folder is the one. The action and the
   download are in [API.md](API.md#snapshot), and restoring stays the manual procedure of the cookbook.
-- **The settings file** ([plan 146](docs/plans/146-settings-and-the-chat-column.md)). The settings of the application
-  are a JSON file beside the database (`life.settings.json` for `life.db`), mode 0600, never in git. They are not in
-  `life.db`, because the model key is a secret and a snapshot copies the database, and they are not in `docs/`, because
-  they belong to this application and not to the contract. The keys, and the owner-only action that sets them, are in
-  [API.md](API.md#settings); the browser keeps its own
-  ([the settings of the browser](extensions/web/README.md#the-settings-of-the-browser)).
-- **The conversation of a day** ([plan 146](docs/plans/146-settings-and-the-chat-column.md), after
-  [plan 145](docs/plans/145-whatsapp.md), [plan 162](docs/plans/162-the-simple-architecture.md)). The conversation of
-  a day is a plain page, and the core writes both turns of it: `say` writes the owner's, and `reply` writes the agent's,
-  so no turn can forge another and a surface needs no knowledge of the format. The agent is an extension of its own,
-  [`aminte-agent`](extensions/agent/README.md), run by `serve --with agent`, and the core calls no model.
-  [API.md](API.md#conversation) holds the format, the key of a turn and every refusal.
 - **One delete, of one row or several** ([plan 107](docs/plans/107-delete-several-at-once.md),
   [plan 131](docs/plans/131-the-pareto-pass.md)). `tombstone-pages` takes `ids` and tombstones them all in one write or
   none ([API.md](API.md#tombstoned)). It is a danger, not the owner's alone, and a revive undoes it.
@@ -237,7 +224,7 @@ aminte actions --human
 | `client` | the hypermedia client, transport only; public: the Go extensions import it; in-process or remote; `DoFiles` sends file parts from readers, and `Do` sends paths through it; of this module it imports only `siren`, so it builds no `core`, no `db` and no SQLite | `client.InProcess` and `client.Remote` on one handler: `TestTheTwoTransportsGiveEqualAnswers` |
 | `app` | the helpers of a Go extension: the shell of a program (`Main`, `API`, `OwnerActs`, `ExitCode`) and what a catalog needs (`Catalog`, `Listen`, `Entity`, `Fail`, `StateDir`); public; standard library, `siren` and `client`; it serves, and it dials only in `program.go`, through `API` | its tests |
 | `amintetest` | the test kit of the extensions: `amintetest.New(t, day)` makes a fresh synthetic file, the real handler over it with a fixed clock, and a server on a loopback socket; public, for `_test.go` files of an extension only | its own test |
-| `client/tools` | the catalog as the functions of a model: a tool for each action that is not the owner's, its JSON Schema from the fields, the arguments flattened to form values; public: the MCP server and the chat agent build their lists from it | its table tests |
+| `client/tools` | the catalog as the functions of a model: a tool for each action that is not the owner's, its JSON Schema from the fields, the arguments flattened to form values; public: the MCP server builds its list from it | its table tests |
 | `extensions/*` | one module each, the program `aminte-NAME`: a client of [API.md](API.md) that imports the public packages of the root module (`siren`, `client`, `client/tools`, `app`, `text`) and nothing of `aminte/internal` ([the contract of an extension](extensions/README.md#what-an-extension-is)); the exception is `extensions/agentic`, a setup extension that is no client and imports nothing from `aminte`; [the table of the extensions](extensions/README.md#the-extensions) names each one | the tests of its packages (`go vet ./... && go test ./...` in its folder); the `e2e_test.go` of an extension builds the real `aminte` and the program and runs the real line; the exception is `extensions/googlephotos`, whose `review/e2e_test.go` builds the real `aminte` and serves it, and runs the review page over it; `extensions/web/web/parity_test.go` holds a form for each action |
 | `internal/scaletest` | the synthetic personas and the lifetime workload of `tools/lifescale`: generators, an oracle and the timed checks | `scaletest.Run` with the profile `small`, in the baseline |
 | `tools/lifescale` | the lifetime and stress runner over `internal/scaletest` ([tests/README.md](tests/README.md)) | `internal/scaletest`: the runner has no test of its own |
@@ -270,12 +257,6 @@ the program `AMINTE_URL` (the API of the file), `AMINTE_EXE` and `AMINTE_DB`. Th
   catalog that is not the owner's is a tool.
 - [`extensions/agentic`](extensions/agentic/README.md): `aminte agentic-init [--force]`. It writes `AGENTS.md`, the
   skills and the MCP configs for a coding agent opened in the folder of the program.
-- [`extensions/agent`](extensions/agent/README.md): the agent that answers, `aminte serve --with agent`. It reads the
-  conversation page, calls a model at an OpenAI-compatible endpoint, and writes through the catalog as `agent:aminte`.
-  The chat of the browser and the chat of WhatsApp both get their answer from it.
-- [`extensions/whatsapp`](extensions/whatsapp/README.md): the WhatsApp transport, `aminte serve --with whatsapp`. A
-  message from the owner's number becomes `say` with `via=whatsapp`, and each new turn of the conversation goes to the
-  phone. It calls no model.
 - [`extensions/ticktick`](extensions/ticktick/README.md): TickTick, the task service. What you finish in
   TickTick comes back as a `Done:` entry of its day, once. It is the task service:
   `aminte` builds the entities of Tasks under `/tasks`, and `aminte-web` draws them. `add-task` and the other actions

@@ -1,15 +1,9 @@
-{{/* The settings of the application (docs/plans/146-settings-and-the-chat-column.md), the owner's alone: one form of
-     the action settings, the key as a password input with its value. A save is a redirect back here with the toast.
-     The generic view would list the properties, the key among them, so this view draws the form only, and the link
-     to the backup: a snapshot, which the toast of its answer offers for download.
-     Under it, "This browser" is the form of web-settings, an action that aminte-web serves in its own catalog
-     (extensions/web/README.md). The page of web adds it to the entity, with the values that web keeps. It is not
-     there when web serves no catalog. */}}
+{{/* The settings, the owner's alone. aminte-web draws this page itself (settingsPage in web/page.go): the core keeps no
+     settings. "This browser" is the form of web-settings, an action that aminte-web serves in its own catalog
+     (extensions/web/README.md), with the values that web keeps. It is not there when web serves no catalog. Under it
+     is the link to the backup: a snapshot, which the toast of its answer offers for download. */}}
 {{define "settings"}}{{template "head" .}}
 {{template "page-head" (dict "v" . "kind" "owner" "title" "Settings")}}
-<div class="sheet">
-{{with .Action "settings"}}{{with .Hint}}<p class="desc">{{.}}</p>{{end}}{{template "form" (form . "button" "Save" "autocomplete" "off")}}{{end}}
-</div>
 {{with .Action "web-settings"}}<div class="sheet"><h2>This browser</h2>
 {{with .Description}}<p class="desc">{{.}}</p>{{end}}{{template "form" (form . "button" "Save" "autocomplete" "off" "back" $.ReturnHere)}}
 </div>

@@ -36,7 +36,6 @@ func New(t testing.TB, day string) *Server {
 		t.Fatalf("amintetest.New: %v", err)
 	}
 	store := &core.Store{DB: dbtest.New(t), Clock: func() time.Time { return start }, Zone: time.UTC}
-	store.SettingsPath = core.SettingsPathFor(store.DB.Path()) // beside the file, as the program puts it
 	apps := api.NewApps()
 	handler := api.NewWith(store, apps)
 	server := httptest.NewServer(handler)

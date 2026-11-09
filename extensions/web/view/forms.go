@@ -55,7 +55,7 @@ func (v *view) shown(a siren.Action) *shownAction {
 // value but not shown, "outside" lists fields that controls outside the form send (the boxes of a list join the form
 // by its id) and that the form does not draw, "autofocus" names the field the browser starts in ("" for none),
 // "more" lists optional fields folded under "More fields" (docs/plans/095-the-leaf-and-its-margin.md; "*" folds every
-// field that the action does not require), "send" (any word) marks the text areas as the ones whose Enter key sends (enterkeyhint), "back" is the
+// field that the action does not require), "back" is the
 // page the browser returns to after the write (no field of the action: the server reads it, see backOf), "label"
 // ("field=words") gives a field a title in this form only (the score form calls its unit Range), "key"
 // ("field=letter") gives a field its access key (the words of an empty field are its Placeholder in the catalog; Prompt
@@ -70,10 +70,8 @@ type formView struct {
 	ID            string // the form's id, which the controls outside it name (form="pick")
 	Focus         string
 	Back          string
-	NoPreview     bool          // the form has a text area but offers no Preview (the chat column)
 	Asked         bool          // the form the page's link asked for (?new=<name>): open
 	Opens         bool          // the form names the path fields of a templated action, and opens its form (opener)
-	Send          bool          // the Enter key of a text area sends the form (the chat)
 	Primary       bool          // the button is the primary one: a form with fields to fill
 	Aria          string        // the aria-label of the button, for a button that is a glyph (the ×)
 	Also          *formView     // a second action that the form sends to, by a button of its own (Or)
@@ -116,9 +114,6 @@ func (f *formView) Or(g *formView) *formView {
 // Preview reports a form with a text area: it offers Preview, a second button that sends the form to POST /render
 // in a new tab, where the body shows as its page will show it, and nothing is saved.
 func (f *formView) Preview() bool {
-	if f.NoPreview {
-		return false
-	}
 	for _, fd := range append(f.Shown[:len(f.Shown):len(f.Shown)], f.More...) {
 		if fd.Type == "textarea" {
 			return true
@@ -152,7 +147,6 @@ type fieldView struct {
 	Focus  bool
 	Key    string            // the field's access key, which the browser's own modifier reaches
 	List   string            // the id of the datalist of a field of page titles with options (Pages): see Fields
-	Send   bool              // the Enter key sends the form (enterkeyhint of a text area)
 	Sole   bool              // the only field the form draws: it needs no mark "required"
 	Labels map[string]string // the words shown beside each option of the datalist (formView.Labels)
 }
@@ -171,7 +165,7 @@ func (f *formView) Fields(folded bool) []fieldView {
 		if w, ok := f.prompts[fd.Name]; ok {
 			fd.Placeholder = w
 		}
-		out[i] = fieldView{fd, fd.Name == f.Focus, f.keys[fd.Name], "", f.Send, sole, f.labels[fd.Name]}
+		out[i] = fieldView{fd, fd.Name == f.Focus, f.keys[fd.Name], "", sole, f.labels[fd.Name]}
 		if fd.Pages && len(fd.Options) > 0 {
 			out[i].List = cmp.Or(f.ID, f.Name) + "-" + fd.Name
 		}
@@ -214,8 +208,6 @@ func (f *formView) MoreOpen() bool {
 type formOptions struct {
 	button, class, id, back string
 	autocomplete, aria      string
-	plain                   bool // "plain" was given: the form offers no Preview
-	send                    bool // "send" was given
 	hasButton               bool // "button" was given, also as ""
 	autofocus               string
 	hasAutofocus            bool // "autofocus" was given, also as "": the options name the field of the focus, or none
@@ -254,10 +246,6 @@ func parseFormOptions(pairs []string) (formOptions, error) {
 			o.autocomplete = v
 		case "aria":
 			o.aria = v
-		case "send":
-			o.send = v != ""
-		case "plain":
-			o.plain = v != ""
 		case "id":
 			o.id = v
 		case "back":
@@ -309,7 +297,7 @@ func formOf(x any, opts ...string) (*formView, error) {
 	if err != nil {
 		return nil, fmt.Errorf("form %s: %w", a.Name, err)
 	}
-	f := &formView{Action: a, Button: a.Title, Class: o.class, Autocomplete: o.autocomplete, Aria: o.aria, ID: o.id, Back: o.back, NoPreview: o.plain, Send: o.send, Focus: o.autofocus,
+	f := &formView{Action: a, Button: a.Title, Class: o.class, Autocomplete: o.autocomplete, Aria: o.aria, ID: o.id, Back: o.back, Focus: o.autofocus,
 		keys: o.keys}
 	if o.hasButton {
 		f.Button = o.button

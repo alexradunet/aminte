@@ -125,8 +125,8 @@ func (f *lockFixture) fetch(path string) *httptest.ResponseRecorder {
 	return request(f.h, "GET", path, "", map[string]string{"Accept": "application/vnd.siren+json", "Cookie": f.cookie, "Sec-Fetch-Site": "same-origin", "Sec-Fetch-Mode": "cors"})
 }
 
-// isLocked probes the session with a script's fetch, as the poll of chat.js reads it: the status, and the code locked
-// of the JSON of the error.
+// isLocked probes the session with a script's fetch of Siren JSON: the status, and the code locked of the JSON of the
+// error.
 func (f *lockFixture) isLocked() bool {
 	f.t.Helper()
 	rec := f.fetch("/days/" + secretDay)
@@ -337,7 +337,7 @@ func TestSessionPagesAreNotCachedAndAssetsKeepTheirHeaders(t *testing.T) {
 	if got := f.browse("/days/"+secretDay, nil).Header().Get("Cache-Control"); got != "no-store" {
 		t.Errorf("a page of a session: Cache-Control %q", got)
 	}
-	rec := request(f.h, "GET", "/assets/chat.js", "", map[string]string{"Cookie": f.cookie})
+	rec := request(f.h, "GET", "/assets/menu.js", "", map[string]string{"Cookie": f.cookie})
 	if rec.Code != 200 || rec.Header().Get("Cache-Control") != "public, max-age=300" {
 		t.Errorf("an asset: %d Cache-Control %q", rec.Code, rec.Header().Get("Cache-Control"))
 	}
@@ -580,7 +580,7 @@ func TestLockNowAndTheLockPage(t *testing.T) {
 	if page.Code != 200 || page.Header().Get("Cache-Control") != "no-store" || !strings.Contains(body, `name="pin"`) || !strings.Contains(body, `value="/days/`+secretDay+`"`) {
 		t.Fatalf("the lock page: %d %q %.300s", page.Code, page.Header().Get("Cache-Control"), body)
 	}
-	for _, leak := range []string{secret, "<dialog", `id="chat"`} {
+	for _, leak := range []string{secret, "<dialog"} {
 		if strings.Contains(body, leak) {
 			t.Errorf("the lock page holds %q", leak)
 		}
@@ -795,14 +795,14 @@ func TestThePageDrawsTheLockOnlyWhenTheLockIsOn(t *testing.T) {
 
 // TestOnlyTheLoginFieldOffersTheSavedLogin: a browser fills an empty password field with the saved login, and the settings
 // form then sends the token as the PIN. Every password field of the settings page says new-password; the login form keeps
-// current-password. The page has the key of the model (the form of the core) and the PIN (the form of this browser).
+// current-password. The page has the PIN (the form of this browser).
 func TestOnlyTheLoginFieldOffersTheSavedLogin(t *testing.T) {
 	f := newLockFixture(t, "5")
 	f.l.core.Connect(t, "web", f.l.browser.Catalog())
 	page := f.browse("/settings", nil).Body.String()
 	pw := regexp.MustCompile(`<input type="password"[^>]*>`).FindAllString(page, -1)
-	if len(pw) != 2 {
-		t.Fatalf("the settings page has %d password fields, want model_key and pin", len(pw))
+	if len(pw) != 1 {
+		t.Fatalf("the settings page has %d password fields, want pin", len(pw))
 	}
 	for _, in := range pw {
 		if !strings.Contains(in, `autocomplete="new-password"`) {
@@ -812,33 +812,6 @@ func TestOnlyTheLoginFieldOffersTheSavedLogin(t *testing.T) {
 	login := request(f.h, "GET", "/login", "", map[string]string{"Accept": "text/html"}).Body.String()
 	if !strings.Contains(login, `name="token" required autocomplete="current-password"`) {
 		t.Error("the login field lost current-password")
-	}
-}
-
-// TestThePollOfTheChatReadsTheVersionAndTheLock: the poll of chat.js asks for the conversation of today as Siren JSON
-// and reads its version, and a locked session answers it 401 with the code locked in JSON, so the poll goes to the lock
-// page. A page drawn as HTML would make the poll fail at its parse and wait for ever.
-func TestThePollOfTheChatReadsTheVersionAndTheLock(t *testing.T) {
-	f := newLockFixture(t, "5")
-	f.l.do(t, "/days/"+today+"/conversation", "say", map[string]string{"text": "Synthetic question?"})
-	rec := f.fetch("/days/" + today + "/conversation")
-	if rec.Code != 200 || !strings.HasPrefix(rec.Header().Get("Content-Type"), "application/vnd.siren+json") {
-		t.Fatalf("poll: %d %q %.200s", rec.Code, rec.Header().Get("Content-Type"), rec.Body.String())
-	}
-	if cc := rec.Header().Get("Cache-Control"); cc != "no-store" {
-		t.Errorf("poll: Cache-Control %q, want no-store", cc)
-	}
-	var e struct {
-		Properties struct{ Version string } `json:"properties"`
-	}
-	if err := json.Unmarshal(rec.Body.Bytes(), &e); err != nil || e.Properties.Version == "" {
-		t.Fatalf("poll: no version in the JSON: %v %.200s", err, rec.Body.String())
-	}
-	if rec := f.post("/lock", "", nil); rec.Code != 303 {
-		t.Fatalf("lock: %d", rec.Code)
-	}
-	if !f.isLocked() {
-		t.Error("the poll of a locked session is not 401 locked")
 	}
 }
 

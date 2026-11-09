@@ -37,11 +37,8 @@ func nullIfEmpty(s string) any {
 type Store struct {
 	DB          *db.DB
 	SnapshotDir string
-	// SettingsPath is the settings file (settings.go); empty means the store has none, and a read or a write of the
-	// settings is refused.
-	SettingsPath string
-	Clock        func() time.Time
-	Zone         *time.Location
+	Clock       func() time.Time
+	Zone        *time.Location
 }
 
 // now is the instant of the store's clock: the Clock, else time.Now.

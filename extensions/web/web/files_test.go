@@ -34,7 +34,7 @@ const (
 var ownFiles = []struct{ path, file, typ, cache string }{
 	{"/manifest.webmanifest", "manifest.webmanifest", "application/manifest+json", cacheHour},
 	{"/assets/speculation.json", "speculation.json", "application/speculationrules+json", cacheHour},
-	{"/assets/chat.js", "chat.js", "text/javascript; charset=utf-8", cacheScript},
+	{"/assets/menu.js", "menu.js", "text/javascript; charset=utf-8", cacheScript},
 	{"/assets/lock.js", "lock.js", "text/javascript; charset=utf-8", cacheScript},
 	{"/assets/icon.svg", "icon.svg", "image/svg+xml", cacheForever},
 	{"/assets/icon-192.png", "icon-192.png", "image/png", cacheForever},
@@ -110,13 +110,13 @@ func TestAPictureWithAVersionIsTheSamePicture(t *testing.T) {
 	}
 }
 
-// TestTheScriptsNameWhatTheyDo: chat.js polls the conversation of the day of its element, as Siren. lock.js sends /awake,
-// asks for /lock, keeps the time in localStorage and waits while a page prerenders. The type, the cache and the size of
+// TestTheScriptsNameWhatTheyDo: menu.js gives the focus back when a menu dialog closes. lock.js sends /awake, asks for
+// /lock, keeps the time in localStorage and waits while a page prerenders. The type, the cache and the size of
 // a script are held by TestTheOwnFilesHaveTheirTypeTheirCacheAndTheirBytes and TestTheScriptsAreSmallAndAlone.
 func TestTheScriptsNameWhatTheyDo(t *testing.T) {
 	l := emptyLife(t)
 	for path, words := range map[string][]string{
-		"/assets/chat.js": {"application/vnd.siren+json", "/conversation", "dataset.day"},
+		"/assets/menu.js": {"dialog.menu-dialog", "menu-button", "focus"},
 		"/assets/lock.js": {"/awake", "/lock", "localStorage", "prerendering"},
 	} {
 		body := ask(l.web, http.MethodGet, path).Body.String()

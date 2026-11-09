@@ -49,7 +49,7 @@ type staticFile struct {
 var staticFiles = []staticFile{
 	{"/manifest.webmanifest", "manifest.webmanifest", "application/manifest+json", hour, true},
 	{"/assets/speculation.json", "speculation.json", "application/speculationrules+json", hour, false},
-	{"/assets/chat.js", "chat.js", "text/javascript; charset=utf-8", script, false},
+	{"/assets/menu.js", "menu.js", "text/javascript; charset=utf-8", script, false},
 	{"/assets/lock.js", "lock.js", "text/javascript; charset=utf-8", script, false},
 	{"/assets/icon.svg", "icon.svg", "image/svg+xml", immutable, true},
 	{"/assets/icon-192.png", "icon-192.png", "image/png", immutable, true},

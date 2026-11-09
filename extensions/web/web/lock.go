@@ -19,7 +19,7 @@ import (
 // cannot be read at the start stops the program (New).
 
 // countsAsActivity reports a request that the owner made, and not the page: a navigation that is not a prefetch or a
-// prerender (no Sec-Purpose header), and a form post. The poll of the chat script and a speculative load are not.
+// prerender (no Sec-Purpose header), and a form post. A fetch of a script and a speculative load are not.
 // A browser that sends no Sec-Fetch-Mode header (an old one) counts for a GET that asks for HTML.
 func countsAsActivity(r *http.Request) bool {
 	if r.Header.Get("Sec-Purpose") != "" {

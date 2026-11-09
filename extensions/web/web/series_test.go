@@ -444,34 +444,3 @@ func TestAPlainPageLeadsToTheNewMetricForm(t *testing.T) {
 		t.Error("Browse of the pages links to New metric")
 	}
 }
-
-// A GET of a live conversation page by a browser is a 303 to the conversation of its day. The redirect keeps the query.
-// A page that is not a conversation is not redirected.
-// A deleted conversation page stays a page.
-// The conversation view is a whole page for a day with no talk and for a day with talk.
-func TestAConversationPageHasOneViewInABrowser(t *testing.T) {
-	l := emptyLife(t)
-	conversation := "/days/" + today + "/conversation"
-	pageAt(t, l.web, "/days/today/conversation")
-	l.do(t, conversation, "say", map[string]string{"text": "Hello"})
-	pageAt(t, l.web, "/days/today/conversation")
-	self := href(must(t)(l.api.Get(t.Context(), conversation)), "page")
-	if self == "" {
-		t.Fatal("the conversation links no page")
-	}
-	for query, want := range map[string]string{"": conversation, "?new=rename": conversation + "?new=rename"} {
-		if rec := ask(l.web, http.MethodGet, self+query); rec.Code != http.StatusSeeOther || rec.Header().Get("Location") != want {
-			t.Errorf("GET %s%s in a browser: %d %q, want 303 to %s", self, query, rec.Code, rec.Header().Get("Location"), want)
-		}
-	}
-	// A page with a title that is not of a day is not a conversation. The redirect does not apply to it.
-	other := l.do(t, "/", "create-page", map[string]string{"title": "Conversation notes"})
-	if rec := ask(l.web, http.MethodGet, href(other, "self")); rec.Code != http.StatusOK {
-		t.Errorf("a page titled Conversation notes: %d, want 200", rec.Code)
-	}
-	l.do(t, self, "tombstone-pages", nil)
-	rec := ask(l.web, http.MethodGet, self)
-	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `action="`+self+`/revive"`) {
-		t.Errorf("a deleted conversation page: %d, want 200 and the page with Restore: %.300s", rec.Code, rec.Body.String())
-	}
-}

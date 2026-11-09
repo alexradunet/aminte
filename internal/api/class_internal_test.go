@@ -77,11 +77,11 @@ func TestTheCatalogUsesOnlyKnownClassesAndOneToAnAction(t *testing.T) {
 //   - A POST row that acts on no {id} and asks for nothing has no class (rebuild-search, resync-links, sync-tasks),
 //     except the rows that are pinned below.
 //
-// Three rows have the shape of another class, so no rule can tell their class from the shape. Each is pinned by name
+// Two rows have the shape of another class, so no rule can tell their class from the shape. Each is pinned by name
 // in pinnedClass, and the test fails when a pinned row is gone, so a rename does not drop a pin silently.
 //
 // The rules leave one thing open, because a row cannot show it: the class edit given to a row that has fields and acts
-// on no {id}, such as file-pages, say or reply. Only settings has that shape with a class, and it is pinned.
+// on no {id}, such as file-pages. No row of the catalog has that shape with a class.
 func TestTheClassOfARowIsWhatTheRowDoes(t *testing.T) {
 	seen := map[string]bool{}
 	for _, s := range append(slices.Clone(catalog), taskCatalog...) {
@@ -138,12 +138,10 @@ func TestTheClassOfARowIsWhatTheRowDoes(t *testing.T) {
 //
 //   - edit-metric asks for one field with two options (daily), which is the shape of a toggle. It is an edit, because
 //     it sets a value of the metric.
-//   - settings is an edit that acts on no {id}, so the rule of an edit on {id} does not reach it.
 //   - snapshot is the one row that acts on no {id}, asks for nothing, and has a class: it makes a file, so it is a
 //     create. Its title has a plain verb, not New or Add, because no field of it names a new thing.
 var pinnedClass = map[string]string{
 	"edit-metric": "edit",
-	"settings":    "edit",
 	"snapshot":    "create",
 }
 

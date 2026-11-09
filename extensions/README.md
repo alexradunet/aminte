@@ -313,10 +313,6 @@ An extension writes as `import:NAME` (an importer) or `agent:NAME` (a model), wi
 `Aminte-Source: import:NAME` or `Aminte-Source: agent:NAME`. Such a writer meets the
 [owner-only](../API.md#reaching-a-server) rule. `GET /actions` of the server is the catalog of the actions.
 
-One kind of extension writes as the owner: a transport that carries the words of the owner from a chat. It sends the
-action `say` with the owner's token and no source, and with `via` set to its own name. `say` is the owner's action, so an
-agent cannot write a turn of the owner. A model reads the turn on the page and answers there: `aminte-agent` is the
-agent, and `aminte-whatsapp` is the transport.
 
 ## Tests
 
@@ -334,6 +330,4 @@ agent, and `aminte-whatsapp` is the transport.
 | `extensions/agentic` | `aminte-agentic-init` | `aminte agentic-init [--force]` | nothing | no: it reads `AMINTE_EXE` and `AMINTE_DB`, and refuses to run without them |
 | `extensions/mcp` | `aminte-mcp` | `aminte mcp [--agent NAME]` | `agent:NAME`, default `agent:mcp` | yes: `AMINTE_URL`, else `--url`, else it refuses; `--source` is refused as today |
 | `extensions/ticktick` | `aminte-ticktick` | `aminte ticktick login`, `aminte ticktick sync [--url U]`, and `aminte serve --with ticktick` (the always-on way, as the task service) | `import:ticktick` | yes: `AMINTE_URL`, else `--url`, else it refuses; `login` needs none |
-| `extensions/agent` | `aminte-agent` | `aminte serve --with agent` (the always-on way) and `aminte agent` (a try on a `life.db` that exists) | `agent:aminte` (the read of the settings is the owner's) | yes: `AMINTE_URL`, else `--url`, else it refuses; `AMINTE_TOKEN` is its bearer token |
-| `extensions/whatsapp` | `aminte-whatsapp` | `aminte serve --with whatsapp` (the always-on way), `aminte whatsapp login` and `aminte whatsapp [--url U]` (the number is the setting `owner_number`) | the owner, with `via=whatsapp`: it only carries the words ([`say`](../API.md#conversation)); it calls no model | yes: `AMINTE_URL`, else `--url`, else it refuses; `login` needs none |
 | `extensions/web` | `aminte-web` | `aminte serve --token-file F --with web` (the always-on way) and `aminte web` (a trial on a `life.db` that exists) | `ui` (the writer of the browser) | yes: `AMINTE_URL` and `AMINTE_TOKEN` (the login of the browser), else it refuses; `AMINTE_WEB_LISTEN` is its door (`127.0.0.1:7780`, a loopback address only); `AMINTE_LISTEN` is its catalog (the settings of the browser) |

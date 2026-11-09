@@ -32,18 +32,8 @@ func (t *Tx) saveBody(id int64, body, version string) (Sync, error) {
 }
 
 // SetBody is SaveBody without the version check, for a write that has the body it sets: SaveBody after its check,
-// the note of a new metric on an empty body, and the picture mark of a page. A writer that is not the owner's does
-// not write the body of a conversation page (keepTurns): 403.
+// the note of a new metric on an empty body, and the picture mark of a page.
 func (t *Tx) SetBody(id int64, body string) (Sync, error) {
-	if err := t.keepTurns(id); err != nil {
-		return Sync{}, err
-	}
-	return t.writeBody(id, body)
-}
-
-// writeBody sets the body of the page id with no check of the writer: SetBody after its check, and the two writes of
-// turns, which are the only writes that may put a turn in a conversation page.
-func (t *Tx) writeBody(id int64, body string) (Sync, error) {
 	if _, err := t.tx.ExecContext(t.ctx, `UPDATE entities SET body = ? WHERE id = ? AND body IS NOT ?`, body, id, body); err != nil {
 		return Sync{}, err
 	}
@@ -99,10 +89,9 @@ func (t *Tx) createNamed(typ, title, body string, day any, extra func(int64) err
 		if err != nil {
 			return 0, err
 		}
-		// A conversation page keeps its type (reservedTitle): promote would refuse it, so the error offers none.
-		return 0, &ExistsError{ID: p.ID, Title: title, Plain: plain && ConversationDay(p.Title) == ""}
+		return 0, &ExistsError{ID: p.ID, Title: title, Plain: plain}
 	}
-	id, err := t.insertPage(typ, title, text.TitleKey(title), day, body)
+	id, err := t.insertRow(typ, title, text.TitleKey(title), day, body)
 	if err != nil || extra == nil {
 		return id, err
 	}
@@ -111,15 +100,13 @@ func (t *Tx) createNamed(typ, title, body string, day any, extra func(int64) err
 
 // promotable says whether a page may be offered to become a person or a metric: a live plain page that is
 // not a day page or a period page (entities_day_page_plain, entities_period_page), that nothing is filed in (a
-// category: its part-of links need a plain page, entities_endpoint_types) and that does not hold the title of the
-// category of the conversations (categoryMustBePlain). It reads the stored columns. It is an offer, not a rule: a
-// promotion that the schema refuses for another reason is still the schema's 422.
+// category: its part-of links need a plain page, entities_endpoint_types). It reads the stored columns. It is an
+// offer, not a rule: a promotion that the schema refuses for another reason is still the schema's 422.
 func (t *Tx) promotable(id int64) (bool, error) {
 	var ok bool
 	err := t.tx.QueryRowContext(t.ctx, `SELECT e.entity_type = 'page' AND e.deleted_at IS NULL AND NOT e.is_journal AND e.period IS NULL
 		   AND NOT EXISTS (SELECT 1 FROM links l WHERE l.to_id = e.id AND l.kind = 'part-of')
-		   AND NOT EXISTS (SELECT 1 FROM entity_names n WHERE n.entity_id = e.id AND n.name_key = ?)
-		  FROM entities e WHERE e.id = ?`, categoryKey, id).Scan(&ok)
+		  FROM entities e WHERE e.id = ?`, id).Scan(&ok)
 	return ok, err
 }
 
@@ -558,99 +545,4 @@ func (s *Store) searchNewest(ctx context.Context, q, omit string, args []any, li
 		}
 	}
 	return out, nil
-}
-
-// AppendParagraph adds a paragraph to the page titled title, in one write: add makes the new body from the body that the
-// page has. It runs inside the transaction, so it must be quick and do no I/O. This is say, the one write that makes a
-// conversation page (conversation.go). It is a write of turns, so it writes the body for any writer (writeBody): the
-// caller makes the lines of the turn safe.
-//
-// The page is made on the first call, written on day, from head, its first line, and filed in category when that is not
-// empty. A plain page that has no words (a wikilink made it before the first call) is adopted the same way: it gets
-// head, its day when it has none, and its category. A tombstoned page is revived, as a capture revives a day page. A
-// title that a page of another type holds is a 409. It returns the page's id and what the save did to the wikilinks of
-// the body. An empty day is today.
-func (s *Store) AppendParagraph(ctx context.Context, source, title, day, category, head string, add func(body string) string) (int64, Sync, error) {
-	m, err := alone(s, ctx, source, func(t *Tx) (made, error) {
-		if day == "" {
-			day = t.today()
-		}
-		p, err := t.lookupWithBody(title)
-		if err != nil {
-			return made{}, err
-		}
-		if p != nil && p.Type != "page" {
-			return made{}, Conflict("%q is a %s, not a plain page: a paragraph cannot be added to it", title, p.Type)
-		}
-		if p != nil && p.Deleted {
-			if err := t.setDeleted(p.ID, false); err != nil {
-				return made{}, err
-			}
-		}
-		if p != nil && strings.TrimSpace(p.Body) != "" {
-			r, err := t.writeBody(p.ID, add(p.Body))
-			return made{p.ID, r}, err
-		}
-		body := add(head)
-		var id int64
-		var r Sync
-		if p == nil {
-			if err := checkTitle("title", title); err != nil {
-				return made{}, err
-			}
-			if id, err = t.insertRow("page", title, text.TitleKey(title), day, body); err != nil {
-				return made{}, err
-			}
-			r, err = t.syncWikilinks(id, body)
-		} else {
-			id = p.ID
-			if _, err = t.tx.ExecContext(t.ctx, `UPDATE entities SET day = ? WHERE id = ? AND day IS NULL`, day, id); err == nil {
-				r, err = t.writeBody(id, body)
-			}
-		}
-		if err != nil {
-			return made{}, err
-		}
-		// The category is the writer's own convention: a deleted one (the owner's file keeps one from an earlier
-		// design) is revived, as a deleted page of the conversation is above, so the first turn is not refused.
-		if c, err := t.lookup(category); err != nil {
-			return made{}, err
-		} else if c != nil && c.Deleted {
-			if err := t.setDeleted(c.ID, false); err != nil {
-				return made{}, err
-			}
-		}
-		return made{id, r}, t.fileNew(id, category)
-	})
-	return m.id, m.sync, err
-}
-
-// EditBody replaces the body of the live plain page titled title by what edit makes of the body it has now, in one
-// write: the body is read and set under the write lock, so no other write comes between and no version token is
-// needed. edit runs inside the transaction: it must be quick and do no I/O. Its error ends the write, and the caller
-// gets it as it is. A missing page is a 404, and a page of another type or a deleted one a 409 (a write to a deleted
-// page does not revive it, as a save of a body does not). It returns the page's id and what the save did to the
-// wikilinks of the body. This is reply, the write of the agent's turn: it writes the body for any writer (writeBody),
-// and the caller makes the lines of the turn safe.
-func (s *Store) EditBody(ctx context.Context, source, title string, edit func(body string) (string, error)) (int64, Sync, error) {
-	m, err := alone(s, ctx, source, func(t *Tx) (made, error) {
-		p, err := t.lookupWithBody(title)
-		switch {
-		case err != nil:
-			return made{}, err
-		case p == nil:
-			return made{}, NotFound("no page %q", title)
-		case p.Type != "page":
-			return made{}, Conflict("%q is a %s, not a plain page", title, p.Type)
-		case p.Deleted:
-			return made{}, Conflict("page %d %q is deleted: restore it first (Restore, revive)", p.ID, p.Title)
-		}
-		body, err := edit(p.Body)
-		if err != nil {
-			return made{}, err
-		}
-		r, err := t.writeBody(p.ID, body)
-		return made{p.ID, r}, err
-	})
-	return m.id, m.sync, err
 }

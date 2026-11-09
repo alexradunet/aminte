@@ -186,7 +186,7 @@ func TestAFileWithADayTellsWhatHappenedInItsDayPageInTheToast(t *testing.T) {
 // The result of a write is text of the core. It can hold a word that an
 // agent wrote. The toast draws it escaped: the page at the Location has Result and the words, and no live script. A
 // receipt is the only way to a toast. So a query with a message in it draws nothing, and a second visit has no toast. The
-// test looks for "<script>alert" and not for "<script>", because a page of the shell has the script chat.js.
+// test looks for "<script>alert" and not for "<script>", because a page of the shell has the script menu.js.
 func TestAToastIsEscapedAndOnlyAReceiptDrawsOne(t *testing.T) {
 	const page = `{"class":["page"],"title":"Synthetic","properties":{"body":"","entity_type":"page"},"links":[{"rel":["self"],"href":"/pages/1","title":"Synthetic"}]`
 	core := http.NewServeMux()

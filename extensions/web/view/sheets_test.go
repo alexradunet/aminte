@@ -199,13 +199,13 @@ func TestTheMenusHangFromTheirButtons(t *testing.T) {
 		t.Fatal("app.css has no @supports (position-area block")
 	}
 	block := app[i:]
-	for _, want := range []string{"position-anchor:--new", "position-anchor:--more"} {
+	for _, want := range []string{"position-anchor:--new", "position-anchor:--menu"} {
 		if !strings.Contains(block, want) {
 			t.Errorf("no %s inside an @supports (position-area block", want)
 		}
 	}
-	if !strings.Contains(app, "anchor-name:--new") || !strings.Contains(app, "anchor-name:--more") {
-		t.Error("app.css does not name the anchors --new and --more")
+	if !strings.Contains(app, "anchor-name:--new") || !strings.Contains(app, "anchor-name:--menu") {
+		t.Error("app.css does not name the anchors --new and --menu")
 	}
 	if strings.Contains(app[:i], "position-anchor:") {
 		t.Error("a position-anchor stands outside an @supports (position-area block")
@@ -233,8 +233,8 @@ func TestTheStuckEdgeIsAnEnhancement(t *testing.T) {
 }
 
 // TestTheShellIsAFrame: the shell is a frame, at most --frame wide and centred, and the column is a slab of oak on the
-// floor (docs/plans/152-the-frame.md); the chat parts take the frame's edge, and the phone and print rules undo what
-// they must. Each check reads the rule that owns the property.
+// floor (docs/plans/152-the-frame.md), and the phone and print rules undo what they must. Each check reads the rule that
+// owns the property.
 func TestTheShellIsAFrame(t *testing.T) {
 	app := cssComments.ReplaceAllString(string(appCSS), "")
 	shell := regexp.MustCompile(`(?m)^\.shell\{([^}]*)\}`).FindStringSubmatch(app)
@@ -248,14 +248,6 @@ func TestTheShellIsAFrame(t *testing.T) {
 	}
 	if !regexp.MustCompile(`\.column\{[^}]*background-color:var\(--desk\)`).MatchString(app) {
 		t.Error("app.css: .column is not filled with var(--desk)")
-	}
-	for _, sel := range []string{".chat-open", ".chat:popover-open"} {
-		if !regexp.MustCompile(`(?m)^` + regexp.QuoteMeta(sel) + `\{[^}]*inset-inline-end:[^;}]*var\(--frame\)`).MatchString(app) {
-			t.Errorf("app.css: the end of %s is not placed from var(--frame)", sel)
-		}
-	}
-	if !regexp.MustCompile(`anchor\(--shell end, [^)]*var\(--frame\)`).MatchString(app) {
-		t.Error("app.css: the chat parts do not take the edge of the shell as the anchor, with the floor as the fallback")
 	}
 	phone := regexp.MustCompile(`@media \(max-width:899px\)\{\s*\.shell\{([^}]*)\}`).FindStringSubmatch(app)
 	if phone == nil || !strings.Contains(phone[1], "outline:0") || strings.Contains(phone[1], "max-inline-size") {

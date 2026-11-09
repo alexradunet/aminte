@@ -2,7 +2,7 @@ package web_test
 
 // Every view of web renders as a whole page. The life is small and synthetic, made through the API of the real core.
 // The rules of the pages that all views share are here: both sheets, the way to skip to the main part, the sections of the
-// rail, the footer, the search dialog, no script but chat.js, no generated id, no id twice, and a datalist for each list.
+// rail, the footer, the search dialog, no script but menu.js, no generated id, no id twice, and a datalist for each list.
 
 import (
 	"net/http"
@@ -15,9 +15,12 @@ import (
 // TestEveryViewRenders draws every view of a small life as a browser gets it: one table of paths, each a whole page with
 // its status. Every page carries what semantic HTML needs: both sheets under their markers, one main with a way to skip to
 // it, the sections of the rail, at most one link of the whole rail marked, a footer, the search dialog, no script but
-// chat.js, and no id generated for a template to find. The one exception is the id of a datalist, which the list of its
+// menu.js, and no id generated for a template to find. The one exception is the id of a datalist, which the list of its
 // input names: each list has its datalist on the page, and no id is repeated on a page. Lisbon is in a category, so the
 // pages draw datalists. A row also names the words that its page shows.
+// menuScriptTag is the script of every page of the shell.
+const menuScriptTag = `<script src="/assets/menu.js" defer></script>`
+
 func TestEveryViewRenders(t *testing.T) {
 	ctx := t.Context()
 	l := lifeStartingOn(t, "2026-09-30")
@@ -81,8 +84,7 @@ func TestEveryViewRenders(t *testing.T) {
 			`<span class="hit-icon" aria-hidden="true">`}},
 		{"/search?q=ran&kind=day", http.StatusOK, []string{`aria-current="page">Days</a>`, `aria-label="Pages by their words"`, `<input type="hidden" name="kind" value="day">`}},
 		{"/integrity", http.StatusOK, []string{`action="/search/rebuild"`, `action="/links/resync"`}},
-		{"/settings", http.StatusOK, []string{"<h1>Settings</h1>", `type="password"`}},
-		{"/days/today/conversation", http.StatusOK, []string{"<h1>Chat</h1>", `/say"`, "Nothing is said on this day yet"}},
+		{"/settings", http.StatusOK, []string{"<h1>Settings</h1>", "<h2>Backup</h2>"}},
 		{href(gone, "self"), http.StatusOK, []string{"Deleted", `action="` + href(gone, "self") + `/revive"`}},
 		{"/years/2026", http.StatusOK, []string{`<a href="/years/2026" aria-current="page">Year</a>`}},
 		{"/months/2026-09", http.StatusOK, []string{`<a href="/months/2026-09" aria-current="page">Month</a>`, `<a href="/days">Days</a>`}},
@@ -101,8 +103,8 @@ func TestEveryViewRenders(t *testing.T) {
 				t.Errorf("%s does not carry %s", row.path, want)
 			}
 		}
-		if strings.Contains(strings.ReplaceAll(body, chatScriptTag, ""), "<script") {
-			t.Errorf("%s carries a script besides chat.js", row.path)
+		if strings.Contains(strings.ReplaceAll(body, menuScriptTag, ""), "<script") {
+			t.Errorf("%s carries a script besides menu.js", row.path)
 		}
 		if strings.Contains(body, `id="f-`) {
 			t.Errorf("%s carries a generated id: a page is semantic HTML", row.path)

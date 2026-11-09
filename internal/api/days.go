@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"aminte/internal/core"
@@ -89,9 +90,10 @@ func (h *server) sameDayEarlier(ctx context.Context, day string) ([]recentDay, e
 	return h.withMoods(ctx, entries)
 }
 
-// The root is the entry point of the API: the newest day pages, and every action that starts something. It names the clock (zone, utc_offset), the day of today and its conversation as sub-entities that ?embed=today,
-// conversation reads in the same answer, the connected apps that run (the links app) and the task service (the link
-// tasks): what a client needs to draw its frame once (API.md, root).
+// The root is the entry point of the API: the newest day pages, and every action that starts something. It names the
+// clock (zone, utc_offset), the day of today as a sub-entity that ?embed=today reads in the same answer, the connected
+// apps that run (the links app) and the task service (the link tasks): what a client needs to draw its frame once
+// (API.md, root).
 func (h *server) root(r *http.Request) (*siren.Entity, error) {
 	ctx := r.Context()
 	now := h.s.Local() // one read of the clock, so today and the zone agree
@@ -113,7 +115,7 @@ func (h *server) root(r *http.Request) (*siren.Entity, error) {
 	e := &siren.Entity{
 		Class: []string{"root"}, Title: "Aminte",
 		Properties: map[string]any{"today": today, "zone": now.Location().String(), "utc_offset": offset, "recent": recent},
-		Entities:   []siren.Link{link("today", siren.DayHref(today), "Today"), link("conversation", conversationHref(today), "Chat")},
+		Entities:   []siren.Link{link("today", siren.DayHref(today), "Today")},
 		Links: []siren.Link{link("self", "/", "Aminte"), link("today", siren.DayHref(today), "Today"), link("days", "/days", "Days"),
 			link("browse", siren.BrowseHref(nil), "Browse"), link("people", siren.BrowseKindHref("person"), "People"),
 			link("media", siren.BrowseKindHref("media"), "Media"), link("files", siren.BrowseKindHref("document"), "Documents"),
@@ -382,7 +384,7 @@ func (h *server) capture(r *http.Request, a admitted) (*siren.Entity, error) {
 	}
 	day := h.dayNamed(r.PathValue("day")) // the share target of the manifest cannot know the day: it sends the word
 	entry := words(a.v.Get("text"))
-	if entry != "" { // the entry begins with its stamp, as a turn of say does; a mood alone writes no text
+	if entry != "" { // the entry begins with its stamp; a mood alone writes no text
 		entry = h.stamp(relayOf(a.src)) + " " + entry
 	}
 	_, sync, already, err := h.s.CaptureWithKey(r.Context(), a.src, a.v.Get("import_key"), day, entry, mood)
@@ -400,3 +402,25 @@ func (h *server) capture(r *http.Request, a admitted) (*siren.Entity, error) {
 	}
 	return withResult(h.dayEntity(r.Context(), day))(sync)
 }
+
+// stamp is the brackets that begin a captured entry: the time in the server's zone, HH:MM, and the name of the relay
+// when there is one: `(HH:MM)` or `(HH:MM, via NAME)`. capture takes the name from its source (relayOf).
+func (h *server) stamp(relay string) string {
+	if relay != "" {
+		relay = ", via " + relay
+	}
+	return "(" + h.s.Local().Format("15:04") + relay + ")"
+}
+
+// relayOf is the writer that relayed an entry when an agent or an import wrote it (its prefix cut), else "".
+func relayOf(source string) string {
+	for _, prefix := range []string{siren.AgentPrefix, siren.ImportPrefix} {
+		if name, ok := strings.CutPrefix(source, prefix); ok {
+			return name
+		}
+	}
+	return ""
+}
+
+// words is the text of an entry as the page keeps it: LF line ends (a browser sends CRLF) and no blank edge.
+func words(text string) string { return strings.TrimSpace(strings.ReplaceAll(text, "\r\n", "\n")) }

@@ -38,62 +38,6 @@ func TestAnOpenedActionWritesFromTheBrowser(t *testing.T) {
 	}
 }
 
-// TestTheFormOfReplyIsOnTheCatalogPageAndWritesTheAgentsTurn: reply is the agent's action. No page of a conversation draws
-// it, because the entity of a conversation does not offer it (the README names /actions alone). The form on /actions
-// posts to the day, takes the key of the owner turn that it answers (a text, from turns[].key of the conversation), and the
-// core writes the reply right after that turn. A second reply to the same turn is 409, and web draws that refusal with
-// its status.
-func TestTheFormOfReplyIsOnTheCatalogPageAndWritesTheAgentsTurn(t *testing.T) {
-	l := emptyLife(t)
-	l.do(t, "/days/"+today+"/conversation", "say", map[string]string{"text": "How did I sleep?"})
-	post := "/days/" + today + "/reply"
-
-	// No page of the conversation draws a form of reply: the form of /actions is the only one.
-	for _, uri := range []string{"/days/" + today + "/conversation", "/"} {
-		if page := pageAt(t, l.web, uri); strings.Contains(page, `data-action="reply"`) || strings.Contains(page, post) {
-			t.Errorf("%s draws the form of reply, which the agent alone uses", uri)
-		}
-	}
-	form := pageAt(t, l.web, "/actions?new=reply&day="+today)
-	for _, want := range []string{`<details class="action" open>`, `action="` + post + `"`,
-		`<input type="text" name="turn"`, `<textarea name="text"`, `name="tools"`} {
-		if !strings.Contains(form, want) {
-			t.Errorf("/actions?new=reply draws no %s:\n%.1500s", want, mainPartOf(form))
-		}
-	}
-
-	// The key is the one that the core says for the question: web sends what the form carries and makes no key.
-	asked, _ := must(t)(l.api.Get(t.Context(), "/days/"+today+"/conversation")).Properties.(map[string]any)["turns"].([]any)
-	if len(asked) != 1 {
-		t.Fatalf("the conversation has %d turns before the reply, want the question alone: %v", len(asked), asked)
-	}
-	question, _ := asked[0].(map[string]any)
-	key, _ := question["key"].(string)
-	if question["who"] != "owner" || key == "" {
-		t.Fatalf("the first turn is %v, want the turn of the owner with a key", question)
-	}
-	sent := url.Values{"turn": {key}, "text": {"You slept 7 hours."}, "tools": {"- `search`: no hits"}}
-	if rec := postForm(l.web, post, sent); rec.Code != http.StatusSeeOther {
-		t.Fatalf("POST %s: %d %.300s", post, rec.Code, rec.Body)
-	}
-	turns, _ := must(t)(l.api.Get(t.Context(), "/days/"+today+"/conversation")).Properties.(map[string]any)["turns"].([]any)
-	if len(turns) != 2 {
-		t.Fatalf("the conversation has %d turns after the reply, want the question and the answer: %v", len(turns), turns)
-	}
-	answer, _ := turns[1].(map[string]any)
-	if answer["who"] != "aminte" || answer["text"] != "You slept 7 hours." || fmt.Sprint(answer["tools"]) != "[- `search`: no hits]" {
-		t.Errorf("the second turn is %v, want the reply of aminte with its tool line", answer)
-	}
-
-	again := postForm(l.web, post, sent)
-	if again.Code != http.StatusConflict || !strings.Contains(again.Body.String(), "conflict") {
-		t.Errorf("a second reply to the turn: %d, want the 409 page of the refusal: %.300s", again.Code, mainPartOf(again.Body.String()))
-	}
-	if turns, _ := must(t)(l.api.Get(t.Context(), "/days/"+today+"/conversation")).Properties.(map[string]any)["turns"].([]any); len(turns) != 2 {
-		t.Errorf("a refused reply left %d turns, want 2", len(turns))
-	}
-}
-
 // TestSnapshotIsTheOwnersFromABrowser: the form of the snapshot is the owner's. A snapshot taken by the form of the browser
 // answers with the toast of the page it returns to, which says where the copy is, its restore check, and a link to download
 // it. The form is open on /actions?new=snapshot with the owner mark, and Settings links to it.

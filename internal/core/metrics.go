@@ -33,7 +33,7 @@ func (t *Tx) RegisterMetric(m NewMetric) (added bool, err error) {
 	switch {
 	case p == nil:
 		// the note is written by the insert: creation is one write, so the metric starts at revision 1
-		id, err := t.insertPage("metric", name, text.TitleKey(name), nil, note)
+		id, err := t.insertRow("metric", name, text.TitleKey(name), nil, note)
 		if err != nil {
 			return false, err
 		}

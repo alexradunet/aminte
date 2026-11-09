@@ -182,7 +182,7 @@ func TestARequestWithoutARequiredFieldIsRefusedAndWritesNothing(t *testing.T) {
 	// A value that a write accepts, for each required field; a field with options takes its first option.
 	valid := map[string]string{"title": "Probe title", "body": "new words", "to": "Required probe",
 		"kind": "part-of", "ids": page, "category": "Probe category", "metric": "weight", "day": "2026-09-02",
-		"value": "70", "name": "Probe metric", "q": "words", "page": "Required probe", "text": "Call the bank", "line": "1", "turn": "1"}
+		"value": "70", "name": "Probe metric", "q": "words", "page": "Required probe", "text": "Call the bank", "line": "1"}
 	// state is the file in short: the rows of each table, and the sum of the edit revisions, so an edit shows too.
 	state := func() string {
 		return scalar(t, s, `SELECT (SELECT count(*) || ' ' || total(revision) FROM entities) || ' ' ||

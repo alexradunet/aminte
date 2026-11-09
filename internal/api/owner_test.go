@@ -41,7 +41,7 @@ func TestOwnerOnlyActionsPolicy(t *testing.T) {
 	if record := apitest.Action(t, catalog, "record"); record.Owner {
 		t.Fatalf("record is owner-only: %+v", record)
 	}
-	sent := map[string]map[string]string{"register-metric": {"name": "Forbidden direct"}, "say": {"day": "today", "text": "Hi"}}
+	sent := map[string]map[string]string{"register-metric": {"name": "Forbidden direct"}}
 	for _, source := range []string{"agent:policy-test", "import:policy-test"} {
 		c := client.InProcess(h, source)
 		for _, a := range catalog.Actions {
@@ -179,13 +179,12 @@ func TestResyncLinksIsTheOwnersRepair(t *testing.T) {
 	}
 }
 
-// TestAnAgentIsRefusedTheOwnersReads: the settings and the integrity check are the owner's reads. The writer of an
-// embedded read (agent:embed) and any other agent get 403, so a tool line of a conversation that names them never makes
-// the server run them (a UI keeps a plain link for such a card).
+// TestAnAgentIsRefusedTheOwnersReads: the integrity check is the owner's read. The writer of an embedded read
+// (agent:embed) and any other agent get 403, so an address that an agent wrote never makes the server run it.
 func TestAnAgentIsRefusedTheOwnersReads(t *testing.T) {
 	_, h, _ := apitest.Fresh(t, "cli")
 	for _, source := range []string{"agent:embed", "agent:x", "import:x"} {
-		for _, path := range []string{"/settings", "/integrity"} {
+		for _, path := range []string{"/integrity"} {
 			rec := request(h, "GET", path, "", map[string]string{siren.SourceHeader: source})
 			if rec.Code != http.StatusForbidden {
 				t.Errorf("GET %s as %s: %d, want 403", path, source, rec.Code)

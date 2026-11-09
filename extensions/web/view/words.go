@@ -258,20 +258,6 @@ func (v *view) Date(x any) string {
 	return v.clock().day(s)
 }
 
-// LongDate is a day in full words, "Wednesday 28 October", with its year when it is not this year's: the date
-// above the first turn of the chat screen.
-func (v *view) LongDate(x any) string {
-	s, _ := x.(string)
-	t, ok := text.ParseDay(s)
-	if !ok {
-		return s
-	}
-	if v.clock().sameYear(t) {
-		return t.Format("Monday 2 January")
-	}
-	return t.Format("Monday 2 January 2006")
-}
-
 // Value draws any value of the entity by its type.
 func (v *view) Value(x any) template.HTML {
 	var sb strings.Builder

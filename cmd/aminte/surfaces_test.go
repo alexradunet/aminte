@@ -78,9 +78,6 @@ func TestActionsHumanShowsTheSurfacesOfEachAction(t *testing.T) {
 		{"snapshot",
 			[]string{"snapshot       POST /snapshots", "  cli: do snapshot", "  shortcut: snapshot", "  mcp: none", "  owner: yes"},
 			nil},
-		{"settings",
-			[]string{"settings       POST /settings", "  cli: do settings", "  mcp: none", "  owner: yes"},
-			[]string{"  shortcut:"}},
 	} {
 		t.Run(tc.action, func(t *testing.T) {
 			block, ok := blocks[tc.action]

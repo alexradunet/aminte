@@ -18,10 +18,7 @@
      every day (Today, Calendar, Metrics and Browse, docs/plans/117-one-browse-view.md) and the owner's links. This
      month is on Calendar, not here: one view of it. A page with no shell (the login) has none. On a phone (docs/plans/093-words-phone-and-today.md) the head is a top bar, the sections of every
      day a bottom bar with More, and the rest (#sections) a popover sheet over the page that More opens and Close,
-     Escape or a tap outside closes: no script (docs/plans/108-the-browser-made-current.md). Chat is the link to the
-     conversation of today; on a phone the bar shows the button of the chat column (#chat) in its place, except on the
-     conversation, where the link is the one marked. New opens a menu of the
-     kinds the same way, each made on its list (docs/plans/114-one-way-to-do-a-thing.md). The access keys (k the
+     Escape or a tap outside closes: no script (docs/plans/108-the-browser-made-current.md). New opens a menu of the kinds the same way, each made on its list (docs/plans/114-one-way-to-do-a-thing.md). The access keys (k the
      search, n New, t Today, c the capture, [ and ] the previous and next page) are the browser's own, with its
      modifier. When the lock is on (docs/plans/160-the-lock.md), the Lock button joins the foot of the More sheet and l, lock
      joins the keys. On a wide screen the sheet is part of the rail, so the access key l works there. */}}
@@ -35,8 +32,6 @@
 <nav aria-label="Sections">
 <ul>{{range $nav}}{{if eq .Group "day"}}<li>{{template "navlink" .}}</li>{{end}}{{end}}
 {{range $nav}}{{if eq .Group "apps"}}<li class="nav-app">{{template "navlink" .}}</li>{{end}}{{end}}
-{{range $nav}}{{if eq .Group "chat"}}<li class="nav-chat">{{template "navlink" .}}</li>{{end}}{{end}}
-{{if .Chat}}<li class="rail-chat-link"><button type="button" popovertarget="chat">{{icon "chat"}}Chat</button></li>{{end}}
 <li class="rail-more-link"><button type="button" popovertarget="sections"{{if .InMore}} class="here"{{end}}>{{icon "more"}}More</button></li></ul>
 </nav>
 <div class="rail-more" id="sections" popover>
@@ -72,10 +67,9 @@
 {{if .Shell}}<dialog class="palette" id="palette" closedby="any" aria-label="Search">
 <search><form method="GET" action="/search"><input type="search" name="q" autocomplete="off" aria-label="Search" placeholder="A page's title, or words of a body"></form></search>
 <p class="meta">Enter searches · <kbd>Escape</kbd> closes · access keys, with the browser's modifier: <kbd>k</kbd> search · <kbd>n</kbd> new · <kbd>c</kbd> capture · <kbd>t</kbd> today · <kbd>[</kbd> <kbd>]</kbd> previous, next{{if .Shell.LockMinutes}} · <kbd>l</kbd> lock{{end}}</p>
-</dialog>
-{{template "chat" .}}{{end}}
+</dialog>{{end}}
 </div>
-{{if .Shell}}<script src="/assets/chat.js" defer></script>
+{{if .Shell}}<script src="/assets/menu.js" defer></script>
 {{if .Shell.LockMinutes}}<script src="/assets/lock.js" data-minutes="{{.Shell.LockMinutes}}" defer></script>
 {{end}}{{end}}</body></html>{{end}}
 
@@ -186,7 +180,7 @@
 {{else if segmented .Field}}<fieldset class="segmented{{if eq .Name "mood"}} faces{{end}}"><legend>{{or .Title .Name}}{{if and .Required (not .Sole)}} <small>required</small>{{end}}</legend>{{$v := num .Value}}{{$n := .Name}}{{$req := .Required}}{{$f := .}}{{range .Options}}{{$o := .}}{{$w := $f.Word $o}}<label{{with $w}} title="{{.}}"{{end}}><input type="radio" name="{{$n}}" value="{{$o}}"{{if eq $o $v}} checked{{end}}{{if $req}} required{{end}}><span>{{if $f.Spoken}}{{$w}}{{else}}{{$o}}{{with $w}} <small>{{.}}</small>{{end}}{{end}}</span></label>{{end}}</fieldset>
 {{else}}<label><span>{{or .Title .Name}}{{if and .Required (not .Sole)}} <small>required</small>{{end}}</span>
 {{if and .Options (not .List)}}<select name="{{.Name}}"{{if and .Required .Placeholder}} required{{end}}{{if .Focus}} autofocus{{end}}>{{$v := num .Value}}{{if and .Required .Placeholder}}<option value="">{{.Placeholder}}</option>{{else if and (not .Required) (ne (index .Options 0) "")}}<option></option>{{end}}{{range .Options}}<option{{if eq . $v}} selected{{end}}>{{.}}</option>{{end}}</select>
-{{else if eq .Type "textarea"}}<textarea name="{{.Name}}"{{with .Rows}} rows="{{.}}"{{end}}{{if .Required}} required{{end}}{{with .Placeholder}} placeholder="{{.}}"{{end}}{{with .Key}} accesskey="{{.}}"{{end}}{{if .Focus}} autofocus{{end}}{{if .Send}} enterkeyhint="send"{{end}}>{{num .Value}}</textarea>
+{{else if eq .Type "textarea"}}<textarea name="{{.Name}}"{{with .Rows}} rows="{{.}}"{{end}}{{if .Required}} required{{end}}{{with .Placeholder}} placeholder="{{.}}"{{end}}{{with .Key}} accesskey="{{.}}"{{end}}{{if .Focus}} autofocus{{end}}>{{num .Value}}</textarea>
 {{else}}<input type="{{.Type}}" name="{{.Name}}" value="{{num .Value}}"{{if eq .Type "password"}} autocomplete="new-password"{{end}}{{if .Required}} required{{end}}{{if eq .Type "number"}} step="any" inputmode="decimal"{{end}}{{with .Accept}} accept="{{.}}"{{end}}{{with .List}} list="{{.}}"{{end}}{{with .Placeholder}} placeholder="{{.}}"{{end}}{{if .Focus}} autofocus{{end}}>{{with .List}}<datalist id="{{.}}">{{$labels := $.Labels}}{{range $.Options}}{{$o := .}}{{with index $labels $o}}<option value="{{$o}}">{{.}}{{else}}<option value="{{$o}}">{{end}}{{end}}</datalist>{{end}}{{end}}</label>
 {{end}}{{end}}
 
@@ -210,8 +204,7 @@
      places by name and that are not `create`, in three groups: the ones that edit it, the others, and the danger
      actions, last and apart. The button opens a popover anchored to it (a sheet from the bottom on a phone). Each item
      is a button that opens a modal dialog with the action's form in it (the command show-modal): no script. A page
-     whose menu is empty draws no button. menu-list and menu-dialogs are its two parts: the chat screen draws them in
-     the popover of its own. */}}
+     whose menu is empty draws no button. menu-list and menu-dialogs are its two parts. */}}
 {{define "menu"}}{{$m := .Menu}}{{if not $m.Empty}}<div class="menu">
 <button type="button" class="button menu-button" popovertarget="menu" aria-label="More actions">⋯</button>
 <div class="menu-list" id="menu" popover><div class="menu-head"><span class="label">More</span><button type="button" class="button small" popovertarget="menu" popovertargetaction="hide">Close</button></div>

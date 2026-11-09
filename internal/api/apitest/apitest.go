@@ -36,9 +36,6 @@ func FreshOn(t testing.TB, source, day string) (*client.Client, http.Handler, *c
 }
 
 func over(s *core.Store, source string) (*client.Client, http.Handler, *core.Store) {
-	if s.SettingsPath == "" { // beside the file, as the program puts it
-		s.SettingsPath = core.SettingsPathFor(s.DB.Path())
-	}
 	h := api.NewWith(s, nil)
 	return client.InProcess(h, source), h, s
 }

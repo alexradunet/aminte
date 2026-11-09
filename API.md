@@ -30,8 +30,8 @@ and this page disagree, so a property here is a property on the wire.
   program on this machine, such as `aminte-web` ([extensions/web](extensions/web/README.md)).
 - **Provenance:** `Aminte-Source: <name>` names the writer on every row the request writes (`[a-z0-9_:.-]{1,64}`,
   e.g. `app:phone`). Without it a request writes as `api`.
-- **Owner-only:** an action with `owner: true` in the catalog, and the reads `GET /settings` and `GET /snapshots/{name}`,
-  are the owner's alone. A writer named `agent:…` or `import:…` is refused them (403 `forbidden`), whatever the token.
+- **Owner-only:** an action with `owner: true` in the catalog, and the read `GET /snapshots/{name}`, are the
+  owner's alone. A writer named `agent:…` or `import:…` is refused them (403 `forbidden`), whatever the token.
   The rule is held in the server, once, for the core and for every connected app. An owner action is never an MCP tool.
   `aminte actions --human` marks each one.
 - **Limits:** a JSON or URL-encoded body of an action is 20 MiB of encoded data at most, and a JSON body is exactly one
@@ -70,8 +70,7 @@ that follows `actions` needs no rules of its own. A `required` field that is mis
 or a `q` of blanks only, it answers with no hits ([search](#search)). A field of the type `date` takes a local day,
 `YYYY-MM-DD`, or the word `today`: the server's local day, the day that `GET /days/today` redirects to. Any other
 value that is not empty is refused (422 `invalid`). A field of the type `password` is a text that the catalog never
-fills in: `GET /actions` leaves its value empty, and only the owner's own resource (`GET /settings`) fills it. A client
-draws it as a password input.
+fills in: `GET /actions` leaves its value empty. A client draws it as a password input.
 
 One read answers `303` to a thing picked at random ([plan 130](docs/plans/130-the-explore-pass.md)): `random-page`
 (`GET /pages/random?kind=`), to a live thing of a Browse kind (`page` by default, or `all`), never a day page and never
@@ -94,8 +93,8 @@ client would read in many requests.
 
 ```mermaid
 flowchart TD
-  R["GET /days/2031-05-14/conversation?embed=ref"] --> A["the handler answers the entity"]
-  A --> S["each sub-entity with rel ref and an href and nothing else: 36 at most"]
+  R["GET /?embed=today"] --> A["the handler answers the entity"]
+  A --> S["each sub-entity with rel today and an href and nothing else: 36 at most"]
   S --> G["GET href through the same handler, as the writer agent:embed"]
   G -->|"2xx Siren entity with content"| E["the sub-entity is the answer, with its rel and href kept"]
   G -->|"a redirect to a path of this server"| H["follow it once"]
@@ -110,8 +109,8 @@ flowchart TD
 - **The bound.** One answer makes 36 reads at most. The sub-entities are taken in order, and the ones after the 36th
   stay references. A read that fails still counts.
 - **The writer.** Each embedded read is made in the server, in the context and with the host of the request, as the
-  writer `agent:embed`. An embedded `href` can come from a text that an agent wrote (a tool line of a conversation),
-  so it must never make the server run an owner-only read. The owner-only reads refuse an `agent:` writer, and their
+  writer `agent:embed`. An embedded `href` can come from a text that an agent wrote (the body of a page), so
+  it must never make the server run an owner-only read. The owner-only reads refuse an `agent:` writer, and their
   sub-entity stays a reference.
 - **A failure keeps the reference.** An `href` that is not a path of this server, an answer that is not 2xx, an answer
   that is not a Siren entity and an entity with no content leave the sub-entity as it is. A redirect to a path of this
@@ -245,9 +244,8 @@ first page. Orders: days newest first; search by rank, or newest first with `ord
 (`/browse?kind=person`), `media` (`/browse?kind=media`), `files`
 (`/browse?kind=document`), `metrics`, `ghosts` (`/browse?ghosts=1&kind=page`), `actions`, `calendar` (this month),
 `year` (this year), one `app` for each connected app that runs (`/with/NAME`; the title is the home title of the app,
-else its name) and `tasks` (`/tasks`) while a task service runs. Embedded: `today` (the [day](#day) of today) and
-`conversation` (the [conversation](#conversation) of today), two references that `?embed=today,conversation`
-[replaces](#embedding): a client that draws a frame reads them with the root. Actions: `capture` (for today), `search`,
+else its name) and `tasks` (`/tasks`) while a task service runs. Embedded: `today` (the [day](#day) of today), a
+reference that `?embed=today` [replaces](#embedding): a client that draws a frame reads it with the root. Actions: `capture` (for today), `search`,
 `find`, `open-day`,
 `create-page`, `create-person`, `add-file`,
 `record`, `register-metric` (owner), `snapshot` (owner).
@@ -269,9 +267,6 @@ else its name) and `tasks` (`/tasks`) while a task service runs. Embedded: `toda
 `GET /actions`: no properties; `actions` is the whole catalog with templated hrefs. With `new=<action>` and a value
 for each path field of that action (`/actions?new=rename&id=12`), that one action has its `href` filled in, as a
 resource offers it; a client that cannot fill a path (a form of a browser) opens an action so.
-
-Three actions have a section of their own, as the resource where they are drawn: `say` and `reply`
-([conversation](#conversation)) and the owner's `settings` ([settings](#settings)).
 
 ### days
 
@@ -435,7 +430,7 @@ names, or to today when `day` is absent or empty, and a value that is not a day 
 `record` and, once the day page exists, `set-cover` and `save-body`
 of it (its body and `version` filled in). The write `capture`
 answers with this entity and a `result` of the sync shape; its field `mood` has the `options` 1 to 5. The entry it
-appends begins with the brackets of a turn of [the conversation](#conversation): `(HH:MM) ` in the server's local
+appends begins with brackets: `(HH:MM) ` in the server's local
 time, or `(HH:MM, via NAME) ` when an `agent:*` or `import:*` writer sent it; a mood alone appends no text. Its field
 `import_key` makes a send again a no-op ([D28](docs/decisions/D28-capture-keys.md)): the sender makes one key for one capture and sends it
 unchanged on a retry, and the answer is then the class [result](#result), not this entity.
@@ -576,14 +571,13 @@ link to each month. Actions: `save-body` once the page of the year exists, else 
 ### page, person, file
 
 `GET /pages/{id}`; `GET /pages?title=` redirects to it. The class is the page's type; a day page adds `day-page`, a
-tombstoned page adds `deleted`. Links: `day` (a day page's day view), `series` (a metric's readings: it carries the page, so a client that draws the view and not the page follows it), `conversation` (the [conversation](#conversation) of a
-conversation page's day: it carries the page, as a series carries a metric's page, so a client that draws the view and not the page follows it), `preview` (a
+tombstoned page adds `deleted`. Links: `day` (a day page's day view), `series` (a metric's readings: it carries the page, so a client that draws the view and not the page follows it), `preview` (a
 file's picture), `cover` (the
 picture of the page's cover, when it has one), `choose-cover` (the [pictures it may take](#cover-choice): a live page that
-is not a file), `make-metric` (a live plain page that is not a day page or a conversation page: the address of the [New metric form](#metrics) with the name filled; registering the metric turns this page into it and keeps its text). Embedded: every outgoing link under its kind, every incoming one under `backlink` and its kind, with the class
+is not a file), `make-metric` (a live plain page that is not a day page: the address of the [New metric form](#metrics) with the name filled; registering the metric turns this page into it and keeps its text). Embedded: every outgoing link under its kind, every incoming one under `backlink` and its kind, with the class
 `category` added to a `part-of` backlink from a category page. Actions by
 what is legal: `save-body` (with the current `body` and `version` filled; an empty `body` is refused, so a save
-cannot empty a page), `promote` (it makes a person) and `rename` (neither on a [conversation page](#conversation), whatever the case of its title: its day names it, so `rename` of it, and `rename` of any page to a title `Conversation YYYY-MM-DD`, is 409, and writes nothing), `edit-person` (a live person: `name`, `birth_day` and `death_day` filled with the current values; a field left out stays, an empty date removes it, and an edit with no field is 422), `edit-metric` (a live metric: `daily` filled with the current mark, 1 or 0; a field left out is 0; a page that is not a live metric is 409), [`file-pages`](#filed) (a page that may
+cannot empty a page), `promote` (it makes a person) and `rename`, `edit-person` (a live person: `name`, `birth_day` and `death_day` filled with the current values; a field left out stays, an empty date removes it, and an edit with no field is 422), `edit-metric` (a live metric: `daily` filled with the current mark, 1 or 0; a field left out is 0; a page that is not a live metric is 409), [`file-pages`](#filed) (a page that may
 be `part-of`, not a day page: `ids` is this page, and `category` offers the category titles; a new title is made),
 `create-page` with `category` filled (a live category page: something is `part-of` it; the new page is made and
 filed in it in one write), `set-cover` (a live page that is not a file), `tombstone-pages` with `ids` this page, or
@@ -596,9 +590,7 @@ keeps each picture once. It takes a new photo as `original` (and
 `preview` when the photo is not a JPEG, PNG or GIF), kept as a file with no day and titled
 `<page> <today>.jpg`, a day page's `<day>.jpg` (` 2`, ` 3`… when taken) unless `title` names it; its `result` is the kept shape. Or it takes
 the `title` of a kept file with a preview, and its `result` is the sync shape. A photo with no picture, a title
-that is not a kept picture, or a file page, is refused (422). It writes the body of the page, so on a
-[conversation page](#conversation) it is the owner's: an `agent:*` or `import:*` writer is refused (403) when the
-write would change the body, as `save-body` is.
+that is not a kept picture, or a file page, is refused (422).
 
 | property | type | meaning |
 |---|---|---|
@@ -929,188 +921,6 @@ category is 422 (`links_endpoint_types`). The answer embeds an `item` link to ea
 | `added` | integer | the part-of links added (a page filed there already adds none) |
 | `moved` | integer | the other part-of links removed by `move` |
 | `removed` | integer | the part-of links removed by `from` |
-
-### settings
-
-`GET /settings` (owner-only) and `POST /settings` (the owner's
-action `settings`; the answer is this entity, with `result` the sentence `Settings saved.`). The
-settings are the application's, in a file beside the database (`life.db` gives `life.settings.json`, mode 0600), and
-not rows of `life.db`. Links: `self`, `index`. Actions: `settings`, with the values filled in, the key included, so
-the owner's form sends the key back as it is. `GET /actions` offers `settings` with no value filled in. A field of
-`settings` that a request leaves out stays as it is; an empty one clears that setting. A server that was started with
-no settings file path refuses both routes (500, the message says so).
-
-| property | type | meaning |
-|---|---|---|
-| `model_url` | string | the base URL of a server that speaks the chat-completions protocol, ending in `/v1`; `""` when not set |
-| `model` | string | the model id; `""` when not set |
-| `model_key` | string | a bearer credential for the server; absent when not set |
-| `owner_number` | string | the digits of the owner's phone number with the country code, the one number the agent on the phone answers; absent when not set. A value that is not digits is 422 `owner_number: digits with the country code, such as 40712345678` |
-
-### conversation
-
-`GET /days/{day}/conversation` (`day` is a local day or the word `today`; another value is 422): the talk of a day
-with an agent, as the turns of one plain page. Class `conversation`, and `page` too when the page exists. The core calls
-no model: an agent (an extension) reads the page and writes its own paragraphs in the format below. Links: `self`, `day`
-(the day view), `index`, and `page` (the conversation page) when it exists. The links `earlier` are the days before
-today that have a live conversation page: the newest three of the last 14 days, the oldest first, each with the day as
-its `title` and the conversation of that day as its `href`. The answer of every day has them, as of today, not as of its
-own day: they are the day bar of a chat client. Embedded: one `ref` for each address that the tool lines name (the
-`refs` of the turns), the newest turn first, each address once, at most 6 of one turn. Each is a reference, so
-`?embed=ref` [replaces](#embedding) it by the thing that the agent touched, in the 36 newest. Actions: `say` first, with `day` filled in,
-only when `day` is the server's local today (the conversation of another day offers none; `reply` is in `GET /actions`
-alone, as the agent's action);
-when the page exists, the actions of [the page](#page-person-file) after it (`save-body` with the `version`, and
-the others). When the page exists, the answer carries the page as a series carries a metric's page: its properties
-(the rows below that follow `turns`), its links but `self`, `conversation` and `index`, and its embedded links. A page that is
-deleted is no conversation: the answer has no turns, and `say` makes it live again. A page of another type that holds the
-title (a file, a person or a metric) is no conversation either: the answer has no turns and no `page`, and `say` and `reply`
-are 409. The page of a live conversation links to this resource (rel `conversation`); the JSON of the page is the page's own.
-
-`POST /days/{day}/say` (the action `say`, the owner's): the field `text` is added to the page of the day as the
-owner's turn, with the time of the server's clock in its zone. The page is made on the first turn of the day, in
-the same write; a deleted page of the conversation, or a deleted category `Conversations`, is revived by it. The
-answer is this entity, and `result` is the [save result](#result-of-capture-create-page-save-body).
-A line of the `text` outside a fenced code block that reads as a marker of a turn is written with its asterisks escaped
-(`\*\*Owner\*\* (09:31): ...`), so it is text and not a turn. A code fence that the `text` opens and does not close is
-closed by a line of three backticks at the end of the turn. A balanced block stays as it is. A line of the `text` outside
-a fenced block that starts with ``- ` `` (a dash, a space and a backtick) is written with a backslash before the dash: it
-is not a tool line, so a reply with no tool lines takes no line of the owner's turn. The page keeps the backslash, and
-`turns[].text` does not: it gives the words as they were said (a line outside a fenced block that starts with a
-backslash, a dash, a space and a backtick is read without the backslash), so a client that draws the words shows a list,
-and a relay that sends them sends ``- `x` ``. A code fence that an edit of the owner left open at the end of the page is
-closed before the turn, so the turn is read as a turn.
-`say` is for today: a `day` that is not the server's local today is 422 `say is for today: the agent answers today's
-conversation`, and writes nothing. A `text` that is empty or only blanks is 422 and writes nothing. The optional field
-`via` names the relay, the program that carries the owner's words (`[a-z0-9_:.-]{1,64}`); another value is 422.
-`say` answers at once and calls no model. When the agent runs (`aminte-agent`, started by `serve --with agent`), it reads
-the page, finds the turn of the owner that nobody has answered (the last turn is the owner's), and writes its reply on the
-page as `agent:aminte`, with `reply`. A client reads the page to see the reply. `say` writes the turn of the owner. The owner may also edit the page with
-`save-body`, and the page reads the edit as it reads any text: text that the owner adds after a turn is part of that
-turn, and a marker line that the owner types outside a fenced block (`**Owner** (HH:MM): ...`) is a turn of the owner,
-as `say` would write it. An
-`agent:*` or `import:*` writer, or a name that is no writer name, is refused (403 `forbidden`: `an agent or an import
-may not write a conversation page: the agent writes its turn with reply`) in every write of the body of a conversation
-page except `say` and `reply`: `save-body`, and `set-cover` when it would change the body. The refusal is in the one
-write of a body in the core, so an action added later meets it too.
-
-**The title of a conversation page.** The title `Conversation YYYY-MM-DD`, in any case, belongs to the plain page that
-`say` makes. A write that would make a page under that title, give a page that title, take it from the page, or change
-the type of the page that holds it is 409 for every writer, and writes nothing: `create-page` (also its `category`),
-`file-pages` (its `category`), `create-person`, `register-metric`, `add-file`, `rename` (to the title or from it) and
-`promote`. The message says that the title is a conversation title. A [wikilink](docs/contract/titles-and-wikilinks.md) is
-the one other write that makes such a page: the save contract makes an empty plain page for a target that does not exist.
-That page has no turns, so it is no conversation yet, and the first `say` of its day adopts it: it writes the first
-line, files the page in `Conversations` and gives it its day, as for a page that it makes itself.
-
-**The category of the conversation pages.** The title `Conversations`, in any case, belongs to a plain page, because a
-part-of link needs a plain page and `say` files every conversation page in that category. A write that would make the
-page under that title a person, a metric or a file, or change its type, is 409 for every writer, and writes nothing:
-`create-person`, `register-metric`, `add-file`, `promote`, and `rename` of a page that is not a plain page to the title.
-The message says that the page stays a plain page. A plain page under the title is allowed (`create-page`, a wikilink,
-the `category` of a filing, `rename` of a plain page, and `say`). The plain page may be renamed: it keeps the title as
-a name that it had, `say` still files in it, and `promote` of it is 409 as well.
-
-`POST /days/{day}/reply` (the action `reply`; no owner action: the agent's writer `agent:aminte` runs it, and so may
-any writer): the agent's turn, written in one transaction on the conversation page of `day` (a local day or the word
-`today`, any day that has a page).
-
-- `turn` (text, required): the key of the owner turn that the reply answers, from `turns[].key` of the conversation. An
-  agent that read the page answers the key of the turn that it read. A missing or blank `turn` is 422.
-- `text` (text, required): the words of the reply. Empty or only blanks is 422. It is made safe as the `text` of `say` is.
-- `tools` (text): the tool lines of the turn, one for each line (LF or CRLF between them). A blank line is dropped. Each
-  line starts with ``- ` `` (a dash, a space and a backtick), or the answer is 422. They are written right before the
-  paragraph of the reply.
-
-A key names a turn by what it is and not by its place on the page, because the page changes while an agent works on a
-turn. It is a string of 16 hex digits that the server makes from the `who`, the `at`, the `via` and the `text` of the turn,
-and from the number of turns before it that have the same four: so two turns of one page never have the same key. An agent
-treats it as an opaque string and compares it whole. A reply that is written, a turn that the owner says, and an edit that
-removes an earlier turn that is different move no key. An edit that removes an earlier turn with the same `who`, the
-same minute, the same relay and the same words gives the key of that turn to the later equal turn, because the later one
-is then the first of its kind: a `reply` with the key that the agent read for the later turn is 409, and the agent reads
-the page again. A key changes when the owner edits the words, the time or the relay of the turn: the
-agent then reads the page again, and answers the key that it finds.
-
-The reply is the paragraph `**aminte** (HH:MM): text`, with the time of the server's clock in its zone, written right
-after the owner turn that it answers: before the marker line of the next turn, or at the end of the page. A turn that the
-owner said while the agent worked stays after the reply and waits for its own. The page keeps LF line ends. A code fence
-that an edit left open before the reply is closed by a line of three backticks, so the reply is a turn. A turn is
-read with such a fence closed already, so the closing does not change the words or the key of the turn that the reply
-answers. A line of the `text`
-that starts with ``- ` `` outside a fenced block is written with a backslash before the dash, so it is no tool line of this
-or of the next reply; `turns[].text` gives it back without the backslash. The same holds for the last lines of the turn that
-the reply answers, when an edit left a block of such lines at its end: they get the backslash, so the reply does not take
-them as its tool lines, and the turn keeps its words and its key. The answer is
-the conversation of the day, and `result` is the [save result](#result-of-capture-create-page-save-body).
-
-| status | `code` | when |
-|---|---|---|
-| 404 | `not_found` | the day has no conversation page |
-| 409 | `conflict` | no owner turn of the page has the key `turn` now: the owner edited or removed the turn, or the key is not the key of an owner turn, and the agent reads the page again. Or the owner turn has a reply already (the turn after it is a turn of the agent): nothing is written, so a resent reply never answers twice. Or the page is deleted, or is not a plain page: `reply` does not revive it |
-| 422 | `invalid` | a missing or blank `turn` or `text`, a `tools` line that is not a tool line, a `day` that is not a day, a field the action does not list |
-
-**The format of the page.** An agent in any language reads the conversation, and writes its turn with `reply` and the
-turn of the owner with `say`. The page:
-
-- is titled `Conversation YYYY-MM-DD` (the day), is filed in the category `Conversations`, and starts with the line
-  `[[YYYY-MM-DD]]`;
-- is read by lines. Line ends are LF; CRLF is read as LF;
-- has a turn from each marker line. A marker line starts with `**Owner** (HH:MM): ` or `**aminte** (HH:MM): ` and is
-  outside a fenced code block (a line that starts with three backticks opens or closes a fence). `HH:MM` is the
-  server's local time; a marker written with the earlier separator, `(HH.MM)`, is read the same. `reply` writes `**aminte**`, and `say` writes `**Owner**`. The brackets may also name the
-  writer that relayed the turn: `**Owner** (HH:MM, via whatsapp): `, where the name is `[a-z0-9_:.-]+`. `say` writes
-  it when the request names `via`, and writes no such part without it;
-- runs a turn from its marker line to the line before the next marker line, or to the end of the page. The words of
-  the turn are the rest of the marker line and the lines after it, with their inner blank lines (a turn may have many
-  paragraphs, and a note that the owner adds after a reply is part of that reply). The blank edge is dropped. A line
-  of the words outside a fenced block that starts with a backslash, a dash, a space and a backtick is read without the
-  backslash (the writer of the page put it there), also on the line of the marker. A fence that the last turn of the
-  page leaves open is read as closed, with a line of three backticks at the end of its words;
-- has the tool lines of a `aminte` turn right before its marker: one block of lines that each start with ``- ` ``, for
-  example ``- `search`: no hits``, with at most one blank line between the block and the marker. They are not part of
-  the turn before. Tool lines before an `Owner` marker are part of the text before it. A tool line names the address
-  of what the agent touched as ``- `name` → [href](href)`` (or ``- `name` → href``); a client may draw it as a card.
-  A failed call is ``- `name` failed: code`` and names no address;
-- may hold text before the first marker, after the first line `[[YYYY-MM-DD]]`. It is one turn of `who` `text` when it
-  is not blank, shown as it is. The first line is no turn.
-
-| property | type | meaning |
-|---|---|---|
-| `day` | day | the day of the conversation |
-| `turns[]` | list | the turns, in the order of the page; empty when the page does not exist |
-| `turns[].who` | string | `owner`, `aminte`, or `text` for a free paragraph |
-| `turns[].key` | string | the name of the turn for `reply`: 16 hex digits, opaque; no two turns of one page have the same |
-| `turns[].at` | string | `HH:MM`, also for a marker written as `HH.MM`; absent for a free paragraph |
-| `turns[].via` | string | the relay named by `via`; absent when the owner wrote on a surface of aminte |
-| `turns[].text` | string | the words of the turn, without the mark |
-| `turns[].tools` | list | the tool lines of a `aminte` turn, as written, with the leading ``- ` ``; absent when none |
-| `turns[].refs` | list | the addresses of the turn's tool lines (paths that start with `/`), in order, unique; absent when none |
-| `id` | integer | only when the page exists: its id, and then the rows of the page that follow |
-| `entity_type` | string | `page` |
-| `title` | string | `Conversation YYYY-MM-DD` |
-| `body` | string | the body, as the page has it |
-| `created_at` | instant | when the page was created |
-| `version` | string | the version token a `save-body` must send back; it changes with every write, so a client that waits for an answer compares it |
-| `is_day_page` | boolean | always false |
-| `cover` | object | the page's cover, as `cover` of [a page](#page-person-file); absent when it has none |
-| `cover.id` | integer | |
-| `cover.title` | string | |
-| `cover.embed` | string | |
-| `links[]` | list | the typed links the page starts, as `links[]` of [a page](#page-person-file) |
-| `links[].kind` | string | |
-| `links[].id` | integer | |
-| `links[].title` | string | |
-| `links[].entity_type` | string | |
-| `links[].note` | string | |
-| `links[].context` | string | |
-| `backlinks[]` | list | the links that end at the page, the same shape |
-| `backlinks[].kind` | string | |
-| `backlinks[].id` | integer | |
-| `backlinks[].title` | string | |
-| `backlinks[].entity_type` | string | |
-| `backlinks[].note` | string | |
-| `backlinks[].context` | string | |
 
 ## Result shapes
 

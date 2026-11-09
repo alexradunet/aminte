@@ -151,7 +151,7 @@ func (t *Tx) keepNew(f FileIn, d fileDay) (k Kept, err error) {
 	body := f.Body
 	switch {
 	case p == nil:
-		if k.ID, err = t.insertPage("file", f.Title, text.TitleKey(f.Title), nullIfEmpty(d.Day), f.Body); err != nil {
+		if k.ID, err = t.insertRow("file", f.Title, text.TitleKey(f.Title), nullIfEmpty(d.Day), f.Body); err != nil {
 			return k, err
 		}
 	case p.Type == "file": // another original under a title in use: the schema cannot see it, and the 409 names the page

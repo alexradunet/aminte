@@ -18,13 +18,13 @@ func TestToolsRefuseNormalizedDuplicates(t *testing.T) {
 		{"built-in get", []siren.Action{{Name: "get"}}, `"get"`},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := Of(tc.actions, nil)
+			_, err := Of(tc.actions)
 			if err == nil || !strings.Contains(err.Error(), tc.want) {
 				t.Fatalf("Of() = %v, want a collision containing %s", err, tc.want)
 			}
 		})
 	}
-	list, err := Of([]siren.Action{{Name: "get", Owner: true}, {Name: "find"}, {Name: "import-find"}, {Name: "open-day", Method: "GET"}}, nil)
+	list, err := Of([]siren.Action{{Name: "get", Owner: true}, {Name: "find"}, {Name: "import-find"}, {Name: "open-day", Method: "GET"}})
 	if err != nil {
 		t.Fatalf("owner-only duplicate and distinct public tools were rejected: %v", err)
 	}
@@ -41,30 +41,8 @@ func names(list []Tool) string {
 	return strings.Join(out, " ")
 }
 
-func TestAnOwnerActionIsNeverAToolWhateverKeepSays(t *testing.T) {
-	list, err := Of([]siren.Action{{Name: "snapshot", Owner: true}, {Name: "find"}},
-		func(siren.Action) bool { return true })
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got := names(list); got != "find get" {
-		t.Fatalf("tools = %q, want find and get only", got)
-	}
-}
-
-func TestKeepNarrowsTheList(t *testing.T) {
-	actions := []siren.Action{
-		{Name: "add-file", Fields: []siren.Field{{Name: "original", Type: "file"}}},
-		{Name: "find", Fields: []siren.Field{{Name: "q", Type: "text"}}},
-	}
-	list, err := Of(actions, func(a siren.Action) bool {
-		for _, f := range a.Fields {
-			if f.Type == "file" {
-				return false
-			}
-		}
-		return true
-	})
+func TestAnOwnerActionIsNeverATool(t *testing.T) {
+	list, err := Of([]siren.Action{{Name: "snapshot", Owner: true}, {Name: "find"}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -104,7 +82,7 @@ func TestArgumentsFlattenToFormValues(t *testing.T) {
 func TestAFileFieldIsThePathOfALocalFile(t *testing.T) {
 	list, err := Of([]siren.Action{{Name: "capture", Method: "POST", Href: "/days/{day}/capture", Fields: []siren.Field{
 		{Name: "day", Type: "date", In: "path", Required: true}, {Name: "text", Type: "textarea"},
-		{Name: "audio", Type: "file", Title: "A recording"}}}}, nil)
+		{Name: "audio", Type: "file", Title: "A recording"}}}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -119,7 +97,7 @@ func TestAFileFieldIsThePathOfALocalFile(t *testing.T) {
 // end of its description. It is words, not a value of the type ("Pick a metric"), so it is not a JSON Schema example.
 func TestAPlaceholderIsAnExampleInTheDescription(t *testing.T) {
 	list, err := Of([]siren.Action{{Name: "register-metric", Method: "POST", Href: "/metrics", Fields: []siren.Field{
-		{Name: "name", Type: "text", Title: "Name", Placeholder: "Weight, Mood, Walk"}, {Name: "note", Type: "text"}}}}, nil)
+		{Name: "name", Type: "text", Title: "Name", Placeholder: "Weight, Mood, Walk"}, {Name: "note", Type: "text"}}}})
 	if err != nil {
 		t.Fatal(err)
 	}

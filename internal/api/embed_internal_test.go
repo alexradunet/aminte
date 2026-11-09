@@ -195,10 +195,10 @@ func TestEmbedFollowsOneRedirect(t *testing.T) {
 
 // TestEmbedReadsAsAnAgentInTheContextOfTheRequest: an embedded read carries the writer agent:embed, the host and the
 // context of the request. An owner-only read refuses that writer, so its reference stays and its answer is not in the
-// result: the settings never reach a client through an address that an agent wrote.
+// result: the owner's read never reaches a client through an address that an agent wrote.
 func TestEmbedReadsAsAnAgentInTheContextOfTheRequest(t *testing.T) {
 	h := embedServer(t, func() []siren.Link {
-		return []siren.Link{ref("item", "/who"), ref("item", "/settings"), ref("item", "/integrity"), ref("item", "/settings?x=1")}
+		return []siren.Link{ref("item", "/who"), ref("item", "/integrity"), ref("item", "/integrity?x=1")}
 	})
 	got := readProbe(t, h, "?embed=item").Entities
 	props, _ := got[0].Properties.(map[string]any)

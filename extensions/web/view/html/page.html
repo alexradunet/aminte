@@ -56,7 +56,7 @@
 {{with .Link "make-metric"}}<div class="actions quiet"><a class="button" href="{{.}}">Make it a metric</a></div>{{end}}
 {{end}}
 
-{{/* links and backlinks are two groups of the margin of a page: the typed links of the page and the pages that link to it. The chat screen's menu draws them too. */}}
+{{/* links and backlinks are two groups of the margin of a page: the typed links of the page and the pages that link to it. */}}
 {{define "links"}}{{$p := .Props}}{{with $p.links}}<section class="group" aria-label="Links"><h2>Links</h2>{{template "typed-links" (dict "v" $ "links" .)}}</section>{{end}}{{end}}
 {{define "backlinks"}}{{$groups := .Backlinks}}{{if $groups}}<section class="group" aria-label="Backlinks"><h2>Backlinks</h2>{{range $groups}}<p class="sub">{{if eq .Key "wikilink"}}mentioned in{{else}}{{.Key}}{{end}}</p>
 <ul class="plain">{{range .Items}}<li><a href="/pages/{{num .id}}">{{$.Date .title}}</a>{{if ne .entity_type "page"}} <span class="badge">{{.entity_type}}</span>{{end}}{{with .context}}

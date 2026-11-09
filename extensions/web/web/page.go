@@ -7,7 +7,6 @@ import (
 	"log"
 	"net/http"
 	"net/url"
-	pathpkg "path"
 	"slices"
 	"strings"
 
@@ -23,9 +22,6 @@ const embedField = "embed"
 // it to the core (webFields).
 const feedbackField = "feedback"
 
-// refRel is the rel of the sub-entities of a conversation that name what its agent touched.
-const refRel = "ref"
-
 // page is the answer to a GET of any path that web does not serve itself. It asks the core for the same path and
 // query as Siren JSON and then does one of three things with the answer:
 //
@@ -35,6 +31,10 @@ const refRel = "ref"
 func (b *Browser) page(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Query().Has(embedField) { // refused, not ignored: web asks for the embedding that its page needs
 		b.fail(w, r, http.StatusUnprocessableEntity, siren.CodeInvalid, "embed is a parameter of the Siren answer, not of a page")
+		return
+	}
+	if r.URL.Path == "/settings" && !wantsSiren(r) {
+		b.settingsPage(w, r)
 		return
 	}
 	if (r.URL.Path == appHome || r.URL.Path == appHome+"/") && wantsHTML(r) {
@@ -55,7 +55,7 @@ func (b *Browser) page(w http.ResponseWriter, r *http.Request) {
 	case isRedirect(res.StatusCode):
 		b.redirect(w, r, res.Header.Get("Location"), res.StatusCode)
 	case isSiren(res) && wantsSiren(r):
-		// A script of the page (the poll of chat.js) reads the entity itself. The session is the owner's, and the
+		// A script reads the entity itself. The session is the owner's, and the
 		// answer is no-store as every answer of a session is (serveSession).
 		stream(w, r, res)
 	case isSiren(res):
@@ -72,14 +72,10 @@ func (b *Browser) page(w http.ResponseWriter, r *http.Request) {
 }
 
 // embedFor is the embedding that the page at path needs, "" for none. Home is the page of today, and the root gives the
-// shell too (homeOf). The conversation view is the chat at full size: the core embeds the entity at each address that
-// its tool lines name. A read that fails keeps the page without its cards.
+// shell too (homeOf).
 func embedFor(path string) string {
 	if path == "/" {
-		return "today,conversation"
-	}
-	if ok, _ := pathpkg.Match("/days/*/conversation", path); ok {
-		return refRel
+		return "today"
 	}
 	return ""
 }
@@ -89,7 +85,7 @@ func embedFor(path string) string {
 // The parts of a page that a GET adds (the day of Home, the view of a metric, the form of the settings of this browser,
 // the toast) are not added to the answer of a POST.
 func (b *Browser) draw(w http.ResponseWriter, r *http.Request, status int, e *siren.Entity, retryAfter string, f view.Facts) {
-	var root *siren.Entity // the root of the API with the day of today and the chat embedded, when this page asked for it
+	var root *siren.Entity // the root of the API with the day of today embedded, when this page asked for it
 	reading := r.Method != http.MethodPost
 	if reading && r.URL.Path == "/" && status < http.StatusBadRequest {
 		var ok bool
@@ -109,9 +105,6 @@ func (b *Browser) draw(w http.ResponseWriter, r *http.Request, status int, e *si
 			b.redirect(w, r, withQuery(to, r.URL.RawQuery), http.StatusSeeOther)
 			return
 		}
-		if r.URL.Path == "/settings" && slices.Contains(e.Class, "settings") {
-			b.offerBrowserSettings(r, e)
-		}
 		if r.Method == http.MethodGet {
 			if text := b.feedback.take(r.URL.Path, r.URL.Query().Get(feedbackField)); text != "" {
 				e.Result = text
@@ -120,7 +113,7 @@ func (b *Browser) draw(w http.ResponseWriter, r *http.Request, status int, e *si
 			}
 		}
 	}
-	b.shellFacts(r, status, root, e, &f)
+	b.shellFacts(r, status, root, &f)
 	body, err := view.Draw(e, f)
 	if err != nil {
 		logFault(r, "the view "+view.TemplateOf(e)+" cannot be drawn", err)
@@ -139,21 +132,31 @@ const (
 	appHome               = "/with/" + appName
 )
 
-// offerBrowserSettings adds the form of this browser to the settings page, under the form of the core: the action
-// web-settings of the catalog of the core, with the values that this program keeps. Without `serve --with web` the core
-// has no such action, and the page is the page of the core.
-func (b *Browser) offerBrowserSettings(r *http.Request, e *siren.Entity) {
+// settingsPage is the page /settings. Web draws it itself, because the core keeps no settings. It has the form of this
+// browser: the action web-settings of the catalog of the core, with the values that this program keeps. Without
+// `serve --with web` the core has no such action, and the page has no form. The link snapshot opens the owner's
+// snapshot, the backup.
+func (b *Browser) settingsPage(w http.ResponseWriter, r *http.Request) {
 	actions, err := b.core.catalog(r.Context())
-	if err != nil {
+	if errors.Is(err, errAnswer) {
 		logFault(r, "the catalog of the core cannot be read", err)
+		b.fail(w, r, http.StatusBadGateway, siren.CodeUpstream, "the core gave no catalog")
 		return
 	}
+	if err != nil {
+		b.unreachable(w, r, err)
+		return
+	}
+	e := &siren.Entity{Class: []string{"settings"}, Title: "Settings", Links: []siren.Link{
+		{Rel: []string{"self"}, Href: "/settings", Title: "Settings"}, {Rel: []string{"index"}, Href: "/", Title: "Home"},
+		{Rel: []string{"snapshot"}, Href: "/actions?new=snapshot", Title: "Take a snapshot"}}}
 	if i := slices.IndexFunc(actions, func(a siren.Action) bool { return a.Name == browserSettingsAction }); i >= 0 {
 		e.Actions = append(e.Actions, withValues(actions[i], b.settings()))
 	}
+	b.draw(w, r, http.StatusOK, e, "", view.Facts{URL: r.URL})
 }
 
-// homeOf is the page of Home, from the root of the API read with ?embed=today,conversation: the day of today. The
+// homeOf is the page of Home, from the root of the API read with ?embed=today: the day of today. The
 // root is the shell too. ok is false when the root has no embedded day of today.
 func homeOf(root *siren.Entity) (_, home *siren.Entity, ok bool) {
 	i := slices.IndexFunc(root.Entities, func(l siren.Link) bool { return l.HasRel("today") && l.Embedded() })
@@ -163,18 +166,15 @@ func homeOf(root *siren.Entity) (_, home *siren.Entity, ok bool) {
 	return root, root.Entities[i].Entity(), true
 }
 
-// ownView is the address of the view that carries the page e, "" when e has none. A live metric and a live conversation
-// page each have one view in a browser: the series of the metric and the conversation of the day. The page links to
-// that view (API.md, "page, person, file"), and the view carries the page. The page of a deleted metric or conversation
-// stays a page.
+// ownView is the address of the view that carries the page e, "" when e has none. A live metric has one view in a
+// browser: the series of the metric. The page links to that view (API.md, "page, person, file"), and the view carries
+// the page. The page of a deleted metric stays a page.
 func ownView(e *siren.Entity) string {
-	if slices.Contains(e.Class, "deleted") {
+	if slices.Contains(e.Class, "deleted") || !slices.Contains(e.Class, "metric") {
 		return ""
 	}
-	for _, v := range []struct{ class, rel string }{{"metric", "series"}, {"page", "conversation"}} {
-		if l := e.LinkByRel(v.rel); l != nil && slices.Contains(e.Class, v.class) && isPath(l.Href) {
-			return l.Href
-		}
+	if l := e.LinkByRel("series"); l != nil && isPath(l.Href) {
+		return l.Href
 	}
 	return ""
 }

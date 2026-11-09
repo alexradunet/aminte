@@ -20,7 +20,7 @@ import (
 func TestEveryAcceptGetsTheSirenAnswer(t *testing.T) {
 	_, h, _ := apitest.FreshOn(t, "cli", fixedToday)
 	browser := map[string]string{"Accept": "text/html,application/xhtml+xml,*/*;q=0.8", "Sec-Fetch-Site": "same-origin", "Host": "localhost"}
-	for _, path := range []string{"/", "/days/" + fixedToday, "/actions", "/browse", "/metrics", "/settings", "/pages/999999"} {
+	for _, path := range []string{"/", "/days/" + fixedToday, "/actions", "/browse", "/metrics", "/pages/999999"} {
 		rec := request(h, "GET", path, "", browser)
 		if rec.Header().Get("Content-Type") != "application/vnd.siren+json" || !strings.HasPrefix(strings.TrimSpace(rec.Body.String()), "{") {
 			t.Errorf("GET %s: %d %q %.80s, want Siren JSON", path, rec.Code, rec.Header().Get("Content-Type"), rec.Body.String())

@@ -19,8 +19,8 @@ import (
 const embedField = "embed"
 
 // embedSource is the writer of an embedded read. It is an agent's, so requireOwner refuses it: an owner-only read
-// (the settings, the integrity check) keeps its link. The reason is that an embedded href can come from text that an
-// agent wrote (a tool line of a conversation), and such text must never make the server run an owner-only read.
+// (the integrity check) keeps its link. The reason is that an embedded href can come from text that an agent wrote
+// (the body of a page), and such text must never make the server run an owner-only read.
 const embedSource = siren.AgentPrefix + "embed"
 
 // maxEmbedded is the most reads that one answer makes. The sub-entities after them stay references.

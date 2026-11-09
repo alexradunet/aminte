@@ -4,11 +4,12 @@ An issue records an incident from real use — a failed import, a bug in the wri
 data could not answer, a rule that is ambiguous or untestable. It is the evidence a schema change needs
 ([how a change happens](../process.md)). One file per incident, named `NNNN-short-slug.md`, written from the
 [template](template.md), numbered on from the last: issues up to 0010 are closed and live in git history
-(`git log -- docs/issues`). Issues 0011–0092 are listed below; the next one is **0093**. Close an issue with its resolution and status, retaining the dated incident as
+(`git log -- docs/issues`). Issues 0011–0093 are listed below; the next one is **0094**. Close an issue with its resolution and status, retaining the dated incident as
 [the process](../process.md) requires. Earlier closed records remain available in git history.
 
 | id | title | status |
 |---|---|---|
+| [0093](0093-three-ways-for-an-agent.md) | There are three ways for an agent to talk to aminte, and the owner wants one | resolved |
 | [0092](0092-plan-lines-cost-more-than-they-give.md) | Plan lines cost more than they give: the owner plans in a task manager | resolved |
 | [0091](0091-places-cost-more-than-they-give.md) | Places and the `at` link cost more than they give | resolved |
 | [0090](0090-the-writer-guesses-which-metrics-are-daily.md) | The writer guesses which metrics are daily | resolved |

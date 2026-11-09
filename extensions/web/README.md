@@ -172,16 +172,11 @@ year would show from the cache in a locked browser.
 Three decisions come from the data of the API and from no rule that web copies:
 
 - **Home.** `GET /` is the page of today. The root of the API names the day of today as a sub-entity, and web draws it.
-- **A page with a view of its own.** The page of a live metric links to its series (rel `series`), and the page of a
-  live conversation links to the conversation of its day (rel `conversation`). Web sends the browser to that view, with
-  the query kept (the receipt of a toast too, which moves with the redirect), because the view carries the page. The
-  page of a deleted metric stays as it is.
-- **The shell.** The strip of today, the days, the apps and the chat column come from `GET /?embed=today,conversation`.
-  The cards of the column come from one more read, `GET <conversation of today>?embed=ref`: the core embeds the thing
-  at each address as the writer `agent:embed`, which the core refuses an owner-only read, and the column draws the
-  newest six. An address that the core did not embed keeps the plain link. The conversation view takes its cards from
-  its own read with `?embed=ref`. A day page makes 3 reads of the core: the page, the root and the conversation. A
-  script that asks for the Siren entity of a conversation (the poll of `chat.js`) gets it without `embed`.
+- **A page with a view of its own.** The page of a live metric links to its series (rel `series`). Web sends the browser
+  to that view, with the query kept (the receipt of a toast too, which moves with the redirect), because the view
+  carries the page. The page of a deleted metric stays as it is.
+- **The shell.** The strip of today, the days and the apps come from `GET /?embed=today`. A day page makes 2 reads of
+  the core: the page and the root.
 
 A core that is down is a 503 page with `Retry-After`. A core that is slow is a 504 page. A browser that goes away ends
 the request to the core. The page names no address and no cause: the log has them.
@@ -273,7 +268,7 @@ stateDiagram-v2
 - `/lock`, `/unlock`, `/locked` and `/awake` are routes of this program beside `/login` and `/logout`. They are not
   actions of the catalog: they are about one browser, not about the data.
 - A navigation that is not a prefetch or a prerender, a form post and `POST /awake` are the owner's activity. A script's
-  fetch, the poll of the chat and a speculative load are not.
+  fetch and a speculative load are not.
 - The lock hides the pages, not the history of the browser. The titles of the pages that were open stay in the history
   and in the suggestions of the address bar.
 - The server cannot clear a screen by itself. The script `/assets/lock.js` does it ([the scripts](#the-scripts)). The Lock
@@ -305,7 +300,7 @@ With `AMINTE_LISTEN`, the program serves a catalog on that address, and `aminte 
 | `GET /` | The home, titled "This browser": the settings as properties, and the action with its values. It has no PIN and no hash. |
 | `POST /settings` | Saves. A field that is left out stays. An empty field clears that setting, but an empty `pin` keeps the stored PIN. An unknown field, a value outside the options, a PIN that is not 4 to 8 digits, and `lock_after` with no PIN are 422, and nothing is written. The answer is the home, with the result "Settings saved.". |
 
-The page `/settings` is the settings page of the core, and under its form a second form, "This browser": the action
+The page `/settings` is drawn by web, because the core keeps no settings. It has the form "This browser": the action
 `web-settings` of the catalog of the core, with the values of this program. It posts to web, which sends it to the core,
 which sends it on to this catalog. Without the app (no `AMINTE_LISTEN`) the form is not drawn. The settings page also
 links to the snapshot form under Backup ([the pages](#backup)).
@@ -433,18 +428,6 @@ write the page returns to the quiet list with the count.
 - A reading is added on the day (the boxed Add a reading of the day) and on the readings of the metric. The New menu of
   the rail opens Reading on the page of today.
 
-### The conversation
-
-- A right column on every page of the shell shows today's turns and the composer. It is a popover: a panel at the right
-  edge of a wide screen and a sheet under 900 px. The Chat button opens it (at the corner, or in the bottom bar of a
-  phone). It draws each address of the tool lines of a turn as a card on one line.
-- The conversation view is the chat screen, and not a page ([plan 148](../../docs/plans/148-the-chat-screen.md)). It has a
-  day bar with the chips of the last days and a menu of the actions, the links and the backlinks of the page (a popover),
-  the thread, and the composer at the bottom. It draws the entity that answers each address as a card by its class (a day,
-  a page, a metric, a search). It has the content of the column at full size and no column.
-- Without a script every form still posts and redirects. The page that comes back shows the new turn when the column is
-  opened, and the reply shows on the next load.
-
 ### Backup
 
 The rail has a Snapshot link (`/actions?new=snapshot`). The toast of the answer says "Download it", and the page of the
@@ -472,8 +455,6 @@ sidebar does not draw it a second time.
   ([plan 093](../../docs/plans/093-words-phone-and-today.md)): a top bar (the brand, the date, Search, New), a bottom bar
   of the sections of every day and More, and the rest as a sheet over the page (`#sections`). The sheet is a popover that
   More opens. Close, Escape or a tap outside closes it, with no script.
-- **The chat column** (`#chat`, [plan 146](../../docs/plans/146-settings-and-the-chat-column.md)) is a popover in the same
-  way: a panel at the right edge of a wide screen and a sheet under 900 px.
 - **Container queries.** Inside the page a layout asks the width of its column (`@container column`), and not the width of
   the screen. So a day beside an open sheet lays out as in a narrow window. The title, the leaf and the padding of the
   sheet scale with the column by `clamp()`, with no step at a breakpoint
@@ -497,7 +478,7 @@ sidebar does not draw it a second time.
   leaf and cross-fades the sheet through a cross-document view transition
   ([plan 097](../../docs/plans/097-the-almanac-reflects.md)). The search dialog and the phone's sheet enter and leave by
   `@starting-style` and a discrete transition. The top bar of the phone takes its drop once the page has scrolled under
-  it, by a scroll-driven animation. The New menu and the menu of the chat screen hang from their buttons by anchor
+  it, by a scroll-driven animation. The New menu and the ⋯ menu of a page hang from their buttons by anchor
   positioning, with the centred box as the fallback
   ([plan 149](../../docs/plans/149-the-browser-on-the-current-platform.md)).
 
@@ -604,18 +585,11 @@ template for every view but the day. The actions that no template places by name
 ## The scripts
 
 A page of the shell carries its two sheets and at most two scripts, each a `script` element with `defer`. The rule of
-this application: `chat.js` is on every page of the shell, and `lock.js` is on a page only when the lock is on.
+this application: `menu.js` is on every page of the shell, and `lock.js` is on a page only when the lock is on.
 
-- `/assets/chat.js` on every page of the shell. When a dialog of the ⋯ menu closes, it gives the focus back to the ⋯ button
+- `/assets/menu.js` on every page of the shell. When a dialog of the ⋯ menu closes, it gives the focus back to the ⋯ button
   (the button that opened the dialog is in a popover that is hidden again), or, for a form that the link of the page
-  asked for, to its head button. For the chat column it does three things:
-  - While the last turn of the column is the owner's, it asks `GET /days/today/conversation` every 3 seconds. When the
-    `version` differs from the `data-version` of the column, it fetches the current page and swaps the content of the
-    column.
-  - It posts the composer with `fetch` and swaps the column from the answer, so the page does not reload.
-  - It keeps the open state of the column in `localStorage` and opens it again on load.
-
-  Any error leaves the column as it is. A request carries the cookie (`credentials: 'same-origin'`).
+  asked for, to its head button.
 - `/assets/lock.js` only when the lock is on. It keeps the time of the last input of the owner in `localStorage`, shared by
   every tab. A load of the page counts as input. It sends `POST /awake` at most once in 30 seconds while the owner types,
   clicks or scrolls. When the idle time is over, it sends `POST /lock` and replaces the page with the lock page, in
@@ -625,7 +599,7 @@ this application: `chat.js` is on every page of the shell, and `lock.js` is on a
 Each script is small (under 80 lines), has no framework and needs no build step. **Every form works without them**: a
 form posts and the answer redirects, a menu and a dialog open with HTML alone. A script is a convenience. The rule that the
 owner gave on 2026-10-14 is that the browser does what HTML can do, even at the cost of a small convenience
-([plan 108](../../docs/plans/108-the-browser-made-current.md), [plan 146](../../docs/plans/146-settings-and-the-chat-column.md)).
+([plan 108](../../docs/plans/108-the-browser-made-current.md)).
 `TestTheScriptsAreSmallAndAlone` holds the count and the size.
 
 What the old scripts did ([plan 091](../../docs/plans/091-the-browser-for-daily-use.md),
@@ -694,8 +668,8 @@ The tests are in files by subject, next to the code that they hold:
   catalog of the settings is in `web/catalog_test.go`.
 - The write side (`web/write_test.go`) holds the requests that reach the core, the stream of a file, and the answers that a
   real core does not give.
-- The pages have one test file for each part of them (for example the day, Browse, the metrics, the conversation, search
-  and the settings page). A test of a page gives the page a real core with a synthetic life, and asserts what the page
+- The pages have one test file for each part of them (for example the day, Browse, the metrics, search and the
+  settings page). A test of a page gives the page a real core with a synthetic life, and asserts what the page
   draws and what a form sends. A page of an error holds the words of each code (`TestAnErrorCodePicksItsWords`, in
   `view/page_test.go`, for each code of `siren.Codes()`).
 - The sheets, the scripts and the pictures: the contrast pairs, the layers, the names of the app out of `base.css` and the

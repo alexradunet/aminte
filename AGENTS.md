@@ -116,15 +116,15 @@ not external services or private files.
   `aminte snapshot` keeps checked copies outside the folder ([D25](docs/decisions/D25-snapshots.md)), so the worst
   loss is one night.
 - A system service runs the installed `aminte` against this file and, for each `--with NAME`, the installed
-  `aminte-NAME` beside it (the reference unit has `web`, `agent` and `whatsapp`). A
+  `aminte-NAME` beside it (the reference unit has `web`). A
   local proxy exposes the door of `aminte-web` (`AMINTE_WEB_LISTEN`) on the owner's private network, and
   it does not point to the core. The CLI in this folder and that service are the same writer on one file, which
   [connections](docs/contract/connections.md) allows; so is the temporary server that `aminte NAME` opens for an
   extension. Do not start a second writer stack on it, and do not point a reader at it while the service writes.
 - The service runs the installed binary, not `./aminte`. A change is live only after `go build -o <install path>
   ./cmd/aminte` and a service restart. Ship a change to an extension with the one
-  build line of [deploy/README.md](deploy/README.md#ship-a-change) and a restart. Ship `aminte`, `aminte-agent` and
-  `aminte-whatsapp` together. Report the install paths, the restart and the service's own log lines (those of each
+  build line of [deploy/README.md](deploy/README.md#ship-a-change) and a restart. Ship `aminte` and each `--with` child
+  together. Report the install paths, the restart and the service's own log lines (those of each
   `--with` child too) when you ship a change.
 
 ## The one hard rule: no migrations until the schema freeze

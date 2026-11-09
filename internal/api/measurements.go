@@ -223,13 +223,13 @@ func (h *server) seriesEntity(ctx context.Context, name string, q url.Values) (*
 }
 
 // viewLinkRels are the rels of the links of a page that a view carrying the page leaves out: the view has its own self
-// and index, and the page's link to the view (series, conversation) would lead to the view itself.
-var viewLinkRels = []string{"self", "series", "conversation", "index"}
+// and index, and the page's link to the view (series) would lead to the view itself.
+var viewLinkRels = []string{"self", "series", "index"}
 
-// carryPage adds the page of a metric to its series e, or the page of a day's talk to its conversation. The view keeps
-// what it sets (its class, its title, its properties, its self and index links); the page's `metric` object is left out,
-// since the series holds the unit and the mark. The links viewLinkRels names are left out too. Every other property,
-// link, embedded link and action of the page is added once.
+// carryPage adds the page of a metric to its series e. The view keeps what it sets (its class, its title, its
+// properties, its self and index links); the page's `metric` object is left out, since the series holds the unit and
+// the mark. The links viewLinkRels names are left out too. Every other property, link, embedded link and action of the
+// page is added once.
 func (h *server) carryPage(ctx context.Context, e *siren.Entity, id int64) error {
 	pe, err := h.pageEntity(ctx, id)
 	if err != nil {

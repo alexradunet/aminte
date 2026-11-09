@@ -42,7 +42,7 @@ func New(ctx context.Context, c *client.Client, version string) (*mcp.Server, er
 	if err != nil {
 		return nil, err
 	}
-	list, err := tools.Of(actions, nil)
+	list, err := tools.Of(actions)
 	if err != nil {
 		return nil, err
 	}

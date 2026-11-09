@@ -126,7 +126,7 @@ func (t *Tx) filePages(ids []int64, category, from string, move bool) (Filed, er
 	case have != nil:
 		cat = have.ID
 	default:
-		if cat, err = t.insertPage("page", category, text.TitleKey(category), nil, ""); err != nil {
+		if cat, err = t.insertRow("page", category, text.TitleKey(category), nil, ""); err != nil {
 			return Filed{}, err
 		}
 	}

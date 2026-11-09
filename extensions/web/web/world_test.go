@@ -6,7 +6,6 @@ package web_test
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"image"
 	"image/color"
 	"image/jpeg"
@@ -160,36 +159,8 @@ func (l *life) do(t *testing.T, from, action string, values map[string]string) *
 	return must(t)(l.api.Do(t.Context(), act(t, e, action), values))
 }
 
-// earlierConversations makes the conversation pages of earlier days, each with the first line that say writes: [[DAY]].
-// say is for today alone, and no write but a wikilink makes a page under a conversation title (API.md, the title of a
-// conversation page). So the page "Earlier talks" links the titles, the save contract makes an empty plain page for each,
-// and the owner writes the first line of each with save-body, as an owner edits the page of a conversation. The day bar
-// of the conversation names these pages: a page that is live and plain is a conversation of its day.
-func (l *life) earlierConversations(t *testing.T, days ...string) {
-	t.Helper()
-	var links strings.Builder
-	for _, day := range days {
-		fmt.Fprintf(&links, "[[Conversation %s]]\n", day)
-	}
-	l.do(t, "/", "create-page", map[string]string{"title": "Earlier talks", "body": links.String()})
-	for _, day := range days {
-		l.do(t, "/days/"+day+"/conversation", "save-body", map[string]string{"body": "[[" + day + "]]\n"})
-	}
-}
-
-// toolLines are the tool lines that name each address, as an agent writes them (the field tools of reply, or the lines of
-// a turn that a test writes into the page).
-func toolLines(refs ...string) string {
-	var b strings.Builder
-	for i, ref := range refs {
-		fmt.Fprintf(&b, "- `tool%d` → [%s](%s)\n", i+1, ref, ref)
-	}
-	return b.String()
-}
-
 // richLife is a file with every kind of thing a page of the shell shows: days with words, a mood, wikilinks and tags;
-// a page, a person, a file with a picture; two metrics, one of them a habit, with readings; the conversation of today
-// with a tool line that names things, and the conversations of two earlier days.
+// a page, a person, a file with a picture; two metrics, one of them a habit, with readings.
 func richLife(t *testing.T) *life {
 	t.Helper()
 	l := emptyLife(t)
@@ -214,20 +185,10 @@ func richLife(t *testing.T) *life {
 	}
 	lake := l.do(t, "/", "add-file", map[string]string{"title": l.picture, "body": "Dawn at the lake.", "day": today, "original": photo})
 
-	l.earlierConversations(t, "2031-05-10", "2031-05-13") // the days of the day bar
-	l.do(t, "/days/"+today+"/conversation", "say", map[string]string{"text": "How did I **sleep**? See [[River walk]]."})
-	conv := must(t)(l.api.Get(t.Context(), "/days/"+today+"/conversation"))
-	page := must(t)(l.api.Get(t.Context(), href(conv, "page")))
-	body, _ := page.Properties.(map[string]any)["body"].(string)
-	refs := []string{"/days/" + today, href(river, "self"), href(sam, "self"), "/metrics/Weight", "/search?q=heron", "/pages/999999", "/days/today"}
-	more := "\n\n" + toolLines(refs...) + "\n**aminte** (09:30): You slept *well*.\n"
-	must(t)(l.api.Do(t.Context(), act(t, page, "save-body"), map[string]string{"body": body + more}))
-
 	l.hrefs["river"], l.hrefs["sam"] = href(river, "self"), href(sam, "self")
 	l.hrefs["lake"] = href(lake, "self")
 	l.hrefs["weightPage"] = pageOf(t, l, "Weight")
 	l.hrefs["walkPage"] = pageOf(t, l, "Walk")
-	l.hrefs["convPage"] = href(conv, "page")
 	l.hrefs["reading"] = href(weight, "self")
 	return l
 }

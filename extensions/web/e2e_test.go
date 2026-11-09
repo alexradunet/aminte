@@ -585,14 +585,14 @@ func TestWebOnTheRealAminte(t *testing.T) {
 			t.Fatalf("GET /: %d %s", home.Status, home.Header.Get("Content-Type"))
 		}
 		// The day, its capture form, the search of the rail and the pictures and fonts of the shell. The sheets are in the page.
-		for _, want := range []string{"<title>", "/days/" + today + "/capture", `action="/search"`, "/assets/fonts/", "/assets/chat.js"} {
+		for _, want := range []string{"<title>", "/days/" + today + "/capture", `action="/search"`, "/assets/fonts/", "/assets/menu.js"} {
 			if !strings.Contains(home.Body, want) {
 				t.Errorf("Home lacks %q", want)
 			}
 		}
-		script := person.get("/assets/chat.js")
+		script := person.get("/assets/menu.js")
 		if script.Status != http.StatusOK || !strings.Contains(script.Header.Get("Content-Type"), "javascript") || script.Header.Get("Cache-Control") == "no-store" {
-			t.Errorf("GET /assets/chat.js: %d %s, Cache-Control %q, want the script, cacheable", script.Status, script.Header.Get("Content-Type"), script.Header.Get("Cache-Control"))
+			t.Errorf("GET /assets/menu.js: %d %s, Cache-Control %q, want the script, cacheable", script.Status, script.Header.Get("Content-Type"), script.Header.Get("Cache-Control"))
 		}
 	})
 

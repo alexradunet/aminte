@@ -2,7 +2,6 @@ package web_test
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -80,18 +79,15 @@ func TestWebAsksTheCoreForSirenAsTheUI(t *testing.T) {
 }
 
 // TestAPageIsFewReadsOfTheCore: the core embeds what a page needs (API.md, "Embedding"), and web reads each embedding
-// once. The day page, the page of the settings and the conversation of today make these reads, in this order. The
-// cards of the chat column come with the conversation that is read with ?embed=ref, not with a read for each card. The
-// conversation view takes its own cards from its own read.
+// once. The day page and the page of the settings make these reads, in this order. Web draws the page of the settings
+// itself, from the catalog of the core.
 func TestAPageIsFewReadsOfTheCore(t *testing.T) {
-	const conversation = "/days/" + today + "/conversation"
 	for _, c := range []struct {
 		name, uri string
 		want      []string
 	}{
-		{"the day page", "/days/2031-05-13", []string{"/days/2031-05-13", "/?embed=today,conversation", conversation + "?embed=ref"}},
-		{"the settings page", "/settings", []string{"/settings", "/actions", "/?embed=today,conversation", conversation + "?embed=ref"}},
-		{"the conversation of today", "/days/today/conversation", []string{"/days/today/conversation?embed=ref", "/?embed=today,conversation"}},
+		{"the day page", "/days/2031-05-13", []string{"/days/2031-05-13", "/?embed=today"}},
+		{"the settings page", "/settings", []string{"/actions", "/?embed=today"}},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			rec := &recorder{next: richLife(t).core.Handler}
@@ -106,76 +102,6 @@ func TestAPageIsFewReadsOfTheCore(t *testing.T) {
 				t.Errorf("GET %s makes %d reads of the core:\n%v\nwant %d:\n%v", c.uri, len(got), got, len(c.want), c.want)
 			}
 		})
-	}
-}
-
-// TestThePollOfTheChatReadsTheConversationWithoutItsCards: a script that asks for the Siren entity of a conversation
-// gets the answer of the core as it is. It reads the version only, so no card is embedded for it.
-func TestThePollOfTheChatReadsTheConversationWithoutItsCards(t *testing.T) {
-	rec := &recorder{next: richLife(t).core.Handler}
-	req := httptest.NewRequest(http.MethodGet, "/days/today/conversation", nil)
-	req.Header.Set("Accept", "application/vnd.siren+json")
-	got := httptest.NewRecorder()
-	webOver(t, rec).ServeHTTP(got, req)
-	if got.Code != http.StatusOK {
-		t.Fatalf("GET /days/today/conversation as Siren: %d", got.Code)
-	}
-	if reads := rec.requests(); len(reads) != 1 || reads[0].URL.RequestURI() != "/days/today/conversation" {
-		t.Errorf("the poll made these reads of the core: %v, want the conversation alone", reads)
-	}
-}
-
-// TestTheColumnDrawsSixCardsAndTheScreenDrawsEveryOne: two turns name six days each. The conversation view draws a
-// card for each of the twelve. The column of any other page draws a card for the six of the newest turn, and the plain
-// link for the six of the older turn.
-func TestTheColumnDrawsSixCardsAndTheScreenDrawsEveryOne(t *testing.T) {
-	l := emptyLife(t)
-	day := func(n int) string { return fmt.Sprintf("/days/2031-05-%02d", n) }
-	var older, newer []string
-	for n := 1; n <= 6; n++ {
-		older, newer = append(older, day(n)), append(newer, day(n+6))
-	}
-	l.do(t, "/days/"+today+"/conversation", "say", map[string]string{"text": "Show me"})
-	conv := must(t)(l.api.Get(t.Context(), "/days/"+today+"/conversation"))
-	page := must(t)(l.api.Get(t.Context(), href(conv, "page")))
-	body, _ := page.Properties.(map[string]any)["body"].(string)
-	must(t)(l.api.Do(t.Context(), act(t, page, "save-body"), map[string]string{"body": body + "\n\n" + toolLines(older...) +
-		"\n**aminte** (09:30): First.\n\n**Owner** (09:31): More.\n\n" + toolLines(newer...) + "\n**aminte** (09:32): Second.\n"}))
-
-	var every, column []string
-	for _, ref := range append(older, newer...) { // the page shows the turns in order, the older first
-		every, column = append(every, "day "+ref), append(column, "link "+ref)
-	}
-	for i := range 6 {
-		column[6+i] = every[6+i] // the newer turn
-	}
-	if got := cardKinds(ask(l.web, http.MethodGet, "/days/today/conversation").Body.String()); !slices.Equal(got, every) {
-		t.Errorf("the conversation view:\n%v\nwant\n%v", got, every)
-	}
-	if got := cardKinds(ask(l.web, http.MethodGet, "/browse").Body.String()); !slices.Equal(got, column) {
-		t.Errorf("the column:\n%v\nwant\n%v", got, column)
-	}
-}
-
-// TestACardAsksForWhatThePageMayRead: a tool line that names an owner-only read draws the plain link, as the core's
-// own page does. The core reads the card as agent:embed, which the core refuses the read of the settings and of the integrity check.
-func TestACardAsksForWhatThePageMayRead(t *testing.T) {
-	l := emptyLife(t)
-	l.do(t, "/days/"+today+"/conversation", "say", map[string]string{"text": "Settings?"})
-	conv := must(t)(l.api.Get(t.Context(), "/days/"+today+"/conversation"))
-	page := must(t)(l.api.Get(t.Context(), href(conv, "page")))
-	body, _ := page.Properties.(map[string]any)["body"].(string)
-	must(t)(l.api.Do(t.Context(), act(t, page, "save-body"), map[string]string{"body": body + "\n\n" + toolLines("/settings", "/integrity") + "\n**aminte** (09:30): No.\n"}))
-	for _, uri := range []string{"/days/today/conversation", "/browse"} {
-		got := ask(l.web, http.MethodGet, uri).Body.String()
-		if strings.Contains(got, "model_key") || strings.Contains(got, "card-settings") || strings.Contains(got, "card-integrity") {
-			t.Errorf("%s draws an owner-only read", uri)
-		}
-		for _, ref := range []string{"/settings", "/integrity"} {
-			if want := `<a class="card card-link" href="` + ref + `">`; !strings.Contains(got, want) && uri == "/days/today/conversation" {
-				t.Errorf("%s lacks the plain link %s", uri, want)
-			}
-		}
 	}
 }
 
@@ -458,16 +384,16 @@ func signedBrowser(t *testing.T, coreURL string) http.Handler {
 }
 
 // TestTheScriptsAreSmallAndAlone: the rule of the scripts (README.md). A page of the shell carries the one script
-// chat.js, and lock.js only when the lock is on. Each script is under 80 lines. The forms of the pages work without
+// menu.js, and lock.js only when the lock is on. Each script is under 80 lines. The forms of the pages work without
 // them, so the page has no script that a form needs.
 func TestTheScriptsAreSmallAndAlone(t *testing.T) {
 	l := richLife(t)
-	const chat = `<script src="/assets/chat.js" defer></script>`
-	uris := []string{"/", "/browse", "/days/today/conversation", "/pages/999999", "/settings", "/actions"}
+	const menu = menuScriptTag
+	uris := []string{"/", "/browse", "/pages/999999", "/settings", "/actions"}
 	for _, uri := range uris {
 		page := ask(l.web, http.MethodGet, uri).Body.String()
-		if strings.Count(page, "<script") != 1 || !strings.Contains(page, chat) {
-			t.Errorf("GET %s has %d script elements, want %s alone", uri, strings.Count(page, "<script"), chat)
+		if strings.Count(page, "<script") != 1 || !strings.Contains(page, menu) {
+			t.Errorf("GET %s has %d script elements, want %s alone", uri, strings.Count(page, "<script"), menu)
 		}
 		if strings.Contains(page, "lock.js") {
 			t.Errorf("GET %s has the script of the lock, and the lock is off", uri)
@@ -477,11 +403,11 @@ func TestTheScriptsAreSmallAndAlone(t *testing.T) {
 	const lock = `<script src="/assets/lock.js" data-minutes="5" defer></script>`
 	for _, uri := range uris {
 		page := ask(l.web, http.MethodGet, uri).Body.String()
-		if strings.Count(page, "<script") != 2 || !strings.Contains(page, chat) || !strings.Contains(page, lock) {
-			t.Errorf("GET %s with the lock on has %d script elements, want %s and %s", uri, strings.Count(page, "<script"), chat, lock)
+		if strings.Count(page, "<script") != 2 || !strings.Contains(page, menu) || !strings.Contains(page, lock) {
+			t.Errorf("GET %s with the lock on has %d script elements, want %s and %s", uri, strings.Count(page, "<script"), menu, lock)
 		}
 	}
-	for _, name := range []string{"chat.js", "lock.js"} {
+	for _, name := range []string{"menu.js", "lock.js"} {
 		if lines := strings.Count(string(view.MustFile(name)), "\n"); lines >= 80 {
 			t.Errorf("%s has %d lines, want under 80", name, lines)
 		}
@@ -492,7 +418,7 @@ func TestTheScriptsAreSmallAndAlone(t *testing.T) {
 // the GET gets, and no body.
 func TestAHeadGetsTheHeadersOfThePage(t *testing.T) {
 	l := richLife(t)
-	for _, uri := range []string{"/days/2031-05-14", "/days/today", "/pages/999999", "/assets/chat.js"} {
+	for _, uri := range []string{"/days/2031-05-14", "/days/today", "/pages/999999", "/assets/menu.js"} {
 		get, head := ask(l.web, http.MethodGet, uri), ask(l.web, http.MethodHead, uri)
 		if head.Code != get.Code || head.Body.Len() != 0 || head.Header().Get("Content-Type") != get.Header().Get("Content-Type") ||
 			head.Header().Get("Location") != get.Header().Get("Location") {

@@ -37,7 +37,7 @@ func snapshotHref(name string) string { return "/snapshots/" + url.PathEscape(na
 
 // snapshotFile is GET /snapshots/{name}: the owner's download of a snapshot that the action wrote, so a browser on
 // another device keeps a copy of life.db. It is the copy, never the live file: a copy has no -wal beside it and passed
-// its restore check. Like GET /settings it is the owner's read: an agent or an import is refused.
+// its restore check. Like GET /integrity it is the owner's read: an agent or an import is refused.
 func (h *server) snapshotFile(w http.ResponseWriter, r *http.Request) {
 	if err := requireOwner(source(r)); err != nil {
 		writeError(w, r, err)

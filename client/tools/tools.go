@@ -1,7 +1,6 @@
 // Package tools offers the action catalog as the functions of a model: a tool for each action that is not the
-// owner's, its JSON Schema made from the fields, and the arguments of a call flattened to form values. Two agents
-// build their tool lists from it: the MCP server and a chat agent. The argument keep of Of is how an agent narrows
-// the list further, for example by dropping every action with a file field.
+// owner's, its JSON Schema made from the fields, and the arguments of a call flattened to form values. The MCP server
+// builds its tool list from it.
 package tools
 
 import (
@@ -25,14 +24,13 @@ type Tool struct {
 }
 
 // Of is the tool list of the catalog: one tool for each action that is not the owner's, then get. An owner's
-// action is never a tool, whatever keep says (AGENTS.md, "Every capability on every surface"). When keep is not nil,
-// an action is a tool only if keep returns true for it. A tool name that two actions share is refused.
-func Of(actions []siren.Action, keep func(siren.Action) bool) ([]Tool, error) {
+// action is never a tool (AGENTS.md, "Every capability on every surface"). A tool name that two actions share is refused.
+func Of(actions []siren.Action) ([]Tool, error) {
 	seen := map[string]string{"get": "built-in tool get"}
 	var list []Tool
 	for i := range actions {
 		a := &actions[i]
-		if a.Owner || (keep != nil && !keep(*a)) {
+		if a.Owner {
 			continue
 		}
 		name := Name(a.Name)

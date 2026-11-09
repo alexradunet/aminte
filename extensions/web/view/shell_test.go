@@ -15,22 +15,20 @@ import (
 // one with the longest path the page is under.
 func TestNavMarksThePageTheBrowserIsOn(t *testing.T) {
 	for path, want := range map[string]string{
-		"/":                             "/",
-		"/days":                         "/days",
-		"/days/2026-01-01":              "/days",
-		"/days/today":                   "/days/today",
-		"/months/2026-10":               "/days",
-		"/years/2026":                   "/days",
-		"/integrity":                    "/integrity",
-		"/browse":                       "/browse",
-		"/metrics":                      "/metrics",
-		"/metrics/TSH":                  "/metrics",
-		"/settings":                     "/settings",
-		"/days/2026-10-28/conversation": "/days/today/conversation",
-		"/days/today/conversation":      "/days/today/conversation",
-		"/pages/7":                      "",
-		"/search":                       "",
-		"/measurements/1":               "",
+		"/":                "/",
+		"/days":            "/days",
+		"/days/2026-01-01": "/days",
+		"/days/today":      "/days/today",
+		"/months/2026-10":  "/days",
+		"/years/2026":      "/days",
+		"/integrity":       "/integrity",
+		"/browse":          "/browse",
+		"/metrics":         "/metrics",
+		"/metrics/TSH":     "/metrics",
+		"/settings":        "/settings",
+		"/pages/7":         "",
+		"/search":          "",
+		"/measurements/1":  "",
 	} {
 		var got string
 		for _, it := range (&view{Path: path}).Nav() {
@@ -195,101 +193,5 @@ func TestEveryIconNameIsACellOfTheSheet(t *testing.T) {
 		if got := icon(name); got != "" {
 			t.Errorf("icon(%q) is %q, want nothing", name, got)
 		}
-	}
-}
-
-// TestTheColumnIsTheShellsAndTheConversationHasNone: a page with a shell and a chat has the column; the conversation
-// view (class conversation) has none, and a page with no shell has none. The turns of the conversation view are read
-// from its property turns, and the agent has not answered when the last turn is the owner's.
-func TestTheColumnIsTheShellsAndTheConversationHasNone(t *testing.T) {
-	chat := &Chat{Version: "v1"}
-	shell := &Shell{Today: "2026-10-28", Chat: chat}
-	if got := (&view{Shell: shell, Entity: &siren.Entity{}}).Chat(); got != chat {
-		t.Errorf("a page with a shell has the chat %v, want the shell's", got)
-	}
-	if got := (&view{Shell: shell, Entity: &siren.Entity{Class: []string{"conversation", "page"}}}).Chat(); got != nil {
-		t.Errorf("the conversation view has the chat %v, want none", got)
-	}
-	if got := (&view{}).Chat(); got != nil {
-		t.Errorf("a page with no shell has the chat %v, want none", got)
-	}
-	v := &view{Props: map[string]any{"turns": []any{
-		map[string]any{"who": "owner", "at": "09.07", "via": "whatsapp", "text": "Hello"},
-		map[string]any{"who": "aminte", "at": "09.08", "text": "Hi", "tools": []any{"- `read_day`"}},
-		map[string]any{"who": "owner", "at": "09.09", "text": "Thanks"},
-	}}}
-	turns := v.Turns()
-	if len(turns) != 3 || turns[1].Who != "aminte" || turns[1].At != "09.08" || turns[1].Text != "Hi" || len(turns[1].Tools) != 1 || siren.ToolLine(turns[1].Tools[0]) != (siren.Tool{Name: "read_day"}) {
-		t.Errorf("the turns: %+v", turns)
-	}
-	if turns[0].Via != "whatsapp" || turns[1].Via != "" {
-		t.Errorf("the relay of the turns: %+v", turns)
-	}
-	if !waiting(turns) || waiting(turns[:2]) || waiting(nil) {
-		t.Error("the agent waits only when the last turn is the owner's")
-	}
-}
-
-// TestTheDayBarMarksTheDayShown: the chips are the days before today that have a conversation, oldest first, and
-// Today last; a day that is not among them (a link from the day view) is a chip too; the day shown is marked.
-func TestTheDayBarMarksTheDayShown(t *testing.T) {
-	shell := &Shell{Today: "2026-10-28"}
-	chips := func(shown string) string {
-		v := &view{Shell: shell, Props: map[string]any{"day": shown}, chatDays: []string{"2026-10-25", "2026-10-27"}}
-		var out []string
-		for _, c := range v.ChatDays() {
-			mark := ""
-			if c.Current {
-				mark = "*"
-			}
-			out = append(out, c.Text+mark+" "+c.Href)
-		}
-		return strings.Join(out, ", ")
-	}
-	if got, want := chips("2026-10-28"), "Sun 25 /days/2026-10-25/conversation, Tue 27 /days/2026-10-27/conversation, Today* /days/today/conversation"; got != want {
-		t.Errorf("today: %s, want %s", got, want)
-	}
-	if got, want := chips("2026-10-27"), "Sun 25 /days/2026-10-25/conversation, Tue 27* /days/2026-10-27/conversation, Today /days/today/conversation"; got != want {
-		t.Errorf("a day of the list: %s, want %s", got, want)
-	}
-	if got, want := chips("2026-10-01"), "Thu 1* /days/2026-10-01/conversation, Sun 25 /days/2026-10-25/conversation, Tue 27 /days/2026-10-27/conversation, Today /days/today/conversation"; got != want {
-		t.Errorf("another day: %s, want %s", got, want)
-	}
-}
-
-// TestACardIsDrawnOnlyForAnAddressTheServerResolved: an address that is not in the facts (an older turn) and one that
-// is there with no entity are the plain link, cut at 80 characters with its href whole; the entity picks the card by
-// its class.
-func TestACardIsDrawnOnlyForAnAddressTheServerResolved(t *testing.T) {
-	v := &view{Shell: &Shell{Today: "2026-10-28"}, cards: map[string]*siren.Entity{
-		"/gone":    nil,
-		"/pages/3": {Class: []string{"person", "page"}, Title: "Sam", Properties: map[string]any{"body": "# Sam\n\nMy **friend** from [[Lisbon]].", "cover": map[string]any{"id": 9}}},
-		"/odd":     {Class: []string{"settings"}, Title: "Settings"},
-	}}
-	long := "/search?q=" + strings.Repeat("a", 100)
-	for _, href := range []string{"/unasked", "/gone"} {
-		if c := v.CardOf(href); c.Kind != "link" || c.Title != href || c.Href != href {
-			t.Errorf("the plain link of %s: %+v", href, c)
-		}
-	}
-	if c := v.CardOf(long); c.Kind != "link" || c.Href != long || c.Title != long[:80]+"…" {
-		t.Errorf("a long plain link: %+v", c)
-	}
-	if c := v.CardOf("/pages/3"); c.Kind != "person" || c.Title != "Sam" || c.Icon != "people" || c.Picture != "/pages/9/preview" || c.Value != "" {
-		t.Errorf("the person: %+v", c)
-	}
-	if c := v.CardOf("/odd"); c.Kind != "other" || c.Title != "Settings" || c.Value != "settings" {
-		t.Errorf("a class without a card: %+v", c)
-	}
-}
-
-// TestTheDateAboveAThreadIsInFullWords: the date above a thread names the weekday, and the year when it is not this year.
-func TestTheDateAboveAThreadIsInFullWords(t *testing.T) {
-	v := &view{Shell: &Shell{Today: "2026-10-28"}}
-	if got := v.LongDate("2026-10-28"); got != "Wednesday 28 October" {
-		t.Errorf("LongDate: %q", got)
-	}
-	if got := v.LongDate("2025-01-05"); got != "Sunday 5 January 2025" {
-		t.Errorf("LongDate of another year: %q", got)
 	}
 }

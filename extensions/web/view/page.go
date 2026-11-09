@@ -32,8 +32,9 @@ import (
 // this app's own vocabulary needs (the shell, its components, .wikilink, .chart), and a test keeps the two apart.
 // The two are one cascade in four layers (tokens, base, components, utilities), declared once in base.css, and
 // every rule is in logical properties (docs/plans/108-the-browser-made-current.md).
-// The three faces are embedded files that /assets/fonts/ serves. There are two scripts. chat.js helps the chat
-// column and returns the focus to the ⋯ button; lock.js (docs/plans/160-the-lock.md) is on the page only when the lock is on. Every form works without them (docs/plans/146-settings-and-the-chat-column.md). What a page does beyond its
+// The three faces are embedded files that /assets/fonts/ serves. There are two scripts. menu.js returns the focus
+// to the ⋯ button; lock.js (docs/plans/160-the-lock.md) is on the page only when the lock is on. Every form works
+// without them. What a page does beyond its
 // links and forms, the browser does by itself (docs/plans/108-the-browser-made-current.md).
 //
 // Files are the files of html/: the templates, the two stylesheets, the script, the icons (one SVG and two PNG), the manifest,
@@ -108,8 +109,6 @@ var templates = template.Must(template.New("").Funcs(template.FuncMap{
 	"alert":         alertOf,
 	"beyond":        beyond,
 	"kindIcon":      kindIcon,
-	"waiting":       waiting,
-	"toolChip":      siren.ToolLine,
 	"roundAction":   roundAction,
 	"rowChips":      rowChips,
 	"slot":          slot,
@@ -175,8 +174,7 @@ var viewOf = map[string]placing{
 	"search":       {"search", []string{"search"}},
 	"browse":       {"browse", []string{"file-pages", "tombstone-pages", "random-page"}},
 	"metrics":      {"metrics", []string{"file-pages"}},
-	"conversation": {"conversation", []string{"save-body", "say", "file-pages"}},
-	"settings":     {"settings", []string{"settings", "web-settings"}},
+	"settings":     {"settings", []string{"web-settings"}},
 	"measurement":  {"measurement", []string{"correct"}},
 	"month":        {"month", []string{"create-page", "save-body"}},
 	"year":         {"year", []string{"create-page", "save-body"}},
@@ -210,8 +208,6 @@ type view struct {
 	Back      string
 	Shell     *Shell     // the sidebar's read; nil when the page is drawn without it
 	query     url.Values // the page's own query: ?new=<action> and the fields it fills
-	cards     map[string]*siren.Entity
-	chatDays  []string
 }
 
 // IsSeries reports the view of a metric (class series): it carries the metric's page (docs/plans/144-one-view-for-a-metric.md),
@@ -260,11 +256,6 @@ type Facts struct {
 	Shell     *Shell   // the sidebar's read; nil when the page is drawn without it
 	Submitted string   // the body (or the text) that a refused form sent
 	Back      string   // the page that a refused form came from, when it is a page of this server
-	// Cards are the entities that the addresses of a conversation's tool lines answer, by address (CardsOf,
-	// docs/plans/148-the-chat-screen.md). An address with no entity is drawn as a plain link.
-	Cards map[string]*siren.Entity
-	// ChatDays are the days before today that have a conversation page, oldest first: the chips of the chat screen.
-	ChatDays []string
 }
 
 // pageView is the view of a page: the entity and the facts of the page. It reads nothing, so the same arguments give
@@ -273,7 +264,7 @@ type Facts struct {
 func pageView(e *siren.Entity, f Facts) *view {
 	props, _ := e.Properties.(map[string]any)
 	return &view{Entity: e, Props: props, Path: f.URL.Path, Here: hereOf(f.URL), Submitted: f.Submitted, Back: f.Back,
-		Shell: f.Shell, query: f.URL.Query(), cards: f.Cards, chatDays: f.ChatDays}
+		Shell: f.Shell, query: f.URL.Query()}
 }
 
 // Draw is the page of e as HTML: the view of e (pageView), drawn by the template of its class (htmlOf). It is the one

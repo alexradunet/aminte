@@ -15,9 +15,9 @@
 @layer components{
 /* The two materials of this sheet, as reusable declarations: parchment (what is written) and wood (the chrome).
    These two lists stay flat: a rule nested under a list takes the whole list's specificity. */
-.rail,.rail>nav,.rail-more:popover-open,.new-menu:popover-open,.chat:popover-open,.scroll:has(>table.calendar){--text:var(--rail-ink); --text-strong:var(--rail-accent); --text-muted:var(--rail-ink); --text-link:var(--rail-accent); --rule:var(--outline);
+.rail,.rail>nav,.rail-more:popover-open,.new-menu:popover-open,.scroll:has(>table.calendar){--text:var(--rail-ink); --text-strong:var(--rail-accent); --text-muted:var(--rail-ink); --text-link:var(--rail-accent); --rule:var(--outline);
   color:var(--text); background-color:var(--rail); background-image:url(/assets/wood.png),var(--grain-ground); background-size:252px 480px,4px 4px; image-rendering:pixelated}
-.sheet,.panel,.leaf,.month-box,.turn-card,.thinking,.more-body,.menu-list,.head-pop,dialog.menu-dialog,.reading-tile,.alert,.toast,.action-form,dialog.palette,table.calendar td,.margin ul.plain,.margin .about,.day-card,
+.sheet,.panel,.leaf,.month-box,.menu-list,.head-pop,dialog.menu-dialog,.reading-tile,.alert,.toast,.action-form,dialog.palette,table.calendar td,.margin ul.plain,.margin .about,.day-card,
 main>.scroll:not(:has(>table.calendar)),.group>.scroll{--text:var(--ink); --text-strong:var(--ink); --text-muted:var(--muted); --text-link:var(--link); --rule:var(--edge);
   color:var(--text); background-color:var(--surface); background-image:var(--grain-ink); background-size:4px 4px; border:2px solid var(--edge)}
 
@@ -127,11 +127,11 @@ span.icon{display:inline-block; flex:none; inline-size:20px; block-size:20px; ba
   & :is(a,button){display:flex; align-items:center; gap:10px; padding:8px 10px; color:var(--rail-ink); white-space:nowrap;
     &:hover{color:var(--rail-accent); text-decoration:none}
     &[aria-current=page]{background:var(--accent-tint); color:var(--rail-accent); font-weight:700; box-shadow:inset 3px 0 0 var(--rail-accent)}}}
-/* A scroll inside a sheet (More, the chat column, the chat menu) stops at its edge and does not move the page behind. */
+/* A scroll inside a sheet (More) stops at its edge and does not move the page behind. */
 /* On a wide screen the rest of the sidebar is in its flow: More, its head and the search link are the phone's. */
 .rail-more{display:contents; overscroll-behavior:contain}
 .today-inline{display:none}
-.rail-more-link,.rail-more-head,.rail .rail-search-link,.rail-chat-link,.rail-apps{display:none}
+.rail-more-link,.rail-more-head,.rail .rail-search-link,.rail-apps{display:none}
 /* The Today strip: a carved well under the sections (in the More sheet on a phone, before the owner's links). A chip
    is a link to the form that does the thing; a done one is gold with a check. */
 .rail-today{display:flex; flex-direction:column; gap:6px; padding:10px; background:var(--rail-deep); border:1px solid var(--outline); box-shadow:var(--bevel-in); color:var(--rail-ink); font-size:13px; line-height:18px;
@@ -147,112 +147,9 @@ span.icon{display:inline-block; flex:none; inline-size:20px; block-size:20px; ba
   & a{color:var(--rail-ink);
     &[aria-current=page]{font-weight:700; color:var(--rail-accent)}}}
 
-/* The chat column (docs/plans/146-settings-and-the-chat-column.md): a popover that the button Chat opens, a wood panel
-   at the right edge of a wide screen, and a sheet over the page under 900 px (below). The turns are in a thread: the
-   owner's on parchment, the agent's in a carved well of the wood, so the two sides are told apart by material. The
-   scroll box is a reversed column, so it starts at its end, where the newest turn is, with no script. */
-.chat-open{position:fixed; z-index:10; inset-block-end:var(--space-4); inset-inline-end:var(--space-4); background:var(--rail); color:var(--rail-accent); border-color:var(--outline); box-shadow:var(--bevel-up),var(--drop-hard);
-  &:hover{background:var(--rail); color:var(--rail-accent); filter:brightness(1.12)}}
-.chat:popover-open{display:flex; flex-direction:column; gap:var(--space-3); position:fixed; z-index:30; inset-block:0; inset-inline:auto 0; margin:0; inline-size:min(26rem, 100vw); block-size:auto;
-  padding:var(--space-4); border:0; border-inline-start:2px solid var(--outline); box-shadow:var(--shadow-float); overflow:hidden}
-/* The button and the open column are fixed to the viewport, so on a screen wider than the frame they take the frame's
-   edge: the inset is the floor at the side of the frame. A browser with anchor positioning reads the edge of the shell
-   itself, which stays exact when a scrollbar takes part of 100vw; the floor is its fallback when the shell is not an
-   anchor it accepts. */
-.chat-open{inset-inline-end:calc(max(0px, calc((100vw - var(--frame)) / 2)) + var(--space-4))}
-.chat:popover-open{inset-inline-end:max(0px, calc((100vw - var(--frame)) / 2))}
+/* The shell is an anchor: the skip link takes its edge (below). */
 @supports (anchor-name:--a){
-  .shell{anchor-name:--shell}
-  .chat-open,.chat:popover-open{inset-inline-end:anchor(--shell end, max(0px, calc((100vw - var(--frame)) / 2)))}
-  .chat-open{margin-inline-end:var(--space-4)}}
-/* The page makes room for the open column on a wide screen, so a form or a list does not run under it: the column
-   of the shell gets the panel's width as its end padding, and its content lays out as in a narrower window
-   (@container column). Under 900 px the column is a sheet over the page, and the padding goes back (below). */
-.shell:has(.chat:popover-open)>.column{padding-inline-end:calc(min(26rem, 100vw) + var(--space-4))}
-.chat-head{display:flex; align-items:center; gap:var(--space-3);
-  & .label{color:var(--rail-accent); margin-inline-end:auto}
-  & a{color:var(--rail-ink); font-size:13px}}
-.chat-scroll{overscroll-behavior:contain; flex:1 1 auto; min-block-size:0; overflow-y:auto; display:flex; flex-direction:column-reverse}
-.chat .empty{color:var(--rail-ink)}
-.chat-form{display:flex; flex-direction:column; gap:var(--space-2);
-  & label>span{color:var(--rail-ink)}}
-/* The thread of the chat (docs/plans/148-the-chat-screen.md), on the screen and in the column alike. Every turn is
-   one parchment card, the owner's and the agent's alike: a meta line (who, the relay, the time) beside a small avatar
-   that tells them apart, and the card under the line. The agent's turn is at the left, the owner's at the right, each
-   with its avatar at the outer edge. The owner's avatar is the person glyph in ink on a parchment slab, the agent's
-   the chat glyph in gold on wood (the owner's word, 2026-10-29: cards only, no bubble of a second material). The tool
-   lines are badges in the head of the card, above the words; a card is as wide as its words, up to the column. A [[link]] in the words is a chip. The three dots wait in a card of their own while the agent
-   answers; they blink only for a reader who allows motion. */
-.turns{display:flex; flex-direction:column; gap:16px; max-inline-size:72ch; inline-size:100%; margin-block:0; margin-inline:auto; padding:0; list-style:none}
-.turn{display:grid; grid-template-columns:28px minmax(0,1fr); grid-template-rows:auto auto; column-gap:12px; row-gap:6px; min-inline-size:0;
-  &.text{display:block; padding:var(--space-2) var(--space-3); border:2px dotted var(--rule)}
-  & .free{margin:0; white-space:pre-wrap; overflow-wrap:anywhere; color:var(--text)}
-  &.owner{grid-template-columns:minmax(0,1fr) 28px}
-  &.owner .avatar{grid-column:2}
-  &.owner .meta,&.owner .turn-card{grid-column:1; justify-self:end}
-  &.owner .meta{justify-content:flex-end}
-  &.owner .tools{justify-content:flex-end}
-  & .avatar{grid-row:1/-1; align-self:start; display:inline-flex; align-items:center; justify-content:center; inline-size:28px; block-size:28px; border:2px solid var(--outline); box-shadow:var(--drop-hard)}
-  &.owner .avatar{color:var(--ink); background:var(--surface-deep)}
-  &.agent .avatar{color:var(--rail-accent); background-color:var(--rail); background-image:url(/assets/wood.png); background-size:252px 480px; image-rendering:pixelated}
-  & .meta{display:flex; flex-wrap:wrap; align-items:center; gap:8px; min-block-size:28px; font:400 12px/16px var(--mono); color:var(--text-muted)}
-  & .from{font-weight:500; letter-spacing:.08em; text-transform:uppercase; color:var(--text)}
-  & .turn-card{inline-size:fit-content; max-inline-size:100%; min-inline-size:0; box-shadow:var(--parch-bevel)}
-  & .tools{display:flex; flex-wrap:wrap; gap:6px; margin:0; padding:8px 12px; border-block-end:2px dotted var(--rule); list-style:none}
-  & .tools li{display:inline-flex; flex-wrap:wrap; align-items:center; gap:4px 8px; min-inline-size:0; max-inline-size:100%; padding:2px 8px; border:1px dashed var(--text-muted); font:400 12px/16px var(--mono); color:var(--text-muted); overflow-wrap:anywhere}
-  & .tools b{font-weight:500; color:var(--text)}
-  & .words{min-inline-size:0; padding:10px 14px; font-size:15px; line-height:22px}
-  & .words a.wikilink:not(.embed){padding:0 6px; border:1px solid currentColor; white-space:nowrap}
-  & .words a.wikilink:not(.embed):hover{text-decoration:none; background:var(--accent-tint)}}
-.thinking{display:flex; gap:5px; align-items:center; inline-size:max-content; padding:12px 16px; box-shadow:var(--parch-bevel);
-  & i{display:block; inline-size:7px; block-size:7px; background:var(--accent-ink); opacity:.8}}
-@keyframes blink{0%,60%,100%{opacity:.25} 30%{opacity:1}}
-@media (prefers-reduced-motion:no-preference){
-  .thinking i{animation:blink 1.2s infinite}
-  .thinking i:nth-child(2){animation-delay:.2s}
-  .thinking i:nth-child(3){animation-delay:.4s}}
-.datesep{align-self:center; padding:4px 0; font:400 12px/16px var(--mono); letter-spacing:.08em; text-transform:uppercase; color:var(--text-muted)}
-.hint{margin:0; font:400 12px/16px var(--mono); color:var(--text-muted)}
-
-/* A card is a thing the agent touched, one link on the badge of its tool line: the kind's icon or a small picture,
-   the title and one value, on one line. */
-.card{display:inline-flex; align-items:center; gap:6px; min-inline-size:0; max-inline-size:100%; color:var(--text-link); text-decoration:none;
-  &:hover .card-title{text-decoration:underline}
-  &.card-link{overflow-wrap:anywhere}
-  & .card-icon{flex:none; display:inline-flex; color:var(--text-muted)}
-  & .card-icon img{display:block; inline-size:20px; block-size:20px; object-fit:cover; border:1px solid var(--edge)}
-  & .card-title{font-weight:500; color:var(--text-link); overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
-  & .card-value{flex:none; color:var(--text-muted)}}
-.compact{
-  & .turns{max-inline-size:none}
-  & .words{font-size:14px; line-height:20px}}
-
-/* The screen: the day bar, the thread and the composer in three rows that fill the height under the shell. The column
-   of the shell keeps no padding and no footer on it, and takes the height of the screen (under the bars of a phone,
-   below). The thread is a reversed column, so it starts at its newest turn with no script. */
-.column:has(>main>.chat-screen){padding:0; block-size:100dvh; overflow:hidden;
-  &>main{max-inline-size:none; gap:0; min-block-size:0}
-  &>footer{display:none}}
-.chat-screen{flex:1; min-block-size:0; min-inline-size:0; display:grid; grid-template-rows:auto minmax(0,1fr) auto}
-.daybar{display:flex; flex-wrap:wrap; align-items:center; gap:var(--space-3) var(--space-4); padding:var(--space-3) calc(var(--space-4) + env(safe-area-inset-right, 0px)) var(--space-3) calc(var(--space-6) + env(safe-area-inset-left, 0px)); border-block-end:2px solid var(--line);
-  & h1{margin:0; font:400 34px/1 var(--display); letter-spacing:.5px; color:var(--text-strong)}
-  & .day{font:400 13px/18px var(--mono); color:var(--text-muted)}
-  & .days{display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin-inline-start:auto}
-  & .days a{padding:5px 9px; border:2px solid var(--line); font:400 12px/16px var(--mono); color:var(--text); text-decoration:none}
-  & .days a[aria-current]{border-color:var(--accent); color:var(--accent); font-weight:500}}
-/* The menu of the day bar is a popover, as the sheet of the shell is: the top layer, so the column's overflow cannot clip
-   it, and Close, Escape or a tap outside closes it. On a wide screen it hangs under the bar at the right; on a phone
-   it is a sheet from the top, over the bars. */
-.daybar button.more{inline-size:34px; block-size:30px; min-block-size:0; margin:0; padding:0; border:2px solid var(--line); background:none; box-shadow:none; font:700 16px/1 var(--sans); color:var(--text)}
-.more-body:popover-open{display:flex; flex-direction:column; gap:var(--space-3); position:fixed; z-index:30; inset:4rem var(--space-4) auto auto; margin:0; padding:var(--space-3);
-  inline-size:min(26rem, calc(100vw - 2 * var(--space-4))); max-block-size:calc(100dvh - 4rem - var(--space-4)); overflow-y:auto; overscroll-behavior:contain; box-shadow:var(--parch-bevel),var(--shadow-float);
-  & .sub{margin:0}}
-/* The menu hangs from its button; the fixed inset above is the fallback for an engine without anchor positioning.
-   The phone resets this in its media block below. */
-.daybar button.more{anchor-name:--more}
-@supports (position-area: block-end){
-  .more-body:popover-open{position-anchor:--more; position-area:block-end span-inline-start; position-try-fallbacks:flip-block, flip-inline; inset:auto}}
-.more-head{display:flex; align-items:center; justify-content:space-between}
+  .shell{anchor-name:--shell}}
 /* The ⋯ menu of a page (docs/plans/159-the-class-of-an-action.md): a popover that hangs from its button, as the New menu
    of the rail does, with three groups: Edit, the others, and the danger actions last and apart, in the danger colour.
    An item opens a dialog that holds the action's form, and the form that the page's link asked for is that dialog,
@@ -283,13 +180,6 @@ dialog.menu-dialog{inline-size:min(34rem, calc(100vw - 2rem)); margin:12vh auto 
 @media (max-width:899px) and (prefers-reduced-motion:no-preference){
   :is(.menu-list,.head-pop){transition:opacity .16s, translate .16s, overlay .16s allow-discrete, display .16s allow-discrete;
     &:popover-open{translate:0 0; @starting-style{opacity:0; translate:0 100%}}}}
-.thread{display:flex; flex-direction:column-reverse; min-block-size:0; overflow-y:auto; padding:var(--space-4) calc(var(--space-4) + env(safe-area-inset-right, 0px)) var(--space-4) calc(var(--space-6) + env(safe-area-inset-left, 0px))}
-.composer{padding:var(--space-3) calc(var(--space-4) + env(safe-area-inset-right, 0px)) max(var(--space-3), env(safe-area-inset-bottom, 0px)) calc(var(--space-6) + env(safe-area-inset-left, 0px)); border-block-start:2px solid var(--line);
-  & .chat-form{display:grid; grid-template-columns:minmax(0,1fr) auto; gap:10px; align-items:end; max-inline-size:72ch; margin-inline:auto}
-  & .chat-form label>span{position:absolute; inline-size:1px; block-size:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap}
-  & textarea{inline-size:100%; min-block-size:46px; max-block-size:40vh; resize:none}
-  & .chat-form button{block-size:46px; padding:0 18px}
-  & .hint{max-inline-size:72ch; margin-block-start:var(--space-2); margin-inline:auto}}
 
 /* A month of the year: a parchment slip; a written day is tinted, today is framed. */
 .month-box{display:flex; flex-direction:column; gap:var(--space-2); padding:var(--space-3) 10px; box-shadow:var(--parch-bevel)}
@@ -333,15 +223,10 @@ table.month{border-collapse:separate; border-spacing:2px; table-layout:fixed; fo
     & li{flex:1 1 0; min-inline-size:0}
     & :is(a,button){position:relative; inline-size:100%; flex-direction:column; gap:2px; padding:6px 0; font-size:12px; line-height:16px;
       &[aria-current=page],&.here{background:none; box-shadow:none; color:var(--rail-accent); font-weight:700}}}
-  .rail-more-link,.rail-chat-link{display:block}
+  .rail-more-link{display:block}
   .rail-apps{display:block}
   .nav-app{display:none} /* the bar has room for the sections of the day; the apps are in the sheet of More, and the link of the page that is open shows here */
   .nav-app:has(a[aria-current=page]){display:block}
-  .nav-chat:not(:has(a[aria-current=page])){display:none} /* the bar has the button of the column in its place; the link shows on the conversation */
-  .chat-open{display:none}
-  .shell:has(.chat:popover-open)>.column{padding-inline-end:calc(var(--space-4) + env(safe-area-inset-right, 0px))}
-  .chat:popover-open{inset-inline:0; inset-block-start:0; inset-block-end:calc(58px + env(safe-area-inset-bottom, 0px)); inline-size:auto; border-inline-start:0;
-    padding:calc(var(--space-4) + env(safe-area-inset-top, 0px)) calc(var(--space-4) + env(safe-area-inset-right, 0px)) var(--space-4) calc(var(--space-4) + env(safe-area-inset-left, 0px))}
   .today-inline{display:block; margin-block-end:var(--space-4)}
   .rail-more{display:none}
   /* The sheet is a popover: the browser puts it in the top layer, with its own size, margin, border and colours,
@@ -355,19 +240,10 @@ table.month{border-collapse:separate; border-spacing:2px; table-layout:fixed; fo
   .rail,.rail>nav{background-image:url(/assets/wood.png),var(--grain-ground); background-size:252px 480px,4px 4px; background-repeat:repeat} /* the bars carry no shade of the tall rail */
   .column{padding:var(--space-5) calc(var(--space-4) + env(safe-area-inset-right, 0px)) calc(72px + env(safe-area-inset-bottom, 0px)) calc(var(--space-4) + env(safe-area-inset-left, 0px));
     &>footer{margin-block-start:var(--space-6)}}
-  /* The top bar is in the flow above the column, so the screen takes what is left of the viewport, less the bottom
-     bar, which is fixed. */
-  .shell:has(.chat-screen){display:flex; flex-direction:column; block-size:100dvh}
-  .column:has(>main>.chat-screen){flex:1 1 auto; block-size:auto; min-block-size:0; padding:0 0 calc(58px + env(safe-area-inset-bottom, 0px))}
-  .daybar{padding-inline-start:calc(var(--space-4) + env(safe-area-inset-left, 0px))}
-  .daybar h1{font-size:28px}
-  .more-body:popover-open{position-area:none; inset:0 0 auto 0; inline-size:auto; max-block-size:calc(100dvh - 58px - env(safe-area-inset-bottom, 0px));
-    padding:calc(var(--space-4) + env(safe-area-inset-top, 0px)) calc(var(--space-4) + env(safe-area-inset-right, 0px)) var(--space-4) calc(var(--space-4) + env(safe-area-inset-left, 0px))}
-  .thread,.composer{padding-inline-start:calc(var(--space-4) + env(safe-area-inset-left, 0px))}
   html{scroll-padding-block-end:calc(var(--control) + var(--space-4) + env(safe-area-inset-bottom, 0px))} /* a focused field stays above the bottom bar */
   footer .keys{display:none}
 }
-@media print{.rail,.skip,.chat,.chat-open{display:none} body[data-ground]::before,body[data-ground]::after{content:none} .shell{display:block; outline:0} .column{padding:0; background:none; box-shadow:none; outline:0} body{background-image:none} .sheet::after,.day-card::after{display:none}}
+@media print{.rail,.skip{display:none} body[data-ground]::before,body[data-ground]::after{content:none} .shell{display:block; outline:0} .column{padding:0; background:none; box-shadow:none; outline:0} body{background-image:none} .sheet::after,.day-card::after{display:none}}
 
 /* Type helpers: the mono styles of the design system. A component restyles them, so they are not utilities. */
 .date,.meta,.value,.reading{font-family:var(--mono); font-variant-numeric:tabular-nums}

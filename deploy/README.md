@@ -6,7 +6,7 @@ keep the settings that are only on the machine (the user, the paths), and then c
 
 | file | installed as | what it does |
 |---|---|---|
-| `aminte.service` | `/etc/systemd/system/aminte.service` | runs `aminte serve` with `--with web` (the browser), `--with agent` (the agent that answers) and `--with whatsapp` (the WhatsApp transport); `KillSignal=SIGTERM` and `TimeoutStopSec=30` let the server drain its requests |
+| `aminte.service` | `/etc/systemd/system/aminte.service` | runs `aminte serve` with `--with web` (the browser); `KillSignal=SIGTERM` and `TimeoutStopSec=30` let the server drain its requests |
 | `aminte-snapshot` | `/usr/local/bin/aminte-snapshot` | runs `aminte snapshot`, tests its exit status, prunes to the newest 14 good snapshots |
 | `aminte-snapshot.service` | `/etc/systemd/system/aminte-snapshot.service` | runs the script once; `TimeoutStartSec=30min`; `OnFailure=aminte-snapshot-failed.service` |
 | `aminte-snapshot.timer` | `/etc/systemd/system/aminte-snapshot.timer` | starts the service every night |
@@ -49,19 +49,14 @@ The service runs the installed program, not the one in the repo folder.
 1. `go build -o <install path> ./cmd/aminte`, and every extension beside it, with one line:
    `for d in extensions/*/; do go build -C "$d" -o <install folder>/ ./cmd/...; done` (`<install folder>` is an absolute
    path, the folder of `<install path>`). Each program gets the name of its folder under `cmd/`: `aminte-web`,
-   `aminte-mcp`, `aminte-agentic-init`, `aminte-gphotos`, `aminte-agent`, `aminte-whatsapp` and `aminte-ticktick`
-   ([extensions](../extensions/README.md)). A unit with `--with web`, `--with agent` or `--with whatsapp` needs the program
-   (`aminte-web`, `aminte-agent`, `aminte-whatsapp`) beside `aminte`: `serve` refuses to start without it, before the
-   file opens. Ship `aminte`, `aminte-agent` and `aminte-whatsapp` together. The agent writes its turn with the
-   action `reply`, so a `aminte` that lacks it makes `aminte-agent` exit 78 and write nothing. The old
-   `aminte-whatsapp` answered by itself, so it beside the new `aminte-agent` gives two replies to one message. The new
-   `aminte-whatsapp` without `aminte-agent` gives none. The `state.json` of the old `aminte-whatsapp` is a first run
-   for the new one: it adopts the page as it is, and it reads the old `saved_at` as the time of the last message that
-   was said, so a message that came during the switch is said. The local proxy points to `AMINTE_WEB_LISTEN` (`127.0.0.1:7780`), and not to the core
+   `aminte-mcp`, `aminte-agentic-init`, `aminte-gphotos` and `aminte-ticktick`
+   ([extensions](../extensions/README.md)). A unit with `--with NAME` needs the program `aminte-NAME` beside `aminte`:
+   `serve` refuses to start without it, before the file opens. Ship `aminte` and each `--with` child together. The
+   local proxy points to `AMINTE_WEB_LISTEN` (`127.0.0.1:7780`), and not to the core
    ([install](../extensions/web/README.md#install)).
 2. `systemctl daemon-reload` after a change to a unit file.
 3. `systemctl restart aminte.service`.
 4. Read the service's log lines (`journalctl -u aminte.service -n 20`): the first names the version and the
-   `user_version`, and a line `aminte: with NAME: started (pid N)` for each `--with` child (`web`, `agent`,
-   `whatsapp`) says that the child started. A line `ended with status 78: not started again (the owner acts first)`
-   says that the owner must act ([the exit status](../extensions/README.md#run-by-serve)).
+   `user_version`, and a line `aminte: with NAME: started (pid N)` for each `--with` child (`web`) says that the child
+   started. A line `ended with status 78: not started again (the owner acts first)` says that the owner must act
+   ([the exit status](../extensions/README.md#run-by-serve)).

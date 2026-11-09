@@ -10,8 +10,6 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
-	"regexp"
-	"runtime"
 	"slices"
 	"strconv"
 	"strings"
@@ -278,9 +276,6 @@ func parityRows() []parityRow {
 		parityRow{"stale save-body", rowStaleSave},
 		parityRow{"save-body at the largest version", rowLargestVersion},
 		parityRow{"register-metric", rowRegisterMetric},
-		parityRow{"settings", rowSettings},
-		parityRow{"say", rowSay},
-		parityRow{"reply", rowReply},
 		parityRow{"promote", rowPromote},
 		parityRow{"edit-metric", rowEditMetric},
 		parityRow{"set-cover by a kept title", rowSetCover},
@@ -821,120 +816,6 @@ func rowEditMetric(x *parityRun) {
 	if n := len(props(x.t, apitest.Must(x.t)(x.read.Get(ctx, "/metrics/Meditate")))["readings"].([]any)); n != 1 {
 		x.t.Errorf("the readings of Meditate: %d, want 1", n)
 	}
-}
-
-// settings is the owner's: an owner saves the model, reads it back with GET /settings, and clears a setting with an empty
-// value while a field left out stays; an agent gets a 403 and no file is written. The file has the mode 0600.
-func rowSettings(x *parityRun) {
-	if !x.owner {
-		x.refused("settings", map[string]string{"model": "x"}, http.StatusForbidden, "forbidden")
-		if _, err := os.Stat(x.store.SettingsPath); !os.IsNotExist(err) {
-			x.t.Errorf("a refused settings wrote the file: %v", err)
-		}
-		return
-	}
-	read := func() map[string]any { return props(x.t, apitest.Must(x.t)(x.read.Get(x.t.Context(), "/settings"))) }
-	x.ok("settings", map[string]string{"model_url": "http://127.0.0.1:1234/v1", "model": "synthetic-model", "model_key": "synthetic-key"})
-	if p := read(); p["model_url"] != "http://127.0.0.1:1234/v1" || p["model"] != "synthetic-model" || p["model_key"] != "synthetic-key" {
-		x.t.Errorf("GET /settings after a save: %v", p)
-	}
-	if fi, err := os.Stat(x.store.SettingsPath); err != nil {
-		x.t.Fatal(err)
-	} else if runtime.GOOS != "windows" && fi.Mode().Perm() != 0o600 {
-		x.t.Errorf("the settings file has the mode %v, want 0600", fi.Mode().Perm())
-	}
-	x.ok("settings", map[string]string{"model": "other-model"}) // the fields left out stay
-	if p := read(); p["model"] != "other-model" || p["model_key"] != "synthetic-key" {
-		x.t.Errorf("GET /settings after a save of one field: %v", p)
-	}
-	x.ok("settings", map[string]string{"model_key": ""}) // an empty field clears
-	if p := read(); p["model_key"] != nil || p["model"] != "other-model" {
-		x.t.Errorf("GET /settings after clearing the key: %v", p)
-	}
-}
-
-// say is the owner's: an agent or an import is refused (403) and writes nothing. The first turn makes the page in the
-// category Conversations with the first line; a second turn is appended after a blank line; an empty text is 422 and
-// writes nothing. The stamp is the time of the surface's clock, so the row checks its shape only.
-func rowSay(x *parityRun) {
-	if !x.owner {
-		x.refused("say", map[string]string{"day": "today", "text": "Hello."}, http.StatusForbidden, "forbidden")
-		x.absent("Conversation " + parityToday)
-		return
-	}
-	x.refused("say", map[string]string{"day": "today", "text": " \n "}, http.StatusUnprocessableEntity, "invalid")
-	x.absent("Conversation " + parityToday)
-	e := x.ok("say", map[string]string{"day": "today", "text": "Hello."})
-	if !slices.Contains(e.Class, "conversation") || len(props(x.t, e)["turns"].([]any)) != 1 {
-		x.t.Errorf("say: %v %v, want the conversation with one turn", e.Class, e.Properties)
-	}
-	x.ok("say", map[string]string{"day": parityToday, "text": "Again."})
-	pe, err := x.page("Conversation " + parityToday)
-	if err != nil {
-		x.t.Fatal(err)
-	}
-	p := props(x.t, pe)
-	want := regexp.MustCompile(`^\[\[` + parityToday + `\]\]\n\n\*\*Owner\*\* \(\d\d:\d\d\): Hello\.\n\n\*\*Owner\*\* \(\d\d:\d\d\): Again\.$`)
-	if body, _ := p["body"].(string); !want.MatchString(body) {
-		x.t.Errorf("the body after two turns: %q", body)
-	}
-	id, _ := p["id"].(json.Number)
-	n, _ := id.Int64()
-	if got := x.categories(n); got != "Conversations" {
-		x.t.Errorf("the categories of the conversation: %q, want Conversations", got)
-	}
-	got := apitest.Must(x.t)(x.read.Get(x.t.Context(), "/days/today/conversation"))
-	if turns, _ := props(x.t, got)["turns"].([]any); len(turns) != 2 {
-		x.t.Errorf("GET /days/today/conversation: %v, want two turns", turns)
-	}
-}
-
-// reply is no owner action: an agent runs it as the owner does. The owner's turn is set up with the store (an agent
-// cannot say). A day with no page is 404; the turn is the key of the owner's turn, and a key that no owner turn has is
-// 409; a turn that has a reply is 409 and the page stays as it was; the tool lines come in one field, one for each line. The one
-// difference between the writers is the save of the page: the owner edits it, an agent or an import is refused (403).
-func rowReply(x *parityRun) {
-	title := "Conversation " + parityToday
-	args := map[string]string{"day": "today", "turn": "0123456789abcdef", "text": "Hi.", "tools": "- `search`: no hits\n- `get` → [/days/2031-05-20](/days/2031-05-20)"}
-	x.refused("reply", args, http.StatusNotFound, "not_found")
-	x.absent(title)
-	if _, _, err := x.store.AppendParagraph(x.t.Context(), "api", title, parityToday, "Conversations", "[["+parityToday+"]]",
-		func(body string) string { return body + "\n\n**Owner** (09:00): Hello." }); err != nil {
-		x.t.Fatal(err)
-	}
-	conv := props(x.t, apitest.Must(x.t)(x.read.Get(x.t.Context(), "/days/today/conversation")))
-	first, _ := conv["turns"].([]any)
-	key, _ := first[0].(map[string]any)["key"].(string)
-	if key == "" {
-		x.t.Fatalf("the owner's turn has no key: %v", first)
-	}
-	x.refused("reply", map[string]string{"day": "today", "text": "Hi."}, http.StatusUnprocessableEntity, "invalid")
-	x.refused("reply", map[string]string{"day": "today", "turn": key, "text": " \n "}, http.StatusUnprocessableEntity, "invalid")
-	x.refused("reply", map[string]string{"day": "today", "turn": key, "text": "Hi.", "tools": "not a tool line"}, http.StatusUnprocessableEntity, "invalid")
-	x.refused("reply", map[string]string{"day": "today", "turn": "1", "text": "Hi."}, http.StatusConflict, "conflict")
-	args["turn"] = key
-	e := x.ok("reply", args)
-	p := props(x.t, e)
-	turns, _ := p["turns"].([]any)
-	if len(turns) != 2 {
-		x.t.Fatalf("reply: %v, want the owner's turn and the reply", turns)
-	}
-	reply, _ := turns[1].(map[string]any)
-	if reply["who"] != "aminte" || reply["text"] != "Hi." || fmt.Sprint(reply["tools"]) != "[- `search`: no hits - `get` → [/days/2031-05-20](/days/2031-05-20)]" ||
-		fmt.Sprint(reply["refs"]) != "[/days/2031-05-20]" {
-		x.t.Errorf("the reply: %v, want the words, two tool lines and the ref of the second", reply)
-	}
-	before, _ := p["body"].(string)
-	x.refused("reply", args, http.StatusConflict, "conflict")
-	if got := x.pageByID(mustInt(x.t, p["id"]))["body"]; got != before {
-		x.t.Errorf("the page after the refused second reply: %q, want %q", got, before)
-	}
-	save := map[string]string{"id": fmt.Sprint(p["id"]), "body": before + "\n\nA note.", "version": fmt.Sprint(p["version"])}
-	if x.owner {
-		x.ok("save-body", save)
-		return
-	}
-	x.refused("save-body", save, http.StatusForbidden, "forbidden")
 }
 
 // mustInt reads the id of an entity that the client decoded with exact numbers.

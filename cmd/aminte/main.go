@@ -443,7 +443,7 @@ func runContext(ctx context.Context, e env) (err error) {
 	}
 	defer func() { err = errors.Join(err, d.Close()) }()
 	e.o.db = path
-	e.store = &core.Store{DB: d, SnapshotDir: o.snapshots, SettingsPath: core.SettingsPathFor(path), Clock: e.clock}
+	e.store = &core.Store{DB: d, SnapshotDir: o.snapshots, Clock: e.clock}
 	if !cmd.ownHandler {
 		e.c = client.InProcess(api.NewWith(e.store, nil), o.source)
 	}

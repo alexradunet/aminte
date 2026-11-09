@@ -32,5 +32,6 @@ becomes a [decision](../decisions/README.md). One file per proposal, named `NNNN
 | [0023](0023-a-daily-mark-on-a-metric.md) | A daily mark on a metric: the owner says which readings the writer asks for | accepted | [0090](../issues/0090-the-writer-guesses-which-metrics-are-daily.md) | [D31](../decisions/D31-daily-metrics.md) |
 | [0024](0024-no-places.md) | No places: a place is a plain page, and where a day was is the words of the day page | accepted | [0091](../issues/0091-places-cost-more-than-they-give.md) | [D16](../decisions/D16-places.md), [D21](../decisions/D21-location-history.md): rewritten by the change that follows |
 | [0025](0025-no-plan-lines-and-connected-apps.md) | No plan lines: a plan lives in the owner's task manager, reached through a catalog the core aggregates | accepted | [0092](../issues/0092-plan-lines-cost-more-than-they-give.md) | [D29](../decisions/D29-plan-lines.md), [D23](../decisions/D23-no-tasks.md), [D15](../decisions/D15-recurrence.md), [D30](../decisions/D30-period-pages.md): rewritten by the change that follows |
+| [0026](0026-no-agent-inside-and-no-whatsapp.md) | No agent inside and no WhatsApp: an agent talks to aminte through the CLI and the MCP server | accepted | [0093](../issues/0093-three-ways-for-an-agent.md) | none |
 
 Status values: draft | accepted | rejected (with a one-line reason) | withdrawn.

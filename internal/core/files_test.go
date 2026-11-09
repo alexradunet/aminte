@@ -174,7 +174,7 @@ func TestFilePromotionDay(t *testing.T) {
 
 	var datedGhost int64
 	if err := s.Do(ctx, "cli", func(tx *Tx) (err error) {
-		datedGhost, err = tx.insertPage("page", "Already dated.jpg", text.TitleKey("Already dated.jpg"), "2026-10-01", "")
+		datedGhost, err = tx.insertRow("page", "Already dated.jpg", text.TitleKey("Already dated.jpg"), "2026-10-01", "")
 		return err
 	}); err != nil {
 		t.Fatal(err)
@@ -201,7 +201,7 @@ func TestFilePromotionDay(t *testing.T) {
 
 	var conflictID int64
 	if err := s.Do(ctx, "cli", func(tx *Tx) (err error) {
-		conflictID, err = tx.insertPage("page", "Conflict.pdf", text.TitleKey("Conflict.pdf"), "2026-10-02", "my own words")
+		conflictID, err = tx.insertRow("page", "Conflict.pdf", text.TitleKey("Conflict.pdf"), "2026-10-02", "my own words")
 		return err
 	}); err != nil {
 		t.Fatal(err)

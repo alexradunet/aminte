@@ -114,7 +114,7 @@ func newServer(s *core.Store, apps *Apps) *server {
 		"retract": h.retract, "rename": h.rename, "register-metric": h.registerMetric, "integrity-check": h.integrity,
 		"search": h.search, "browse": h.browse, "find": h.find, "open-day": h.openDay,
 		"random-page": h.randomPage, "snapshot": h.snapshot,
-		"rebuild-search": h.rebuildSearch, "resync-links": h.resyncLinks, "say": h.say, "reply": h.reply, "settings": h.saveSettings,
+		"rebuild-search": h.rebuildSearch, "resync-links": h.resyncLinks,
 	})
 	// The routes that are not actions: the resources and the files (a picture, a snapshot).
 	m.HandleFunc("GET /{$}", h.serve(h.root))
@@ -122,8 +122,6 @@ func newServer(s *core.Store, apps *Apps) *server {
 	m.HandleFunc("GET /days", h.serve(h.days))
 	m.HandleFunc("GET /days/today", h.serve(h.today))
 	m.HandleFunc("GET /days/{day}", h.serve(h.day))
-	m.HandleFunc("GET /days/{day}/conversation", h.serve(h.conversation))
-	m.HandleFunc("GET /settings", h.serve(h.settings))
 	m.HandleFunc("GET /snapshots/{name}", h.snapshotFile)
 	m.HandleFunc("GET /months/{month}", h.serve(h.month))
 	m.HandleFunc("GET /weeks/today", h.serve(h.currentWeek))

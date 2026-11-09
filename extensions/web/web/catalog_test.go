@@ -270,15 +270,15 @@ func TestManyReadersAndWritersSeeWholeSettings(t *testing.T) {
 }
 
 // TestTheSettingsPageHasTheFormOfThisBrowser: with the app web connected to the core (`serve --with web`), the page of
-// the settings has the form of the core and, under it, the form "This browser", which is the action web-settings of the
-// catalog of the core, with the values that web keeps. A save through web goes to the core, which forwards it to the
-// catalog with its owner rule, and the browser returns to the page with the toast. The core's form has no field of the
-// browser: each setting of the browser is one field, in the form "This browser".
+// the settings has the form "This browser", which is the action web-settings of the catalog of the core, with the values
+// that web keeps. A save through web goes to the core, which forwards it to the
+// catalog with its owner rule, and the browser returns to the page with the toast. Each setting of the browser is one
+// field, in the form "This browser".
 func TestTheSettingsPageHasTheFormOfThisBrowser(t *testing.T) {
 	l := emptyLife(t)
 	l.core.Connect(t, "web", l.browser.Catalog())
 	page := ask(l.web, http.MethodGet, "/settings").Body.String()
-	for _, want := range []string{"<h2>This browser</h2>", `action="/with/web/settings"`, `name="model"`, // the core's own form is still there
+	for _, want := range []string{"<h2>This browser</h2>", `action="/with/web/settings"`,
 		`<input type="password" name="pin" value="" autocomplete="new-password">`, `<option selected>boards</option>`, `<option selected>off</option>`,
 		`<input type="hidden" name="back" value="/settings">`} {
 		if !strings.Contains(page, want) {

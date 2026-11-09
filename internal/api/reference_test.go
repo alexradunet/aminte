@@ -41,11 +41,6 @@ func TestAPIReferenceMatchesTheCode(t *testing.T) {
 			// and the page of the metric (plan 144): the properties of a page but its `metric` object
 			"id": int64(0), "entity_type": "", "title": "", "body": "", "created_at": "", "version": "", "is_day_page": false,
 			"links": []core.Edge{}, "backlinks": []core.Edge{}, "cover": core.Cover{}},
-		"settings": map[string]any{"model_url": "", "model": "", "model_key": "", "owner_number": ""},
-		"conversation": map[string]any{"day": "", "turns": []Turn{},
-			// and the page of the conversation (plan 146): the properties of a page
-			"id": int64(0), "entity_type": "", "title": "", "body": "", "created_at": "", "version": "", "is_day_page": false,
-			"links": []core.Edge{}, "backlinks": []core.Edge{}, "cover": core.Cover{}},
 		"metrics":    map[string]any{"metrics": []metricRow{}, "groups": []metricGroup{}, "categories": []core.Category{}, "today": ""},
 		"snapshot":   map[string]any{"snapshot": "", "download": "", "restore_check": core.IntegrityResult{}},
 		"rebuilt":    map[string]any{"documents": 0},
@@ -87,17 +82,13 @@ func TestAPIReferenceMatchesTheCode(t *testing.T) {
 
 	// Live: every route's top-level keys are documented for its section.
 	h, c, ids := fixture(t)
-	if _, _, err := c.AppendParagraph(t.Context(), "cli", core.ConversationTitle("2031-05-01"), "2031-05-01", core.ConversationCategory, conversationFirstLine("2031-05-01"),
-		func(body string) string { return body + "\n\n**Owner** (09.07): Hello" }); err != nil {
-		t.Fatal(err)
-	}
 	live := []struct{ section, route string }{
 		{"root", "/"}, {"days", "/days"}, {"search", "/search?q=word"},
 		{"day", "/days/2031-05-01"}, {"page, person, file", ids["page"]}, {"page, person, file", ids["person"]},
 		{"page, person, file", ids["file"]},
 		{"measurement", ids["measurement"]}, {"series", "/metrics/Weight"}, {"metrics", "/metrics"},
 		{"browse", "/browse?in=A+note"}, {"browse", "/browse?kind=person"}, {"browse", "/browse?kind=media"}, {"browse", "/browse?ghosts=1"}, {"browse", "/browse?deleted=1"},
-		{"integrity", "/integrity"}, {"settings", "/settings"}, {"conversation", "/days/2031-05-01/conversation"}, {"conversation", "/days/2031-05-02/conversation"}, {"cover-choice", ids["page"] + "/cover"},
+		{"integrity", "/integrity"}, {"cover-choice", ids["page"] + "/cover"},
 		{"month", "/months/2031-05"}, {"year", "/years/2031"}, {"week", "/weeks/2031-W20"},
 	}
 	named := func(section, key string) bool { // a list is documented as "name[]"
@@ -250,7 +241,7 @@ func walkType(prefix string, t reflect.Type, out map[string]bool) {
 func fixture(t *testing.T) (http.Handler, *core.Store, map[string]string) {
 	t.Helper()
 	d := dbtest.New(t)
-	s := &core.Store{DB: d, SettingsPath: core.SettingsPathFor(d.Path())}
+	s := &core.Store{DB: d}
 	ctx := t.Context()
 	ids := map[string]string{}
 	personID, err := s.CreatePerson(ctx, "cli", "Sam", "Sam Synthetic", "2001-01-01", "")

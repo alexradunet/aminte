@@ -57,7 +57,7 @@ func TestRenderDrawsTheBodyAndWritesNothing(t *testing.T) {
 				t.Errorf("render of %s lacks %s\n%.600s", field, want, page)
 			}
 		}
-		if strings.Contains(page, `<section class="rail-today"`) || strings.Contains(page, `id="chat"`) || strings.Contains(page, `class="rail"`) {
+		if strings.Contains(page, `<section class="rail-today"`) || strings.Contains(page, `class="rail"`) {
 			t.Errorf("render of %s has a shell", field)
 		}
 		if got.Header().Get("Speculation-Rules") != "" {
