@@ -436,7 +436,7 @@ settings links to the snapshot form under Backup.
 ### The rail and the apps
 
 The rail has one entry for each link `app` of the root, that is, for each app that runs. A phone shows the apps in the
-More sheet. It has Tasks while a task service runs. The page of an app is drawn by [the generic view](#how-the-browser-draws-a-page-of-an-app).
+More sheet. The page of an app is drawn by [the generic view](#how-the-browser-draws-a-page-of-an-app).
 The rail lists no app `web`: `/with/web` leads to `/settings`.
 
 ## The shell and the look
@@ -557,7 +557,7 @@ flowchart LR
   M --> A["the other actions: the ⋯ menu of the head"]
 ```
 
-1. **Quick-add.** On a page under `/with/NAME` or `/tasks`, the first action of the entity that has the class `create`,
+1. **Quick-add.** On a page under `/with/NAME`, the first action of the entity that has the class `create`,
    writes (not a `GET`), has no path field and has exactly one required field, of the type `text`, is one line at the top of the main column: that field, the button with the
    title of the action, and the other fields folded under "More fields". The Actions section does not draw it again.
 2. **Rows.** Each embedded link is a row. An embedded link may carry `properties` and `actions`

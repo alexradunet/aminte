@@ -92,7 +92,7 @@ func (h *server) sameDayEarlier(ctx context.Context, day string) ([]recentDay, e
 
 // The root is the entry point of the API: the newest day pages, and every action that starts something. It names the
 // clock (zone, utc_offset), the day of today as a sub-entity that ?embed=today reads in the same answer, the connected
-// apps that run (the links app) and the task service (the link tasks): what a client needs to draw its frame once
+// apps that run (the links app): what a client needs to draw its frame once
 // (API.md, root).
 func (h *server) root(r *http.Request) (*siren.Entity, error) {
 	ctx := r.Context()
@@ -125,9 +125,6 @@ func (h *server) root(r *http.Request) (*siren.Entity, error) {
 		Actions: actions,
 	}
 	e.Links = append(e.Links, h.with.links()...)
-	if _, ok := h.with.taskService(); ok {
-		e.Links = append(e.Links, link("tasks", "/tasks", "Tasks"))
-	}
 	return e, nil
 }
 

@@ -173,7 +173,7 @@ flowchart TB
     K["internal/api and cmd/aminte: one catalog, one Siren handler, the CLI's do, all generated from the catalog. It holds no HTML, CSS, JavaScript or picture. siren, client and app are public packages of this ring (app: the shell of an extension program, and the package a connected app serves its catalog with)."]
   end
   subgraph R3["ring 3: extensions, in any language"]
-    X["extensions/NAME, the program aminte-NAME: a client of API.md, run as aminte NAME. aminte-web is the browser. An extension names the third party. It may serve a catalog of its own, which ring 2 aggregates under /with/NAME (plan 154), or it is the one task service, which ring 2 serves under /tasks (plan 158)."]
+    X["extensions/NAME, the program aminte-NAME: a client of API.md, run as aminte NAME. aminte-web is the browser. An extension names the third party. It may serve a catalog of its own, which ring 2 aggregates under /with/NAME (plan 154)."]
   end
   S --> C --> K --> X
 ```
@@ -183,7 +183,7 @@ flowchart TD
   Q["does it open life.db, or run inside a transaction?"] -->|"yes"| C["ring 0 or 1: the file, the writer"]
   Q -->|"no"| R["does it dispatch the catalog on the origin of the API?"]
   R -->|"yes"| K["ring 2: the routes, the CLI"]
-  R -->|"no"| E["ring 3: an extension; the browser is one; its own catalog, if it has one, is merged by ring 2; the task service is served by ring 2 under /tasks"]
+  R -->|"no"| E["ring 3: an extension; the browser is one; its own catalog, if it has one, is merged by ring 2"]
 ```
 
 Three tests of `cmd/aminte` (`boundary_test.go`) keep the rings, and a change preserves them: **the core names no
@@ -194,8 +194,8 @@ no presentation** (no `.html`, `.css`, `.js` or picture file under `internal/` o
 `html/template` in the Go sources of the core and its public packages). Go enforces the fourth: an extension never
 imports `aminte/internal`. The core dials its own server and the children that `serve --with`
 started, and only in the files that `remoteAllowed` names in `boundary_test.go`. The list of
-third parties has `ticktick`, so the core never says it: the connector `extensions/ticktick` names it. The browser is an
-extension, by the owner's word (2026-10-31, [plan 161](docs/plans/161-the-browser-as-an-extension.md)): ring 3 holds
+third parties keeps the names of extensions that are gone, such as `ticktick`, so the core never says them again. The
+browser is an extension, by the owner's word (2026-10-31, [plan 161](docs/plans/161-the-browser-as-an-extension.md)): ring 3 holds
 `extensions/web`, which draws the answers of the API.
 
 - **Ordinary Go first.** Follow [Go Code Review Comments](https://go.dev/wiki/CodeReviewComments): clear names,

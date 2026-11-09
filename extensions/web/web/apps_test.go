@@ -1,11 +1,10 @@
 package web_test
 
-// The pages of the connected apps and of the task service, as web draws them over the real core. The core merges an app:
+// The pages of the connected apps, as web draws them over the real core. The core merges an app:
 // it puts the actions of the app in its own namespace and forwards the routes under /with/NAME. Web draws what the core
 // answers. The view tests hold the pieces drawn from a hand-made entity; these hold the whole path.
 
 import (
-	"cmp"
 	"net/http"
 	"regexp"
 	"strings"
@@ -89,73 +88,5 @@ func TestTheBrowserDrawsTheRowsOfAnApp(t *testing.T) {
 	}
 	if n := done.Load(); n != 1 {
 		t.Errorf("the app ran done-item %d times, want once", n)
-	}
-}
-
-// taskServiceHandler is a small task service (extensions/README.md, "A task service"): two lists, two open tasks and the
-// six writes. A write answers with a task that has the id of the path (t3 for add-task). The days are relative to
-// 2031-05-14, the day of the clock of the tests.
-func taskServiceHandler() http.Handler {
-	var actions []siren.Action
-	run := map[string]func(*http.Request) (*siren.Entity, error){}
-	for _, w := range []struct{ name, href string }{
-		{"add-task", "/tasks"}, {"edit-task", "/tasks/{id}"}, {"complete-task", "/tasks/{id}/complete"},
-		{"reopen-task", "/tasks/{id}/reopen"}, {"delete-task", "/tasks/{id}/delete"}, {"sync", "/sync"},
-	} {
-		a := siren.Action{Name: w.name, Method: http.MethodPost, Href: w.href, Title: w.name}
-		if strings.Contains(w.href, "{id}") {
-			a.Fields = []siren.Field{{Name: "id", Type: "text", Required: true, In: "path"}}
-		}
-		actions = append(actions, a)
-		run[w.name] = func(r *http.Request) (*siren.Entity, error) { // the core takes a write as done when the answer is a task with an id
-			return &siren.Entity{Class: []string{"task"}, Title: "A task", Properties: map[string]any{"id": cmp.Or(r.PathValue("id"), "t3"), "title": "A task"}}, nil
-		}
-	}
-	read := func(properties map[string]any) http.HandlerFunc {
-		return func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Content-Type", "application/vnd.siren+json")
-			_ = siren.WriteJSON(w, &siren.Entity{Class: []string{"tasks"}, Properties: properties}, "")
-		}
-	}
-	mux := http.NewServeMux()
-	mux.Handle("/", app.CatalogOf("tasks", "Task service", func(*http.Request) (*siren.Entity, error) {
-		return &siren.Entity{Class: []string{"taskservice"}, Title: "Task service"}, nil
-	}, actions, run))
-	mux.HandleFunc("GET /lists", read(map[string]any{"lists": []map[string]string{{"id": "home", "name": "Home"}, {"id": "work", "name": "Work"}}}))
-	mux.HandleFunc("GET /open", read(map[string]any{"tasks": []map[string]any{
-		{"id": "t1", "title": "Fix tap", "list": "home", "due": "2031-05-12"},
-		{"id": "t2", "title": "Call mom", "list": "home", "due": "2031-05-14", "notes": "about the visit"},
-	}}))
-	mux.HandleFunc("GET /done", read(map[string]any{"tasks": []map[string]any{}}))
-	return mux
-}
-
-// TestTheTaskServiceIsDrawnAsTasksAndNotAsAnApp: the task service is Tasks, at /tasks, with its own link in the rail
-// after Browse. The page names neither the address of an app nor the name of the service.
-func TestTheTaskServiceIsDrawnAsTasksAndNotAsAnApp(t *testing.T) {
-	l := emptyLife(t)
-	l.core.Connect(t, "taskservice", taskServiceHandler())
-
-	page := pageAt(t, l.web, "/tasks")
-	for _, row := range []string{"Fix tap", "Call mom"} { // the page is drawn from the service, so the next checks are not about an empty page
-		if !strings.Contains(page, row) {
-			t.Errorf("the page of Tasks lacks the task %q", row)
-		}
-	}
-	if !strings.Contains(page, `<a href="/tasks" aria-current="page">`) {
-		t.Error("the rail does not mark Tasks on /tasks")
-	}
-	if strings.Contains(page, "/with/") || strings.Contains(strings.ToLower(page), "taskservice") {
-		t.Error("the page of Tasks names the service or an address of an app")
-	}
-	rail := railAsideRE.FindString(pageAt(t, l.web, "/browse"))
-	if !strings.Contains(rail, `href="/tasks"`) {
-		t.Error("the rail of /browse has no Tasks")
-	}
-	if strings.Index(rail, `href="/browse"`) > strings.Index(rail, `href="/tasks"`) {
-		t.Error("Tasks is not after Browse in the rail")
-	}
-	if got := ask(l.web, http.MethodGet, "/with/taskservice/"); got.Code != http.StatusNotFound {
-		t.Errorf("GET /with/taskservice/: %d, want 404: a task service is no app", got.Code)
 	}
 }

@@ -68,24 +68,24 @@ body[data-ground=embers]::after{background-position-x:144px; opacity:.5}
 .shell.bare{display:block; max-inline-size:none; outline:0}
 .shell.bare>.column{max-inline-size:34rem; margin:0 auto; outline:2px solid var(--outline)}
 
-/* An icon is a glyph of icons.png (10 by 10 pixels in a cell of 16 by 16, 15 cells in a row: 240 by 16), used as a
+/* An icon is a glyph of icons.png (10 by 10 pixels in a cell of 16 by 16, 14 cells in a row: 224 by 16), used as a
    mask over the colour of the text, so it takes the ink of the place it is in. It is drawn at 2 screen pixels a
    pixel: the span is 20 by 20, and the sheet is 15 * 16 * 2 = 480 by 16 * 2 = 32. The cell n is at x = n * 16 * 2 =
    n * 32. The order of the cells is pixelart.IconNames, and a test keeps these numbers equal to it. The mask is not
    prefixed: the browsers of the README (Chromium and Safari, current) take the plain property. */
 span.icon{display:inline-block; flex:none; inline-size:20px; block-size:20px; background-color:currentColor;
-  mask-image:url(/assets/icons.png); mask-size:480px 32px; mask-repeat:no-repeat; image-rendering:pixelated}
+  mask-image:url(/assets/icons.png); mask-size:448px 32px; mask-repeat:no-repeat; image-rendering:pixelated}
 .icon-today{mask-position:0 0} .icon-calendar{mask-position:-32px 0} .icon-browse{mask-position:-64px 0} .icon-people{mask-position:-96px 0}
 .icon-files{mask-position:-128px 0} .icon-metrics{mask-position:-160px 0} .icon-search{mask-position:-192px 0} .icon-new{mask-position:-224px 0}
 .icon-more{mask-position:-256px 0} .icon-image{mask-position:-288px 0} .icon-video{mask-position:-320px 0} .icon-audio{mask-position:-352px 0}
-.icon-week{mask-position:-384px 0} .icon-chat{mask-position:-416px 0} .icon-tasks{mask-position:-448px 0}
+.icon-week{mask-position:-384px 0} .icon-chat{mask-position:-416px 0}
 /* The same sheet at 4 screen pixels a pixel, where a tile draws an icon large: the span is 40 by 40, the sheet is
    15 * 16 * 4 = 960 by 16 * 4 = 64, and the cell n is at x = n * 16 * 4 = n * 64. */
-.tile-blank span.icon{inline-size:40px; block-size:40px; mask-size:960px 64px}
+.tile-blank span.icon{inline-size:40px; block-size:40px; mask-size:896px 64px}
 .tile-blank .icon-today{mask-position:0 0} .tile-blank .icon-calendar{mask-position:-64px 0} .tile-blank .icon-browse{mask-position:-128px 0} .tile-blank .icon-people{mask-position:-192px 0}
 .tile-blank .icon-files{mask-position:-256px 0} .tile-blank .icon-metrics{mask-position:-320px 0} .tile-blank .icon-search{mask-position:-384px 0} .tile-blank .icon-new{mask-position:-448px 0}
 .tile-blank .icon-more{mask-position:-512px 0} .tile-blank .icon-image{mask-position:-576px 0} .tile-blank .icon-video{mask-position:-640px 0} .tile-blank .icon-audio{mask-position:-704px 0}
-.tile-blank .icon-week{mask-position:-768px 0} .tile-blank .icon-chat{mask-position:-832px 0} .tile-blank .icon-tasks{mask-position:-896px 0}
+.tile-blank .icon-week{mask-position:-768px 0} .tile-blank .icon-chat{mask-position:-832px 0}
 
 /* The rail is wood: pixel planks, a raised bevel, the outline on its right. Its words are the rail's ink; where the
    owner is, gold on a carved well. */

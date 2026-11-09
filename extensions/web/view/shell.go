@@ -3,7 +3,6 @@ package view
 import (
 	"fmt"
 	"html/template"
-	"slices"
 	"strings"
 	"time"
 
@@ -26,7 +25,6 @@ type Shell struct {
 	Strip       *Strip         // what today has: nil draws no strip (docs/plans/137-pixel-wood-and-the-focus-pass.md, part 4)
 	Apps        []AppLink      // the connected apps that run (docs/plans/154-connected-apps-through-the-catalog.md): a link each in the rail
 	LockMinutes int            // the minutes of lock_after when the lock is on, else 0 (docs/plans/160-the-lock.md): the rail has the Lock button and the page lock.js
-	Tasks       bool           // a task service runs (docs/plans/158-one-task-service-behind-tasks.md): the rail has Tasks
 }
 
 // AppLink is a connected app in the rail: its name, which is its address /with/NAME, and the title of its home.
@@ -34,8 +32,8 @@ type AppLink struct{ Name, Title string }
 
 // ShellOf is the shell that the root of the API describes when it is read with ?embed=today (API.md, root): the day of
 // today and the zone of the words from the properties of the root, the Today strip from the embedded day of today, the
-// connected apps that run from the links app, and whether a task service runs from the link tasks. The root was read as
-// JSON, so its properties are the lists and maps of the JSON client. When the day was not embedded, the strip stays nil
+// connected apps that run from the links app. The root was read as JSON, so its properties are the lists and maps of
+// the JSON client. When the day was not embedded, the strip stays nil
 // and the shell draws no strip. Ground and LockMinutes are not in the root: the caller reads them.
 func ShellOf(root *siren.Entity) (*Shell, error) {
 	props, _ := root.Properties.(map[string]any)
@@ -53,11 +51,8 @@ func ShellOf(root *siren.Entity) (*Shell, error) {
 		}
 	}
 	for _, l := range root.Links {
-		switch {
-		case l.HasRel("app"):
+		if l.HasRel("app") {
 			shell.Apps = append(shell.Apps, AppLink{Name: strings.TrimPrefix(l.Href, "/with/"), Title: l.Title})
-		case l.HasRel("tasks"):
-			shell.Tasks = true
 		}
 	}
 	return shell, nil
@@ -185,19 +180,6 @@ type navEntry struct {
 	Group, Key        string
 }
 
-// tasksEntry is the sidebar link of Tasks. It is in the sidebar only while a task service runs (Shell.Tasks), after
-// Browse (docs/plans/158-one-task-service-behind-tasks.md).
-var tasksEntry = navEntry{"Tasks", "/tasks", "tasks", []string{"/tasks"}, "day", ""}
-
-// navTable is navItems, with Tasks after Browse while a task service runs.
-func (v *view) navTable() []navEntry {
-	if v.Shell == nil || !v.Shell.Tasks {
-		return navItems
-	}
-	at := slices.IndexFunc(navItems, func(it navEntry) bool { return it.Href == "/browse" })
-	return slices.Insert(slices.Clone(navItems), at+1, tasksEntry)
-}
-
 // navItem is one sidebar link, marked when the browser is on a page it stands for.
 type navItem struct {
 	Title, Href, Icon, Group, Key string
@@ -226,7 +208,7 @@ func (v *view) Nav() []navItem {
 	if today := v.Today(); today != "" && path == siren.DayHref(today) {
 		path = "/days/today"
 	}
-	table := v.navTable()
+	table := navItems
 	out := make([]navItem, len(table))
 	best, at, length := -1, 0, 0
 	for i, it := range table {

@@ -25,10 +25,9 @@ const rootJSON = `{"class":["root"],"title":"Aminte",
   {"rel":["today"],"href":"/days/2031-05-14","title":"2031-05-14","class":["day"],
    "properties":{"day":"2031-05-14","mood":[4],"streak":3,"written":true,
      "habits":[{"name":"Smoke","done":false},{"name":"Stretch","done":null},{"name":"Walk","done":true}]}}],
- "links":[{"rel":["self"],"href":"/"},{"rel":["app"],"href":"/with/notes","title":"Notes"},{"rel":["app"],"href":"/with/maps","title":"maps"},{"rel":["tasks"],"href":"/tasks","title":"Tasks"}]}`
+ "links":[{"rel":["self"],"href":"/"},{"rel":["app"],"href":"/with/notes","title":"Notes"},{"rel":["app"],"href":"/with/maps","title":"maps"}]}`
 
-// TestTheShellIsReadFromTheRoot: the day of today and its zone, the strip of the embedded day, the apps and the task
-// service.
+// TestTheShellIsReadFromTheRoot: the day of today and its zone, the strip of the embedded day and the apps.
 func TestTheShellIsReadFromTheRoot(t *testing.T) {
 	shell, err := ShellOf(rootOf(t, rootJSON))
 	if err != nil {
@@ -46,8 +45,8 @@ func TestTheShellIsReadFromTheRoot(t *testing.T) {
 			t.Errorf("habit %d is %s %s, want %s %s", i, got.Name, got.State(), want.name, want.state)
 		}
 	}
-	if !slices.Equal(shell.Apps, []AppLink{{"notes", "Notes"}, {"maps", "maps"}}) || !shell.Tasks {
-		t.Errorf("apps %v, tasks %v", shell.Apps, shell.Tasks)
+	if !slices.Equal(shell.Apps, []AppLink{{"notes", "Notes"}, {"maps", "maps"}}) {
+		t.Errorf("apps %v", shell.Apps)
 	}
 }
 
@@ -57,7 +56,7 @@ func TestTheShellKeepsWhatWasNotEmbedded(t *testing.T) {
 	bare := `{"class":["root"],"title":"Aminte","properties":{"today":"2031-05-14","zone":"UTC","utc_offset":0},
 	 "entities":[{"rel":["today"],"href":"/days/2031-05-14"}]}`
 	shell, err := ShellOf(rootOf(t, bare))
-	if err != nil || shell.Strip != nil || shell.Zone != time.UTC || shell.Tasks || len(shell.Apps) != 0 {
+	if err != nil || shell.Strip != nil || shell.Zone != time.UTC || len(shell.Apps) != 0 {
 		t.Errorf("a root with references: %+v, %v", shell, err)
 	}
 	for _, body := range []string{`{"class":["root"],"properties":{}}`, `{"class":["root"],"properties":{"today":"soon"}}`, `{"class":["root"]}`} {

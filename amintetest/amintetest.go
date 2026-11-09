@@ -45,10 +45,8 @@ func New(t testing.TB, day string) *Server {
 
 // Connect registers h as the child name of `serve --with name`, by the same handshake (api.Apps.Register): the server
 // reads GET /actions of h, which must have the class actions, as serve requires (extensions/README.md, "A catalog of
-// its own"). With the class tasks too, h is the task service (extensions/README.md, "A task service"): the server reads
-// GET /lists of h and draws Tasks under /tasks from it. Else h is a connected app: its actions join GET /actions as
-// name-action, and the routes under /with/name forward to it. h runs in the process, on a loopback socket that the
-// cleanup of t closes before the server. It fails t when the server refuses the catalog, with the words of the server.
+// its own"). Its actions join GET /actions as name-action, and the routes under /with/name forward to it. h runs
+// in the process, on a loopback socket that the cleanup of t closes before the server. It fails t when the server refuses the catalog, with the words of the server.
 func (s *Server) Connect(t testing.TB, name string, h http.Handler) {
 	t.Helper()
 	child := httptest.NewServer(h)

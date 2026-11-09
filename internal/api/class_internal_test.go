@@ -37,11 +37,10 @@ func TestEveryActionClassIsInTheContract(t *testing.T) {
 	}
 }
 
-// TestTheCatalogUsesOnlyKnownClassesAndOneToAnAction: every class of an action of the catalog (and of the task
-// catalog) is in the list, and no action has two.
+// TestTheCatalogUsesOnlyKnownClassesAndOneToAnAction: every class of an action of the catalog is in the list, and no action has two.
 func TestTheCatalogUsesOnlyKnownClassesAndOneToAnAction(t *testing.T) {
 	used := map[string]bool{}
-	for _, s := range append(slices.Clone(catalog), taskCatalog...) {
+	for _, s := range catalog {
 		if len(s.Class) > 1 {
 			t.Errorf("%s has %d classes %v, want at most one", s.Name, len(s.Class), s.Class)
 		}
@@ -64,7 +63,7 @@ func TestTheCatalogUsesOnlyKnownClassesAndOneToAnAction(t *testing.T) {
 
 // TestTheClassOfARowIsWhatTheRowDoes: API.md says what each class does, and a row shows it: its method, its title, whether
 // it acts on one resource by {id}, and what it asks a person for (the fields that are not path fields). The test reads
-// these from every row of the catalog and of the task service, so a new action needs no edit here, and the message
+// these from every row of the catalog, so a new action needs no edit here, and the message
 // names the row that breaks a rule. The rules:
 //
 //   - A row with a class is a POST row: a GET reads and changes nothing.
@@ -74,7 +73,7 @@ func TestTheCatalogUsesOnlyKnownClassesAndOneToAnAction(t *testing.T) {
 //     with two options.
 //   - A POST on {id} that asks for a field is an edit, unless it has the shape of a toggle. An edit asks for a field.
 //   - A danger row has no class: its danger mark draws it.
-//   - A POST row that acts on no {id} and asks for nothing has no class (rebuild-search, resync-links, sync-tasks),
+//   - A POST row that acts on no {id} and asks for nothing has no class (rebuild-search, resync-links),
 //     except the rows that are pinned below.
 //
 // Two rows have the shape of another class, so no rule can tell their class from the shape. Each is pinned by name
@@ -84,7 +83,7 @@ func TestTheCatalogUsesOnlyKnownClassesAndOneToAnAction(t *testing.T) {
 // on no {id}, such as file-pages. No row of the catalog has that shape with a class.
 func TestTheClassOfARowIsWhatTheRowDoes(t *testing.T) {
 	seen := map[string]bool{}
-	for _, s := range append(slices.Clone(catalog), taskCatalog...) {
+	for _, s := range catalog {
 		var class string
 		if len(s.Class) > 0 {
 			class = s.Class[0]

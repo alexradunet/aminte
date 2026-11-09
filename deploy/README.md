@@ -49,7 +49,7 @@ The service runs the installed program, not the one in the repo folder.
 1. `go build -o <install path> ./cmd/aminte`, and every extension beside it, with one line:
    `for d in extensions/*/; do go build -C "$d" -o <install folder>/ ./cmd/...; done` (`<install folder>` is an absolute
    path, the folder of `<install path>`). Each program gets the name of its folder under `cmd/`: `aminte-web`,
-   `aminte-mcp`, `aminte-agentic-init`, `aminte-gphotos` and `aminte-ticktick`
+   `aminte-mcp`, `aminte-agentic-init` and `aminte-gphotos`
    ([extensions](../extensions/README.md)). A unit with `--with NAME` needs the program `aminte-NAME` beside `aminte`:
    `serve` refuses to start without it, before the file opens. Ship `aminte` and each `--with` child together. The
    local proxy points to `AMINTE_WEB_LISTEN` (`127.0.0.1:7780`), and not to the core

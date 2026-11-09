@@ -4,7 +4,6 @@ package web_test
 // real core, and never a table of the views. The life is small and synthetic, made through the API of the core.
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"regexp"
@@ -127,41 +126,12 @@ func fakeAppOfEveryAction() http.Handler {
 	})
 }
 
-// fakeTaskServiceOfEveryAction answers the reads of the task protocol: two open tasks, and the first of them by its
-// address. Its catalog has the class tasks and the six writes of the protocol.
-func fakeTaskServiceOfEveryAction(t *testing.T) http.Handler {
-	t.Helper()
-	var writes []siren.Action
-	for _, href := range []string{"/tasks", "/tasks/{id}", "/tasks/{id}/complete", "/tasks/{id}/reopen", "/tasks/{id}/delete", "/sync"} {
-		writes = append(writes, siren.Action{Name: "w" + href, Method: "POST", Href: href})
-	}
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		e := &siren.Entity{Class: []string{"tasks"}, Properties: map[string]any{"tasks": []map[string]any{}}}
-		switch r.URL.Path {
-		case "/actions":
-			e = &siren.Entity{Class: []string{"actions", "tasks"}, Title: "Actions", Actions: writes}
-		case "/lists":
-			e.Properties = map[string]any{"lists": []map[string]string{{"id": "home", "name": "Home"}, {"id": "work", "name": "Work"}}}
-		case "/open":
-			e.Properties = map[string]any{"tasks": []map[string]any{
-				{"id": "t1", "title": "Water the plants", "list": "home", "due": "2000-01-01"}, {"id": "t2", "title": "Call Ana", "list": "work"}}}
-		case "/tasks/t1":
-			e.Properties = map[string]any{"id": "t1", "title": "Water the plants", "list": "home", "due": "2000-01-01"}
-		}
-		w.Header().Set("Content-Type", "application/vnd.siren+json")
-		if err := json.NewEncoder(w).Encode(e); err != nil {
-			t.Error(err)
-		}
-	})
-}
-
-// TestEveryActionOfAnAppAndOfTheTaskServiceIsDrawnOnce is the test above for the pages that a connected app and the task
-// service send: the actions of their entities are drawn by class, and each of them once.
-func TestEveryActionOfAnAppAndOfTheTaskServiceIsDrawnOnce(t *testing.T) {
+// TestEveryActionOfAnAppIsDrawnOnce is the test above for the pages that a connected app sends: the actions of its
+// entities are drawn by class, and each of them once.
+func TestEveryActionOfAnAppIsDrawnOnce(t *testing.T) {
 	l := lifeStartingOn(t, "2026-09-30")
 	l.core.Connect(t, "testapp", fakeAppOfEveryAction())
-	l.core.Connect(t, "svc", fakeTaskServiceOfEveryAction(t))
-	for _, path := range []string{"/with/testapp/", "/tasks", "/tasks/week", "/tasks/items/t1"} {
+	for _, path := range []string{"/with/testapp/"} {
 		t.Run(path, func(t *testing.T) {
 			e := must(t)(l.api.Get(t.Context(), path))
 			if len(e.Actions) == 0 {

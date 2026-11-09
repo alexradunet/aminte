@@ -114,45 +114,6 @@ func TestAConnectedAppIsInTheCatalogAndAnswersItsRoutes(t *testing.T) {
 	}
 }
 
-// taskService is a small task service: the catalog has the class tasks and the six writes, and GET /lists gives one list.
-func taskService(t *testing.T) http.Handler {
-	var writes []siren.Action
-	for _, href := range []string{"/tasks", "/tasks/{id}", "/tasks/{id}/complete", "/tasks/{id}/reopen", "/tasks/{id}/delete", "/sync"} {
-		writes = append(writes, siren.Action{Name: "w" + href, Method: "POST", Href: href})
-	}
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		e := &siren.Entity{Class: []string{"tasks"}, Properties: map[string]any{"tasks": []any{}}}
-		switch r.URL.Path {
-		case "/actions":
-			e = &siren.Entity{Class: []string{"actions", "tasks"}, Title: "Actions", Actions: writes}
-		case "/lists":
-			e.Properties = map[string]any{"lists": []map[string]string{{"id": "home", "name": "Home"}}}
-		}
-		w.Header().Set("Content-Type", "application/vnd.siren+json")
-		if err := json.NewEncoder(w).Encode(e); err != nil {
-			t.Error(err)
-		}
-	})
-}
-
-// TestAChildWithTheClassTasksMakesTheServiceTasks registers a small task service and reads Tasks through the server:
-// the list of the service is a list of the page. Connect reads the class, as serve does.
-func TestAChildWithTheClassTasksMakesTheServiceTasks(t *testing.T) {
-	s := amintetest.New(t, "2031-05-14")
-	s.Connect(t, "svc", taskService(t))
-	tasks, err := client.Remote(s.URL, "cli", "").Get(t.Context(), "/tasks")
-	if err != nil {
-		t.Fatalf("GET /tasks: %v", err)
-	}
-	b, err := json.Marshal(tasks)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(string(b), `"Home"`) {
-		t.Errorf("GET /tasks does not name the list Home: %s", b)
-	}
-}
-
 // failure is a testing.TB that records the first Fatalf and ends the goroutine, as t.Fatalf does: a test sees the
 // refusal of a helper that fails its test. The other methods are those of the test that made it.
 type failure struct {
@@ -186,13 +147,13 @@ func refusal(t *testing.T, name string, h http.Handler) string {
 }
 
 // TestTheKitRefusesWhatServeRefuses: Connect makes the handshake of serve, so a catalog that serve refuses fails the
-// test with the words of the server. A child with no class actions has no catalog; a child with the class tasks and
-// not the six writes is refused by the registry.
+// test with the words of the server. A child with no class actions has no catalog; an app with an action name that
+// the registry does not take is refused.
 func TestTheKitRefusesWhatServeRefuses(t *testing.T) {
 	answer := func(class []string, actions ...siren.Action) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "application/vnd.siren+json")
-			e := &siren.Entity{Class: class, Title: "Child", Actions: actions, Properties: map[string]any{"lists": []any{}}}
+			e := &siren.Entity{Class: class, Title: "Child", Actions: actions}
 			if err := json.NewEncoder(w).Encode(e); err != nil {
 				t.Error(err)
 			}
@@ -204,7 +165,7 @@ func TestTheKitRefusesWhatServeRefuses(t *testing.T) {
 		want string // what the failure says; "" when the catalog is taken
 	}{
 		{"no class actions", answer([]string{"demo"}, siren.Action{Name: "ping", Method: "POST", Href: "/ping"}), "no catalog"},
-		{"a class tasks with no writes", answer([]string{"actions", "tasks"}), "catalog refused"},
+		{"an action name the registry refuses", answer([]string{"actions"}, siren.Action{Name: "Ping!", Method: "POST", Href: "/ping"}), "catalog refused"},
 		{"an app", answer([]string{"actions"}, siren.Action{Name: "ping", Method: "POST", Href: "/ping"}), ""},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

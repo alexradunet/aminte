@@ -12,8 +12,8 @@ import (
 // a title edit is the pencil beside the title (Pencil); any other action of the entity is in the ⋯ menu. A new action
 // of the catalog is on a page with no change of a template.
 
-// placing is the way this view's entity is drawn. A page of a connected app or of the task service (drawnByShape) is
-// always drawn by generic: the class is the app's word, and it may be the name of a class of this server.
+// placing is the way this view's entity is drawn. A page of a connected app (drawnByShape) is always
+// drawn by generic: the class is the app's word, and it may be the name of a class of this server.
 func (v *view) placing() placing {
 	if drawnByShape(v.Path) {
 		return placing{template: "generic"}

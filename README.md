@@ -24,7 +24,7 @@ The database it writes is specified independently of it, so another program — 
 
 ```
 go build -o aminte ./cmd/aminte   # Go >= 1.27, no cgo
-for d in extensions/*/; do go build -C "$d" -o "$PWD/" ./cmd/...; done   # every extension, beside aminte: aminte-web, aminte-mcp, aminte-ticktick, ...
+for d in extensions/*/; do go build -C "$d" -o "$PWD/" ./cmd/...; done   # every extension, beside aminte: aminte-web, aminte-mcp, ...
 aminte init                               # life.db beside the program; --db PATH or $AMINTE_DB names another
 aminte agentic-init                       # AGENTS.md, skills and MCP configs here, for a coding agent opened here
 
@@ -80,11 +80,6 @@ what was decided and why. The behaviour is in the page that the link names, and 
   the browser carry an app with no further work, and the code of a third party stays in the connector. The protocol is
   in [the contract of an extension](extensions/README.md#a-catalog-of-its-own), and the wire shape in
   [API.md](API.md#connected-apps).
-- **One task service behind `/tasks`** ([plan 158](docs/plans/158-one-task-service-behind-tasks.md)). One child of
-  `serve --with` may be the task service. `aminte` builds the entities of Tasks, so every client draws one kind of
-  page whatever task manager stands behind it, and the file keeps no task ([D23](docs/decisions/D23-no-tasks.md)). The
-  routes are in [API.md](API.md#tasks), and the protocol in
-  [the contract of an extension](extensions/README.md#a-task-service).
 - **One handler, three surfaces.** `internal/api` is the only thing the surfaces call. `serve` mounts it on a socket;
   the CLI calls it in-process, or a running server with `--url`. The MCP server, `aminte-mcp`
   ([extensions/mcp](extensions/mcp/README.md)), and the browser, `aminte-web`
@@ -197,8 +192,8 @@ The catalog (`GET /actions`) is the one list of what `aminte` can do, and each a
 ([AGENTS.md](AGENTS.md#go-implementation)). The route is the `href` of the action. The CLI line is
 `aminte do NAME field=value`, and a shortcut such as `aminte capture` wraps one action and adds nothing. The MCP tool
 is the name with `_` in place of `-`, and an owner action has no tool. The browser, `aminte-web`, draws the form of the
-action where its resource is. An action of a connected app or of the task service follows the same rule while it runs
-(`NAME-action` and `NAME_action` for an app). No page keeps a copy of the list: `aminte actions --human` prints each
+action where its resource is. An action of a connected app follows the same rule while it runs
+(`NAME-action` and `NAME_action`). No page keeps a copy of the list: `aminte actions --human` prints each
 action with its route, its CLI line, its MCP tool, its owner mark and its shortcut. `TestParityOfTheSurfaces` runs one
 row for each thing that a surface adapts (a shortcut, the word `today`, a flag, the refusals, the owner and the agent)
 on the API and the CLI. The generic `do` is one path for every action, so no row repeats it for each action.
@@ -257,10 +252,6 @@ the program `AMINTE_URL` (the API of the file), `AMINTE_EXE` and `AMINTE_DB`. Th
   catalog that is not the owner's is a tool.
 - [`extensions/agentic`](extensions/agentic/README.md): `aminte agentic-init [--force]`. It writes `AGENTS.md`, the
   skills and the MCP configs for a coding agent opened in the folder of the program.
-- [`extensions/ticktick`](extensions/ticktick/README.md): TickTick, the task service. What you finish in
-  TickTick comes back as a `Done:` entry of its day, once. It is the task service:
-  `aminte` builds the entities of Tasks under `/tasks`, and `aminte-web` draws them. `add-task` and the other actions
-  of [Tasks](API.md#tasks) are in the catalog. Run it with `aminte serve --with ticktick`.
 
 ## Engineering references
 

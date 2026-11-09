@@ -37,9 +37,6 @@ var appNameRE = regexp.MustCompile(`^[a-z0-9-]+$`)
 type Apps struct {
 	mu   sync.RWMutex
 	apps map[string]liveApp // by name; a name that is here is known
-	// tasks is the task service, the one child whose catalog has the class tasks (tasks.go). It is not an app: it has
-	// no name in apps, no /with/NAME and no action with a prefix. Nil while none runs.
-	tasks *taskService
 }
 
 // liveApp is a connected app that the server knows. c is nil while the app does not run.
@@ -67,14 +64,12 @@ func (a *Apps) Expect(name string) {
 var registerTimeout = 5 * time.Second
 
 // Register is the one handshake of a child of `serve --with`, and of the child of a test (amintetest): it makes the
-// child at base (http://127.0.0.1:PORT) known as what its catalog says (extensions/README.md, "A catalog of its own"
-// and "A task service").
+// child at base (http://127.0.0.1:PORT) known as an app (extensions/README.md, "A catalog of its own").
 //
 //	GET /actions    the entity must have the class actions. Else the child has no catalog.
-//	  class tasks   the child is the task service: GET /lists gives its lists (setTasks).
-//	  no tasks      the child is an app: GET / gives its title, and its name is the title when the home gives none (set).
+//	GET /           the title of the app; its name is the title when the home gives none (set).
 //
-// The registry refuses a catalog for the reasons of set and setTasks, and stays as it was. The answer says what the
+// The registry refuses a catalog for the reasons of set, and stays as it was. The answer says what the
 // child became, for the line of a log. When the child does not answer GET /actions, the error wraps the cause of the
 // client, so the caller can tell a child that is not up yet (a dial that fails, or a late answer) from a child that has
 // no catalog; no other error wraps a cause.
@@ -94,19 +89,6 @@ func (a *Apps) Register(ctx context.Context, name, base string) (Registered, err
 		return Registered{}, fmt.Errorf("no catalog (%w)", err)
 	case !slices.Contains(e.Class, "actions"):
 		return Registered{}, errors.New("no catalog (the answer is not an actions entity)")
-	case slices.Contains(e.Class, "tasks"):
-		listed, err := get("/lists")
-		var lists []taskList
-		if err == nil {
-			lists, err = taskListsOf(listed)
-		}
-		if err != nil {
-			return Registered{}, fmt.Errorf("catalog refused: the task service gives no lists: %v", err)
-		}
-		if err := a.setTasks(name, base, e.Actions, lists); err != nil {
-			return Registered{}, fmt.Errorf("catalog refused: %v", err)
-		}
-		return Registered{Tasks: true, Actions: len(e.Actions), Lists: len(lists)}, nil
 	}
 	title := name
 	if home, err := get("/"); err == nil && home.Title != "" {
@@ -118,12 +100,9 @@ func (a *Apps) Register(ctx context.Context, name, base string) (Registered, err
 	return Registered{Actions: len(e.Actions)}, nil
 }
 
-// Registered says what Register made of a child: the task service (with its lists), or an app. Actions are the
-// actions of its catalog.
+// Registered says what Register made of a child. Actions are the actions of its catalog.
 type Registered struct {
-	Tasks   bool
 	Actions int
-	Lists   int
 }
 
 // set says that the app NAME runs at base (http://127.0.0.1:PORT), with its home title and its catalog. It refuses
@@ -139,7 +118,7 @@ func (a *Apps) set(name, base, title string, actions []siren.Action) error {
 			return fmt.Errorf("the app %s: %w", name, err)
 		}
 		taken := name + "-" + act.Name
-		if _, ok := lookup(taken); ok || slices.ContainsFunc(taskCatalog, func(t spec) bool { return t.Name == taken }) {
+		if _, ok := lookup(taken); ok {
 			return fmt.Errorf("the app %s: the action %s is in the catalog already", name, taken)
 		}
 		for other, o := range a.apps {
@@ -155,37 +134,6 @@ func (a *Apps) set(name, base, title string, actions []siren.Action) error {
 	}
 	a.apps[name] = liveApp{c: client.Remote(base, "", ""), title: title, actions: slices.Clone(actions)}
 	return nil
-}
-
-// setTasks says that the child NAME is the task service, at base (http://127.0.0.1:PORT), with its catalog and its
-// lists (docs/plans/158-one-task-service-behind-tasks.md). It refuses the child, and the registry stays as it was,
-// when another task service runs, or when the catalog lacks one of the six writes of the protocol (taskCatalog). The
-// name stops being an app: Expect made it known, and setTasks takes it back, so /with/NAME is 404.
-func (a *Apps) setTasks(name, base string, actions []siren.Action, lists []taskList) error {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	if a.tasks != nil && a.tasks.name != name {
-		return fmt.Errorf("a task service runs already: %s", a.tasks.name)
-	}
-	for _, t := range taskCatalog {
-		if !slices.ContainsFunc(actions, func(x siren.Action) bool { return x.Method == "POST" && x.Href == t.Service }) {
-			return fmt.Errorf("the task service has no action POST %s", t.Service)
-		}
-	}
-	delete(a.apps, name)
-	a.tasks = &taskService{name: name, c: client.Remote(base, "", ""), lists: slices.Clone(lists)}
-	return nil
-}
-
-// taskService is the task service that runs, and false when none does. The value is a copy that the registry never
-// changes, so a request reads one consistent service.
-func (a *Apps) taskService() (taskService, bool) {
-	a.mu.RLock()
-	defer a.mu.RUnlock()
-	if a.tasks == nil {
-		return taskService{}, false
-	}
-	return *a.tasks, true
 }
 
 // checkAppAction refuses an action that set does not take, with the reason.
@@ -208,13 +156,10 @@ func checkAppAction(act siren.Action) error {
 	return nil
 }
 
-// Remove says that the app NAME does not run. Its name stays known. If NAME is the task service, the role is free.
+// Remove says that the app NAME does not run. Its name stays known.
 func (a *Apps) Remove(name string) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	if a.tasks != nil && a.tasks.name == name {
-		a.tasks = nil
-	}
 	if _, ok := a.apps[name]; ok {
 		a.apps[name] = liveApp{}
 	}
@@ -257,7 +202,6 @@ func (a *Apps) links() []siren.Link {
 }
 
 // specs are the actions of the apps that run, as rows of the merged catalog: by app, then in the order of the app.
-// The six actions of the task service follow while it runs.
 func (a *Apps) specs() []spec {
 	var out []spec
 	for _, name := range a.names() {
@@ -265,9 +209,6 @@ func (a *Apps) specs() []spec {
 		for _, act := range x.actions {
 			out = append(out, specOfApp(name, act))
 		}
-	}
-	if svc, ok := a.taskService(); ok {
-		out = append(out, svc.specs()...)
 	}
 	return out
 }

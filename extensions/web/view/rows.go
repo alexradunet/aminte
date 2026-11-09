@@ -12,10 +12,10 @@ import (
 // rules are in extensions/README.md, "How the browser draws a page of an app". The code below holds them.
 
 // drawnByShape says that the page at path is drawn by the generic view, by the shape of its entity and not by its
-// class: a page of a connected app (/with/NAME) and a page of the task service (/tasks). The class of such a page is
-// the word of the service, and it may be the name of a class of this server.
+// class: a page of a connected app (/with/NAME). The class of such a page is the word of the app, and it may be the
+// name of a class of this server.
 func drawnByShape(path string) bool {
-	return strings.HasPrefix(path, "/with/") || path == "/tasks" || strings.HasPrefix(path, "/tasks/")
+	return strings.HasPrefix(path, "/with/")
 }
 
 // QuickAdd is the first action of the entity that a browser draws as one line at the top of the page: its class is

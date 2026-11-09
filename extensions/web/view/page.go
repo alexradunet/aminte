@@ -274,9 +274,8 @@ func Draw(e *siren.Entity, f Facts) ([]byte, error) { return htmlOf(pageView(e, 
 // TemplateOf names the template that draws an entity: the first of its classes that has one, else "generic".
 func TemplateOf(e *siren.Entity) string { return placingOf(e).template }
 
-// htmlOf is the page of a view, drawn by the template of its entity's class. A page of a connected app or of the task
-// service (drawnByShape) is always drawn by generic: the class is the app's word, and it may be the name of a class of this
-// server.
+// htmlOf is the page of a view, drawn by the template of its entity's class. A page of a connected app (drawnByShape) is
+// always drawn by generic: the class is the app's word, and it may be the name of a class of this server.
 func htmlOf(v *view) ([]byte, error) {
 	var b bytes.Buffer
 	if err := templates.ExecuteTemplate(&b, v.placing().template, v); err != nil {

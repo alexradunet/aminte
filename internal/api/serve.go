@@ -143,7 +143,6 @@ func newServer(s *core.Store, apps *Apps) *server {
 	m.HandleFunc("GET /metrics/{name}", h.serve(h.series))
 	m.HandleFunc("GET /measurements/{id}", h.serve(h.measurement))
 	h.mountWith(m)
-	h.mountTasks(m)
 	return h
 }
 
@@ -173,9 +172,8 @@ type admitted struct {
 	id  int64      // the {id} of the path, when the row has a numeric one; else 0
 }
 
-// admit is the one opening of every action: mount, the forward to a connected app and the writes of the task service
-// all go through it, and a handler runs only after it. So a handler cannot skip a step, and a new action has none to
-// forget. In this order, admit
+// admit is the one opening of every action: mount and the forward to a connected app both go through it, and a
+// handler runs only after it. So a handler cannot skip a step, and a new action has none to forget. In this order, admit
 //   - reads the writer of a write, and of an owner read, and refuses a writer that is not the owner for an Owner row
 //     (an agent or an import). Any other read reads no writer, so its source header cannot refuse it;
 //   - parses the {id} of the path when the row has one that is a number (404 when it is not a number);

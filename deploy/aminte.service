@@ -16,9 +16,8 @@ ExecStart=/home/OWNER/.local/bin/aminte --db /home/OWNER/aminte/life.db serve --
 Environment=AMINTE_WEB_LISTEN=127.0.0.1:7780
 Environment=AMINTE_WEB_ORIGINS=https://aminte.example
 # with ProtectHome=read-only, the browser's state folder must be writable: ReadWritePaths=/home/OWNER/.config/aminte-web
-# add --with ticktick to run TickTick, a connected app, beside the server (extensions/ticktick)
-# with ProtectHome=read-only, its state folder must be writable: ReadWritePaths=/home/OWNER/.config/aminte-ticktick
-# the same holds for the state folder of any connected app: ReadWritePaths=/home/OWNER/.config/aminte-NAME
+# add --with NAME to run a connected app beside the server; with ProtectHome=read-only, its state folder must be
+# writable: ReadWritePaths=/home/OWNER/.config/aminte-NAME
 Restart=on-failure
 # systemd stops the server with SIGTERM. aminte then drains the requests that it admitted (up to 10 seconds) and
 # closes life.db. TimeoutStopSec is longer than the drain, so systemd sends SIGKILL only to a server that is stuck.

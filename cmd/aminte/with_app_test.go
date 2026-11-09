@@ -181,7 +181,11 @@ func TestAConnectedAppIsInTheCatalogOfTheServer(t *testing.T) {
 		if e.Title != "Test app" || add != "/with/testapp/items" {
 			t.Errorf("the entity of the app: title %q, add-item at %q, want Test app and /with/testapp/items", e.Title, add)
 		}
-		if l := mustGet(t, w, "", "/").LinkByRel("app"); l == nil || l.Href != "/with/testapp" {
+		root, err := client.Remote(w.base, "", "").Get(t.Context(), "/")
+		if err != nil {
+			t.Fatalf("GET /: %v", err)
+		}
+		if l := root.LinkByRel("app"); l == nil || l.Href != "/with/testapp" {
 			t.Errorf("the root links the app as %+v, want /with/testapp", l)
 		}
 	})

@@ -12,7 +12,7 @@ func TestIconsAreDeterministicAndHaveTheirSize(t *testing.T) {
 	if !bytes.Equal(a.Pix, b.Pix) {
 		t.Error("two calls of Icons draw different pixels")
 	}
-	if got, want := a.Bounds(), image.Rect(0, 0, 240, 16); got != want {
+	if got, want := a.Bounds(), image.Rect(0, 0, 224, 16); got != want {
 		t.Errorf("bounds %v, want %v", got, want)
 	}
 }

@@ -194,9 +194,6 @@ func probeCatalog(ctx context.Context, name, addr string, apps *api.Apps, say fu
 		switch {
 		case ctx.Err() != nil:
 			return
-		case err == nil && got.Tasks:
-			say("the task service, %d lists, on %s", got.Lists, addr)
-			return
 		case err == nil:
 			say("a catalog of %d actions on %s", got.Actions, addr)
 			return

@@ -2,20 +2,19 @@ package api
 
 import (
 	"regexp"
-	"slices"
 	"strings"
 	"testing"
 )
 
-// TestTheFormsHintsAreInPlainWords: a POST row of the catalog or of the task catalog that asks a person for a value has
+// TestTheFormsHintsAreInPlainWords: a POST row of the catalog that asks a person for a value has
 // a hint, and a hint holds no status code and no code style, which are the words of the API text (Description). A row
 // that asks for nothing (a button, such as revive, retract or snapshot) needs no hint; a hint that it has is read like
 // any other. The old hand list of hints held retract. The rule leaves it out on purpose: retract asks for nothing, so
-// it needs no hint, and it keeps the one it has. The test reads every POST row of both catalogs, so a new action needs
+// it needs no hint, and it keeps the one it has. The test reads every POST row of the catalog, so a new action needs
 // no edit here. save-body is the one exception: a client draws it as the editor of a page, not as a form with a note.
 func TestTheFormsHintsAreInPlainWords(t *testing.T) {
 	status := regexp.MustCompile(`\b[1-5][0-9][0-9]\b`)
-	for _, s := range append(slices.Clone(catalog), taskCatalog...) {
+	for _, s := range catalog {
 		if s.Method != "POST" {
 			continue
 		}

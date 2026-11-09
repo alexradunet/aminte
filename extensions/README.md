@@ -5,7 +5,6 @@ any language. It may also serve a catalog of its own ([a catalog of its own](#a-
 third party: an extension does.
 
 [`googlephotos`](googlephotos/README.md) is the worked example. Read its code and its end-to-end test first.
-[`ticktick`](ticktick/README.md) is the task service, and the worked example of [a task service](#a-task-service).
 
 ## What an extension is
 
@@ -110,7 +109,6 @@ flowchart TD
 - **The stop.** On an interrupt or SIGTERM, `serve` interrupts the child first and waits for it, 10 seconds at most,
   then kills it. Then it drains its own requests and closes the file, so the child may still write while it ends.
 - **A catalog of its own.** A child may serve a Siren catalog on `AMINTE_LISTEN`: see [a catalog of its own](#a-catalog-of-its-own).
-- **A task service.** One child may be the task service. `aminte` builds the entities of Tasks under `/tasks`, and `aminte-web` draws them: see [a task service](#a-task-service).
 
 ## A catalog of its own
 
@@ -224,88 +222,13 @@ The package `aminte/app` holds what the program of a Go extension needs. It serv
 | `OwnerActs(err)`, `ExitCode(err)`, `ExitOwnerActs` | `OwnerActs` marks an error that only the owner can mend; its text does not change. `ExitCode` gives the status that `Main` would use, for a test. `ExitOwnerActs` is 78. |
 | `API(command, url, source)` | The client of the server at `url`, which writes as `source` (`""` is the owner). It sends `$AMINTE_TOKEN` as the bearer token when it is set. An empty `url` is an `OwnerActs` error with one sentence, which names `command`: the line that the owner types to run the program (for example `aminte agent`). |
 | `Listen(ctx, handler)` | Serves on `AMINTE_LISTEN`, refuses an unset value or an address that is not a loopback address, and drains on the end of `ctx`. |
-| `Catalog(title, home, actions, handlers)`, `CatalogOf(role, ...)` | The handler of a catalog: it serves `GET /actions`, `GET /` and one route for each action, and it panics at the start when an action has no handler. `CatalogOf` adds a role to the class of `GET /actions`; the role `tasks` marks the [task service](#a-task-service). |
+| `Catalog(title, home, actions, handlers)` | The handler of a catalog: it serves `GET /actions`, `GET /` and one route for each action, and it panics at the start when an action has no handler. |
 | `Entity(f)`, `Fail(w, status, code, msg)`, `Error` | `Entity` turns a function that returns an entity into a handler; an `*Error` that it returns (also wrapped) gives its status and code, and any other error is 500 `internal`. `Fail` writes an error entity. |
 | `StateDir(name)` | Makes the state folder `os.UserConfigDir()/aminte-NAME` with mode `0700`. |
 
 [`cmd/aminte/testdata/withapp/main.go`](../cmd/aminte/testdata/withapp/main.go) is the whole example, and
 `cmd/aminte/with_app_test.go` runs it on the real `aminte serve --with`. A program in another language implements the
 same environment and the same exit rule, and serves the same routes with any HTTP library.
-
-## A task service
-
-One child of `serve --with` may be the **task service**: the program that stands for the task manager the owner plans
-in. `aminte` builds the entities and the actions of Tasks, and `aminte-web` draws them. The service is a small data
-adapter. The server does not know
-which task manager it is. Only one task service runs at one time. The file keeps no task
-([D23](../docs/decisions/D23-no-tasks.md)). The routes and the actions that a client sees are in
-[API.md](../API.md#tasks).
-
-```mermaid
-flowchart LR
-  B["aminte-web, aminte do, the MCP tools"] -->|"GET /tasks...; add-task, complete-task, ..."| L["aminte serve: the entities and the six actions of Tasks"]
-  L -->|"the protocol below, as the writer of the request, on AMINTE_LISTEN"| S["aminte-NAME: the task service"]
-  S -->|"the API of the task manager"| T["the task manager outside this repository"]
-  S -->|"capture with import_key, as import:NAME"| L
-```
-
-### The marker and the refusals
-
-The service is an app that serves a catalog ([the handshake](#the-handshake)) with one difference: the `class` of
-`GET /actions` is `actions` **and `tasks`**. The server then reads `GET /lists` and registers the child as the task
-service, not as an app: it has no `/with/NAME`, no link `app` at the root and no action with the prefix `NAME-`.
-
-```mermaid
-flowchart TD
-  P["GET /actions answers class actions and tasks"] --> L["serve reads GET /lists"]
-  L -->|"no list entity, or no answer"| X["refused: one line in the log; the child stays a plain child"]
-  L --> C{"a task service runs already?"}
-  C -->|"yes"| R1["refused: a task service runs already: NAME"]
-  C -->|"no"| W{"does the catalog have the six writes?"}
-  W -->|"no"| R2["refused: the task service has no action POST /tasks/{id}/reopen"]
-  W -->|"yes"| OK["the task service: the root links tasks, the six actions are in GET /actions"]
-  OK -->|"the child ends"| E["the root has no link tasks; every /tasks route is 503 unavailable"]
-```
-
-The catalog must hold an action with the method `POST` and each of these `href` values (the names are the service's
-own; the server calls the `href`, not the name): `/tasks`, `/tasks/{id}`, `/tasks/{id}/complete`,
-`/tasks/{id}/reopen`, `/tasks/{id}/delete` and `/sync`. A catalog that lacks one is refused. The lists are read once,
-when the service registers: a new list needs a restart of the service.
-An app whose prefixed action name is one of the six names of [API.md](../API.md#tasks) is refused too.
-The service sends no `class` on its actions. The server builds the entities of `/tasks` from its own catalog of the
-protocol, and that catalog holds the class of each write (`create`, `edit`, `toggle`). A connected app under
-`/with/NAME` still sends its own classes.
-
-### The protocol
-
-All answers are Siren JSON. Data is in `properties`. An error is the error entity, as for any app.
-
-| route | answer |
-|---|---|
-| `GET /actions` | Class `actions` and `tasks`. The actions are the six writes below. |
-| `GET /lists` | `properties.lists`: `[{id, name}]` in the order of the service. The default list may be absent. |
-| `GET /open[?list=ID]` | `properties.tasks`: the open tasks, in the order of the service. |
-| `GET /done?since=YYYY-MM-DD[&list=ID]` | `properties.tasks`: the tasks done on that day or later. |
-| `GET /tasks/{id}` | Class `task`, `properties` = one task. An unknown id is 404 `not_found`. |
-| `POST /tasks` | Fields `title` (required), `list` (an id; absent means the default list), `due` (a day), `notes`. Answer: the task. |
-| `POST /tasks/{id}` | Edit: `title`, `notes`, `due`. A field that is not sent stays as it is. An empty `due` or `notes` clears it. |
-| `POST /tasks/{id}/complete`, `/reopen`, `/delete` | Answer: the task (delete: the task as it was). |
-| `POST /sync` | Read the done tasks and write a Done entry for each, once. Answer: `properties.written`. |
-
-A list id must be unique: the server refuses a service with two lists of one id. A later list whose name is taken gets
-the suffix ` (2)`, ` (3)`, and so on, because `add-task` names a list by its name.
-
-A task is `{id, title, list, notes?, due?, done, done_day?, done_at?}`:
-
-- `list` is the list id, or `""` for the default list.
-- `due` and `done_day` are days (`YYYY-MM-DD`) in the zone of the task.
-- `done_at` is an RFC 3339 instant.
-
-`aminte` sorts and filters: the service need not. Today is the day of the owner's clock in `aminte`, and the window of
-Done (30 days) is sent as `since`. There is no priority in the protocol. The service writes its Done entries as any app
-does ([what the app writes back](#what-the-app-writes-back)).
-[`cmd/aminte/testdata/taskservice/main.go`](../cmd/aminte/testdata/taskservice/main.go) is the whole example, in Go with
-`app.CatalogOf("tasks", ...)`, and `cmd/aminte/tasks_test.go` runs it on the real `aminte serve --with`.
 
 ## Who writes
 
@@ -329,5 +252,4 @@ An extension writes as `import:NAME` (an importer) or `agent:NAME` (a model), wi
 | `extensions/googlephotos` | `aminte-gphotos` | `aminte gphotos [--addr A] [--credentials F] [--zone Z]` | `import:google-photos` | yes |
 | `extensions/agentic` | `aminte-agentic-init` | `aminte agentic-init [--force]` | nothing | no: it reads `AMINTE_EXE` and `AMINTE_DB`, and refuses to run without them |
 | `extensions/mcp` | `aminte-mcp` | `aminte mcp [--agent NAME]` | `agent:NAME`, default `agent:mcp` | yes: `AMINTE_URL`, else `--url`, else it refuses; `--source` is refused as today |
-| `extensions/ticktick` | `aminte-ticktick` | `aminte ticktick login`, `aminte ticktick sync [--url U]`, and `aminte serve --with ticktick` (the always-on way, as the task service) | `import:ticktick` | yes: `AMINTE_URL`, else `--url`, else it refuses; `login` needs none |
 | `extensions/web` | `aminte-web` | `aminte serve --token-file F --with web` (the always-on way) and `aminte web` (a trial on a `life.db` that exists) | `ui` (the writer of the browser) | yes: `AMINTE_URL` and `AMINTE_TOKEN` (the login of the browser), else it refuses; `AMINTE_WEB_LISTEN` is its door (`127.0.0.1:7780`, a loopback address only); `AMINTE_LISTEN` is its catalog (the settings of the browser) |

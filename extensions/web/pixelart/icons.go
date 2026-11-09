@@ -12,7 +12,7 @@ const IconSize = 10
 // IconNames are the names of the glyphs, in the order of the cells of the icon sheet: the name at index n is the
 // cell n. The view reads this list, and app.css has one position for each name.
 var IconNames = []string{"today", "calendar", "browse", "people", "files", "metrics", "search", "new",
-	"more", "image", "video", "audio", "week", "chat", "tasks"}
+	"more", "image", "video", "audio", "week", "chat"}
 
 // IconCell gives the cell of the glyph with this name. The second value is false for a name that is not a glyph.
 func IconCell(name string) (int, bool) {
@@ -211,19 +211,6 @@ var glyphs = map[string]drawing{
 		"...XX.....",
 		"..XX......",
 		"..X.......",
-	},
-	// a check box with a tick
-	"tasks": {
-		"XXXXXXXXX.",
-		"X.......X.",
-		"X.....X.X.",
-		"X....XX.X.",
-		"X.X.XX..X.",
-		"X.XXX...X.",
-		"X..X....X.",
-		"X.......X.",
-		"XXXXXXXXX.",
-		"..........",
 	},
 }
 

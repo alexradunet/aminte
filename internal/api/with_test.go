@@ -346,24 +346,6 @@ func TestRegisterEndsWithItsContext(t *testing.T) {
 	}
 }
 
-// TestARegisteredTaskServiceNeedsItsListsAndItsWrites: a child with the class tasks is the task service, not an app. The
-// registry refuses it when it gives no lists, and the line says so.
-func TestARegisteredTaskServiceNeedsItsListsAndItsWrites(t *testing.T) {
-	service := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/vnd.siren+json")
-		if r.URL.Path == "/lists" {
-			http.Error(w, "no", http.StatusInternalServerError)
-			return
-		}
-		io.WriteString(w, `{"class":["actions","tasks"],"title":"Actions"}`)
-	}))
-	t.Cleanup(service.Close)
-	_, err := api.NewApps().Register(t.Context(), "svc", service.URL)
-	if err == nil || !strings.Contains(err.Error(), "catalog refused: the task service gives no lists") {
-		t.Errorf("a task service with no lists: %v, want catalog refused: the task service gives no lists", err)
-	}
-}
-
 func TestAnAppThatAnswersNoEntityIsBadGateway(t *testing.T) {
 	_, _, s := apitest.Fresh(t, "cli")
 	text := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

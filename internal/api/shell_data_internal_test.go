@@ -96,7 +96,8 @@ func TestTheDayOfTodayCarriesTheStrip(t *testing.T) {
 }
 
 // TestTheRootCarriesTheFrame: the clock (zone and offset), the day of today as a reference that ?embed replaces, the
-// connected apps that run and the task service. A zone with no name in the database has the name of its offset. The root of a server with no app and no task service has neither link.
+// connected apps that run. A zone with no name in the database has the name of its offset. The root of a server with
+// no app has no link app.
 func TestTheRootCarriesTheFrame(t *testing.T) {
 	s := dataStore(t)
 	s.Zone = time.FixedZone("+14", 14*3600)
@@ -119,8 +120,8 @@ func TestTheRootCarriesTheFrame(t *testing.T) {
 	if want := []string{"today /days/2031-05-14"}; !slices.Equal(refs, want) {
 		t.Errorf("the sub-entities: %v, want %v", refs, want)
 	}
-	if root.LinkByRel("app") != nil || root.LinkByRel("tasks") != nil {
-		t.Error("a root with no app and no task service has a link app or tasks")
+	if root.LinkByRel("app") != nil {
+		t.Error("a root with no app has a link app")
 	}
 
 	if err := apps.set("notes", "http://127.0.0.1:1", "Notes", nil); err != nil {
@@ -130,16 +131,13 @@ func TestTheRootCarriesTheFrame(t *testing.T) {
 	if err := apps.set("maps", "http://127.0.0.1:2", "", nil); err != nil {
 		t.Fatal(err)
 	}
-	if err := apps.setTasks("svc", "http://127.0.0.1:3", actionsOfWrites(), nil); err != nil {
-		t.Fatal(err)
-	}
 	var links []string
 	for _, l := range readData(t, h, "/").Links {
-		if l.HasRel("app") || l.HasRel("tasks") {
+		if l.HasRel("app") {
 			links = append(links, l.Rel[0]+" "+l.Href+" "+l.Title)
 		}
 	}
-	if want := []string{"app /with/maps maps", "app /with/notes Notes", "tasks /tasks Tasks"}; !slices.Equal(links, want) {
+	if want := []string{"app /with/maps maps", "app /with/notes Notes"}; !slices.Equal(links, want) {
 		t.Errorf("the links of the apps: %q, want %q", links, want)
 	}
 
