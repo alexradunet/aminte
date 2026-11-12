@@ -9,7 +9,8 @@
 - **Priority:** P2. **Effort:** M. **Risk:** LOW for the file: nothing of `schema.sql` changes, and no decision of
   `docs/` changes. MEDIUM for the browser: the service worker answers every navigation, and no Go test runs it.
 - **Checks:** see [the checks](#checks) and [the check by hand](#the-check-by-hand). The service worker ran in a
-  headless Firefox; no phone and no other engine yet. Not shipped.
+  headless Firefox; no phone and no other engine yet.
+- **Live:** 2026-11-12, 13:21, at `e5c6f8e` ([the ship](#ship)). Not yet seen on a phone.
 
 ## Context
 
@@ -141,6 +142,17 @@ Needs the owner's word (given on 2026-11-12: "do all three", "and push"). `amint
 a pinned commit of this repository, so the ship is a push of `master` and an update of that pin; the service then
 starts again with the new programs. After it, open the app one time on each device while the server is up: the worker
 installs at that visit, and the offline page works only after it.
+
+**The record of the ship (2026-11-12).** `master` was pushed at `e5c6f8e`, and the owner pushed the new pin. The
+machine of the server built its system and started the service again at 13:21.
+
+- The installed programs: `aminte` and `aminte-web` of the build `aminte-0.1.0-e5c6f8e`, in one folder.
+- The log of the service: `aminte: serving ... (token required) (version 0.1.0, user_version 1)`,
+  `aminte: with web: started (pid 57175)`, `aminte-web: ... the browser is on http://127.0.0.1:7780`,
+  `aminte: with web: a catalog of 1 actions on 127.0.0.1:36235`.
+- On the door of the live service, with no session: `GET /sw.js` is 200, `text/javascript`, `no-cache`;
+  `GET /offline` is 200, `no-cache`, with the mark of the outbox one time; `GET /assets/menu.js` is 401, as before.
+- Not checked: the offline mode on a phone, against the live service.
 
 ## Checks
 

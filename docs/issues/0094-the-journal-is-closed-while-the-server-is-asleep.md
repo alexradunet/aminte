@@ -1,7 +1,7 @@
 # 0094 — The journal takes no entry while the machine of the server is asleep
 
 - **Date:** 2026-11-12
-- **Status:** open
+- **Status:** resolved
 - **Seen in:** the owner's use on 2026-11-11, reported on 2026-11-12: "I closed the tablet ( this os ) on which aminte
   is running and I wanted to add some text to the daily journal. The problem was that it was offline and could not
   access the app. I want to be able to access the app even when it is offline ( as a PWA or something ) and when it
@@ -47,7 +47,7 @@ Two parts of the writer were in the way:
 
 ## Resolution
 
-[Plan 165](../plans/165-the-journal-while-the-server-is-asleep.md), built and not yet closed. The browser keeps a
-capture that got no answer and sends it again with its key, and `capture` takes the time of the writing in an optional
-field. Nothing in the schema and no decision changes: the file already had the key (D28) and the rule (D3). The issue
-closes when the service worker has been checked in a browser and the change is live, as the plan records.
+[Plan 165](../plans/165-the-journal-while-the-server-is-asleep.md), live on 2026-11-12 at `e5c6f8e`. The browser keeps
+a capture that got no answer and sends it again with its key, and `capture` takes the time of the writing in an
+optional field. Nothing in the schema and no decision changes: the file already had the key (D28) and the rule (D3).
+The service worker was checked in a headless Firefox; the plan records what that check did not show.

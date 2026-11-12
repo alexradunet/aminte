@@ -9,7 +9,7 @@ data could not answer, a rule that is ambiguous or untestable. It is the evidenc
 
 | id | title | status |
 |---|---|---|
-| [0094](0094-the-journal-is-closed-while-the-server-is-asleep.md) | The journal takes no entry while the machine of the server is asleep | open |
+| [0094](0094-the-journal-is-closed-while-the-server-is-asleep.md) | The journal takes no entry while the machine of the server is asleep | resolved |
 | [0093](0093-three-ways-for-an-agent.md) | There are three ways for an agent to talk to aminte, and the owner wants one | resolved |
 | [0092](0092-plan-lines-cost-more-than-they-give.md) | Plan lines cost more than they give: the owner plans in a task manager | resolved |
 | [0091](0091-places-cost-more-than-they-give.md) | Places and the `at` link cost more than they give | resolved |
