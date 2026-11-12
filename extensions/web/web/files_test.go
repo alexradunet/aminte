@@ -22,11 +22,13 @@ import (
 )
 
 // The Cache-Control of a file: a name that never changes (a font, a picture; app.css names a picture with ?v= and its
-// hash), the manifest and the rules of speculation, and a script.
+// hash), the manifest and the rules of speculation, a script, and the service worker, which a browser asks for again
+// each time.
 const (
 	cacheForever = "public, max-age=31536000, immutable"
 	cacheHour    = "public, max-age=3600"
 	cacheScript  = "public, max-age=300"
+	cacheAsk     = "no-cache"
 )
 
 // ownFiles are the files of the browser, each with its path, its embedded file, its type and its Cache-Control. The fonts
@@ -36,6 +38,7 @@ var ownFiles = []struct{ path, file, typ, cache string }{
 	{"/assets/speculation.json", "speculation.json", "application/speculationrules+json", cacheHour},
 	{"/assets/menu.js", "menu.js", "text/javascript; charset=utf-8", cacheScript},
 	{"/assets/lock.js", "lock.js", "text/javascript; charset=utf-8", cacheScript},
+	{"/sw.js", "sw.js", "text/javascript; charset=utf-8", cacheAsk},
 	{"/assets/icon.svg", "icon.svg", "image/svg+xml", cacheForever},
 	{"/assets/icon-192.png", "icon-192.png", "image/png", cacheForever},
 	{"/assets/icon-512.png", "icon-512.png", "image/png", cacheForever},
@@ -46,9 +49,9 @@ var ownFiles = []struct{ path, file, typ, cache string }{
 	{"/assets/icons.png", "icons.png", "image/png", cacheForever},
 }
 
-// installFiles are the nine files that a browser fetches without a session to install the app: the manifest, the icon and
-// the pictures of the sheet. They hold nothing of the life log.
-var installFiles = []string{"/manifest.webmanifest", "/assets/icon.svg", "/assets/icon-192.png", "/assets/icon-512.png",
+// installFiles are the ten files that a browser fetches without a session to install the app: the manifest, the service
+// worker, the icon and the pictures of the sheet. They hold nothing of the life log.
+var installFiles = []string{"/manifest.webmanifest", "/sw.js", "/assets/icon.svg", "/assets/icon-192.png", "/assets/icon-512.png",
 	"/assets/wood.png", "/assets/ground.png", "/assets/embers.png", "/assets/sprites.png", "/assets/icons.png"}
 
 // fontURLs are the font files that the style sheet of a page names, as the page gives them.
@@ -110,14 +113,30 @@ func TestAPictureWithAVersionIsTheSamePicture(t *testing.T) {
 	}
 }
 
-// TestTheScriptsNameWhatTheyDo: menu.js gives the focus back when a menu dialog closes. lock.js sends /awake, asks for
-// /lock, keeps the time in localStorage and waits while a page prerenders. The type, the cache and the size of
-// a script are held by TestTheOwnFilesHaveTheirTypeTheirCacheAndTheirBytes and TestTheScriptsAreSmallAndAlone.
+// TestTheScriptsNameWhatTheyDo: menu.js gives the focus back when a menu dialog closes, and it registers the service
+// worker. lock.js sends /awake, asks for /lock, keeps the time in localStorage and waits while a page prerenders. sw.js
+// keeps /offline, keeps a capture in IndexedDB, makes a key for it, sends it with its time, reads the redirect of a
+// write without following it, and leaves a prerender alone. It limits the wait for each address that the installed app
+// opens: the start_url and the shortcuts of the manifest. The type, the cache and the size of a script are held by
+// TestTheOwnFilesHaveTheirTypeTheirCacheAndTheirBytes and TestTheScriptsAreSmallAndAlone.
 func TestTheScriptsNameWhatTheyDo(t *testing.T) {
 	l := emptyLife(t)
+	var m struct {
+		StartURL  string `json:"start_url"`
+		Shortcuts []struct{ URL string }
+	}
+	if err := json.Unmarshal(ask(l.web, http.MethodGet, "/manifest.webmanifest").Body.Bytes(), &m); err != nil || m.StartURL == "" || len(m.Shortcuts) == 0 {
+		t.Fatalf("the manifest has no start addresses: %+v (%v)", m, err)
+	}
+	worker := []string{"'/offline'", "indexedDB", "crypto.randomUUID", "import_key", "'time'", "opaqueredirect", "Sec-Purpose", "'" + m.StartURL + "'"}
+	for _, s := range m.Shortcuts {
+		path, _, _ := strings.Cut(s.URL, "#")
+		worker = append(worker, "'"+path+"'")
+	}
 	for path, words := range map[string][]string{
-		"/assets/menu.js": {"dialog.menu-dialog", "menu-button", "focus"},
+		"/assets/menu.js": {"dialog.menu-dialog", "menu-button", "focus", "serviceWorker?.register('/sw.js')"},
 		"/assets/lock.js": {"/awake", "/lock", "localStorage", "prerendering"},
+		"/sw.js":          worker,
 	} {
 		body := ask(l.web, http.MethodGet, path).Body.String()
 		for _, want := range words {

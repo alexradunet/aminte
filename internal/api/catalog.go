@@ -72,11 +72,12 @@ func placeheld(f siren.Field, example string) siren.Field {
 // server are built from it.
 var catalog = []spec{
 	{Name: "capture", Title: "Add to the day", Class: []string{"create"},
-		Description: "Append an entry to the journal page of a local day (created on the first capture), with an optional mood 1-5. The entry begins with its time, (HH:MM) in the server's zone, and names the relay when an agent or an import wrote it: (HH:MM, via NAME). [[Title]] and #tag in the text link pages, creating them if new. import_key makes a re-send a no-op: make one key for one capture and send it again unchanged on a retry; the answer is then Already added, with the day.",
+		Description: "Append an entry to the journal page of a local day (created on the first capture), with an optional mood 1-5. The entry begins with its time, (HH:MM) in the server's zone, and names the relay when an agent or an import wrote it: (HH:MM, via NAME). time (HH:MM, 24 hours) is the time the entry was written, for a capture that is sent late: it takes the place of the server's time. [[Title]] and #tag in the text link pages, creating them if new. import_key makes a re-send a no-op: make one key for one capture and send it again unchanged on a retry; the answer is then Already added, with the day.",
 		Hint:        "Add a note to the journal of a day. A mood from 1 to 5 is optional. A name in [[double brackets]] or a #tag links a page, and makes it when it is new.",
 		Method:      "POST", Path: "/days/{day}/capture",
 		Fields: []siren.Field{path("day", "date", "Local day"), placeheld(area("text", "Entry (CommonMark)", 4), "What happened? Who was there?"),
-			{Name: "mood", Type: "number", Title: "Mood", Options: []string{"1", "2", "3", "4", "5"}}, opt("import_key", "text", "Key")},
+			{Name: "mood", Type: "number", Title: "Mood", Options: []string{"1", "2", "3", "4", "5"}}, opt("import_key", "text", "Key"),
+			opt("time", "time", "Time written (HH:MM; default: now)")},
 	},
 	{Name: "create-page", Title: "New page", Class: []string{"create"},
 		Description: "Create a page with a unique title (a valid file name) and a CommonMark body. category files it in that category page (D26) in the same write, making the category when it is new.",

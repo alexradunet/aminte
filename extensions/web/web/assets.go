@@ -1,7 +1,7 @@
 package web
 
-// The routes that web serves itself: the files of the browser (sheets, scripts, pictures, fonts, the manifest) and
-// /render. They hold nothing of the database, so they ask the core for nothing.
+// The routes that web serves itself: the files of the browser (sheets, scripts, pictures, fonts, the manifest, the
+// service worker), the offline page and /render. They hold nothing of the database, so they ask the core for nothing.
 
 import (
 	"bytes"
@@ -25,7 +25,13 @@ const (
 	immutable = "public, max-age=31536000, immutable"
 	hour      = "public, max-age=3600"
 	script    = "public, max-age=300"
+	// revalidate is for the two files of the offline mode (README.md, "Offline"): a browser asks again each time, so a
+	// correction of the service worker or of its page reaches a phone at its next visit.
+	revalidate = "no-cache"
 )
+
+// offlinePath is the page that the service worker keeps and shows when the server does not answer.
+const offlinePath = "/offline"
 
 // fontTypes are the files the font route serves, by their extension: the faces and their licences.
 var fontTypes = map[string]string{"woff2": "font/woff2", "txt": "text/plain; charset=utf-8"}
@@ -33,8 +39,9 @@ var fontTypes = map[string]string{"woff2": "font/woff2", "txt": "text/plain; cha
 // staticFile is a file of view/html/ that web serves at path. install marks a file that a browser fetches without its
 // cookie to install the app: the manifest, the icon and the pictures of the sheet (the wood tile is one: it is an image
 // of the sheet, fetched like an icon). They are embedded and static, and they hold nothing of the life log. The door
-// serves a GET or a HEAD of them with no session (isInstallFile). The fonts are not here: the page fetches them with its
-// cookie.
+// serves a GET or a HEAD of them with no session (needsNoSession). The fonts are not here: the page fetches them with its
+// cookie. The service worker is an install file too, and it is at the root, so its scope is the whole app: a browser
+// checks it for a new version by itself, and that check must pass in a browser that is locked or logged out.
 type staticFile struct {
 	path, name, typ, cache string
 	install                bool
@@ -51,6 +58,7 @@ var staticFiles = []staticFile{
 	{"/assets/speculation.json", "speculation.json", "application/speculationrules+json", hour, false},
 	{"/assets/menu.js", "menu.js", "text/javascript; charset=utf-8", script, false},
 	{"/assets/lock.js", "lock.js", "text/javascript; charset=utf-8", script, false},
+	{"/sw.js", "sw.js", "text/javascript; charset=utf-8", revalidate, true},
 	{"/assets/icon.svg", "icon.svg", "image/svg+xml", immutable, true},
 	{"/assets/icon-192.png", "icon-192.png", "image/png", immutable, true},
 	{"/assets/icon-512.png", "icon-512.png", "image/png", immutable, true},
@@ -61,9 +69,10 @@ var staticFiles = []staticFile{
 	{"/assets/icons.png", "icons.png", "image/png", immutable, true},
 }
 
-// isInstallFile reports whether path is the path of a file that needs no session (staticFile).
-func isInstallFile(path string) bool {
-	return slices.ContainsFunc(staticFiles, func(f staticFile) bool { return f.install && f.path == path })
+// needsNoSession reports whether path is the path of a route that a GET or a HEAD reads with no session: an install
+// file (staticFile) or the offline page. They hold nothing of the life log.
+func needsNoSession(path string) bool {
+	return path == offlinePath || slices.ContainsFunc(staticFiles, func(f staticFile) bool { return f.install && f.path == path })
 }
 
 // ownRoutes registers the routes of web's own files and /render on m. A file takes GET and its HEAD, and /render takes
@@ -77,8 +86,18 @@ func (b *Browser) ownRoutes(m *http.ServeMux) {
 	for _, f := range staticFiles {
 		readOnly(f.path, file(f.name, f.typ, f.cache))
 	}
+	readOnly(offlinePath, b.offline)
 	m.HandleFunc("POST /render", b.render)
 	m.HandleFunc("/render", b.onlyAllow("POST"))
+}
+
+// offline is GET /offline: the page that the service worker keeps and shows when the server does not answer
+// (README.md, "Offline"). It is the same for every browser and holds nothing of the life log, so it needs no session:
+// the worker gets it in a browser that is locked too, and what the worker keeps is never an answer of a session. Its
+// form has no import_key, because one kept page would send one key for every entry: the worker makes the key.
+func (b *Browser) offline(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", revalidate)
+	b.bare(w, r, http.StatusOK, &siren.Entity{Class: []string{"offline"}, Title: "Offline"})
 }
 
 // onlyAllow answers a method that a route of web's own does not take: 405 with the Allow header. The route is web's, so

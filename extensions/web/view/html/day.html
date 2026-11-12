@@ -30,7 +30,7 @@
 
 {{with .Action "capture"}}<section class="capture" id="capture" aria-label="Capture">
 <h2>{{if $today}}Add to today{{else}}Add to {{shortDay $.Title}}{{end}}</h2>
-{{template "form" (form . "button" "Add" "back" $.ReturnHere "label" "text=Entry" "key" "text=c" "import_key" newKey)}}
+{{template "form" (form . "button" "Add" "back" $.ReturnHere "label" "text=Entry" "key" "text=c" "hide" "time" "import_key" newKey)}}
 </section>{{end}}
 
 {{template "body-editor" (dict "action" (.Action "save-body") "back" (.Link "self") "summary" "Edit the day page")}}

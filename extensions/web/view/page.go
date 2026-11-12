@@ -182,6 +182,7 @@ var viewOf = map[string]placing{
 	"cover-choice": {"cover-choice", []string{"set-cover"}},
 	"actions":      {"catalog", nil}, // the catalog page draws every action boxed: nothing is placed, and it has no menu
 	"error":        {"error", nil}, "login": {"login", nil}, "locked": {"locked", nil}, "preview": {"preview", nil},
+	"offline": {"offline", nil},
 }
 
 // placingOf is the way an entity is drawn: that of the first of its classes that has one, else the generic view.

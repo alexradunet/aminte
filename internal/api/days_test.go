@@ -242,6 +242,77 @@ func TestACaptureSentAgainIsAddedOnce(t *testing.T) {
 	}
 }
 
+// TestACaptureKeepsTheTimeItWasWritten: the field time is the clock of the writer when the entry was written
+// (docs/plans/165-the-journal-while-the-server-is-asleep.md). A capture that is sent late begins with that time, and a
+// capture with no time begins with the clock of the server. A relay keeps its name after the time.
+func TestACaptureKeepsTheTimeItWasWritten(t *testing.T) {
+	c, _, _ := apitest.FreshOn(t, "cli", fixedToday) // the clock of the server is 00:00
+	toDay := "/days/" + fixedToday
+	capture := apitest.Action(t, apitest.Must(t)(c.Get(t.Context(), toDay)), "capture")
+	if f := capture.Field("time"); f == nil || f.Type != "time" || f.Required {
+		t.Fatalf("the field time of capture: %+v, want an optional field of the type time", f)
+	}
+	apitest.Must(t)(c.Do(t.Context(), capture, map[string]string{"text": "Written in the evening", "time": "21:40"}))
+	apitest.Must(t)(c.Do(t.Context(), capture, map[string]string{"text": "Written now"}))
+	day := apitest.Must(t)(c.Get(t.Context(), toDay))
+	want := "(21:40) Written in the evening\n\n(00:00) Written now"
+	if page := apitest.Must(t)(c.Get(t.Context(), apitest.Href(day, "page"))); props(page)["body"] != want {
+		t.Errorf("the page: %q, want %q", props(page)["body"], want)
+	}
+
+	agent, _, _ := apitest.FreshOn(t, "agent:robot", fixedToday)
+	capture = apitest.Action(t, apitest.Must(t)(agent.Get(t.Context(), toDay)), "capture")
+	apitest.Must(t)(agent.Do(t.Context(), capture, map[string]string{"text": "Relayed", "time": "07:05"}))
+	day = apitest.Must(t)(agent.Get(t.Context(), toDay))
+	if page := apitest.Must(t)(agent.Get(t.Context(), apitest.Href(day, "page"))); props(page)["body"] != "(07:05, via robot) Relayed" {
+		t.Errorf("the page of the relay: %q", props(page)["body"])
+	}
+}
+
+// TestACaptureRefusesATimeThatIsNotAClock: a time is two digits of the hour, a colon and two digits of the minute. Any
+// other value is refused (422) and nothing is written: no day page, no entry, no mood and no key. A time with a mood
+// alone is refused too, because a mood has no stamp to carry it.
+func TestACaptureRefusesATimeThatIsNotAClock(t *testing.T) {
+	c, _, s := apitest.FreshOn(t, "cli", fixedToday)
+	capture := apitest.Action(t, apitest.Must(t)(c.Get(t.Context(), "/days/"+fixedToday)), "capture")
+	rows := func() string {
+		return scalar(t, s, "SELECT (SELECT count(*) FROM entities) || ' ' || (SELECT count(*) FROM measurements) || ' ' || (SELECT count(*) FROM capture_keys)")
+	}
+	before := rows()
+	for _, bad := range []string{"24:00", "12:60", "7:5", "7:05", "21:40:00", " 21:40", "21h40", "9pm", "2140"} {
+		_, err := c.Do(t.Context(), capture, map[string]string{"text": "not written", "mood": "3", "time": bad, "import_key": "k-" + bad})
+		if apitest.Status(err) != 422 {
+			t.Errorf("time %q: %v, want 422", bad, err)
+		}
+	}
+	if _, err := c.Do(t.Context(), capture, map[string]string{"mood": "3", "time": "21:40"}); apitest.Status(err) != 422 {
+		t.Errorf("a time with a mood alone: %v, want 422", err)
+	}
+	if after := rows(); after != before {
+		t.Errorf("entities, readings and keys after the refusals: %s, want %s", after, before)
+	}
+}
+
+// TestACaptureWithATimeSentAgainIsAddedOnce: an outbox sends a late capture with its key and its time, and it may send
+// it twice. The first one stands with its time (D28); the second changes nothing.
+func TestACaptureWithATimeSentAgainIsAddedOnce(t *testing.T) {
+	c, _, _ := apitest.FreshOn(t, "ui", fixedToday)
+	toDay := "/days/" + dayOf(-1) // written yesterday, sent today
+	capture := apitest.Action(t, apitest.Must(t)(c.Get(t.Context(), toDay)), "capture")
+	late := map[string]string{"text": "Written while the server slept", "time": "23:10", "import_key": "outbox-1"}
+	if first := apitest.Must(t)(c.Do(t.Context(), capture, late)); first.Title == "Already added" {
+		t.Errorf("the first send says Already added")
+	}
+	again := apitest.Must(t)(c.Do(t.Context(), capture, late))
+	if again.Title != "Already added" || apitest.Href(again, "day") != toDay {
+		t.Errorf("sent again: %q links the day %q, want Already added with %s", again.Title, apitest.Href(again, "day"), toDay)
+	}
+	day := apitest.Must(t)(c.Get(t.Context(), toDay))
+	if page := apitest.Must(t)(c.Get(t.Context(), apitest.Href(day, "page"))); props(page)["body"] != "(23:10) Written while the server slept" {
+		t.Errorf("the page after a send again: %q", props(page)["body"])
+	}
+}
+
 // TestTheStreamPagesByDay: /days is the days with something, the newest first (docs/plans/130-the-explore-pass.md),
 // paged by limit and offset as every list: next is the older days, prev the newer days or the top. A day after today
 // is not in it.

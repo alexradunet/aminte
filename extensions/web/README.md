@@ -167,7 +167,8 @@ things:
   to the core, so a browser can resume a download. The body is never held whole.
 
 Every answer of a session but a file under `/assets/` has `Cache-Control: no-store`. A picture that the core keeps for a
-year would show from the cache in a locked browser.
+year would show from the cache in a locked browser. The install files and `/offline` are no answers of a session: web
+serves them before it reads the cookie, and they hold nothing of the database ([offline](#offline)).
 
 Three decisions come from the data of the API and from no rule that web copies:
 
@@ -230,7 +231,8 @@ flowchart TD
   because the text is in the body, which web does not read.
 - **The guard.** A write from an origin that is not trusted is refused before anything else (403 `cross_origin`): the
   browser's own `Sec-Fetch-Site` and `Origin` headers, with `AMINTE_WEB_ORIGINS` for the origin of the proxy.
-- **No retry.** Web sends a write once. A write that was sent may be done.
+- **No retry.** Web sends a write once. A write that was sent may be done. The one sender that sends again is the
+  service worker of the browser, and only a capture with its key ([offline](#offline)).
 
 ## The login and the lock
 
@@ -511,11 +513,72 @@ object of the generic view is facts. A write's result is in sentences by the res
 
 `GET /manifest.webmanifest` and the icons (`/assets/icon.svg`, and `/assets/icon-192.png` and `/assets/icon-512.png` for
 Android) make the app installable. The manifest has two shortcuts (Today, and Add to today) and a share target that posts
-shared text into Capture (`POST /days/today/capture`). There is no service worker, since the server is the owner's own.
+shared text into Capture (`POST /days/today/capture`). The service worker `/sw.js` is for [the offline mode](#offline).
 
 These files hold nothing of the database. A browser fetches them without its cookie, so web serves them with no session
 (`GET` and `HEAD`), together with the pictures `wood.png`, `ground.png`, `embers.png`, `sprites.png` and `icons.png`. The
 fonts stay behind the session.
+
+## Offline
+
+The journal takes an entry while the server does not answer
+([plan 165](../../docs/plans/165-the-journal-while-the-server-is-asleep.md)). The server is the owner's own machine, and it
+can be asleep. One service worker, `/sw.js`, holds the whole of this mode, so no page gets a script that a form needs.
+The worker keeps a capture that got no answer in an outbox in the browser, and sends it again when the server answers.
+This is the queue of new rows that [D3](../../docs/decisions/D03-integer-ids.md) allows. It is not a copy of `life.db`.
+
+```mermaid
+flowchart TD
+  P["a capture form: Home, /offline, the share target"] --> W["sw.js: give the entry a key if it has none, send it, wait 8 s at most"]
+  W -->|"303: written, or Already added"| OK["the page follows the 303"]
+  W -->|"another answer of the server"| ERR["the page of the server: the refusal and the words"]
+  W -->|"no answer, 401, 502, 503, 504"| Q["the outbox: the entry, its key, the day and the time of the device"]
+  Q --> OFF["/offline: the form and the entries that wait"]
+  N["a navigation"] --> F{"does an entry wait?"}
+  F -->|"yes"| S["send each entry, the oldest first, with its key and its time"]
+  S -->|"303"| DEL["remove the entry"]
+  S -->|"no answer"| OFF
+  S -->|"401, or a fault of the server"| G
+  S -->|"another 4xx"| REF["mark it refused, show /offline one time, with Remove"]
+  F -->|"no"| G["get the page from the server"]
+  DEL --> G
+  G -->|"an error of the network"| OFF
+```
+
+- **Write only**, by the owner's word (2026-11-12). The worker keeps one page, `/offline`, and the entries that wait. It
+  keeps no page of the life log and no answer of a session, so the `no-store` rule and the lock hold as before. A body
+  cannot be edited offline: `save-body` needs the version that the server has now.
+- **One key for one entry.** The first try and each later try carry the same `import_key`, so the server writes the entry
+  one time ([D28](../../docs/decisions/D28-capture-keys.md)), also when the first try was done after the wait ended. That
+  first try has no `time`, so an entry that the server wrote late from it has the time of the server at that moment. The
+  worker makes the key when the form has none: `/offline` has none, because one kept page would send one key for every
+  entry, and the share target has none.
+- **The day and the time of the writing.** An entry that is kept goes to the day of the device (the word `today` becomes
+  a date at that moment), with the field `time` of `capture` ([API.md](../../API.md#day)): the journal shows the time the
+  entry was written, not the time it arrived. The capture form of the day hides that field and sends it empty.
+- **What the worker reads** is the status of the capture. A 303 is a write that the server did, and a session POST to
+  this route gets no other redirect. A 401 is a browser with no session or a locked one: the entry waits until the login
+  or the PIN. A refusal that will not pass (a 4xx that is not 401) shows as the page of the server when the owner sent the
+  form, and as a refused entry on `/offline`, with its words and a Remove button, when the outbox sent it.
+  `TestWhatTheWorkerReadsFromACapture` holds these answers.
+- **The wait.** A capture waits 8 seconds for the server. A navigation waits 8 seconds only at the addresses that the
+  installed app opens, the `start_url` and the shortcuts of the manifest (`TestTheScriptsNameWhatTheyDo` holds the two
+  lists equal). Any other page has no limit in the worker, because the integrity check and a snapshot can take long: it
+  shows `/offline` only when the network gives an error.
+- **When the outbox is sent.** At the next navigation that the server answers: the next open of the app, or "Try again"
+  on `/offline`. Nothing is sent in the background (Background Sync is in one engine only).
+- **`/sw.js` and `/offline` need no session**, and a browser asks for them again each time (`Cache-Control: no-cache`).
+  A browser checks the worker for a new version by itself, and a locked browser must get the correction too. `/offline`
+  is the same page for every browser: it has no script, and nothing of the database. The worker gets it again after each
+  Home that the server answers.
+- **The outbox is in this browser only** (IndexedDB), until the entries are sent. A browser can clear the storage of a
+  site, so `menu.js` asks it not to (`navigator.storage.persist()`; Firefox asks the owner one time). `/offline` shows
+  the words of the entries that wait without the PIN: the server cannot lock a page that it does not serve.
+- **The lock does not count the worker.** A capture that the worker sends is a fetch and not a navigation, so it is no
+  activity of the owner. The page that follows it is.
+- **No Go test runs the worker**: it runs in a browser only, and a browser driver would be a new dependency. The Go
+  tests hold the page that it keeps and each answer that it reads (`web/offline_test.go`, the end-to-end test). The
+  worker is checked by hand in a browser; plan 165 has the steps and the record of the run.
 
 ## The sheets, the faces and the pictures
 
@@ -585,21 +648,25 @@ template for every view but the day. The actions that no template places by name
 ## The scripts
 
 A page of the shell carries its two sheets and at most two scripts, each a `script` element with `defer`. The rule of
-this application: `menu.js` is on every page of the shell, and `lock.js` is on a page only when the lock is on.
+this application: `menu.js` is on every page of the shell, and `lock.js` is on a page only when the lock is on. The
+service worker is no script of a page: `menu.js` registers it.
 
 - `/assets/menu.js` on every page of the shell. When a dialog of the ⋯ menu closes, it gives the focus back to the ⋯ button
   (the button that opened the dialog is in a popover that is hidden again), or, for a form that the link of the page
-  asked for, to its head button.
+  asked for, to its head button. It registers `/sw.js` and asks the browser to keep the storage of the site.
 - `/assets/lock.js` only when the lock is on. It keeps the time of the last input of the owner in `localStorage`, shared by
   every tab. A load of the page counts as input. It sends `POST /awake` at most once in 30 seconds while the owner types,
   clicks or scrolls. When the idle time is over, it sends `POST /lock` and replaces the page with the lock page, in
   every tab. The Lock button does the same at once, and the other tabs follow at their next check. A page without the
   script stays on the screen until its next request.
+- `/sw.js`, the service worker of [the offline mode](#offline). It is one file under 200 lines, and it loads no other
+  script. HTML cannot keep a form that the server did not answer, so this one thing needs a script.
 
-Each script is small (under 80 lines), has no framework and needs no build step. **Every form works without them**: a
-form posts and the answer redirects, a menu and a dialog open with HTML alone. A script is a convenience. The rule that the
-owner gave on 2026-10-14 is that the browser does what HTML can do, even at the cost of a small convenience
-([plan 108](../../docs/plans/108-the-browser-made-current.md)).
+Each script of a page is small (under 80 lines), has no framework and needs no build step. **Every form works without
+them**: a form posts and the answer redirects, a menu and a dialog open with HTML alone. A script is a convenience. The
+rule that the owner gave on 2026-10-14 is that the browser does what HTML can do, even at the cost of a small convenience
+([plan 108](../../docs/plans/108-the-browser-made-current.md)). With no worker (an old browser, a private window) every
+form works as before, and a capture that gets no answer is the error of the browser.
 `TestTheScriptsAreSmallAndAlone` holds the count and the size.
 
 What the old scripts did ([plan 091](../../docs/plans/091-the-browser-for-daily-use.md),
@@ -629,6 +696,9 @@ browser. It is rejected, for three reasons that hold for a page with no build st
 - A single-page app is a second implementation of every view. The tests of every view would be written again, and the
   second implementation would be kept equal to the first, or would replace it.
 
+**Rejected: pages of the life log kept in the browser.** The offline mode writes only (the owner's word, 2026-11-12). A
+kept page would show without the PIN, it could be old, and it would be a second copy of private pages outside the file.
+
 **Dropped, by the owner's word:**
 
 - the names after `[[`;
@@ -644,7 +714,7 @@ browser. It is rejected, for three reasons that hold for a page with no build st
 | path | what |
 |---|---|
 | `cmd/aminte-web` | The program: the environment, the loopback door, the catalog, the drain on an interrupt. |
-| `web` | The handler: `web.New(web.Options{...})`. `web.go` the options and the routes; `door.go` the checks of every request, the login and the logout; `sessions.go` the sessions and their cookie; `lock.go` the lock; `page.go` the read; `write.go` the write; `feedback.go` the toast; `shell.go` the shell; `assets.go` the files and `/render`; `settings.go` the file of the settings and the PIN; `catalog.go` the catalog of this program. |
+| `web` | The handler: `web.New(web.Options{...})`. `web.go` the options and the routes; `door.go` the checks of every request, the login and the logout; `sessions.go` the sessions and their cookie; `lock.go` the lock; `page.go` the read; `write.go` the write; `feedback.go` the toast; `shell.go` the shell; `assets.go` the files, `/offline` and `/render`; `settings.go` the file of the settings and the PIN; `catalog.go` the catalog of this program. |
 | `view` | The templates, the sheets, the scripts, the fonts and the pictures of the pages. The view imports `aminte/siren`, `aminte/text` and `pixelart`, and no store (`TestTheViewImportsNoStore`). A form of a file puts `back` in the query of its address (`formView.ActionHref`), and the settings page draws the form "This browser". The OFL texts of the three fonts and `fonts/README.md` travel with `view/html/fonts`. |
 | `pixelart` | The drawings of the five pictures. A test compares each picture of `view/html` with its drawing, pixel by pixel. |
 | `tools/pixelart` | Writes the five pictures to `view/html/` after a change to a drawing. Run it with `go run ./tools/pixelart` in this folder; a stale file fails the comparison of `pixelart`. |
@@ -675,6 +745,8 @@ The tests are in files by subject, next to the code that they hold:
 - The sheets, the scripts and the pictures: the contrast pairs, the layers, the names of the app out of `base.css` and the
   count of the scripts (`TestTheScriptsAreSmallAndAlone`) are held in `view` and `web`. Each picture of `view/html` is
   compared with its drawing.
+- The offline mode is in `web/offline_test.go`: the page that the service worker keeps, and each answer that the worker
+  reads from a capture. No Go test runs the worker itself ([offline](#offline)).
 - A panic in a handler is held by a test of the recover wrapper: the 500 page, the one log line, and the pass of
   `http.ErrAbortHandler`.
 

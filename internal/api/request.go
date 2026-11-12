@@ -12,6 +12,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"aminte/internal/core"
 	"aminte/siren"
@@ -226,6 +227,19 @@ func number(v url.Values, name string) (*float64, error) {
 		return nil, core.Invalid("%s %q is not a number", name, s)
 	}
 	return &f, nil
+}
+
+// clock is a field's value as a time of the day, HH:MM in 24 hours, "" when the field is empty. The value must be the
+// text that Go prints for it, because time.Parse alone also reads 7:05.
+func clock(v url.Values, name string) (string, error) {
+	s := v.Get(name)
+	if s == "" {
+		return "", nil
+	}
+	if t, err := time.Parse("15:04", s); err != nil || t.Format("15:04") != s {
+		return "", core.Invalid("%s %q is not a time HH:MM", name, s)
+	}
+	return s, nil
 }
 
 // parseDecimal reads s as a float64. It refuses what is not a decimal number, and a value that does not fit.

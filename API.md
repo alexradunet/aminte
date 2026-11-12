@@ -69,7 +69,8 @@ that follows `actions` needs no rules of its own. A `required` field that is mis
 `invalid`, the message `missing field <name>`), and nothing is written. `search` is the one exception: with no `q`,
 or a `q` of blanks only, it answers with no hits ([search](#search)). A field of the type `date` takes a local day,
 `YYYY-MM-DD`, or the word `today`: the server's local day, the day that `GET /days/today` redirects to. Any other
-value that is not empty is refused (422 `invalid`). A field of the type `password` is a text that the catalog never
+value that is not empty is refused (422 `invalid`). A field of the type `time` takes a time of the day, `HH:MM` in 24
+hours (`07:05`, `21:40`); any other value that is not empty is refused (422 `invalid`). A field of the type `password` is a text that the catalog never
 fills in: `GET /actions` leaves its value empty. A client draws it as a password input.
 
 One read answers `303` to a thing picked at random ([plan 130](docs/plans/130-the-explore-pass.md)): `random-page`
@@ -390,6 +391,9 @@ of it (its body and `version` filled in). The write `capture`
 answers with this entity and a `result` of the sync shape; its field `mood` has the `options` 1 to 5. The entry it
 appends begins with brackets: `(HH:MM) ` in the server's local
 time, or `(HH:MM, via NAME) ` when an `agent:*` or `import:*` writer sent it; a mood alone appends no text. Its field
+`time` is the time the entry was written, on the clock of the writer and on the day of the path: a sender that sends a
+capture late (an outbox that was offline) gives it, and it takes the place of the server's time in the brackets. A
+`time` with no text is refused (422 `invalid`), and the server accepts a time later than now. Its field
 `import_key` makes a send again a no-op ([D28](docs/decisions/D28-capture-keys.md)): the sender makes one key for one capture and sends it
 unchanged on a retry, and the answer is then the class [result](#result), not this entity.
 

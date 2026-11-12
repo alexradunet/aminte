@@ -45,7 +45,7 @@ func absoluteForm(r *http.Request) bool {
 //     (recovered).
 //  1. An absolute-form target is refused.
 //  2. The guard refuses a write from an origin that it does not trust, before anything else is done for the request.
-//  3. The login, the logout and the install files need no session.
+//  3. The login, the logout, the install files and the offline page need no session.
 //  4. Any other request needs a valid session cookie: a browser gets /login, any other client gets 401.
 //  5. A session goes on to serveSession, which holds the lock.
 func (b *Browser) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -65,7 +65,7 @@ func (b *Browser) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		b.login(w, r)
 	case r.URL.Path == "/logout" && r.Method == http.MethodPost:
 		b.logout(w, r)
-	case isInstallFile(b.routeOf(r)) && (r.Method == http.MethodGet || r.Method == http.MethodHead):
+	case needsNoSession(b.routeOf(r)) && (r.Method == http.MethodGet || r.Method == http.MethodHead):
 		b.mux.ServeHTTP(w, r)
 	default:
 		id, ok := b.sessions.idOf(r)

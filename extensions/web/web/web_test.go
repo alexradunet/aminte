@@ -384,8 +384,9 @@ func signedBrowser(t *testing.T, coreURL string) http.Handler {
 }
 
 // TestTheScriptsAreSmallAndAlone: the rule of the scripts (README.md). A page of the shell carries the one script
-// menu.js, and lock.js only when the lock is on. Each script is under 80 lines. The forms of the pages work without
-// them, so the page has no script that a form needs.
+// menu.js, and lock.js only when the lock is on. Each script of a page is under 80 lines. The forms of the pages work
+// without them, so the page has no script that a form needs. The service worker is no script of a page: menu.js
+// registers it. It is one file under 200 lines that loads no other script.
 func TestTheScriptsAreSmallAndAlone(t *testing.T) {
 	l := richLife(t)
 	const menu = menuScriptTag
@@ -407,10 +408,13 @@ func TestTheScriptsAreSmallAndAlone(t *testing.T) {
 			t.Errorf("GET %s with the lock on has %d script elements, want %s and %s", uri, strings.Count(page, "<script"), menu, lock)
 		}
 	}
-	for _, name := range []string{"menu.js", "lock.js"} {
-		if lines := strings.Count(string(view.MustFile(name)), "\n"); lines >= 80 {
-			t.Errorf("%s has %d lines, want under 80", name, lines)
+	for name, limit := range map[string]int{"menu.js": 80, "lock.js": 80, "sw.js": 200} {
+		if lines := strings.Count(string(view.MustFile(name)), "\n"); lines >= limit {
+			t.Errorf("%s has %d lines, want under %d", name, lines, limit)
 		}
+	}
+	if worker := string(view.MustFile("sw.js")); strings.Contains(worker, "importScripts") || strings.Contains(worker, "import ") {
+		t.Errorf("sw.js loads another script")
 	}
 }
 

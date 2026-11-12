@@ -4,10 +4,11 @@ A plan is a dated record ([how a change happens](../process.md)): a change large
 written as a self-contained brief with done criteria. It cites the docs as they were at the commit it names. One file
 per plan, `NNN-short-slug.md`, numbered on from the last.
 
-Earlier closed plans live in git history (`git log -- docs/plans`). The next plan number is **165**.
+Earlier closed plans live in git history (`git log -- docs/plans`). The next plan number is **166**.
 
 | Plan | Title | Priority | Effort | Depends on | Status |
 |------|-------|----------|--------|------------|--------|
+| [165](165-the-journal-while-the-server-is-asleep.md) | The journal takes an entry while the server is asleep | P2 | M | owner word 2026-11-12; issue 0094; `6153686` | BUILT (the worker ran in a headless Firefox; not on a phone; not shipped) |
 | [164](164-no-task-service.md) | No task service: TickTick and Tasks go | P2 | M | owner word 2026-11-09; `066ce18` | DONE |
 | [163](163-one-way-for-an-agent.md) | One way for an agent: the CLI and the MCP server | P2 | L | owner word 2026-11-09; RFC 0026; `7bc13da` | IN PROGRESS |
 | [162](162-the-simple-architecture.md) | The simple architecture: one home for each thing, and the agent on its own | P2 | XL | owner word 2026-10-31; plan 161; `cf5d373` | DONE |

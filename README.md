@@ -98,6 +98,13 @@ what was decided and why. The behaviour is in the page that the link names, and 
   day pages. A day carries its mood and the `save-body` of its day page, so a client edits in place; a date field reads
   the word `today` as the server's local day. The pages are in API.md: the [root](API.md#root), the [day](API.md#day),
   the [month](API.md#month) and the [year](API.md#year).
+- **A capture that is sent late** ([plan 165](docs/plans/165-the-journal-while-the-server-is-asleep.md)). The server is
+  the owner's own machine, and it can be asleep. `aminte-web` then keeps a journal entry in the browser and sends it
+  when the server answers again ([offline](extensions/web/README.md#offline)). The core gives it two things: the
+  `import_key` of `capture`, so an entry that is sent twice is written one time
+  ([D28](docs/decisions/D28-capture-keys.md)), and the field `time` of `capture`, so the entry shows the time it was
+  written ([API.md](API.md#day)). No copy of `life.db` leaves the machine
+  ([non-goals](docs/architecture/non-goals.md)).
 - **Period pages** ([D30](docs/decisions/D30-period-pages.md)). A week (`2026-W43`), a month, a quarter and a year may
   have a page: a plain page whose title is the key. A period with no page offers `create-page` with its key as the
   title, the one action that makes it ([API.md](API.md#week)).

@@ -379,10 +379,17 @@ func (h *server) capture(r *http.Request, a admitted) (*siren.Entity, error) {
 	if err != nil {
 		return nil, err
 	}
+	written, err := clock(a.v, "time")
+	if err != nil {
+		return nil, err
+	}
 	day := h.dayNamed(r.PathValue("day")) // the share target of the manifest cannot know the day: it sends the word
 	entry := words(a.v.Get("text"))
+	if entry == "" && written != "" { // refused, not ignored: a mood alone has no stamp to carry the time
+		return nil, core.Invalid("time is the time of an entry: send text with it")
+	}
 	if entry != "" { // the entry begins with its stamp; a mood alone writes no text
-		entry = h.stamp(relayOf(a.src)) + " " + entry
+		entry = h.stamp(written, relayOf(a.src)) + " " + entry
 	}
 	_, sync, already, err := h.s.CaptureWithKey(r.Context(), a.src, a.v.Get("import_key"), day, entry, mood)
 	if err != nil {
@@ -400,13 +407,17 @@ func (h *server) capture(r *http.Request, a admitted) (*siren.Entity, error) {
 	return withResult(h.dayEntity(r.Context(), day))(sync)
 }
 
-// stamp is the brackets that begin a captured entry: the time in the server's zone, HH:MM, and the name of the relay
-// when there is one: `(HH:MM)` or `(HH:MM, via NAME)`. capture takes the name from its source (relayOf).
-func (h *server) stamp(relay string) string {
+// stamp is the brackets that begin a captured entry: its time, HH:MM, and the name of the relay when there is one:
+// `(HH:MM)` or `(HH:MM, via NAME)`. written is the time that the writer sent (the field time of capture, for an entry
+// that is sent late); "" is the time now in the server's zone. capture takes the name from its source (relayOf).
+func (h *server) stamp(written, relay string) string {
+	if written == "" {
+		written = h.s.Local().Format("15:04")
+	}
 	if relay != "" {
 		relay = ", via " + relay
 	}
-	return "(" + h.s.Local().Format("15:04") + relay + ")"
+	return "(" + written + relay + ")"
 }
 
 // relayOf is the writer that relayed an entry when an agent or an import wrote it (its prefix cut), else "".

@@ -618,6 +618,37 @@ func TestWebOnTheRealAminte(t *testing.T) {
 		}
 	})
 
+	// The service worker runs in a browser only. This part holds what it gets from the real programs: its two files
+	// with no session, and the answers to an entry that it kept and sends late, two times.
+	t.Run("an entry that the outbox sends late is stored one time, on its day, with the time it was written", func(t *testing.T) {
+		stranger := newBrowser(t, s.door)
+		worker := stranger.get("/sw.js")
+		if worker.Status != http.StatusOK || !strings.Contains(worker.Header.Get("Content-Type"), "javascript") || worker.Header.Get("Cache-Control") != "no-cache" {
+			t.Errorf("GET /sw.js with no session: %d %s, Cache-Control %q", worker.Status, worker.Header.Get("Content-Type"), worker.Header.Get("Cache-Control"))
+		}
+		kept := stranger.get("/offline")
+		if kept.Status != http.StatusOK || !strings.Contains(kept.Body, `action="/days/today/capture"`) || strings.Contains(kept.Body, captureWords) {
+			t.Errorf("GET /offline with no session: %d, want the page with its capture form and nothing of the life log", kept.Status)
+		}
+		day, err := time.Parse(time.DateOnly, today)
+		if err != nil {
+			t.Fatal(err)
+		}
+		yesterday := day.AddDate(0, 0, -1).Format(time.DateOnly)
+		const lateWords = "Written while the server slept. Words of the end-to-end test."
+		entry := url.Values{"text": {lateWords}, "time": {"21:40"}, "import_key": {"e2e-outbox-1"}}
+		for n := range 2 {
+			sent := person.post("/days/"+yesterday+"/capture", entry, "/", "Accept", "*/*", "Sec-Fetch-Mode", "cors")
+			if sent.Status != http.StatusSeeOther {
+				t.Fatalf("send %d of the late entry: %d\n%.300s", n+1, sent.Status, sent.Body)
+			}
+		}
+		got := s.dayWords(yesterday)
+		if strings.Count(got, lateWords) != 1 || !strings.Contains(got, "(21:40) "+lateWords) {
+			t.Errorf("the core holds %q for %s, want the entry one time with its time", got, yesterday)
+		}
+	})
+
 	t.Run("a file goes to the core through the form add-file", func(t *testing.T) {
 		fresh := person.get("/browse?kind=media&new=add-file")
 		form := formOf(t, fresh.Body, named("add-file"))

@@ -1,0 +1,15 @@
+{{/* The offline page (README.md, "Offline"). The service worker keeps one copy of it and shows it when the server
+     does not answer. It has no shell and no script, and it is the same for every browser: it holds nothing of the
+     life log. The empty div is the mark that the worker replaces with the list of the entries that wait (sw.js names
+     the same text). The form has no import_key: the kept page would send one key for every entry, so the worker
+     makes the key. With no worker the form is an ordinary capture form. */}}
+{{define "offline"}}{{template "head" .}}
+<header class="page-head"><div class="what"><span class="kind">Aminte</span><h1>Offline</h1></div></header>
+<p><small class="desc">This page works when the server does not answer. Write an entry here: this browser keeps it and sends it to the journal when the server answers again. Until then the entry is in this browser only.</small></p>
+<div id="outbox"></div>
+<form method="POST" action="/days/today/capture">
+<label><span>Entry</span>
+<textarea name="text" rows="4" required placeholder="What happened? Who was there?" autofocus></textarea></label>
+<button class="primary">Add</button></form>
+<p><a href="/">Try again</a></p>
+{{template "foot" .}}{{end}}
